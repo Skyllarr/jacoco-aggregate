@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OidcClientConfigurationBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-oidc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.oidc</a> &gt; <span class="el_source">OidcClientConfigurationBuilder.java</span></div><h1>OidcClientConfigurationBuilder.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2020 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.http.oidc;
+
+import static org.wildfly.security.http.oidc.ElytronMessages.log;
+import static org.wildfly.security.http.oidc.Oidc.SSLRequired;
+import static org.wildfly.security.http.oidc.Oidc.TokenStore;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.security.PublicKey;
+import java.util.concurrent.Callable;
+
+import org.apache.http.client.HttpClient;
+import org.wildfly.common.iteration.CodePointIterator;
+import org.wildfly.security.jose.util.SystemPropertiesJsonParserFactory;
+import org.wildfly.security.pem.Pem;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+/**
+ * Builder for the OpenID Connect (OIDC) configuration for a client application. This class is based on
+ * {@code org.keycloak.adapters.KeycloakDeploymentBuilder}.
+ *
+ * @author &lt;a href=&quot;mailto:bill@burkecentral.com&quot;&gt;Bill Burke&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:brad.culley@spartasystems.com&quot;&gt;Brad Culley&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:john.ament@spartasystems.com&quot;&gt;John D. Ament&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+public class OidcClientConfigurationBuilder {
+
+<span class="nc" id="L49">    protected OidcClientConfiguration oidcClientConfiguration = new OidcClientConfiguration();</span>
+
+<span class="nc" id="L51">    protected OidcClientConfigurationBuilder() {</span>
+<span class="nc" id="L52">    }</span>
+
+
+    protected OidcClientConfiguration internalBuild(final OidcJsonConfiguration oidcJsonConfiguration) {
+<span class="nc bnc" id="L56" title="All 4 branches missed.">        if (oidcJsonConfiguration.getAuthServerUrl() != null &amp;&amp; oidcJsonConfiguration.getRealm() == null) {</span>
+<span class="nc" id="L57">            throw log.keycloakRealmMissing();</span>
+        }
+<span class="nc bnc" id="L59" title="All 2 branches missed.">        if (oidcJsonConfiguration.getRealm() != null) {</span>
+<span class="nc" id="L60">            oidcClientConfiguration.setRealm(oidcJsonConfiguration.getRealm());</span>
+        }
+<span class="nc" id="L62">        String resource = oidcJsonConfiguration.getResource();</span>
+<span class="nc" id="L63">        String clientId = oidcJsonConfiguration.getClientId();</span>
+<span class="nc bnc" id="L64" title="All 4 branches missed.">        if (resource == null &amp;&amp; clientId == null) {</span>
+<span class="nc" id="L65">            throw log.resourceOrClientIdMustBeSet();</span>
+        }
+<span class="nc" id="L67">        oidcClientConfiguration.setResource(resource);</span>
+<span class="nc" id="L68">        oidcClientConfiguration.setClientId(clientId);</span>
+
+<span class="nc" id="L70">        String realmKeyPem = oidcJsonConfiguration.getRealmKey();</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        if (realmKeyPem != null) {</span>
+            PublicKey realmKey;
+            try {
+<span class="nc" id="L74">                realmKey = Pem.parsePemPublicKey(CodePointIterator.ofString(realmKeyPem));</span>
+<span class="nc" id="L75">                HardcodedPublicKeyLocator pkLocator = new HardcodedPublicKeyLocator(realmKey);</span>
+<span class="nc" id="L76">                oidcClientConfiguration.setPublicKeyLocator(pkLocator);</span>
+<span class="nc" id="L77">            } catch (Exception e) {</span>
+<span class="nc" id="L78">                throw new RuntimeException(e);</span>
+<span class="nc" id="L79">            }</span>
+        } else {
+<span class="nc" id="L81">            JWKPublicKeyLocator pkLocator = new JWKPublicKeyLocator();</span>
+<span class="nc" id="L82">            oidcClientConfiguration.setPublicKeyLocator(pkLocator);</span>
+        }
+
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        if (oidcJsonConfiguration.getSslRequired() != null) {</span>
+<span class="nc" id="L86">            oidcClientConfiguration.setSSLRequired(SSLRequired.valueOf(oidcJsonConfiguration.getSslRequired().toUpperCase()));</span>
+        } else {
+<span class="nc" id="L88">            oidcClientConfiguration.setSSLRequired(SSLRequired.EXTERNAL);</span>
+        }
+
+<span class="nc bnc" id="L91" title="All 2 branches missed.">        if (oidcJsonConfiguration.getConfidentialPort() != -1) {</span>
+<span class="nc" id="L92">            oidcClientConfiguration.setConfidentialPort(oidcJsonConfiguration.getConfidentialPort());</span>
+        }
+
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        if (oidcJsonConfiguration.getTokenStore() != null) {</span>
+<span class="nc" id="L96">            oidcClientConfiguration.setTokenStore(TokenStore.valueOf(oidcJsonConfiguration.getTokenStore().toUpperCase()));</span>
+        } else {
+<span class="nc" id="L98">            oidcClientConfiguration.setTokenStore(TokenStore.SESSION);</span>
+        }
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        if (oidcJsonConfiguration.getTokenCookiePath() != null) {</span>
+<span class="nc" id="L101">            oidcClientConfiguration.setOidcStateCookiePath(oidcJsonConfiguration.getTokenCookiePath());</span>
+        }
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        if (oidcJsonConfiguration.getPrincipalAttribute() != null) oidcClientConfiguration.setPrincipalAttribute(oidcJsonConfiguration.getPrincipalAttribute());</span>
+
+<span class="nc" id="L105">        oidcClientConfiguration.setResourceCredentials(oidcJsonConfiguration.getCredentials());</span>
+<span class="nc" id="L106">        oidcClientConfiguration.setClientAuthenticator(ClientCredentialsProviderUtils.bootstrapClientAuthenticator(oidcClientConfiguration));</span>
+
+<span class="nc" id="L108">        oidcClientConfiguration.setPublicClient(oidcJsonConfiguration.isPublicClient());</span>
+<span class="nc" id="L109">        oidcClientConfiguration.setUseResourceRoleMappings(oidcJsonConfiguration.isUseResourceRoleMappings());</span>
+<span class="nc" id="L110">        oidcClientConfiguration.setUseRealmRoleMappings(oidcJsonConfiguration.isUseRealmRoleMappings());</span>
+
+<span class="nc" id="L112">        oidcClientConfiguration.setExposeToken(oidcJsonConfiguration.isExposeToken());</span>
+
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        if (oidcJsonConfiguration.isCors()) {</span>
+<span class="nc" id="L115">            oidcClientConfiguration.setCors(true);</span>
+<span class="nc" id="L116">            oidcClientConfiguration.setCorsMaxAge(oidcJsonConfiguration.getCorsMaxAge());</span>
+<span class="nc" id="L117">            oidcClientConfiguration.setCorsAllowedHeaders(oidcJsonConfiguration.getCorsAllowedHeaders());</span>
+<span class="nc" id="L118">            oidcClientConfiguration.setCorsAllowedMethods(oidcJsonConfiguration.getCorsAllowedMethods());</span>
+<span class="nc" id="L119">            oidcClientConfiguration.setCorsExposedHeaders(oidcJsonConfiguration.getCorsExposedHeaders());</span>
+        }
+
+        // https://tools.ietf.org/html/rfc7636
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        if (oidcJsonConfiguration.isPkce()) {</span>
+<span class="nc" id="L124">            oidcClientConfiguration.setPkce(true);</span>
+        }
+
+<span class="nc" id="L127">        oidcClientConfiguration.setBearerOnly(oidcJsonConfiguration.isBearerOnly());</span>
+<span class="nc" id="L128">        oidcClientConfiguration.setAutodetectBearerOnly(oidcJsonConfiguration.isAutodetectBearerOnly());</span>
+<span class="nc" id="L129">        oidcClientConfiguration.setEnableBasicAuth(oidcJsonConfiguration.isEnableBasicAuth());</span>
+<span class="nc" id="L130">        oidcClientConfiguration.setAlwaysRefreshToken(oidcJsonConfiguration.isAlwaysRefreshToken());</span>
+<span class="nc" id="L131">        oidcClientConfiguration.setRegisterNodeAtStartup(oidcJsonConfiguration.isRegisterNodeAtStartup());</span>
+<span class="nc" id="L132">        oidcClientConfiguration.setRegisterNodePeriod(oidcJsonConfiguration.getRegisterNodePeriod());</span>
+<span class="nc" id="L133">        oidcClientConfiguration.setTokenMinimumTimeToLive(oidcJsonConfiguration.getTokenMinimumTimeToLive());</span>
+<span class="nc" id="L134">        oidcClientConfiguration.setMinTimeBetweenJwksRequests(oidcJsonConfiguration.getMinTimeBetweenJwksRequests());</span>
+<span class="nc" id="L135">        oidcClientConfiguration.setPublicKeyCacheTtl(oidcJsonConfiguration.getPublicKeyCacheTtl());</span>
+<span class="nc" id="L136">        oidcClientConfiguration.setIgnoreOAuthQueryParameter(oidcJsonConfiguration.isIgnoreOAuthQueryParameter());</span>
+<span class="nc" id="L137">        oidcClientConfiguration.setRewriteRedirectRules(oidcJsonConfiguration.getRedirectRewriteRules());</span>
+<span class="nc" id="L138">        oidcClientConfiguration.setVerifyTokenAudience(oidcJsonConfiguration.isVerifyTokenAudience());</span>
+
+<span class="nc bnc" id="L140" title="All 4 branches missed.">        if (realmKeyPem == null &amp;&amp; oidcJsonConfiguration.isBearerOnly()</span>
+<span class="nc bnc" id="L141" title="All 4 branches missed.">                &amp;&amp; (oidcJsonConfiguration.getAuthServerUrl() == null &amp;&amp; oidcJsonConfiguration.getProviderUrl() == null)) {</span>
+<span class="nc" id="L142">            throw log.invalidConfigurationForBearerAuth();</span>
+        }
+<span class="nc bnc" id="L144" title="All 8 branches missed.">        if ((oidcJsonConfiguration.getAuthServerUrl() == null &amp;&amp; oidcJsonConfiguration.getProviderUrl() == null) &amp;&amp; (!oidcClientConfiguration.isBearerOnly() || realmKeyPem == null)) {</span>
+<span class="nc" id="L145">            throw log.authServerUrlOrProviderUrlMustBeSet();</span>
+        }
+<span class="nc" id="L147">        oidcClientConfiguration.setClient(createHttpClientProducer(oidcJsonConfiguration));</span>
+<span class="nc" id="L148">        oidcClientConfiguration.setAuthServerBaseUrl(oidcJsonConfiguration);</span>
+<span class="nc" id="L149">        oidcClientConfiguration.setProviderUrl(oidcJsonConfiguration.getProviderUrl());</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">        if (oidcJsonConfiguration.getTurnOffChangeSessionIdOnLogin() != null) {</span>
+<span class="nc" id="L151">            oidcClientConfiguration.setTurnOffChangeSessionIdOnLogin(oidcJsonConfiguration.getTurnOffChangeSessionIdOnLogin());</span>
+        }
+
+<span class="nc" id="L154">        oidcClientConfiguration.setTokenSignatureAlgorithm(oidcJsonConfiguration.getTokenSignatureAlgorithm());</span>
+
+<span class="nc" id="L156">        return oidcClientConfiguration;</span>
+    }
+
+    private Callable&lt;HttpClient&gt; createHttpClientProducer(final OidcJsonConfiguration oidcJsonConfiguration) {
+<span class="nc" id="L160">        return new Callable&lt;HttpClient&gt;() {</span>
+            private HttpClient client;
+            @Override
+            public HttpClient call() {
+<span class="nc bnc" id="L164" title="All 2 branches missed.">                if (client == null) {</span>
+<span class="nc" id="L165">                    synchronized (oidcClientConfiguration) {</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">                        if (client == null) {</span>
+<span class="nc" id="L167">                            client = new HttpClientBuilder().build(oidcJsonConfiguration);</span>
+                        }
+<span class="nc" id="L169">                    }</span>
+                }
+<span class="nc" id="L171">                return client;</span>
+            }
+        };
+    }
+
+    public static OidcClientConfiguration build(InputStream is) {
+<span class="nc" id="L177">        OidcJsonConfiguration oidcJsonConfiguration = loadOidcJsonConfiguration(is);</span>
+<span class="nc" id="L178">        return new OidcClientConfigurationBuilder().internalBuild(oidcJsonConfiguration);</span>
+    }
+
+    public static OidcJsonConfiguration loadOidcJsonConfiguration(InputStream is) {
+<span class="nc" id="L182">        ObjectMapper mapper = new ObjectMapper(new SystemPropertiesJsonParserFactory());</span>
+<span class="nc" id="L183">        mapper.setSerializationInclusion(JsonInclude.Include.NON_DEFAULT);</span>
+        OidcJsonConfiguration adapterConfig;
+        try {
+<span class="nc" id="L186">            adapterConfig = mapper.readValue(is, OidcJsonConfiguration.class);</span>
+<span class="nc" id="L187">        } catch (IOException e) {</span>
+<span class="nc" id="L188">            throw new RuntimeException(e);</span>
+<span class="nc" id="L189">        }</span>
+<span class="nc" id="L190">        return adapterConfig;</span>
+    }
+
+
+    public static OidcClientConfiguration build(OidcJsonConfiguration oidcJsonConfiguration) {
+<span class="nc" id="L195">        return new OidcClientConfigurationBuilder().internalBuild(oidcJsonConfiguration);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

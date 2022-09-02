@@ -1,0 +1,713 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SSLExplorer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-ssl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.ssl</a> &gt; <span class="el_source">SSLExplorer.java</span></div><h1>SSLExplorer.java</h1><pre class="source lang-java linenums">/*
+* Copyright (c) 2013, Oracle and/or its affiliates. All rights reserved.
+*
+* Redistribution and use in source and binary forms, with or without
+* modification, are permitted provided that the following conditions
+* are met:
+*
+*   - Redistributions of source code must retain the above copyright
+*     notice, this list of conditions and the following disclaimer.
+*
+*   - Redistributions in binary form must reproduce the above copyright
+*     notice, this list of conditions and the following disclaimer in the
+*     documentation and/or other materials provided with the distribution.
+*
+*   - Neither the name of Oracle or the names of its
+*     contributors may be used to endorse or promote products derived
+*     from this software without specific prior written permission.
+*
+* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS
+* IS&quot; AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+* THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+* PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+* CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+* EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+* PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+* PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+* LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+* NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
+package org.wildfly.security.ssl;
+
+import java.nio.ByteBuffer;
+import java.nio.BufferUnderflowException;
+import java.io.IOException;
+
+import javax.net.ssl.SNIHostName;
+import javax.net.ssl.SNIServerName;
+import javax.net.ssl.SSLException;
+import javax.net.ssl.StandardConstants;
+
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Instances of this class acts as an explorer of the network data of an
+ * SSL/TLS connection.
+ */
+final class SSLExplorer {
+
+    // Private constructor prevents construction outside this class.
+    private SSLExplorer() {
+    }
+
+    /**
+     * The header size of TLS/SSL records.
+     * &lt;P&gt;
+     * The value of this constant is {@value}.
+     */
+    public static final int RECORD_HEADER_SIZE = 0x05;
+
+    /**
+     * Returns the required number of bytes in the {@code source}
+     * {@link ByteBuffer} necessary to explore SSL/TLS connection.
+     * &lt;P&gt;
+     * This method tries to parse as few bytes as possible from
+     * {@code source} byte buffer to get the length of an
+     * SSL/TLS record.
+     * &lt;P&gt;
+     * This method accesses the {@code source} parameter in read-only
+     * mode, and does not update the buffer's properties such as capacity,
+     * limit, position, and mark values.
+     *
+     * @param  source
+     *         a {@link ByteBuffer} containing
+     *         inbound or outbound network data for an SSL/TLS connection.
+     * @throws BufferUnderflowException if less than {@code RECORD_HEADER_SIZE}
+     *         bytes remaining in {@code source}
+     * @return the required size in byte to explore an SSL/TLS connection
+     */
+    public static int getRequiredSize(ByteBuffer source) {
+
+<span class="nc" id="L88">        ByteBuffer input = source.duplicate();</span>
+
+        // Do we have a complete header?
+<span class="nc bnc" id="L91" title="All 2 branches missed.">        if (input.remaining() &lt; RECORD_HEADER_SIZE) {</span>
+<span class="nc" id="L92">            throw new BufferUnderflowException();</span>
+        }
+
+        // Is it a handshake message?
+<span class="nc" id="L96">        byte firstByte = input.get();</span>
+<span class="nc" id="L97">        byte secondByte = input.get();</span>
+<span class="nc" id="L98">        byte thirdByte = input.get();</span>
+<span class="nc bnc" id="L99" title="All 4 branches missed.">        if ((firstByte &amp; 0x80) != 0 &amp;&amp; thirdByte == 0x01) {</span>
+            // looks like a V2ClientHello
+            // return (((firstByte &amp; 0x7F) &lt;&lt; 8) | (secondByte &amp; 0xFF)) + 2;
+<span class="nc" id="L102">            return RECORD_HEADER_SIZE;   // Only need the header fields</span>
+        } else {
+<span class="nc" id="L104">            return ((input.get() &amp; 0xFF) &lt;&lt; 8 | input.get() &amp; 0xFF) + 5;</span>
+        }
+    }
+
+    /**
+     * Returns the required number of bytes in the {@code source} byte array
+     * necessary to explore SSL/TLS connection.
+     * &lt;P&gt;
+     * This method tries to parse as few bytes as possible from
+     * {@code source} byte array to get the length of an
+     * SSL/TLS record.
+     *
+     * @param  source
+     *         a byte array containing inbound or outbound network data for
+     *         an SSL/TLS connection.
+     * @param  offset
+     *         the start offset in array {@code source} at which the
+     *         network data is read from.
+     * @param  length
+     *         the maximum number of bytes to read.
+     *
+     * @throws BufferUnderflowException if less than {@code RECORD_HEADER_SIZE}
+     *         bytes remaining in {@code source}
+     * @return the required size in byte to explore an SSL/TLS connection
+     */
+    public static int getRequiredSize(byte[] source,
+            int offset, int length) throws IOException {
+
+<span class="nc" id="L132">        ByteBuffer byteBuffer =</span>
+<span class="nc" id="L133">            ByteBuffer.wrap(source, offset, length).asReadOnlyBuffer();</span>
+<span class="nc" id="L134">        return getRequiredSize(byteBuffer);</span>
+    }
+
+    /**
+     * Launch and explore the security capabilities from byte buffer.
+     * &lt;P&gt;
+     * This method tries to parse as few records as possible from
+     * {@code source} byte buffer to get the capabilities
+     * of an SSL/TLS connection.
+     * &lt;P&gt;
+     * Please NOTE that this method must be called before any handshaking
+     * occurs.  The behavior of this method is not defined in this release
+     * if the handshake has begun, or has completed.
+     * &lt;P&gt;
+     * This method accesses the {@code source} parameter in read-only
+     * mode, and does not update the buffer's properties such as capacity,
+     * limit, position, and mark values.
+     *
+     * @param  source
+     *         a {@link ByteBuffer} containing
+     *         inbound or outbound network data for an SSL/TLS connection.
+     *
+     * @throws IOException on network data error
+     * @throws BufferUnderflowException if not enough source bytes available
+     *         to make a complete exploration.
+     *
+     * @return the explored capabilities of the SSL/TLS
+     *         connection
+     */
+    public static SSLConnectionInformationImpl explore(ByteBuffer source)
+            throws SSLException {
+
+<span class="nc" id="L166">        ByteBuffer input = source.duplicate();</span>
+
+        // Do we have a complete header?
+<span class="nc bnc" id="L169" title="All 2 branches missed.">        if (input.remaining() &lt; RECORD_HEADER_SIZE) {</span>
+<span class="nc" id="L170">            throw new BufferUnderflowException();</span>
+        }
+
+        // Is it a handshake message?
+<span class="nc" id="L174">        byte firstByte = input.get();</span>
+<span class="nc" id="L175">        byte secondByte = input.get();</span>
+<span class="nc" id="L176">        byte thirdByte = input.get();</span>
+<span class="nc bnc" id="L177" title="All 4 branches missed.">        if ((firstByte &amp; 0x80) != 0 &amp;&amp; thirdByte == 0x01) {</span>
+            // looks like a V2ClientHello
+<span class="nc" id="L179">            return exploreV2HelloRecord(input, thirdByte);</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">        } else if (firstByte == 22) {   // 22: handshake record</span>
+<span class="nc" id="L181">            return exploreTLSRecord(input,</span>
+                                    firstByte, secondByte, thirdByte);
+        } else {
+<span class="nc" id="L184">            throw ElytronMessages.log.notHandshakeRecord();</span>
+        }
+    }
+
+    /**
+     * Launch and explore the security capabilities from byte array.
+     * &lt;P&gt;
+     * Please NOTE that this method must be called before any handshaking
+     * occurs.  The behavior of this method is not defined in this release
+     * if the handshake has begun, or has completed.  Once handshake has
+     * begun, or has completed, the security capabilities can not and
+     * should not be launched with this method.
+     *
+     * @param  source
+     *         a byte array containing inbound or outbound network data for
+     *         an SSL/TLS connection.
+     * @param  offset
+     *         the start offset in array {@code source} at which the
+     *         network data is read from.
+     * @param  length
+     *         the maximum number of bytes to read.
+     *
+     * @throws IOException on network data error
+     * @throws BufferUnderflowException if not enough source bytes available
+     *         to make a complete exploration.
+     * @return the explored capabilities of the SSL/TLS
+     *         connection
+     *
+     * @see #explore(ByteBuffer)
+     */
+    public static SSLConnectionInformationImpl explore(byte[] source,
+            int offset, int length) throws IOException {
+<span class="nc" id="L216">        ByteBuffer byteBuffer =</span>
+<span class="nc" id="L217">            ByteBuffer.wrap(source, offset, length).asReadOnlyBuffer();</span>
+<span class="nc" id="L218">        return explore(byteBuffer);</span>
+    }
+
+    /*
+     * uint8 V2CipherSpec[3];
+     * struct {
+     *     uint16 msg_length;         // The highest bit MUST be 1;
+     *                                // the remaining bits contain the length
+     *                                // of the following data in bytes.
+     *     uint8 msg_type;            // MUST be 1
+     *     Version version;
+     *     uint16 cipher_spec_length; // It cannot be zero and MUST be a
+     *                                // multiple of the V2CipherSpec length.
+     *     uint16 session_id_length;  // This field MUST be empty.
+     *     uint16 challenge_length;   // SHOULD use a 32-byte challenge
+     *     V2CipherSpec cipher_specs[V2ClientHello.cipher_spec_length];
+     *     opaque session_id[V2ClientHello.session_id_length];
+     *     opaque challenge[V2ClientHello.challenge_length;
+     * } V2ClientHello;
+     */
+    private static SSLConnectionInformationImpl exploreV2HelloRecord(
+            ByteBuffer input,
+            byte thirdByte) throws SSLException {
+
+        // We only need the header. We have already had enough source bytes.
+        // int recordLength = (firstByte &amp; 0x7F) &lt;&lt; 8) | (secondByte &amp; 0xFF);
+        try {
+            // Is it a V2ClientHello?
+<span class="nc bnc" id="L246" title="All 2 branches missed.">            if (thirdByte != 0x01) {</span>
+<span class="nc" id="L247">                throw ElytronMessages.log.unsupportedSslRecord();</span>
+            }
+
+            // What's the hello version?
+<span class="nc" id="L251">            byte helloVersionMajor = input.get();</span>
+<span class="nc" id="L252">            byte helloVersionMinor = input.get();</span>
+
+<span class="nc" id="L254">            int csLen = getInt16(input); // in units of 3 bytes</span>
+<span class="nc" id="L255">            input.getShort(); // session_id_length</span>
+<span class="nc" id="L256">            input.getShort(); // challenge_length</span>
+
+<span class="nc" id="L258">            List&lt;String&gt; ciphers = new ArrayList&lt;&gt;();</span>
+
+<span class="nc bnc" id="L260" title="All 2 branches missed.">            while (csLen &gt;= 3) {</span>
+<span class="nc" id="L261">                int lead = getInt8(input);</span>
+<span class="nc" id="L262">                int byte1 = getInt8(input);</span>
+<span class="nc" id="L263">                int byte2 = getInt8(input);</span>
+<span class="nc bnc" id="L264" title="All 2 branches missed.">                if (lead == 0) {</span>
+<span class="nc" id="L265">                    final MechanismDatabase.Entry entry = getCipherSuiteById(byte1, byte2);</span>
+<span class="nc bnc" id="L266" title="All 2 branches missed.">                    if (entry != null) ciphers.add(entry.getName());</span>
+                }
+                // skip any non-TLS cipher suites
+<span class="nc" id="L269">                csLen -= 3;</span>
+<span class="nc" id="L270">            }</span>
+
+            // 0x00: major version of SSLv20
+            // 0x02: minor version of SSLv20
+            //
+            // SNIServerName is an extension, SSLv20 doesn't support extension.
+<span class="nc" id="L276">            return new SSLConnectionInformationImpl((byte)0x00, (byte)0x02,</span>
+                        helloVersionMajor, helloVersionMinor,
+<span class="nc" id="L278">                        Collections.emptyList(), Collections.emptyList(),</span>
+<span class="nc bnc" id="L279" title="All 2 branches missed.">                        ciphers.isEmpty() ? Collections.emptyList() : ciphers);</span>
+<span class="nc" id="L280">        } catch (BufferUnderflowException ignored) {</span>
+<span class="nc" id="L281">            throw ElytronMessages.log.invalidHandshakeRecord();</span>
+        }
+    }
+
+    /*
+     * struct {
+     *     uint8 major;
+     *     uint8 minor;
+     * } ProtocolVersion;
+     *
+     * enum {
+     *     change_cipher_spec(20), alert(21), handshake(22),
+     *     application_data(23), (255)
+     * } ContentType;
+     *
+     * struct {
+     *     ContentType type;
+     *     ProtocolVersion version;
+     *     uint16 length;
+     *     opaque fragment[TLSPlaintext.length];
+     * } TLSPlaintext;
+     */
+    private static SSLConnectionInformationImpl exploreTLSRecord(
+            ByteBuffer input, byte firstByte, byte secondByte,
+            byte thirdByte) throws SSLException {
+
+        // Is it a handshake message?
+<span class="nc bnc" id="L308" title="All 2 branches missed.">        if (firstByte != 22) {        // 22: handshake record</span>
+<span class="nc" id="L309">            throw ElytronMessages.log.notHandshakeRecord();</span>
+        }
+
+        // Is there enough data for a full record?
+<span class="nc" id="L313">        int recordLength = getInt16(input);</span>
+<span class="nc bnc" id="L314" title="All 2 branches missed.">        if (recordLength &gt; input.remaining()) {</span>
+<span class="nc" id="L315">            throw new BufferUnderflowException();</span>
+        }
+
+        // We have already had enough source bytes.
+        try {
+<span class="nc" id="L320">            return exploreHandshake(input,</span>
+                secondByte, thirdByte, recordLength);
+<span class="nc" id="L322">        } catch (BufferUnderflowException ignored) {</span>
+<span class="nc" id="L323">            throw ElytronMessages.log.invalidHandshakeRecord();</span>
+        }
+    }
+
+    /*
+     * enum {
+     *     hello_request(0), client_hello(1), server_hello(2),
+     *     certificate(11), server_key_exchange (12),
+     *     certificate_request(13), server_hello_done(14),
+     *     certificate_verify(15), client_key_exchange(16),
+     *     finished(20)
+     *     (255)
+     * } HandshakeType;
+     *
+     * struct {
+     *     HandshakeType msg_type;
+     *     uint24 length;
+     *     select (HandshakeType) {
+     *         case hello_request:       HelloRequest;
+     *         case client_hello:        ClientHello;
+     *         case server_hello:        ServerHello;
+     *         case certificate:         Certificate;
+     *         case server_key_exchange: ServerKeyExchange;
+     *         case certificate_request: CertificateRequest;
+     *         case server_hello_done:   ServerHelloDone;
+     *         case certificate_verify:  CertificateVerify;
+     *         case client_key_exchange: ClientKeyExchange;
+     *         case finished:            Finished;
+     *     } body;
+     * } Handshake;
+     */
+    private static SSLConnectionInformationImpl exploreHandshake(
+            ByteBuffer input, byte recordMajorVersion,
+            byte recordMinorVersion, int recordLength) throws SSLException {
+
+        // What is the handshake type?
+<span class="nc" id="L359">        byte handshakeType = input.get();</span>
+<span class="nc bnc" id="L360" title="All 2 branches missed.">        if (handshakeType != 0x01) {   // 0x01: client_hello message</span>
+<span class="nc" id="L361">            throw ElytronMessages.log.expectedClientHello();</span>
+        }
+
+        // What is the handshake body length?
+<span class="nc" id="L365">        int handshakeLength = getInt24(input);</span>
+
+        // Theoretically, a single handshake message might span multiple
+        // records, but in practice this does not occur.
+<span class="nc bnc" id="L369" title="All 2 branches missed.">        if (handshakeLength &gt; recordLength - 4) { // 4: handshake header size</span>
+<span class="nc" id="L370">            throw ElytronMessages.log.multiRecordSSLHandshake();</span>
+        }
+
+<span class="nc" id="L373">        input = input.duplicate();</span>
+<span class="nc" id="L374">        input.limit(handshakeLength + input.position());</span>
+<span class="nc" id="L375">        return exploreClientHello(input,</span>
+                                    recordMajorVersion, recordMinorVersion);
+    }
+
+    /*
+     * struct {
+     *     uint32 gmt_unix_time;
+     *     opaque random_bytes[28];
+     * } Random;
+     *
+     * opaque SessionID&lt;0..32&gt;;
+     *
+     * uint8 CipherSuite[2];
+     *
+     * enum { null(0), (255) } CompressionMethod;
+     *
+     * struct {
+     *     ProtocolVersion client_version;
+     *     Random random;
+     *     SessionID session_id;
+     *     CipherSuite cipher_suites&lt;2..2^16-2&gt;;
+     *     CompressionMethod compression_methods&lt;1..2^8-1&gt;;
+     *     select (extensions_present) {
+     *         case false:
+     *             struct {};
+     *         case true:
+     *             Extension extensions&lt;0..2^16-1&gt;;
+     *     };
+     * } ClientHello;
+     */
+    private static SSLConnectionInformationImpl exploreClientHello(
+            ByteBuffer input,
+            byte recordMajorVersion,
+            byte recordMinorVersion) throws SSLException {
+
+<span class="nc" id="L410">        ExtensionInfo info = null;</span>
+
+        // client version
+<span class="nc" id="L413">        byte helloMajorVersion = input.get();</span>
+<span class="nc" id="L414">        byte helloMinorVersion = input.get();</span>
+
+        // ignore random
+<span class="nc" id="L417">        int position = input.position();</span>
+<span class="nc" id="L418">        input.position(position + 32);  // 32: the length of Random</span>
+
+        // ignore session id
+<span class="nc" id="L421">        ignoreByteVector8(input);</span>
+
+<span class="nc" id="L423">        ArrayList&lt;String&gt; ciphers = new ArrayList&lt;&gt;();</span>
+
+        // ignore cipher_suites
+<span class="nc" id="L426">        int csLen = getInt16(input);</span>
+<span class="nc bnc" id="L427" title="All 2 branches missed.">        while (csLen &gt; 0) {</span>
+<span class="nc" id="L428">            int byte1 = getInt8(input);</span>
+<span class="nc" id="L429">            int byte2 = getInt8(input);</span>
+<span class="nc" id="L430">            final MechanismDatabase.Entry entry = getCipherSuiteById(byte1, byte2);</span>
+<span class="nc bnc" id="L431" title="All 2 branches missed.">            if (entry != null) ciphers.add(entry.getName());</span>
+<span class="nc" id="L432">            csLen -= 2;</span>
+<span class="nc" id="L433">        }</span>
+
+        // ignore compression methods
+<span class="nc" id="L436">        ignoreByteVector8(input);</span>
+
+<span class="nc bnc" id="L438" title="All 2 branches missed.">        if (input.remaining() &gt; 0) {</span>
+<span class="nc" id="L439">            info = exploreExtensions(input);</span>
+        }
+
+<span class="nc bnc" id="L442" title="All 2 branches missed.">        final List&lt;SNIServerName&gt; snList = info != null ? info.sni : Collections.emptyList();</span>
+<span class="nc bnc" id="L443" title="All 2 branches missed.">        final List&lt;String&gt; alpnProtocols = info != null ? info.alpn : Collections.emptyList();</span>
+
+<span class="nc" id="L445">        return new SSLConnectionInformationImpl(</span>
+                recordMajorVersion, recordMinorVersion,
+                helloMajorVersion, helloMinorVersion, snList, alpnProtocols,
+<span class="nc bnc" id="L448" title="All 2 branches missed.">                ciphers.isEmpty() ? Collections.emptyList() : ciphers);</span>
+    }
+
+    /*
+     * struct {
+     *     ExtensionType extension_type;
+     *     opaque extension_data&lt;0..2^16-1&gt;;
+     * } Extension;
+     *
+     * enum {
+     *     server_name(0), max_fragment_length(1),
+     *     client_certificate_url(2), trusted_ca_keys(3),
+     *     truncated_hmac(4), status_request(5), (65535)
+     * } ExtensionType;
+     */
+    private static ExtensionInfo exploreExtensions(ByteBuffer input)
+            throws SSLException {
+
+<span class="nc" id="L466">        List&lt;SNIServerName&gt; sni = Collections.emptyList();</span>
+<span class="nc" id="L467">        List&lt;String&gt; alpn = Collections.emptyList();</span>
+
+<span class="nc" id="L469">        int length = getInt16(input);           // length of extensions</span>
+<span class="nc bnc" id="L470" title="All 2 branches missed.">        while (length &gt; 0) {</span>
+<span class="nc" id="L471">            int extType = getInt16(input);      // extension type</span>
+<span class="nc" id="L472">            int extLen = getInt16(input);       // length of extension data</span>
+
+<span class="nc bnc" id="L474" title="All 2 branches missed.">            if (extType == 0x00) {      // 0x00: type of server name indication</span>
+<span class="nc" id="L475">                sni = exploreSNIExt(input, extLen);</span>
+<span class="nc bnc" id="L476" title="All 2 branches missed.">            } else if (extType == 0x10) { // 0x10: type of alpn</span>
+<span class="nc" id="L477">                alpn = exploreALPN(input, extLen);</span>
+            } else {                    // ignore other extensions
+<span class="nc" id="L479">                ignoreByteVector(input, extLen);</span>
+            }
+
+<span class="nc" id="L482">            length -= extLen + 4;</span>
+<span class="nc" id="L483">        }</span>
+
+<span class="nc" id="L485">        return new ExtensionInfo(sni, alpn);</span>
+    }
+
+    /*
+     * opaque ProtocolName&lt;1..2^8-1&gt;;
+     *
+     * struct {
+     *     ProtocolName protocol_name_list&lt;2..2^16-1&gt;
+     * } ProtocolNameList;
+     *
+     */
+    private static List&lt;String&gt; exploreALPN(ByteBuffer input,
+            int extLen) throws SSLException {
+<span class="nc" id="L498">        final ArrayList&lt;String&gt; strings = new ArrayList&lt;&gt;();</span>
+
+<span class="nc" id="L500">        int rem = extLen;</span>
+<span class="nc bnc" id="L501" title="All 2 branches missed.">        if (extLen &gt;= 2) {</span>
+<span class="nc" id="L502">            int listLen = getInt16(input);</span>
+<span class="nc bnc" id="L503" title="All 4 branches missed.">            if (listLen == 0 || listLen + 2 != extLen) {</span>
+<span class="nc" id="L504">                throw ElytronMessages.log.invalidTlsExt();</span>
+            }
+
+<span class="nc" id="L507">            rem -= 2;</span>
+<span class="nc bnc" id="L508" title="All 2 branches missed.">            while (rem &gt; 0) {</span>
+<span class="nc" id="L509">                int len = getInt8(input);</span>
+<span class="nc bnc" id="L510" title="All 2 branches missed.">                if (len &gt; rem) {</span>
+<span class="nc" id="L511">                    throw ElytronMessages.log.notEnoughData();</span>
+                }
+<span class="nc" id="L513">                byte[] b = new byte[len];</span>
+<span class="nc" id="L514">                input.get(b);</span>
+<span class="nc" id="L515">                strings.add(new String(b, StandardCharsets.UTF_8));</span>
+
+<span class="nc" id="L517">                rem -= len + 1;</span>
+<span class="nc" id="L518">            }</span>
+        }
+<span class="nc bnc" id="L520" title="All 2 branches missed.">        return strings.isEmpty() ? Collections.emptyList() : strings;</span>
+    }
+
+    /*
+     * struct {
+     *     NameType name_type;
+     *     select (name_type) {
+     *         case host_name: HostName;
+     *     } name;
+     * } ServerName;
+     *
+     * enum {
+     *     host_name(0), (255)
+     * } NameType;
+     *
+     * opaque HostName&lt;1..2^16-1&gt;;
+     *
+     * struct {
+     *     ServerName server_name_list&lt;1..2^16-1&gt;
+     * } ServerNameList;
+     */
+    private static List&lt;SNIServerName&gt; exploreSNIExt(ByteBuffer input,
+            int extLen) throws SSLException {
+
+<span class="nc" id="L544">        Map&lt;Integer, SNIServerName&gt; sniMap = new LinkedHashMap&lt;&gt;();</span>
+
+<span class="nc" id="L546">        int remains = extLen;</span>
+<span class="nc bnc" id="L547" title="All 2 branches missed.">        if (extLen &gt;= 2) {     // &quot;server_name&quot; extension in ClientHello</span>
+<span class="nc" id="L548">            int listLen = getInt16(input);     // length of server_name_list</span>
+<span class="nc bnc" id="L549" title="All 4 branches missed.">            if (listLen == 0 || listLen + 2 != extLen) {</span>
+<span class="nc" id="L550">                throw ElytronMessages.log.invalidTlsExt();</span>
+            }
+
+<span class="nc" id="L553">            remains -= 2;     // 0x02: the length field of server_name_list</span>
+<span class="nc bnc" id="L554" title="All 2 branches missed.">            while (remains &gt; 0) {</span>
+<span class="nc" id="L555">                int code = getInt8(input);      // name_type</span>
+<span class="nc" id="L556">                int snLen = getInt16(input);    // length field of server name</span>
+<span class="nc bnc" id="L557" title="All 2 branches missed.">                if (snLen &gt; remains) {</span>
+<span class="nc" id="L558">                    throw ElytronMessages.log.notEnoughData();</span>
+                }
+<span class="nc" id="L560">                byte[] encoded = new byte[snLen];</span>
+<span class="nc" id="L561">                input.get(encoded);</span>
+
+                SNIServerName serverName;
+<span class="nc bnc" id="L564" title="All 2 branches missed.">                switch (code) {</span>
+                    case StandardConstants.SNI_HOST_NAME:
+<span class="nc bnc" id="L566" title="All 2 branches missed.">                        if (encoded.length == 0) {</span>
+<span class="nc" id="L567">                            throw ElytronMessages.log.emptyHostNameSni();</span>
+                        }
+<span class="nc" id="L569">                        serverName = new SNIHostName(encoded);</span>
+<span class="nc" id="L570">                        break;</span>
+                    default:
+<span class="nc" id="L572">                        serverName = new UnknownServerName(code, encoded);</span>
+                }
+                // check for duplicated server name type
+<span class="nc bnc" id="L575" title="All 2 branches missed.">                if (sniMap.put(serverName.getType(), serverName) != null) {</span>
+<span class="nc" id="L576">                    throw ElytronMessages.log.duplicatedSniServerName(serverName.getType());</span>
+                }
+
+<span class="nc" id="L579">                remains -= encoded.length + 3;  // NameType: 1 byte</span>
+                                                // HostName length: 2 bytes
+<span class="nc" id="L581">            }</span>
+<span class="nc bnc" id="L582" title="All 2 branches missed.">        } else if (extLen == 0) {     // &quot;server_name&quot; extension in ServerHello</span>
+<span class="nc" id="L583">            throw ElytronMessages.log.invalidTlsExt();</span>
+        }
+
+<span class="nc bnc" id="L586" title="All 2 branches missed.">        if (remains != 0) {</span>
+<span class="nc" id="L587">            throw ElytronMessages.log.invalidTlsExt();</span>
+        }
+
+<span class="nc" id="L590">        return Collections.unmodifiableList(new ArrayList&lt;&gt;(sniMap.values()));</span>
+    }
+
+    private static int getInt8(ByteBuffer input) {
+<span class="nc" id="L594">        return input.get();</span>
+    }
+
+    private static int getInt16(ByteBuffer input) {
+<span class="nc" id="L598">        return (input.get() &amp; 0xFF) &lt;&lt; 8 | input.get() &amp; 0xFF;</span>
+    }
+
+    private static int getInt24(ByteBuffer input) {
+<span class="nc" id="L602">        return (input.get() &amp; 0xFF) &lt;&lt; 16 | (input.get() &amp; 0xFF) &lt;&lt; 8 |</span>
+<span class="nc" id="L603">            input.get() &amp; 0xFF;</span>
+    }
+
+    private static void ignoreByteVector8(ByteBuffer input) {
+<span class="nc" id="L607">        ignoreByteVector(input, getInt8(input));</span>
+<span class="nc" id="L608">    }</span>
+
+    private static void ignoreByteVector(ByteBuffer input, int length) {
+<span class="nc bnc" id="L611" title="All 2 branches missed.">        if (length != 0) {</span>
+<span class="nc" id="L612">            int position = input.position();</span>
+<span class="nc" id="L613">            input.position(position + length);</span>
+        }
+<span class="nc" id="L615">    }</span>
+
+    private static MechanismDatabase.Entry getCipherSuiteById(int byte1, int byte2) {
+<span class="nc" id="L618">        MechanismDatabase.Entry entry = MechanismDatabase.getTLS13Instance().getCipherSuiteById(byte1, byte2);</span>
+<span class="nc bnc" id="L619" title="All 2 branches missed.">        if (entry == null) {</span>
+<span class="nc" id="L620">            entry = MechanismDatabase.getInstance().getCipherSuiteById(byte1, byte2);</span>
+        }
+<span class="nc" id="L622">        return entry;</span>
+    }
+
+    static final class UnknownServerName extends SNIServerName {
+        UnknownServerName(int code, byte[] encoded) {
+<span class="nc" id="L627">            super(code, encoded);</span>
+<span class="nc" id="L628">        }</span>
+    }
+
+    static final class ExtensionInfo {
+        final List&lt;SNIServerName&gt; sni;
+        final List&lt;String&gt; alpn;
+
+<span class="nc" id="L635">        ExtensionInfo(final List&lt;SNIServerName&gt; sni, final List&lt;String&gt; alpn) {</span>
+<span class="nc" id="L636">            this.sni = sni;</span>
+<span class="nc" id="L637">            this.alpn = alpn;</span>
+<span class="nc" id="L638">        }</span>
+    }
+
+    static final class SSLConnectionInformationImpl implements SSLConnectionInformation {
+
+        private final String recordVersion;
+        private final String helloVersion;
+        private final List&lt;SNIServerName&gt; sniNames;
+        private final List&lt;String&gt; alpnProtocols;
+        private final List&lt;String&gt; ciphers;
+
+        SSLConnectionInformationImpl(byte recordMajorVersion, byte recordMinorVersion,
+            byte helloMajorVersion, byte helloMinorVersion,
+<span class="nc" id="L651">            List&lt;SNIServerName&gt; sniNames, final List&lt;String&gt; alpnProtocols, final List&lt;String&gt; ciphers) {</span>
+
+<span class="nc" id="L653">            this.recordVersion = getVersionString(recordMajorVersion, recordMinorVersion);</span>
+<span class="nc" id="L654">            this.helloVersion = getVersionString(helloMajorVersion, helloMinorVersion);</span>
+<span class="nc" id="L655">            this.sniNames = sniNames;</span>
+<span class="nc" id="L656">            this.alpnProtocols = alpnProtocols;</span>
+<span class="nc" id="L657">            this.ciphers = ciphers;</span>
+<span class="nc" id="L658">        }</span>
+
+        private static String getVersionString(final byte helloMajorVersion, final byte helloMinorVersion) {
+<span class="nc bnc" id="L661" title="All 3 branches missed.">            switch (helloMajorVersion) {</span>
+                case 0x00: {
+<span class="nc bnc" id="L663" title="All 2 branches missed.">                    switch (helloMinorVersion) {</span>
+<span class="nc" id="L664">                        case 0x02: return &quot;SSLv2Hello&quot;;</span>
+<span class="nc" id="L665">                        default: return unknownVersion(helloMajorVersion, helloMinorVersion);</span>
+                    }
+                }
+                case 0x03: {
+<span class="nc bnc" id="L669" title="All 6 branches missed.">                    switch (helloMinorVersion) {</span>
+<span class="nc" id="L670">                        case 0x00: return &quot;SSLv3&quot;;</span>
+<span class="nc" id="L671">                        case 0x01: return &quot;TLSv1&quot;;</span>
+<span class="nc" id="L672">                        case 0x02: return &quot;TLSv1.1&quot;;</span>
+<span class="nc" id="L673">                        case 0x03: return &quot;TLSv1.2&quot;;</span>
+<span class="nc" id="L674">                        case 0x04: return &quot;TLSv1.3&quot;;</span>
+<span class="nc" id="L675">                        default: return unknownVersion(helloMajorVersion, helloMinorVersion);</span>
+                    }
+                }
+<span class="nc" id="L678">                default: return unknownVersion(helloMajorVersion, helloMinorVersion);</span>
+            }
+        }
+
+        @Override
+        public String getRecordVersion() {
+<span class="nc" id="L684">            return recordVersion;</span>
+        }
+
+        @Override
+        public String getHelloVersion() {
+<span class="nc" id="L689">            return helloVersion;</span>
+        }
+
+        @Override
+        public List&lt;SNIServerName&gt; getSNIServerNames() {
+<span class="nc" id="L694">            return Collections.unmodifiableList(sniNames);</span>
+        }
+
+        @Override
+        public List&lt;String&gt; getProtocols() {
+<span class="nc" id="L699">            return Collections.unmodifiableList(alpnProtocols);</span>
+        }
+
+        @Override
+        public List&lt;String&gt; getCipherSuites() {
+<span class="nc" id="L704">            return Collections.unmodifiableList(ciphers);</span>
+        }
+
+        private static String unknownVersion(byte major, byte minor) {
+<span class="nc" id="L708">            return &quot;Unknown-&quot; + (major &amp; 0xff) + &quot;.&quot; + (minor &amp; 0xff);</span>
+        }
+    }
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

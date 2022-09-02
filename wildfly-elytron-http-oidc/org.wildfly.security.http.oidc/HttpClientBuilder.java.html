@@ -1,0 +1,361 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>HttpClientBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-oidc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.oidc</a> &gt; <span class="el_source">HttpClientBuilder.java</span></div><h1>HttpClientBuilder.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2021 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.http.oidc;
+
+import static org.wildfly.security.http.oidc.ElytronMessages.log;
+import static org.wildfly.security.http.oidc.Oidc.EnvUtil;
+import static org.wildfly.security.http.oidc.Oidc.PROTOCOL_CLASSPATH;
+
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.net.URI;
+import java.security.KeyStore;
+import java.security.SecureRandom;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+
+import org.apache.http.HttpHost;
+import org.apache.http.client.CookieStore;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.config.Registry;
+import org.apache.http.config.RegistryBuilder;
+import org.apache.http.conn.HttpClientConnectionManager;
+import org.apache.http.conn.socket.ConnectionSocketFactory;
+import org.apache.http.conn.socket.PlainConnectionSocketFactory;
+import org.apache.http.conn.ssl.DefaultHostnameVerifier;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+import org.apache.http.cookie.Cookie;
+import org.apache.http.impl.conn.BasicHttpClientConnectionManager;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.http.ssl.SSLContexts;
+
+/**
+ * Abstraction for creating HttpClients. Allows SSL configuration.
+ *
+ * @author &lt;a href=&quot;mailto:bill@burkecentral.com&quot;&gt;Bill Burke&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+<span class="nc" id="L66">public class HttpClientBuilder {</span>
+
+<span class="nc" id="L68">    public static enum HostnameVerificationPolicy {</span>
+        /**
+         * Hostname verification is not done on the server's certificate
+         */
+<span class="nc" id="L72">        ANY,</span>
+        /**
+         * Allows wildcards in subdomain names i.e. *.foo.com
+         */
+<span class="nc" id="L76">        WILDCARD</span>
+    }
+
+    private KeyStore truststore;
+    private boolean disableTrustManager;
+<span class="nc" id="L81">    private boolean disableCookieCache = true;</span>
+    private KeyStore clientKeyStore;
+    private String clientPrivateKeyPassword;
+<span class="nc" id="L84">    private int connectionPoolSize = 100;</span>
+<span class="nc" id="L85">    protected int maxPooledPerRoute = 0;</span>
+<span class="nc" id="L86">    private HostnameVerificationPolicy policy = HostnameVerificationPolicy.WILDCARD;</span>
+    private HttpHost proxyHost;
+<span class="nc" id="L88">    private HostnameVerifier verifier = null;</span>
+    private SSLContext sslContext;
+<span class="nc" id="L90">    private long connectionTimeToLive = -1;</span>
+<span class="nc" id="L91">    private TimeUnit connectionTimeToLiveUnit = TimeUnit.MILLISECONDS;</span>
+<span class="nc" id="L92">    private long socketTimeout = -1;</span>
+<span class="nc" id="L93">    private TimeUnit socketTimeoutUnits = TimeUnit.MILLISECONDS;</span>
+<span class="nc" id="L94">    private long establishConnectionTimeout = -1;</span>
+<span class="nc" id="L95">    private TimeUnit establishConnectionTimeoutUnits = TimeUnit.MILLISECONDS;</span>
+
+    /**
+     * This should only be set if you cannot or do not want to verify the identity of the
+     * host you are communicating with.
+     *
+     * @return the builder
+     */
+    public HttpClientBuilder setDisableTrustManager() {
+<span class="nc" id="L104">        this.disableTrustManager = true;</span>
+<span class="nc" id="L105">        return this;</span>
+    }
+
+    public HttpClientBuilder setDisableCookieCache(boolean disable) {
+<span class="nc" id="L109">        this.disableCookieCache = disable;</span>
+<span class="nc" id="L110">        return this;</span>
+    }
+
+    public HttpClientBuilder setKeyStore(KeyStore keyStore, String password) {
+<span class="nc" id="L114">        this.clientKeyStore = keyStore;</span>
+<span class="nc" id="L115">        this.clientPrivateKeyPassword = password;</span>
+<span class="nc" id="L116">        return this;</span>
+    }
+
+    public HttpClientBuilder setConnectionPoolSize(int connectionPoolSize) {
+<span class="nc" id="L120">        this.connectionPoolSize = connectionPoolSize;</span>
+<span class="nc" id="L121">        return this;</span>
+    }
+
+    public HttpClientBuilder setHostnameVerification(HostnameVerificationPolicy policy) {
+<span class="nc" id="L125">        this.policy = policy;</span>
+<span class="nc" id="L126">        return this;</span>
+    }
+
+    public HttpClientBuilder setTrustStore(KeyStore truststore) {
+<span class="nc" id="L130">        this.truststore = truststore;</span>
+<span class="nc" id="L131">        return this;</span>
+    }
+
+    public HttpClientBuilder setConnectionTimeToLive(long timeToLive, TimeUnit timeToLiveUnit) {
+<span class="nc" id="L135">        this.connectionTimeToLive = timeToLive;</span>
+<span class="nc" id="L136">        this.connectionTimeToLiveUnit = timeToLiveUnit;</span>
+<span class="nc" id="L137">        return this;</span>
+    }
+
+    public HttpClientBuilder setMaxPooledPerRoute(int maxPooledPerRoute) {
+<span class="nc" id="L141">        this.maxPooledPerRoute = maxPooledPerRoute;</span>
+<span class="nc" id="L142">        return this;</span>
+    }
+
+    public HttpClientBuilder setSocketTimeout(long timeout, TimeUnit unit) {
+<span class="nc" id="L146">        this.socketTimeout = timeout;</span>
+<span class="nc" id="L147">        this.socketTimeoutUnits = unit;</span>
+<span class="nc" id="L148">        return this;</span>
+    }
+
+    public HttpClientBuilder setEstablishConnectionTimeout(long timeout, TimeUnit unit) {
+<span class="nc" id="L152">        this.establishConnectionTimeout = timeout;</span>
+<span class="nc" id="L153">        this.establishConnectionTimeoutUnits = unit;</span>
+<span class="nc" id="L154">        return this;</span>
+    }
+
+    public HttpClient build() {
+<span class="nc" id="L158">        HostnameVerifier verifier = null;</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">        if (this.verifier != null) verifier = new VerifierWrapper(this.verifier);</span>
+        else {
+<span class="nc bnc" id="L161" title="All 3 branches missed.">            switch (policy) {</span>
+                case ANY:
+<span class="nc" id="L163">                    verifier = new NoopHostnameVerifier();</span>
+<span class="nc" id="L164">                    break;</span>
+                case WILDCARD:
+<span class="nc" id="L166">                    verifier = new DefaultHostnameVerifier();</span>
+                    break;
+            }
+        }
+        try {
+<span class="nc" id="L171">            SSLConnectionSocketFactory sslSocketFactory = null;</span>
+<span class="nc" id="L172">            SSLContext theContext = sslContext;</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">            if (disableTrustManager) {</span>
+<span class="nc" id="L174">                theContext = SSLContext.getInstance(&quot;TLS&quot;);</span>
+<span class="nc" id="L175">                theContext.init(null, new TrustManager[]{ new PassthroughTrustManager() },</span>
+                        new SecureRandom());
+<span class="nc" id="L177">                verifier = new NoopHostnameVerifier();</span>
+<span class="nc" id="L178">                sslSocketFactory = new SSLConnectionSocketFactory(theContext, verifier);</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">            } else if (theContext != null) {</span>
+<span class="nc" id="L180">                sslSocketFactory = new SSLConnectionSocketFactory(theContext, verifier);</span>
+<span class="nc bnc" id="L181" title="All 4 branches missed.">            } else if (clientKeyStore != null || truststore != null) {</span>
+<span class="nc" id="L182">                sslSocketFactory = new SSLConnectionSocketFactory(SSLContexts.custom()</span>
+<span class="nc" id="L183">                        .setProtocol(SSLConnectionSocketFactory.TLS)</span>
+<span class="nc" id="L184">                        .setSecureRandom(null)</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">                        .loadKeyMaterial(clientKeyStore, clientPrivateKeyPassword != null ? clientPrivateKeyPassword.toCharArray() : null)</span>
+<span class="nc" id="L186">                        .loadTrustMaterial(truststore,null)</span>
+<span class="nc" id="L187">                        .build(), verifier);</span>
+            } else {
+<span class="nc" id="L189">                final SSLContext tlsContext = SSLContext.getInstance(SSLConnectionSocketFactory.TLS);</span>
+<span class="nc" id="L190">                tlsContext.init(null, null, null);</span>
+<span class="nc" id="L191">                sslSocketFactory = new SSLConnectionSocketFactory(tlsContext, verifier);</span>
+            }
+<span class="nc" id="L193">            Registry&lt;ConnectionSocketFactory&gt; registry = RegistryBuilder.&lt;ConnectionSocketFactory&gt;create()</span>
+<span class="nc" id="L194">                    .register(&quot;http&quot;, PlainConnectionSocketFactory.getSocketFactory())</span>
+<span class="nc" id="L195">                    .register(&quot;https&quot;, sslSocketFactory)</span>
+<span class="nc" id="L196">                    .build();</span>
+            HttpClientConnectionManager connectionManager;
+<span class="nc bnc" id="L198" title="All 2 branches missed.">            if (connectionPoolSize &gt; 0) {</span>
+<span class="nc" id="L199">                PoolingHttpClientConnectionManager pcm = new PoolingHttpClientConnectionManager(registry, null, null, null, connectionTimeToLive, connectionTimeToLiveUnit);</span>
+<span class="nc" id="L200">                pcm.setMaxTotal(connectionPoolSize);</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">                if (maxPooledPerRoute == 0) maxPooledPerRoute = connectionPoolSize;</span>
+<span class="nc" id="L202">                pcm.setDefaultMaxPerRoute(maxPooledPerRoute);</span>
+<span class="nc" id="L203">                connectionManager = pcm;</span>
+
+<span class="nc" id="L205">            } else {</span>
+<span class="nc" id="L206">                connectionManager = new BasicHttpClientConnectionManager(registry);</span>
+            }
+
+<span class="nc" id="L209">            org.apache.http.impl.client.HttpClientBuilder clientBuilder = org.apache.http.impl.client.HttpClientBuilder.create();</span>
+<span class="nc" id="L210">            clientBuilder.setConnectionManager(connectionManager);</span>
+
+<span class="nc" id="L212">            RequestConfig.Builder requestConfigBuilder = RequestConfig.custom();</span>
+<span class="nc bnc" id="L213" title="All 2 branches missed.">            if (proxyHost != null) {</span>
+<span class="nc" id="L214">                requestConfigBuilder.setProxy(proxyHost);</span>
+            }
+<span class="nc bnc" id="L216" title="All 2 branches missed.">            if (socketTimeout &gt; -1) {</span>
+<span class="nc" id="L217">                requestConfigBuilder.setSocketTimeout((int) socketTimeoutUnits.toMillis(socketTimeout));</span>
+            }
+<span class="nc bnc" id="L219" title="All 2 branches missed.">            if (establishConnectionTimeout &gt; -1) {</span>
+<span class="nc" id="L220">                requestConfigBuilder.setConnectTimeout((int) establishConnectionTimeoutUnits.toMillis(establishConnectionTimeout));</span>
+            }
+<span class="nc" id="L222">            clientBuilder.setDefaultRequestConfig(requestConfigBuilder.build());</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">            if (disableCookieCache) {</span>
+<span class="nc" id="L224">                clientBuilder.setDefaultCookieStore(new CookieStore() {</span>
+                    @Override
+                    public void addCookie(Cookie cookie) {
+<span class="nc" id="L227">                    }</span>
+
+                    @Override
+                    public List&lt;Cookie&gt; getCookies() {
+<span class="nc" id="L231">                        return Collections.emptyList();</span>
+                    }
+
+                    @Override
+                    public boolean clearExpired(Date date) {
+<span class="nc" id="L236">                        return false;</span>
+                    }
+
+                    @Override
+                    public void clear() {
+<span class="nc" id="L241">                    }</span>
+                });
+            }
+<span class="nc" id="L244">            return clientBuilder.build();</span>
+<span class="nc" id="L245">        } catch (Exception e) {</span>
+<span class="nc" id="L246">            throw new RuntimeException(e);</span>
+        }
+    }
+
+    public HttpClient build(OidcJsonConfiguration oidcClientConfig) {
+<span class="nc" id="L251">        setDisableCookieCache(true); // disable cookie cache as we don't want sticky sessions for load balancing</span>
+
+<span class="nc" id="L253">        String truststorePath = oidcClientConfig.getTruststore();</span>
+<span class="nc bnc" id="L254" title="All 2 branches missed.">        if (truststorePath != null) {</span>
+<span class="nc" id="L255">            truststorePath = EnvUtil.replace(truststorePath);</span>
+<span class="nc" id="L256">            String truststorePassword = oidcClientConfig.getTruststorePassword();</span>
+            try {
+<span class="nc" id="L258">                this.truststore = loadKeyStore(truststorePath, truststorePassword);</span>
+<span class="nc" id="L259">            } catch (Exception e) {</span>
+<span class="nc" id="L260">                throw log.unableToLoadKeyStore(e);</span>
+<span class="nc" id="L261">            }</span>
+        }
+<span class="nc" id="L263">        String clientKeystore = oidcClientConfig.getClientKeystore();</span>
+<span class="nc bnc" id="L264" title="All 2 branches missed.">        if (clientKeystore != null) {</span>
+<span class="nc" id="L265">            clientKeystore = EnvUtil.replace(clientKeystore);</span>
+<span class="nc" id="L266">            String clientKeystorePassword = oidcClientConfig.getClientKeystorePassword();</span>
+            try {
+<span class="nc" id="L268">                KeyStore clientCertKeystore = loadKeyStore(clientKeystore, clientKeystorePassword);</span>
+<span class="nc" id="L269">                setKeyStore(clientCertKeystore, clientKeystorePassword);</span>
+<span class="nc" id="L270">            } catch (Exception e) {</span>
+<span class="nc" id="L271">                throw log.unableToLoadTrustStore(e);</span>
+<span class="nc" id="L272">            }</span>
+        }
+<span class="nc" id="L274">        int size = 10;</span>
+<span class="nc bnc" id="L275" title="All 2 branches missed.">        if (oidcClientConfig.getConnectionPoolSize() &gt; 0) {</span>
+<span class="nc" id="L276">            size = oidcClientConfig.getConnectionPoolSize();</span>
+        }
+<span class="nc" id="L278">        HttpClientBuilder.HostnameVerificationPolicy policy = HttpClientBuilder.HostnameVerificationPolicy.WILDCARD;</span>
+<span class="nc bnc" id="L279" title="All 2 branches missed.">        if (oidcClientConfig.isAllowAnyHostname()) {</span>
+<span class="nc" id="L280">            policy = HttpClientBuilder.HostnameVerificationPolicy.ANY;</span>
+        }
+<span class="nc" id="L282">        setConnectionPoolSize(size);</span>
+<span class="nc" id="L283">        setHostnameVerification(policy);</span>
+<span class="nc bnc" id="L284" title="All 2 branches missed.">        if (oidcClientConfig.isDisableTrustManager()) {</span>
+<span class="nc" id="L285">            setDisableTrustManager();</span>
+        } else {
+<span class="nc" id="L287">            setTrustStore(truststore);</span>
+        }
+
+<span class="nc" id="L290">        configureProxyForAuthServerIfProvided(oidcClientConfig);</span>
+<span class="nc" id="L291">        return build();</span>
+    }
+
+    /**
+     * Configures a the proxy to use for auth-server requests if provided.
+     * &lt;p&gt;
+     * If the given {@link OidcJsonConfiguration} contains the attribute {@code proxy-url} we use the
+     * given URL as a proxy server, otherwise the proxy configuration is ignored.
+     * &lt;/p&gt;
+     *
+     * @param adapterConfig
+     */
+    private void configureProxyForAuthServerIfProvided(OidcJsonConfiguration adapterConfig) {
+<span class="nc bnc" id="L304" title="All 6 branches missed.">        if (adapterConfig == null || adapterConfig.getProxyUrl() == null || adapterConfig.getProxyUrl().trim().isEmpty()) {</span>
+<span class="nc" id="L305">            return;</span>
+        }
+<span class="nc" id="L307">        URI uri = URI.create(adapterConfig.getProxyUrl());</span>
+<span class="nc" id="L308">        this.proxyHost = new HttpHost(uri.getHost(), uri.getPort(), uri.getScheme());</span>
+<span class="nc" id="L309">    }</span>
+
+    private static KeyStore loadKeyStore(String filename, String password) throws Exception {
+<span class="nc" id="L312">        KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());</span>
+<span class="nc" id="L313">        InputStream trustStream = null;</span>
+<span class="nc bnc" id="L314" title="All 2 branches missed.">        if (filename.startsWith(PROTOCOL_CLASSPATH)) {</span>
+<span class="nc" id="L315">            String resourcePath = filename.replace(PROTOCOL_CLASSPATH, &quot;&quot;);</span>
+<span class="nc bnc" id="L316" title="All 2 branches missed.">            if (Thread.currentThread().getContextClassLoader() != null) {</span>
+<span class="nc" id="L317">                trustStream = Thread.currentThread().getContextClassLoader().getResourceAsStream(resourcePath);</span>
+            }
+<span class="nc bnc" id="L319" title="All 2 branches missed.">            if (trustStream == null) {</span>
+<span class="nc" id="L320">                trustStream = HttpClientBuilder.class.getResourceAsStream(resourcePath);</span>
+            }
+<span class="nc bnc" id="L322" title="All 2 branches missed.">            if (trustStream == null) {</span>
+<span class="nc" id="L323">                throw log.unableToFindTrustStoreFile(filename);</span>
+            }
+<span class="nc" id="L325">        } else {</span>
+<span class="nc" id="L326">            trustStream = new FileInputStream(filename);</span>
+        }
+<span class="nc" id="L328">        try (InputStream is = trustStream) {</span>
+<span class="nc" id="L329">            trustStore.load(is, password.toCharArray());</span>
+        }
+<span class="nc" id="L331">        return trustStore;</span>
+    }
+
+    static class VerifierWrapper implements HostnameVerifier {
+        protected HostnameVerifier verifier;
+
+<span class="nc" id="L337">        VerifierWrapper(HostnameVerifier verifier) {</span>
+<span class="nc" id="L338">            this.verifier = verifier;</span>
+<span class="nc" id="L339">        }</span>
+
+        @Override
+        public boolean verify(String s, SSLSession sslSession) {
+<span class="nc" id="L343">            return verifier.verify(s, sslSession);</span>
+        }
+    }
+
+    private static class PassthroughTrustManager implements X509TrustManager {
+        public void checkClientTrusted(X509Certificate[] chain,
+                                       String authType) throws CertificateException {
+<span class="nc" id="L350">        }</span>
+
+        public void checkServerTrusted(X509Certificate[] chain,
+                                       String authType) throws CertificateException {
+<span class="nc" id="L354">        }</span>
+
+        public X509Certificate[] getAcceptedIssuers() {
+<span class="nc" id="L357">            return null;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

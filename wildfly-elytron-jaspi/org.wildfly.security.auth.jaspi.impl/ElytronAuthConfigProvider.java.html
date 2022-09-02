@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronAuthConfigProvider.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-jaspi</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.jaspi.impl</a> &gt; <span class="el_source">ElytronAuthConfigProvider.java</span></div><h1>ElytronAuthConfigProvider.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2016 Red Hat, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.jaspi.impl;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+
+import java.util.List;
+import java.util.Map;
+
+import javax.security.auth.Subject;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.message.AuthException;
+import javax.security.auth.message.MessageInfo;
+import javax.security.auth.message.config.AuthConfig;
+import javax.security.auth.message.config.AuthConfigProvider;
+import javax.security.auth.message.config.ClientAuthConfig;
+import javax.security.auth.message.config.ClientAuthContext;
+import javax.security.auth.message.config.ServerAuthConfig;
+import javax.security.auth.message.config.ServerAuthContext;
+
+/**
+ * The WildFly Elytron implementation of {@link AuthConfigProvider}.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public class ElytronAuthConfigProvider implements AuthConfigProvider {
+
+    /*
+     * The instance of AuthConfigProvider can be obtained once per deployment, for this reason it is important not to cache
+     * per-request state long term.
+     */
+
+<span class="fc" id="L47">    private static ClientAuthConfig EMPTY_CLIENT_AUTH_CONFIG = new EmptyClientAuthConfig();</span>
+<span class="fc" id="L48">    private static ServerAuthConfig EMPTY_SERVER_AUTH_CONFIG = new EmptyServerAuthConfig();</span>
+
+    /**
+     * The messageLayer this config provider will match against, can be {@code null} for wildcard matches.
+     */
+    private final String messageLayer;
+
+    /**
+     * The applicationContext this config provider will match against, can be {@code null} for wildcard matches.
+     */
+    private final String applicationContext;
+
+    private final List&lt;AuthenticationModuleDefinition&gt; serverAuthModuleDefinitions;
+
+<span class="fc" id="L62">    public ElytronAuthConfigProvider(final String messageLayer, final String applicationContext, final List&lt;AuthenticationModuleDefinition&gt; serverAuthModuleDefinitions) {</span>
+<span class="fc" id="L63">        this.messageLayer = messageLayer;</span>
+<span class="fc" id="L64">        this.applicationContext = applicationContext;</span>
+<span class="fc" id="L65">        this.serverAuthModuleDefinitions = checkNotNullParam(&quot;serverAuthModuleDefinitions&quot;, serverAuthModuleDefinitions); // Can however be empty.</span>
+<span class="fc" id="L66">    }</span>
+
+    /*
+     * The APIs allow a single AuthConfigProvider to support multiple layers and appContexts
+     * and then in conjunction with how they are discovered from the AuthConfigFactory an
+     * AuthConfig will be discovered, to reduce complexity each provider instance will only
+     * support a single layer / appContext pair.
+     */
+
+    /**
+     * @see javax.security.auth.message.config.AuthConfigProvider#getClientAuthConfig(java.lang.String, java.lang.String, javax.security.auth.callback.CallbackHandler)
+     */
+    @Override
+    public ClientAuthConfig getClientAuthConfig(String layer, String appContext, CallbackHandler handler) throws AuthException, SecurityException {
+        // Presently we only support the Servlet profile so no support for client config.
+<span class="nc" id="L81">        return EMPTY_CLIENT_AUTH_CONFIG;</span>
+    }
+
+    /**
+     * @see javax.security.auth.message.config.AuthConfigProvider#getServerAuthConfig(java.lang.String, java.lang.String,
+     *      javax.security.auth.callback.CallbackHandler)
+     */
+    @Override
+    public ServerAuthConfig getServerAuthConfig(String layer, String appContext, CallbackHandler callbackHandler) throws AuthException, SecurityException {
+        // The layer and appContext values are required to match the values used to obtain this provider, however unless we
+        // create a new instance each time we can not really enforce that - but it does mean as per JSR-196 2.1.1.1 these must
+        // not be null.
+<span class="fc" id="L93">        checkNotNullParam(&quot;layer&quot;, layer);</span>
+<span class="fc" id="L94">        checkNotNullParam(&quot;appContext&quot;, appContext);</span>
+
+        // We can however double check the values match the configuration this provider should be used for.
+<span class="pc bpc" id="L97" title="4 of 8 branches missed.">        if ( !serverAuthModuleDefinitions.isEmpty() &amp;&amp; (messageLayer == null || messageLayer.equals(layer))</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">                &amp;&amp; (applicationContext == null || applicationContext.equals(appContext))) {</span>
+<span class="fc" id="L99">            return new ElytronServerAuthConfig(this.messageLayer, this.applicationContext, callbackHandler, serverAuthModuleDefinitions);</span>
+        }
+<span class="nc" id="L101">        return EMPTY_SERVER_AUTH_CONFIG;</span>
+    }
+
+    /**
+     * @see javax.security.auth.message.config.AuthConfigProvider#refresh()
+     */
+    @Override
+    public void refresh() {
+<span class="nc" id="L109">    }</span>
+
+<span class="fc" id="L111">    static class EmptyAuthConfig implements AuthConfig {</span>
+        // TODO Can we just use ElytronAuthConfig instead?
+
+        @Override
+        public String getAppContext() {
+<span class="nc" id="L116">            return null;</span>
+        }
+
+        @Override
+        public String getMessageLayer() {
+<span class="nc" id="L121">            return null;</span>
+        }
+
+        @Override
+        public String getAuthContextID(MessageInfo messageInfo) {
+<span class="nc" id="L126">            return null;</span>
+        }
+
+        @Override
+        public boolean isProtected() {
+<span class="nc" id="L131">            return false;</span>
+        }
+
+        @Override
+        public void refresh() {
+<span class="nc" id="L136">        }</span>
+
+    }
+
+<span class="fc" id="L140">    static class EmptyClientAuthConfig extends EmptyAuthConfig implements ClientAuthConfig  {</span>
+
+        @Override
+        public ClientAuthContext getAuthContext(String authContextID, Subject clientSubject, Map properties)
+                throws AuthException {
+<span class="nc" id="L145">            return null;</span>
+        }
+
+    }
+
+<span class="fc" id="L150">    static class EmptyServerAuthConfig extends EmptyAuthConfig implements ServerAuthConfig {</span>
+
+        @Override
+        public ServerAuthContext getAuthContext(String authContextID, Subject serviceSubject, Map properties)
+                throws AuthException {
+<span class="nc" id="L155">            return null;</span>
+        }
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,573 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LdapSecurityRealmBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-realm-ldap</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.realm.ldap</a> &gt; <span class="el_source">LdapSecurityRealmBuilder.java</span></div><h1>LdapSecurityRealmBuilder.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.realm.ldap;
+
+import static org.wildfly.common.Assert.assertNotNull;
+import static org.wildfly.security.auth.realm.ldap.ElytronMessages.log;
+import static org.wildfly.security.provider.util.ProviderUtil.INSTALLED_PROVIDERS;
+
+import org.wildfly.common.Assert;
+import org.wildfly.common.function.ExceptionSupplier;
+import org.wildfly.security.auth.realm.ldap.LdapSecurityRealm.IdentityMapping;
+import org.wildfly.security.auth.server.ModifiableSecurityRealm;
+import org.wildfly.security.auth.server.NameRewriter;
+import org.wildfly.security.password.spec.Encoding;
+
+import javax.naming.NamingException;
+import javax.naming.directory.Attributes;
+import javax.naming.directory.DirContext;
+import javax.naming.ldap.LdapName;
+
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.security.Provider;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Supplier;
+
+/**
+ * Builder for the security realm implementation backed by LDAP.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public class LdapSecurityRealmBuilder {
+
+    /*
+     *  The LDAP security realm constructed by this builder expects no further modifications to the
+     *  Collections it is passed.
+     *
+     *  This is the reason this builder and all child builders are implemented to prevent subsequent
+     *  modification after the build is complete.
+     */
+
+    private static final int DEFAULT_SEARCH_TIME_LIMIT = 10000;
+
+<span class="nc" id="L62">    private boolean built = false;</span>
+<span class="nc" id="L63">    private Supplier&lt;Provider[]&gt; providers = INSTALLED_PROVIDERS;</span>
+    private ExceptionSupplier&lt;DirContext, NamingException&gt; dirContextSupplier;
+<span class="nc" id="L65">    private NameRewriter nameRewriter = NameRewriter.IDENTITY_REWRITER;</span>
+    private IdentityMapping identityMapping;
+<span class="nc" id="L67">    private int pageSize = 50;</span>
+
+<span class="nc" id="L69">    private List&lt;CredentialLoader&gt; credentialLoaders = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L70">    private List&lt;CredentialPersister&gt; credentialPersisters = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L71">    private List&lt;EvidenceVerifier&gt; evidenceVerifiers = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L72">    private Charset hashCharset = StandardCharsets.UTF_8;</span>
+<span class="nc" id="L73">    private Encoding hashEncoding = Encoding.BASE64;</span>
+
+<span class="nc" id="L75">    private LdapSecurityRealmBuilder() {</span>
+<span class="nc" id="L76">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @return the new builder instance
+     */
+    public static LdapSecurityRealmBuilder builder() {
+<span class="nc" id="L84">        return new LdapSecurityRealmBuilder();</span>
+    }
+
+    /**
+     * The the Provider[] supplier.
+     *
+     * @param providers the supplier of Providers to be used by the realm
+     * @return this builder
+     */
+    public LdapSecurityRealmBuilder setProviders(Supplier&lt;Provider[]&gt; providers) {
+<span class="nc" id="L94">        assertNotBuilt();</span>
+<span class="nc" id="L95">        this.providers = providers;</span>
+
+<span class="nc" id="L97">        return this;</span>
+    }
+
+    /**
+     * Set the directory context supplier.
+     *
+     * @param dirContextSupplier the directory context supplier
+     * @return this builder
+     */
+    public LdapSecurityRealmBuilder setDirContextSupplier(final ExceptionSupplier&lt;DirContext, NamingException&gt; dirContextSupplier) {
+<span class="nc" id="L107">        assertNotBuilt();</span>
+
+<span class="nc" id="L109">        this.dirContextSupplier = dirContextSupplier;</span>
+
+<span class="nc" id="L111">        return this;</span>
+    }
+
+    /**
+     * Add a name rewriter to this builder.
+     *
+     * @param nameRewriter the name rewriter
+     * @return this builder
+     */
+    public LdapSecurityRealmBuilder setNameRewriter(final NameRewriter nameRewriter) {
+<span class="nc" id="L121">        Assert.checkNotNullParam(&quot;nameRewriter&quot;, nameRewriter);</span>
+<span class="nc" id="L122">        assertNotBuilt();</span>
+
+<span class="nc" id="L124">        this.nameRewriter = nameRewriter;</span>
+
+<span class="nc" id="L126">        return this;</span>
+    }
+
+    /**
+     * Set size of page for realm iterating
+     *
+     * @param pageSize size of page
+     * @return this builder
+     */
+    public LdapSecurityRealmBuilder setPageSize(final int pageSize) {
+<span class="nc" id="L136">        this.pageSize = pageSize;</span>
+
+<span class="nc" id="L138">        return this;</span>
+    }
+
+    public IdentityMappingBuilder identityMapping() {
+<span class="nc" id="L142">        assertNotBuilt();</span>
+
+<span class="nc" id="L144">        return new IdentityMappingBuilder();</span>
+    }
+
+    /**
+     * Add a principal mapping to this builder.
+     *
+     * @return the builder for the principal mapping
+     */
+    LdapSecurityRealmBuilder setIdentityMapping(IdentityMapping principalMapping) {
+<span class="nc" id="L153">        this.identityMapping = principalMapping;</span>
+
+<span class="nc" id="L155">        return this;</span>
+    }
+
+    /**
+     * Set the character set to use when converting the password string
+     * to a byte array. Set to UTF-8 by default.
+     * @param hashCharset the name of the character set (must not be {@code null}).
+     *
+     * @return this builder
+     */
+    public LdapSecurityRealmBuilder setHashCharset(Charset hashCharset) {
+<span class="nc" id="L166">        assertNotNull(hashCharset);</span>
+<span class="nc" id="L167">        this.hashCharset = hashCharset;</span>
+
+<span class="nc" id="L169">        return this;</span>
+    }
+
+    /**
+     *  Set the string format for the password in the properties file if they are not
+     *  stored in plain text. Set to base64 by default.
+     * @param hashEncoding specifies the string format for the hashed password
+     *
+     * @return this builder
+     */
+    public LdapSecurityRealmBuilder setHashEncoding(Encoding hashEncoding) {
+<span class="nc" id="L180">        assertNotNull(hashEncoding);</span>
+<span class="nc" id="L181">        this.hashEncoding = hashEncoding;</span>
+
+<span class="nc" id="L183">        return this;</span>
+    }
+
+    public UserPasswordCredentialLoaderBuilder userPasswordCredentialLoader() {
+<span class="nc" id="L187">        assertNotBuilt();</span>
+
+<span class="nc" id="L189">        return new UserPasswordCredentialLoaderBuilder();</span>
+    }
+
+    public OtpCredentialLoaderBuilder otpCredentialLoader() {
+<span class="nc" id="L193">        assertNotBuilt();</span>
+
+<span class="nc" id="L195">        return new OtpCredentialLoaderBuilder();</span>
+    }
+
+    public X509EvidenceVerifierBuilder x509EvidenceVerifier() {
+<span class="nc" id="L199">        assertNotBuilt();</span>
+
+<span class="nc" id="L201">        return new X509EvidenceVerifierBuilder();</span>
+    }
+
+    LdapSecurityRealmBuilder addCredentialLoader(CredentialLoader credentialLoader) {
+<span class="nc" id="L205">        credentialLoaders.add(credentialLoader);</span>
+
+<span class="nc" id="L207">        return this;</span>
+    }
+
+    LdapSecurityRealmBuilder addCredentialPersister(CredentialPersister credentialPersister) {
+<span class="nc" id="L211">        credentialPersisters.add(credentialPersister);</span>
+
+<span class="nc" id="L213">        return this;</span>
+    }
+
+    LdapSecurityRealmBuilder addEvidenceVerifier(EvidenceVerifier evidenceVerifier) {
+<span class="nc" id="L217">        evidenceVerifiers.add(evidenceVerifier);</span>
+
+<span class="nc" id="L219">        return this;</span>
+    }
+
+    public LdapSecurityRealmBuilder addDirectEvidenceVerification() {
+<span class="nc" id="L223">        return addDirectEvidenceVerification(false);</span>
+    }
+
+    public LdapSecurityRealmBuilder addDirectEvidenceVerification(boolean allowBlankPassword) {
+<span class="nc" id="L227">        assertNotBuilt();</span>
+
+<span class="nc" id="L229">        return addEvidenceVerifier(new DirectEvidenceVerifier(allowBlankPassword));</span>
+    }
+
+    /**
+     * Build this realm.
+     *
+     * @return the built realm
+     */
+    public ModifiableSecurityRealm build() {
+<span class="nc" id="L238">        assertNotBuilt();</span>
+<span class="nc bnc" id="L239" title="All 2 branches missed.">        if (dirContextSupplier == null) {</span>
+<span class="nc" id="L240">            throw log.noDirContextSupplierSet();</span>
+        }
+<span class="nc bnc" id="L242" title="All 2 branches missed.">        if (identityMapping == null) {</span>
+<span class="nc" id="L243">            throw log.noPrincipalMappingDefinition();</span>
+        }
+
+<span class="nc" id="L246">        built = true;</span>
+<span class="nc" id="L247">        return new LdapSecurityRealm(providers, dirContextSupplier, nameRewriter,</span>
+                identityMapping, credentialLoaders, credentialPersisters, evidenceVerifiers,
+                pageSize, hashCharset, hashEncoding);
+    }
+
+    private void assertNotBuilt() {
+<span class="nc bnc" id="L253" title="All 2 branches missed.">        if (built) {</span>
+<span class="nc" id="L254">            throw log.builderAlreadyBuilt();</span>
+        }
+<span class="nc" id="L256">    }</span>
+
+    /**
+     * A builder for a principal mapping.
+     */
+<span class="nc" id="L261">    public class IdentityMappingBuilder {</span>
+
+<span class="nc" id="L263">        private boolean built = false;</span>
+
+<span class="nc" id="L265">        private String searchDn = null;</span>
+<span class="nc" id="L266">        private boolean searchRecursive = false;</span>
+        private String nameAttribute;
+<span class="nc" id="L268">        private int searchTimeLimit = DEFAULT_SEARCH_TIME_LIMIT;</span>
+<span class="nc" id="L269">        private List&lt;AttributeMapping&gt; attributes = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L270">        private LdapName newIdentityParent = null;</span>
+<span class="nc" id="L271">        private Attributes newIdentityAttributes = null;</span>
+        private String filterName;
+        private String iteratorFilter;
+
+        /**
+         * &lt;p&gt;Set the name of the context to be used when executing queries.
+         *
+         * &lt;p&gt;This option is specially useful when authenticating users based on names that don't use a X.500 format such as &lt;em&gt;plainUser&lt;/em&gt;.
+         * In this case, you must also provide {@link #setRdnIdentifier(String)} with the attribute name that contains the user name.&lt;/p&gt;
+         *
+         * &lt;p&gt;If the names used to authenticate users are based on the X.500 format, this configuration can be suppressed.
+         *
+         * &lt;p&gt;Please note that by using this option the realm is able to authenticate users based on their simple or X.500 names.
+         *
+         * @param searchDn the name of the context to search
+         * @return this builder
+         */
+        public IdentityMappingBuilder setSearchDn(final String searchDn) {
+<span class="nc" id="L289">            assertNotBuilt();</span>
+
+<span class="nc" id="L291">            this.searchDn = searchDn;</span>
+<span class="nc" id="L292">            return this;</span>
+        }
+
+        /**
+         * Indicate if queries are searchRecursive, searching the entire subtree rooted at the name specified in {@link #setSearchDn(String)}.
+         * Otherwise search one level of the named context.
+         *
+         * @return this builder
+         */
+        public IdentityMappingBuilder searchRecursive() {
+<span class="nc" id="L302">            assertNotBuilt();</span>
+
+<span class="nc" id="L304">            this.searchRecursive = true;</span>
+<span class="nc" id="L305">            return this;</span>
+        }
+
+        /**
+         * Sets the time limit of LDAP search in milliseconds.
+         *
+         * @param limit the limit in milliseconds. Defaults to {@value #DEFAULT_SEARCH_TIME_LIMIT} milliseconds.
+         * @return this builder
+         */
+        public IdentityMappingBuilder setSearchTimeLimit(int limit) {
+<span class="nc" id="L315">            assertNotBuilt();</span>
+
+<span class="nc" id="L317">            this.searchTimeLimit = limit;</span>
+<span class="nc" id="L318">            return this;</span>
+        }
+
+        /**
+         * Set the name of the attribute in LDAP that holds the user name and will appear in path of new entries.
+         *
+         * @param nameAttribute the name attribute
+         * @return this builder
+         */
+        public IdentityMappingBuilder setRdnIdentifier(final String nameAttribute) {
+<span class="nc" id="L328">            assertNotBuilt();</span>
+
+<span class="nc" id="L330">            this.nameAttribute = nameAttribute;</span>
+<span class="nc" id="L331">            return this;</span>
+        }
+
+        public IdentityMappingBuilder setNewIdentityParent(LdapName newIdentityParent) {
+<span class="nc" id="L335">            assertNotBuilt();</span>
+
+<span class="nc" id="L337">            this.newIdentityParent = newIdentityParent;</span>
+<span class="nc" id="L338">            return this;</span>
+        }
+
+        public IdentityMappingBuilder setNewIdentityAttributes(Attributes newIdentityAttributes) {
+<span class="nc" id="L342">            assertNotBuilt();</span>
+
+<span class="nc" id="L344">            this.newIdentityAttributes = newIdentityAttributes;</span>
+<span class="nc" id="L345">            return this;</span>
+        }
+
+        public IdentityMappingBuilder setFilterName(String filterName) {
+<span class="nc" id="L349">            assertNotBuilt();</span>
+
+<span class="nc" id="L351">            this.filterName = filterName;</span>
+<span class="nc" id="L352">            return this;</span>
+        }
+
+        public IdentityMappingBuilder setIteratorFilter(String iteratorFilter) {
+<span class="nc" id="L356">            assertNotBuilt();</span>
+
+<span class="nc" id="L358">            this.iteratorFilter = iteratorFilter;</span>
+<span class="nc" id="L359">            return this;</span>
+        }
+
+        /**
+         * Define an attribute mapping configuration.
+         *
+         * @param attributes one or more {@link AttributeMapping} configuration
+         * @return this builder
+         */
+        public IdentityMappingBuilder map(AttributeMapping... attributes) {
+<span class="nc" id="L369">            assertNotBuilt();</span>
+
+<span class="nc" id="L371">            this.attributes.addAll(Arrays.asList(attributes));</span>
+<span class="nc" id="L372">            return this;</span>
+        }
+
+        public LdapSecurityRealmBuilder build() {
+<span class="nc" id="L376">            assertNotBuilt();</span>
+<span class="nc" id="L377">            built = true;</span>
+
+<span class="nc bnc" id="L379" title="All 2 branches missed.">            if (filterName == null) filterName = String.format(&quot;(%s={0})&quot;, nameAttribute);</span>
+
+<span class="nc" id="L381">            return LdapSecurityRealmBuilder.this.setIdentityMapping(new IdentityMapping(</span>
+                    searchDn, searchRecursive, searchTimeLimit, nameAttribute, attributes,
+                    newIdentityParent, newIdentityAttributes, filterName, iteratorFilter));
+        }
+
+        private void assertNotBuilt() {
+<span class="nc bnc" id="L387" title="All 2 branches missed.">            if (built) {</span>
+<span class="nc" id="L388">                throw log.builderAlreadyBuilt();</span>
+            }
+
+<span class="nc" id="L391">            LdapSecurityRealmBuilder.this.assertNotBuilt();</span>
+<span class="nc" id="L392">        }</span>
+
+    }
+
+<span class="nc" id="L396">    public class UserPasswordCredentialLoaderBuilder {</span>
+
+<span class="nc" id="L398">        private boolean built = false;</span>
+
+<span class="nc" id="L400">        private String userPasswordAttribute = UserPasswordCredentialLoader.DEFAULT_USER_PASSWORD_ATTRIBUTE_NAME;</span>
+<span class="nc" id="L401">        private boolean enablePersistence = false;</span>
+<span class="nc" id="L402">        private boolean enableVerification = true;</span>
+
+        /**
+         * Set the name of the attribute within the LDAP entry that should be queries to load the credential.
+         *
+         * @param userPasswordAttribute the name of the attribute within the LDAP entry that should be queries to load the credential.
+         * @return the {@link UserPasswordCredentialLoaderBuilder} to allow chaining of calls.
+         */
+        public UserPasswordCredentialLoaderBuilder setUserPasswordAttribute(final String userPasswordAttribute) {
+<span class="nc" id="L411">            assertNotBuilt();</span>
+<span class="nc" id="L412">            this.userPasswordAttribute = userPasswordAttribute;</span>
+
+<span class="nc" id="L414">            return this;</span>
+        }
+
+        /**
+         * Enable persistence for the {@link UserPasswordCredentialLoader} being defined.
+         *
+         * @return the {@link UserPasswordCredentialLoaderBuilder} to allow chaining of calls.
+         */
+        public UserPasswordCredentialLoaderBuilder enablePersistence() {
+<span class="nc" id="L423">            assertNotBuilt();</span>
+<span class="nc" id="L424">            enablePersistence = true;</span>
+
+<span class="nc" id="L426">            return this;</span>
+        }
+
+        /**
+         * By default if we can obtain a credential we support verification against it, this disables it.
+         *
+         * @return the {@link UserPasswordCredentialLoaderBuilder} to allow chaining of calls.
+         */
+        public UserPasswordCredentialLoaderBuilder disableVerification() {
+<span class="nc" id="L435">            assertNotBuilt();</span>
+<span class="nc" id="L436">            enableVerification = false;</span>
+
+<span class="nc" id="L438">            return this;</span>
+        }
+
+        public LdapSecurityRealmBuilder build() {
+<span class="nc" id="L442">            assertNotBuilt();</span>
+<span class="nc" id="L443">            built = true;</span>
+
+<span class="nc" id="L445">            UserPasswordCredentialLoader upcl = new UserPasswordCredentialLoader(userPasswordAttribute);</span>
+<span class="nc" id="L446">            LdapSecurityRealmBuilder.this.addCredentialLoader(upcl);</span>
+<span class="nc bnc" id="L447" title="All 2 branches missed.">            if (enablePersistence) LdapSecurityRealmBuilder.this.addCredentialPersister(upcl);</span>
+<span class="nc bnc" id="L448" title="All 2 branches missed.">            if (enableVerification) LdapSecurityRealmBuilder.this.addEvidenceVerifier(upcl.toEvidenceVerifier());</span>
+
+<span class="nc" id="L450">            return LdapSecurityRealmBuilder.this;</span>
+        }
+
+
+        private void assertNotBuilt() {
+<span class="nc bnc" id="L455" title="All 2 branches missed.">            if (built) {</span>
+<span class="nc" id="L456">                throw log.builderAlreadyBuilt();</span>
+            }
+
+<span class="nc" id="L459">            LdapSecurityRealmBuilder.this.assertNotBuilt();</span>
+<span class="nc" id="L460">        }</span>
+    }
+
+<span class="nc" id="L463">    public class OtpCredentialLoaderBuilder {</span>
+
+<span class="nc" id="L465">        private boolean built = false;</span>
+
+<span class="nc" id="L467">        private String otpAlgorithmAttribute = null;</span>
+<span class="nc" id="L468">        private String otpHashAttribute = null;</span>
+<span class="nc" id="L469">        private String otpSeedAttribute = null;</span>
+<span class="nc" id="L470">        private String otpSequenceAttribute = null;</span>
+
+        public OtpCredentialLoaderBuilder setOtpAlgorithmAttribute(final String otpAlgorithmAttribute) {
+<span class="nc" id="L473">            assertNotBuilt();</span>
+<span class="nc" id="L474">            this.otpAlgorithmAttribute = otpAlgorithmAttribute;</span>
+
+<span class="nc" id="L476">            return this;</span>
+        }
+
+        public OtpCredentialLoaderBuilder setOtpHashAttribute(final String otpHashAttribute) {
+<span class="nc" id="L480">            assertNotBuilt();</span>
+<span class="nc" id="L481">            this.otpHashAttribute = otpHashAttribute;</span>
+
+<span class="nc" id="L483">            return this;</span>
+        }
+
+        public OtpCredentialLoaderBuilder setOtpSeedAttribute(final String otpSeedAttribute) {
+<span class="nc" id="L487">            assertNotBuilt();</span>
+<span class="nc" id="L488">            this.otpSeedAttribute = otpSeedAttribute;</span>
+
+<span class="nc" id="L490">            return this;</span>
+        }
+
+        public OtpCredentialLoaderBuilder setOtpSequenceAttribute(final String otpSequenceAttribute) {
+<span class="nc" id="L494">            assertNotBuilt();</span>
+<span class="nc" id="L495">            this.otpSequenceAttribute = otpSequenceAttribute;</span>
+
+<span class="nc" id="L497">            return this;</span>
+        }
+
+        public LdapSecurityRealmBuilder build() {
+<span class="nc" id="L501">            assertNotBuilt();</span>
+<span class="nc" id="L502">            built = true;</span>
+
+<span class="nc" id="L504">            OtpCredentialLoader ocl = new OtpCredentialLoader(otpAlgorithmAttribute, otpHashAttribute, otpSeedAttribute, otpSequenceAttribute);</span>
+<span class="nc" id="L505">            LdapSecurityRealmBuilder.this.addCredentialLoader(ocl);</span>
+<span class="nc" id="L506">            LdapSecurityRealmBuilder.this.addCredentialPersister(ocl);</span>
+
+<span class="nc" id="L508">            return LdapSecurityRealmBuilder.this;</span>
+        }
+
+        private void assertNotBuilt() {
+<span class="nc bnc" id="L512" title="All 2 branches missed.">            if (built) {</span>
+<span class="nc" id="L513">                throw log.builderAlreadyBuilt();</span>
+            }
+
+<span class="nc" id="L516">            LdapSecurityRealmBuilder.this.assertNotBuilt();</span>
+<span class="nc" id="L517">        }</span>
+    }
+
+<span class="nc" id="L520">    public class X509EvidenceVerifierBuilder {</span>
+
+<span class="nc" id="L522">        private boolean built = false;</span>
+
+<span class="nc" id="L524">        private List&lt;X509EvidenceVerifier.CertificateVerifier&gt; certificateVerifiers = new ArrayList&lt;&gt;();</span>
+
+        public X509EvidenceVerifierBuilder addSerialNumberCertificateVerifier(final String ldapAttribute) {
+<span class="nc" id="L527">            assertNotBuilt();</span>
+<span class="nc" id="L528">            certificateVerifiers.add(new X509EvidenceVerifier.SerialNumberCertificateVerifier(ldapAttribute));</span>
+
+<span class="nc" id="L530">            return this;</span>
+        }
+
+        public X509EvidenceVerifierBuilder addSubjectDnCertificateVerifier(final String ldapAttribute) {
+<span class="nc" id="L534">            assertNotBuilt();</span>
+<span class="nc" id="L535">            certificateVerifiers.add(new X509EvidenceVerifier.SubjectDnCertificateVerifier(ldapAttribute));</span>
+
+<span class="nc" id="L537">            return this;</span>
+        }
+
+        public X509EvidenceVerifierBuilder addDigestCertificateVerifier(final String ldapAttribute, final String algorithm) {
+<span class="nc" id="L541">            assertNotBuilt();</span>
+<span class="nc" id="L542">            certificateVerifiers.add(new X509EvidenceVerifier.DigestCertificateVerifier(ldapAttribute, algorithm));</span>
+
+<span class="nc" id="L544">            return this;</span>
+        }
+
+        public X509EvidenceVerifierBuilder addEncodedCertificateVerifier(final String ldapAttribute) {
+<span class="nc" id="L548">            assertNotBuilt();</span>
+<span class="nc" id="L549">            certificateVerifiers.add(new X509EvidenceVerifier.EncodedCertificateVerifier(ldapAttribute));</span>
+
+<span class="nc" id="L551">            return this;</span>
+        }
+
+        public LdapSecurityRealmBuilder build() {
+<span class="nc" id="L555">            assertNotBuilt();</span>
+<span class="nc" id="L556">            Assert.checkNotEmptyParam(&quot;certificateVerifiers&quot;, certificateVerifiers);</span>
+<span class="nc" id="L557">            built = true;</span>
+
+<span class="nc" id="L559">            addEvidenceVerifier(new X509EvidenceVerifier(certificateVerifiers));</span>
+
+<span class="nc" id="L561">            return LdapSecurityRealmBuilder.this;</span>
+        }
+
+        private void assertNotBuilt() {
+<span class="nc bnc" id="L565" title="All 2 branches missed.">            if (built) {</span>
+<span class="nc" id="L566">                throw log.builderAlreadyBuilt();</span>
+            }
+
+<span class="nc" id="L569">            LdapSecurityRealmBuilder.this.assertNotBuilt();</span>
+<span class="nc" id="L570">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

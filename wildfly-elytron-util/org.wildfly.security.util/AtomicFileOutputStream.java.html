@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AtomicFileOutputStream.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-util</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.util</a> &gt; <span class="el_source">AtomicFileOutputStream.java</span></div><h1>AtomicFileOutputStream.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.util;
+
+import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
+import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
+import static java.nio.file.StandardOpenOption.CREATE;
+import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
+
+/**
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class AtomicFileOutputStream extends OutputStream {
+    private volatile State current;
+
+<span class="fc" id="L40">    private static final AtomicReferenceFieldUpdater&lt;AtomicFileOutputStream, State&gt; currentUpdater = AtomicReferenceFieldUpdater.newUpdater(AtomicFileOutputStream.class, State.class, &quot;current&quot;);</span>
+
+    public AtomicFileOutputStream(final String name) throws IOException {
+<span class="nc" id="L43">        this(Paths.get(name));</span>
+<span class="nc" id="L44">    }</span>
+
+    public AtomicFileOutputStream(final File file) throws IOException {
+<span class="fc" id="L47">        this(file.toPath());</span>
+<span class="fc" id="L48">    }</span>
+
+<span class="fc" id="L50">    public AtomicFileOutputStream(final Path path) throws IOException {</span>
+<span class="fc" id="L51">        final Path parent = path.getParent();</span>
+<span class="pc bpc" id="L52" title="2 of 6 branches missed.">        if (parent != null &amp;&amp; parent.getNameCount() != 0 &amp;&amp; ! Files.exists(parent)) {</span>
+<span class="fc" id="L53">            Files.createDirectories(parent);</span>
+        }
+<span class="fc" id="L55">        current = new OpenState(Files.newOutputStream(path.resolveSibling(path.getFileName() + &quot;.new&quot;), CREATE, TRUNCATE_EXISTING), path);</span>
+<span class="fc" id="L56">    }</span>
+
+    public void flush() throws IOException {
+<span class="fc" id="L59">        current.flush();</span>
+<span class="fc" id="L60">    }</span>
+
+    public void close() throws IOException {
+<span class="fc" id="L63">        current.close();</span>
+<span class="fc" id="L64">    }</span>
+
+    public void write(final int b) throws IOException {
+<span class="fc" id="L67">        current.write(b);</span>
+<span class="fc" id="L68">    }</span>
+
+    public void write(final byte[] bytes, final int off, final int len) throws IOException {
+<span class="fc" id="L71">        current.write(bytes, off, len);</span>
+<span class="fc" id="L72">    }</span>
+
+    boolean casCurrent(State expect, State update) {
+<span class="fc" id="L75">        return currentUpdater.compareAndSet(this, expect, update);</span>
+    }
+
+    public void cancel() throws IOException {
+<span class="nc" id="L79">        current.cancel();</span>
+<span class="nc" id="L80">    }</span>
+
+<span class="fc" id="L82">    abstract static class State {</span>
+        abstract void write(int b) throws IOException;
+
+        abstract void write(byte[] b, int off, int len) throws IOException;
+
+        abstract void flush() throws IOException;
+
+        abstract void close() throws IOException;
+
+        abstract void cancel() throws IOException;
+    }
+
+    final class OpenState extends State {
+        private final OutputStream delegate;
+        private final Path path;
+
+<span class="fc" id="L98">        OpenState(final OutputStream delegate, final Path path) {</span>
+<span class="fc" id="L99">            this.delegate = delegate;</span>
+<span class="fc" id="L100">            this.path = path;</span>
+<span class="fc" id="L101">        }</span>
+
+        void write(final int b) throws IOException {
+<span class="fc" id="L104">            delegate.write(b);</span>
+<span class="fc" id="L105">        }</span>
+
+        void write(final byte[] b, final int off, final int len) throws IOException {
+<span class="fc" id="L108">            delegate.write(b, off, len);</span>
+<span class="fc" id="L109">        }</span>
+
+        void flush() throws IOException {
+<span class="fc" id="L112">            delegate.flush();</span>
+<span class="fc" id="L113">        }</span>
+
+        void close() throws IOException {
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">            if (casCurrent(this, CLOSED)) {</span>
+                // atomic cleanup operation: close out our stream
+<span class="fc" id="L118">                delegate.close();</span>
+<span class="fc" id="L119">                final Path path = this.path;</span>
+<span class="fc" id="L120">                final Path newPath = path.resolveSibling(path.getFileName() + &quot;.new&quot;);</span>
+                try {
+                    // move new file in
+<span class="fc" id="L123">                    Files.move(newPath, path, REPLACE_EXISTING, ATOMIC_MOVE);</span>
+<span class="nc" id="L124">                } catch (Throwable t) {</span>
+                    try {
+                        // didn't work, gotta delete our temp copy
+<span class="nc" id="L127">                        Files.deleteIfExists(newPath);</span>
+<span class="nc" id="L128">                    } catch (Throwable problem) {</span>
+<span class="nc" id="L129">                        problem.addSuppressed(t);</span>
+<span class="nc" id="L130">                        throw problem;</span>
+<span class="nc" id="L131">                    }</span>
+<span class="nc" id="L132">                    throw t;</span>
+<span class="fc" id="L133">                }</span>
+            }
+<span class="fc" id="L135">        }</span>
+
+        void cancel() throws IOException {
+<span class="nc bnc" id="L138" title="All 2 branches missed.">            if (casCurrent(this, CLOSED)) {</span>
+<span class="nc" id="L139">                delegate.close();</span>
+<span class="nc" id="L140">                final Path newPath = path.resolveSibling(path.getFileName() + &quot;.new&quot;);</span>
+<span class="nc" id="L141">                Files.deleteIfExists(newPath);</span>
+            }
+<span class="nc" id="L143">        }</span>
+    }
+
+<span class="fc" id="L146">    private static final State CLOSED = new State() {</span>
+        void write(final int b) throws IOException {
+<span class="nc" id="L148">            throw ElytronMessages.log.closed();</span>
+        }
+
+        void write(final byte[] b, final int off, final int len) throws IOException {
+<span class="nc" id="L152">            throw ElytronMessages.log.closed();</span>
+        }
+
+        void flush() throws IOException {
+<span class="nc" id="L156">            throw ElytronMessages.log.closed();</span>
+        }
+
+        void close() throws IOException {
+            // no op
+<span class="fc" id="L161">        }</span>
+
+        void cancel() throws IOException {
+            // no op
+<span class="nc" id="L165">        }</span>
+    };
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

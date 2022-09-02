@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Digest.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-ssl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.ssl</a> &gt; <span class="el_source">Digest.java</span></div><h1>Digest.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.ssl;
+
+import java.util.EnumSet;
+
+/**
+ * The digest algorithm type for SSL/TLS cipher suite selection.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+<span class="fc" id="L28">public enum Digest {</span>
+    /**
+     * The MD5 digest algorithm.
+     */
+<span class="fc" id="L32">    MD5,</span>
+    /**
+     * The SHA-1 digest algorithm.
+     */
+<span class="fc" id="L36">    SHA1,</span>
+    /**
+     * The GOST R 34.11-94 (HMAC) digest algorithm.
+     */
+<span class="fc" id="L40">    GOST94,</span>
+    /**
+     * The GOST 28147-89 (MAC, not HMAC) digest algorithm.
+     */
+<span class="fc" id="L44">    GOST89MAC,</span>
+    /**
+     * The SHA-256 digest algorithm.
+     */
+<span class="fc" id="L48">    SHA256,</span>
+    /**
+     * The SHA-384 digest algorithm.
+     */
+<span class="fc" id="L52">    SHA384,</span>
+    /**
+     * AEAD (Authenticated Encryption with Associated Data) based authenticated message mode.
+     *
+     * @deprecated no longer used; refer to the actual digest algorithm instead.
+     */
+<span class="fc" id="L58">    @Deprecated</span>
+    AEAD,
+    ;
+<span class="fc" id="L61">    static final int fullSize = values().length;</span>
+
+    static Digest forName(final String name) {
+<span class="pc bpc" id="L64" title="1 of 8 branches missed.">        switch (name) {</span>
+<span class="fc" id="L65">            case &quot;MD5&quot;: return MD5;</span>
+<span class="fc" id="L66">            case &quot;SHA1&quot;: return SHA1;</span>
+<span class="fc" id="L67">            case &quot;GOST94&quot;: return GOST94;</span>
+<span class="fc" id="L68">            case &quot;GOST89MAC&quot;: return GOST89MAC;</span>
+<span class="fc" id="L69">            case &quot;SHA256&quot;: return SHA256;</span>
+<span class="fc" id="L70">            case &quot;SHA384&quot;: return SHA384;</span>
+<span class="fc" id="L71">            case &quot;AEAD&quot;: return AEAD;</span>
+<span class="nc" id="L72">            default: return null;</span>
+        }
+    }
+
+    /**
+     * Determine whether the given set is &quot;full&quot; (meaning it contains all possible values).
+     *
+     * @param digests the set
+     * @return {@code true} if the set is full, {@code false} otherwise
+     */
+    public static boolean isFull(final EnumSet&lt;Digest&gt; digests) {
+<span class="nc bnc" id="L83" title="All 4 branches missed.">        return digests != null &amp;&amp; digests.size() == fullSize;</span>
+    }
+
+    /**
+     * Determine whether this instance is equal to one of the given instances.
+     *
+     * @param value1 the first instance
+     * @param value2 the second instance
+     * @return {@code true} if one of the instances matches this one, {@code false} otherwise
+     */
+    public boolean in(final Digest value1, final Digest value2) {
+<span class="nc bnc" id="L94" title="All 4 branches missed.">        return this == value1 || this == value2;</span>
+    }
+
+    /**
+     * Determine whether this instance is equal to one of the given instances.
+     *
+     * @param value1 the first instance
+     * @param value2 the second instance
+     * @param value3 the third instance
+     * @return {@code true} if one of the instances matches this one, {@code false} otherwise
+     */
+    public boolean in(final Digest value1, final Digest value2, final Digest value3) {
+<span class="nc bnc" id="L106" title="All 6 branches missed.">        return this == value1 || this == value2 || this == value3;</span>
+    }
+
+    /**
+     * Determine whether this instance is equal to one of the given instances.
+     *
+     * @param values the values to match against
+     * @return {@code true} if one of the instances matches this one, {@code false} otherwise
+     */
+    public boolean in(final Digest... values) {
+<span class="nc bnc" id="L116" title="All 4 branches missed.">        if (values != null) for (Digest value : values) {</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">            if (this == value) return true;</span>
+        }
+<span class="nc" id="L119">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

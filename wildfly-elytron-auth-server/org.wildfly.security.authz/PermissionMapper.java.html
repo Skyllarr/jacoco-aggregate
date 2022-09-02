@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PermissionMapper.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.authz</a> &gt; <span class="el_source">PermissionMapper.java</span></div><h1>PermissionMapper.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source
+ *
+ * Copyright 2015 Red Hat, Inc. and/or its affiliates.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.authz;
+
+import java.security.Permission;
+
+import org.wildfly.security.auth.server.SecurityDomain;
+import org.wildfly.security.permission.PermissionVerifier;
+
+/**
+ * A permission mapper is responsible to enable permission mapping to a {@link SecurityDomain}
+ * in order to obtain and check permissions based on an previously authorized identity and any other authorization information (eg.: roles)
+ * associated with it.
+ *
+ * @author &lt;a href=&quot;mailto:psilva@redhat.com&quot;&gt;Pedro Igor&lt;/a&gt;
+ */
+@FunctionalInterface
+public interface PermissionMapper {
+
+    /**
+     * &lt;p&gt;Returns a {@link PermissionVerifier} with all the permissions associated with the given information.
+     *
+     * &lt;p&gt;Once returned, client code can use the {@link PermissionVerifier#implies(Permission)} to check if a given permission is granted or not
+     * to the given principal. Implementors must make sure that the returned collection is immutable.
+     *
+     * @param permissionMappable the object to which permissions can be mapped (must not be {@code null})
+     * @param roles a set of effective roles after all role mapping was applied by security domain (may be {@code null})
+     * @return a permission verifier (not {@code null})
+     */
+    PermissionVerifier mapPermissions(PermissionMappable permissionMappable, Roles roles);
+
+    /**
+     * Returns a new mapper where the {@link PermissionVerifier} created by this {@link PermissionMapper} is combined with the
+     * {@code PermissionVerifier} of the {@code other} {@code PermissionMapper} using 'and'.
+     *
+     * @param other the other {@link PermissionMapper} to combine with this {@link PermissionMapper}
+     * @return the combined {@link PermissionMapper}
+     */
+    default PermissionMapper and(final PermissionMapper other) {
+<span class="nc" id="L55">        return (p, r) -&gt; mapPermissions(p, r).and(other.mapPermissions(p, r));</span>
+    }
+
+    /**
+     * Returns a new mapper where the {@link PermissionVerifier} created by this {@link PermissionMapper} is combined with the
+     * {@code PermissionVerifier} of the {@code other} {@code PermissionMapper} using 'or'.
+     *
+     * @param other the other {@link PermissionMapper} to combine with this {@link PermissionMapper}
+     * @return the combined {@link PermissionMapper}
+     */
+    default PermissionMapper or(final PermissionMapper other) {
+<span class="nc" id="L66">        return (p, r) -&gt; mapPermissions(p, r).or(other.mapPermissions(p, r));</span>
+    }
+
+    /**
+     * Returns a new mapper where the {@link PermissionVerifier} created by this {@link PermissionMapper} is combined with the
+     * {@code PermissionVerifier} of the {@code other} {@code PermissionMapper} using 'xor'.
+     *
+     * @param other the other {@link PermissionMapper} to combine with this {@link PermissionMapper}
+     * @return the combined {@link PermissionMapper}
+     */
+    default PermissionMapper xor(final PermissionMapper other) {
+<span class="nc" id="L77">        return (p, r) -&gt; mapPermissions(p, r).xor(other.mapPermissions(p, r));</span>
+    }
+
+    /**
+     * Returns a new mapper where the {@link PermissionVerifier} created by this {@link PermissionMapper} is combined with the
+     * {@code PermissionVerifier} of the {@code other} {@code PermissionMapper} using 'unless'.
+     *
+     * @param other the other {@link PermissionMapper} to combine with this {@link PermissionMapper}
+     * @return the combined {@link PermissionMapper}
+     */
+    default PermissionMapper unless(final PermissionMapper other) {
+<span class="nc" id="L88">        return (p, r) -&gt; mapPermissions(p, r).unless(other.mapPermissions(p, r));</span>
+    }
+
+    /**
+     * Returns a new mapper that maps all to pre-defined {@link PermissionVerifier} instance.
+     * @param verifier the {@link PermissionVerifier} that will be returned for anybody.
+     * @return the constant {@link PermissionVerifier}
+     */
+    static PermissionMapper createConstant(PermissionVerifier verifier) {
+<span class="fc" id="L97">        return (p, r) -&gt; verifier;</span>
+    }
+
+    /**
+     * A default implementation that does nothing but returns an empty and read-only {@link PermissionVerifier}.
+     */
+<span class="pc" id="L103">    PermissionMapper EMPTY_PERMISSION_MAPPER = (permissionMappable, roles) -&gt; PermissionVerifier.NONE;</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

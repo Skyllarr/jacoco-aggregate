@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ExclusiveNameCallback.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.callback</a> &gt; <span class="el_source">ExclusiveNameCallback.java</span></div><h1>ExclusiveNameCallback.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.callback;
+
+import javax.security.auth.callback.NameCallback;
+
+/**
+ * A variation on {@code NameCallback} which allows exclusive access to the backing identity to be requested.
+ *
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+public class ExclusiveNameCallback extends NameCallback implements ExtendedCallback {
+
+    private static final long serialVersionUID = 3332866436399055886L;
+
+    /**
+     * @serial A flag indicating whether exclusive access to the backing identity is required.
+     */
+    private final boolean needsExclusiveAccess;
+
+    /**
+     * @serial A flag indicating whether exclusive access to the backing identity was granted.
+     */
+    private boolean exclusiveAccess;
+
+    /**
+     * @serial A flag indicating whether the callback is optional.
+     */
+    private final boolean optional;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param prompt the text prompt (must not be {@code null})
+     * @param needsExclusiveAccess {@code true} if exclusive access to the backing identity is required
+     * @param optional {@code true} if the support for the callback is optional
+     */
+    public ExclusiveNameCallback(final String prompt, final boolean needsExclusiveAccess, final boolean optional) {
+<span class="nc" id="L55">        super(prompt);</span>
+<span class="nc" id="L56">        this.needsExclusiveAccess = needsExclusiveAccess;</span>
+<span class="nc" id="L57">        this.optional = optional;</span>
+<span class="nc" id="L58">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param prompt the text prompt (must not be {@code null})
+     * @param defaultName the name to be used as the default name displayed with the prompt
+     * @param needsExclusiveAccess {@code true} if exclusive access to the backing identity is required
+     * @param optional {@code true} if the support for the callback is optional
+     */
+    public ExclusiveNameCallback(final String prompt, final String defaultName, final boolean needsExclusiveAccess, final boolean optional) {
+<span class="nc" id="L69">        super(prompt, defaultName);</span>
+<span class="nc" id="L70">        this.needsExclusiveAccess = needsExclusiveAccess;</span>
+<span class="nc" id="L71">        this.optional = optional;</span>
+<span class="nc" id="L72">    }</span>
+
+    /**
+     * Determine if exclusive access to the backing identity is required.
+     *
+     * @return {@code true} if exclusive access to the backing identity is required, {@code false} otherwise
+     */
+    public boolean needsExclusiveAccess() {
+<span class="nc" id="L80">        return needsExclusiveAccess;</span>
+    }
+
+    /**
+     * Determine if exclusive access to the backing identity was granted.
+     *
+     * @return {@code true} if exclusive access to the backing identity was granted, {@code false} otherwise
+     */
+    public boolean hasExclusiveAccess() {
+<span class="nc" id="L89">        return exclusiveAccess;</span>
+    }
+
+    /**
+     * Set whether exclusive access to the backing identity was granted.
+     *
+     * @param exclusiveAccess {@code true} if exclusive access to the backing identity was granted, {@code false} otherwise
+     */
+    public void setExclusiveAccess(final boolean exclusiveAccess) {
+<span class="nc" id="L98">        this.exclusiveAccess = exclusiveAccess;</span>
+<span class="nc" id="L99">    }</span>
+
+    public boolean isOptional() {
+<span class="nc" id="L102">        return optional;</span>
+    }
+
+    public boolean needsInformation() {
+<span class="nc" id="L106">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

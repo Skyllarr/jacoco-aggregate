@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>EnumerationIterator.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-util</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.util</a> &gt; <span class="el_source">EnumerationIterator.java</span></div><h1>EnumerationIterator.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.util;
+
+import java.util.Enumeration;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
+
+/**
+ * An enumeration which is also an iterator.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public interface EnumerationIterator&lt;E&gt; extends Enumeration&lt;E&gt;, Iterator&lt;E&gt; {
+    /**
+     * Determine if there are more elements to iterate over in the direction of this iterator.
+     *
+     * @return {@code true} if there are more elements, {@code false} otherwise
+     */
+    default boolean hasMoreElements() {
+<span class="nc" id="L37">        return hasNext();</span>
+    }
+
+    /**
+     * Get the next element in the direction of this iterator.
+     *
+     * @return the next element
+     */
+    default E nextElement() {
+<span class="nc" id="L46">        return next();</span>
+    }
+
+    /**
+     * Get an enumeration iterator over one element.
+     *
+     * @param item the element
+     * @param &lt;E&gt; the element type
+     * @return the enumeration iterator
+     */
+    static &lt;E&gt; EnumerationIterator&lt;E&gt; over(E item) {
+<span class="fc" id="L57">        return new EnumerationIterator&lt;E&gt;() {</span>
+            boolean done;
+            public boolean hasNext() {
+<span class="fc bfc" id="L60" title="All 2 branches covered.">                return ! done;</span>
+            }
+
+            public E next() {
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">                if (! hasNext()) throw new NoSuchElementException();</span>
+<span class="fc" id="L65">                done = true;</span>
+<span class="fc" id="L66">                return item;</span>
+            }
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-audit</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.audit</a> &gt; <span class="el_source">ElytronMessages.java</span></div><h1>ElytronMessages.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.audit;
+
+import java.io.IOException;
+import java.net.PortUnreachableException;
+
+import org.jboss.logging.BasicLogger;
+import org.jboss.logging.Logger;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.LogMessage;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageLogger;
+import org.jboss.logging.annotations.ValidIdRange;
+import org.jboss.logging.annotations.ValidIdRanges;
+
+/**
+ * Log messages and exceptions for Elytron.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+@MessageLogger(projectCode = &quot;ELY&quot;, length = 5)
+@ValidIdRanges({
+    @ValidIdRange(min = 11001, max = 11007),
+    @ValidIdRange(min = 12000, max = 12999)
+})
+interface ElytronMessages extends BasicLogger {
+<span class="nc" id="L44">    ElytronMessages audit = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.audit&quot;);</span>
+
+    /* Audit Exceptions */
+
+    // 11000 - Unused in any Final release
+
+    @LogMessage(level = Logger.Level.FATAL)
+    @Message(id = 11001, value = &quot;Endpoint unable to handle SecurityEvent priority=%s, message=%s&quot;)
+    void endpointUnavaiable(String priority, String message, @Cause Throwable cause);
+
+    @Message(id = 11002, value = &quot;Invalid EventPriority '%s' passed to AuditEndpoint.&quot;)
+    IllegalArgumentException invalidEventPriority(EventPriority eventPriority);
+
+    @LogMessage(level = Logger.Level.ERROR)
+    @Message(id = 11003, value = &quot;Unable to rotate log file&quot;)
+    void unableToRotateLogFile( @Cause Throwable cause);
+
+    @Message(id = 11004, value = &quot;Invalid suffix \&quot;%s\&quot; - rotating by second or millisecond is not supported&quot;)
+    IllegalArgumentException rotatingBySecondUnsupported(String suffix);
+
+    @LogMessage(level = Logger.Level.FATAL)
+    @Message(id = 11007, value = &quot;Endpoint unable to accept SecurityEvent.&quot;)
+    void unableToAcceptEvent(@Cause Throwable cause);
+
+    /*
+     * The error code 12000 had accidentally been used twice, to avoid ambiguity it has been replaced with 12003.
+     */
+
+    //@Message(id = 12000, value = &quot;The reconnect attempts value of %s is invalid. Please use an integer value &gt;= -1.&quot;)
+    //IllegalArgumentException badReconnectAttemptsNumber(int reconnectAttempts);
+
+    @Message(id = 12001, value = &quot;The maximum reconnect attempts value of %s was reached. The syslog endpoint will be shutdown.&quot;)
+    IOException syslogMaximumReconnectAttemptsReached(int reconnectAttempts);
+
+    @Message(id = 12002, value = &quot;The configured UDP port is unavailable.&quot;)
+    PortUnreachableException udpPortUnavailable(@Cause Throwable cause);
+
+    @Message(id = 12003, value = &quot;The reconnect attempts value of %s is invalid. Please use an integer value &gt;= -1.&quot;)
+    IllegalArgumentException badReconnectAttemptsNumber(int reconnectAttempts);
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-realm-token</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.realm.token._private</a> &gt; <span class="el_source">ElytronMessages.java</span></div><h1>ElytronMessages.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.realm.token._private;
+
+import static org.jboss.logging.Logger.Level.WARN;
+
+import java.net.URL;
+
+import org.jboss.logging.BasicLogger;
+import org.jboss.logging.Logger;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.LogMessage;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageLogger;
+import org.jboss.logging.annotations.ValidIdRange;
+import org.jboss.logging.annotations.ValidIdRanges;
+import org.wildfly.security.auth.server.RealmUnavailableException;
+
+/**
+ * Log messages and exceptions for Elytron.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+@MessageLogger(projectCode = &quot;ELY&quot;, length = 5)
+@ValidIdRanges({
+    @ValidIdRange(min = 1104, max = 1180),
+    @ValidIdRange(min = 1181, max = 1185)
+})
+public interface ElytronMessages extends BasicLogger {
+
+<span class="fc" id="L48">    ElytronMessages log = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security&quot;);</span>
+
+    @Message(id = 1104, value = &quot;OAuth2-based realm failed to obtain principal&quot;)
+    RuntimeException tokenRealmFailedToObtainPrincipal(@Cause Throwable cause);
+
+    @Message(id = 1105, value = &quot;OAuth2-based realm failed to introspect token&quot;)
+    RealmUnavailableException tokenRealmOAuth2TokenIntrospectionFailed(@Cause Throwable cause);
+
+    @Message(id = 1113, value = &quot;Token-based realm failed to obtain principal from token using claim [%s]&quot;)
+    IllegalStateException tokenRealmFailedToObtainPrincipalWithClaim(String claimName);
+
+    @Message(id = 1114, value = &quot;Invalid token format. Tokens must have a signature part accordingly with JWS specification&quot;)
+    IllegalArgumentException tokenRealmJwtInvalidFormat();
+
+    @Message(id = 1115, value = &quot;Failed to parse token&quot;)
+    IllegalStateException tokenRealmJwtParseFailed(@Cause Throwable cause);
+
+    @Message(id = 1116, value = &quot;Signature verification failed&quot;)
+    IllegalStateException tokenRealmJwtSignatureCheckFailed(@Cause Throwable cause);
+
+    @Message(id = 1117, value = &quot;Invalid signature algorithm [%s]&quot;)
+    IllegalArgumentException tokenRealmJwtSignatureInvalidAlgorithm(String algorithm);
+
+    @Message(id = 1118, value = &quot;Public key could not be obtained. Probably due to an invalid PEM format.&quot;)
+    IllegalArgumentException tokenRealmJwtInvalidPublicKeyPem();
+
+    @LogMessage(level = WARN)
+    @Message(id = 1126, value = &quot;Jwt-based token realm not configured with a list of valid issuers. Ignoring issuer verification.&quot;)
+    void tokenRealmJwtWarnNoIssuerIgnoringIssuerCheck();
+
+    @LogMessage(level = WARN)
+    @Message(id = 1127, value = &quot;Jwt-based token not configured with a list of valid audiences. Ignoring audience verification.&quot;)
+    void tokenRealmJwtWarnNoAudienceIgnoringAudienceCheck();
+
+    @LogMessage(level = WARN)
+    @Message(id = 1128, value = &quot;Jwt-based token not configured with a public key. Ignoring signature verification.&quot;)
+    void tokenRealmJwtWarnNoPublicKeyIgnoringSignatureCheck();
+
+    @LogMessage(level = WARN)
+    @Message(id = 1178, value = &quot;Unable to update jwk set from \&quot;%1$s\&quot;.&quot;)
+    void unableToFetchJwks(String url);
+
+    @LogMessage(level = WARN)
+    @Message(id = 1179, value = &quot;SSL not configured. jku claim will not be supported.&quot;)
+    void tokenRealmJwtNoSSLIgnoringJku();
+
+    @LogMessage
+    @Message(id = 1180, value = &quot;Fetched jwk does not contain \&quot;%1$s\&quot; claim, ignoring...&quot;)
+    void tokenRealmJwkMissingClaim(String claim);
+
+    @LogMessage(level = WARN)
+    @Message(id = 1181, value = &quot;Not sending new request to jwks url \&quot;%s\&quot;. Last request time was %d.&quot;)
+    void avoidingFetchJwks(URL url, long timestamp);
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

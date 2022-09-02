@@ -1,0 +1,791 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PeerIdentity.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-client</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.client</a> &gt; <span class="el_source">PeerIdentity.java</span></div><h1>PeerIdentity.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.client;
+
+import java.security.Principal;
+import java.security.PrivilegedAction;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
+import java.util.Collections;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.ObjIntConsumer;
+import java.util.function.Supplier;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.ParametricPrivilegedAction;
+import org.wildfly.security.ParametricPrivilegedExceptionAction;
+import org.wildfly.security.auth.client._private.ElytronMessages;
+import org.wildfly.security.authz.Attributes;
+
+/**
+ * A peer's authenticated identity.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public abstract class PeerIdentity {
+    private final PeerIdentityContext context;
+    private final Principal peerPrincipal;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param configuration the opaque configuration (must not be {@code null})
+     * @param peerPrincipal the peer principal (must not be {@code null})
+     */
+<span class="nc" id="L56">    protected PeerIdentity(final Configuration configuration, final Principal peerPrincipal) {</span>
+<span class="nc" id="L57">        Assert.checkNotNullParam(&quot;configuration&quot;, configuration);</span>
+<span class="nc" id="L58">        Assert.checkNotNullParam(&quot;peerPrincipal&quot;, peerPrincipal);</span>
+<span class="nc" id="L59">        context = configuration.getContext();</span>
+<span class="nc" id="L60">        this.peerPrincipal = peerPrincipal;</span>
+<span class="nc" id="L61">    }</span>
+
+    /**
+     * Perform an optional pre-association action, called before association with the current thread.
+     */
+<span class="nc" id="L66">    protected void preAssociate() {}</span>
+
+    /**
+     * Perform an optional post-association action, called after association with the current thread has completed.
+     */
+<span class="nc" id="L71">    protected void postAssociate() {}</span>
+
+    private void safePostAssociate() {
+        try {
+<span class="nc" id="L75">            postAssociate();</span>
+<span class="nc" id="L76">        } catch (Throwable t) {</span>
+<span class="nc" id="L77">            ElytronMessages.log.postAssociationFailed(t);</span>
+<span class="nc" id="L78">        }</span>
+<span class="nc" id="L79">    }</span>
+
+    /**
+     * Determine if the peer identity context of this identity is the same as that of the given identity.
+     *
+     * @param other the other peer identity
+     * @return {@code true} if the identities share a context, {@code false} otherwise
+     */
+    public boolean isSamePeerIdentityContext(PeerIdentity other) {
+<span class="nc bnc" id="L88" title="All 4 branches missed.">        return other != null &amp;&amp; context == other.context;</span>
+    }
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param runnable the action to run
+     */
+    public void runAs(Runnable runnable) {
+<span class="nc" id="L97">        PeerIdentity old = context.getAndSetPeerIdentity(this);</span>
+        try {
+<span class="nc" id="L99">            preAssociate();</span>
+            try {
+<span class="nc" id="L101">                runnable.run();</span>
+            } finally {
+<span class="nc" id="L103">                safePostAssociate();</span>
+            }
+        } finally {
+<span class="nc" id="L106">            context.setPeerIdentity(old);</span>
+        }
+<span class="nc" id="L108">    }</span>
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param callable the action to run
+     * @param &lt;T&gt; the action return type
+     * @return the action result (may be {@code null})
+     * @throws PrivilegedActionException if the action fails
+     */
+    public &lt;T&gt; T runAs(Callable&lt;T&gt; callable) throws Exception {
+<span class="nc" id="L119">        PeerIdentity old = context.getAndSetPeerIdentity(this);</span>
+        try {
+<span class="nc" id="L121">            preAssociate();</span>
+            try {
+<span class="nc" id="L123">                return callable.call();</span>
+            } finally {
+<span class="nc" id="L125">                safePostAssociate();</span>
+            }
+        } finally {
+<span class="nc" id="L128">            context.setPeerIdentity(old);</span>
+        }
+    }
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param action the action to run
+     * @param &lt;T&gt; the action return type
+     * @return the action result (may be {@code null})
+     */
+    public &lt;T&gt; T runAs(PrivilegedAction&lt;T&gt; action) {
+<span class="nc" id="L140">        PeerIdentity old = context.getAndSetPeerIdentity(this);</span>
+        try {
+<span class="nc" id="L142">            preAssociate();</span>
+            try {
+<span class="nc" id="L144">                return action.run();</span>
+            } finally {
+<span class="nc" id="L146">                safePostAssociate();</span>
+            }
+        } finally {
+<span class="nc" id="L149">            context.setPeerIdentity(old);</span>
+        }
+    }
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param action the action to run
+     * @param &lt;T&gt; the action return type
+     * @return the action result (may be {@code null})
+     * @throws PrivilegedActionException if the action fails
+     */
+    public &lt;T&gt; T runAs(PrivilegedExceptionAction&lt;T&gt; action) throws PrivilegedActionException {
+<span class="nc" id="L162">        PeerIdentity old = context.getAndSetPeerIdentity(this);</span>
+        try {
+<span class="nc" id="L164">            preAssociate();</span>
+            try {
+<span class="nc" id="L166">                return action.run();</span>
+            } finally {
+<span class="nc" id="L168">                safePostAssociate();</span>
+            }
+<span class="nc" id="L170">        } catch (RuntimeException | PrivilegedActionException e) {</span>
+<span class="nc" id="L171">            throw e;</span>
+<span class="nc" id="L172">        } catch (Exception e) {</span>
+<span class="nc" id="L173">            throw new PrivilegedActionException(e);</span>
+        } finally {
+<span class="nc" id="L175">            context.setPeerIdentity(old);</span>
+        }
+    }
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param parameter the parameter to pass to the action
+     * @param action the action to run
+     * @param &lt;T&gt; the action return type
+     * @param &lt;P&gt; the action parameter type
+     * @return the action result (may be {@code null})
+     */
+    public &lt;T, P&gt; T runAs(P parameter, ParametricPrivilegedAction&lt;T, P&gt; action) {
+<span class="nc" id="L189">        PeerIdentity old = context.getAndSetPeerIdentity(this);</span>
+        try {
+<span class="nc" id="L191">            preAssociate();</span>
+            try {
+<span class="nc" id="L193">                return action.run(parameter);</span>
+            } finally {
+<span class="nc" id="L195">                safePostAssociate();</span>
+            }
+        } finally {
+<span class="nc" id="L198">            context.setPeerIdentity(old);</span>
+        }
+    }
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param parameter the parameter to pass to the action
+     * @param action the action to run
+     * @param &lt;T&gt; the action return type
+     * @param &lt;P&gt; the action parameter type
+     * @return the action result (may be {@code null})
+     * @throws PrivilegedActionException if the action fails
+     */
+    public &lt;T, P&gt; T runAs(P parameter, ParametricPrivilegedExceptionAction&lt;T, P&gt; action) throws PrivilegedActionException {
+<span class="nc" id="L213">        PeerIdentity old = context.getAndSetPeerIdentity(this);</span>
+        try {
+<span class="nc" id="L215">            preAssociate();</span>
+            try {
+<span class="nc" id="L217">                return action.run(parameter);</span>
+            } finally {
+<span class="nc" id="L219">                safePostAssociate();</span>
+            }
+<span class="nc" id="L221">        } catch (RuntimeException | PrivilegedActionException e) {</span>
+<span class="nc" id="L222">            throw e;</span>
+<span class="nc" id="L223">        } catch (Exception e) {</span>
+<span class="nc" id="L224">            throw new PrivilegedActionException(e);</span>
+        } finally {
+<span class="nc" id="L226">            context.setPeerIdentity(old);</span>
+        }
+    }
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param parameter the parameter to pass to the action
+     * @param action the action to run
+     * @param &lt;T&gt; the action parameter type
+     * @param &lt;R&gt; the action return type
+     * @return the action result (may be {@code null})
+     */
+    public &lt;T, R&gt; R runAsFunction(T parameter, Function&lt;T, R&gt; action) {
+<span class="nc" id="L240">        PeerIdentity old = context.getAndSetPeerIdentity(this);</span>
+        try {
+<span class="nc" id="L242">            preAssociate();</span>
+            try {
+<span class="nc" id="L244">                return action.apply(parameter);</span>
+            } finally {
+<span class="nc" id="L246">                safePostAssociate();</span>
+            }
+        } finally {
+<span class="nc" id="L249">            context.setPeerIdentity(old);</span>
+        }
+    }
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param parameter1 the first parameter to pass to the action
+     * @param parameter2 the second parameter to pass to the action
+     * @param action the action to run
+     * @param &lt;T&gt; the action first parameter type
+     * @param &lt;U&gt; the action second parameter type
+     * @param &lt;R&gt; the action return type
+     * @return the action result (may be {@code null})
+     */
+    public &lt;T, U, R&gt; R runAsFunction(T parameter1, U parameter2, BiFunction&lt;T, U, R&gt; action) {
+<span class="nc" id="L265">        PeerIdentity old = context.getAndSetPeerIdentity(this);</span>
+        try {
+<span class="nc" id="L267">            preAssociate();</span>
+            try {
+<span class="nc" id="L269">                return action.apply(parameter1, parameter2);</span>
+            } finally {
+<span class="nc" id="L271">                safePostAssociate();</span>
+            }
+        } finally {
+<span class="nc" id="L274">            context.setPeerIdentity(old);</span>
+        }
+    }
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param parameter the parameter to pass to the action
+     * @param action the action to run
+     * @param &lt;T&gt; the action parameter type
+     */
+    public &lt;T&gt; void runAsConsumer(T parameter, Consumer&lt;T&gt; action) {
+<span class="nc" id="L286">        PeerIdentity old = context.getAndSetPeerIdentity(this);</span>
+        try {
+<span class="nc" id="L288">            preAssociate();</span>
+            try {
+<span class="nc" id="L290">                action.accept(parameter);</span>
+            } finally {
+<span class="nc" id="L292">                safePostAssociate();</span>
+            }
+        } finally {
+<span class="nc" id="L295">            context.setPeerIdentity(old);</span>
+        }
+<span class="nc" id="L297">    }</span>
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param parameter1 the first parameter to pass to the action
+     * @param parameter2 the second parameter to pass to the action
+     * @param action the action to run
+     * @param &lt;T&gt; the action first parameter type
+     * @param &lt;U&gt; the action second parameter type
+     */
+    public &lt;T, U&gt; void runAsConsumer(T parameter1, U parameter2, BiConsumer&lt;T, U&gt; action) {
+<span class="nc" id="L309">        PeerIdentity old = context.getAndSetPeerIdentity(this);</span>
+        try {
+<span class="nc" id="L311">            preAssociate();</span>
+            try {
+<span class="nc" id="L313">                action.accept(parameter1, parameter2);</span>
+            } finally {
+<span class="nc" id="L315">                safePostAssociate();</span>
+            }
+        } finally {
+<span class="nc" id="L318">            context.setPeerIdentity(old);</span>
+        }
+<span class="nc" id="L320">    }</span>
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param supplier the action to run
+     * @param &lt;T&gt; the action return type
+     * @return the action result (may be {@code null})
+     * @throws PrivilegedActionException if the action fails
+     */
+    public &lt;T&gt; T runAsSupplier(Supplier&lt;T&gt; supplier) throws Exception {
+<span class="nc" id="L331">        PeerIdentity old = context.getAndSetPeerIdentity(this);</span>
+        try {
+<span class="nc" id="L333">            preAssociate();</span>
+            try {
+<span class="nc" id="L335">                return supplier.get();</span>
+            } finally {
+<span class="nc" id="L337">                safePostAssociate();</span>
+            }
+        } finally {
+<span class="nc" id="L340">            context.setPeerIdentity(old);</span>
+        }
+    }
+
+    /**
+     * Run an action under a series of identities.
+     *
+     * @param runnable the action to run
+     * @param identities the identities to use
+     */
+    public static void runAsAll(Runnable runnable, PeerIdentity... identities) {
+<span class="nc" id="L351">        int length = identities.length;</span>
+<span class="nc bnc" id="L352" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i ++) {</span>
+<span class="nc" id="L353">            PeerIdentity identity = identities[i];</span>
+<span class="nc" id="L354">            boolean ok = false;</span>
+            try {
+<span class="nc" id="L356">                identity.preAssociate();</span>
+<span class="nc" id="L357">                ok = true;</span>
+            } finally {
+<span class="nc bnc" id="L359" title="All 2 branches missed.">                if (! ok) {</span>
+<span class="nc bnc" id="L360" title="All 2 branches missed.">                    for (--i; i &gt;= 0; --i) {</span>
+<span class="nc" id="L361">                        identities[i].safePostAssociate();</span>
+                    }
+                }
+            }
+        }
+        try {
+<span class="nc" id="L367">            runnable.run();</span>
+        } finally {
+<span class="nc bnc" id="L369" title="All 2 branches missed.">            for (int i = length - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L370">                identities[i].safePostAssociate();</span>
+            }
+        }
+<span class="nc" id="L373">    }</span>
+
+    /**
+     * Run an action under a series of identities.
+     *
+     * @param callable the action to run
+     * @param identities the identities to use
+     * @param &lt;T&gt; the action return type
+     */
+    public static &lt;T&gt; T runAsAll(Callable&lt;T&gt; callable, PeerIdentity... identities) throws Exception {
+<span class="nc" id="L383">        int length = identities.length;</span>
+<span class="nc bnc" id="L384" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i ++) {</span>
+<span class="nc" id="L385">            PeerIdentity identity = identities[i];</span>
+<span class="nc" id="L386">            boolean ok = false;</span>
+            try {
+<span class="nc" id="L388">                identity.preAssociate();</span>
+<span class="nc" id="L389">                ok = true;</span>
+            } finally {
+<span class="nc bnc" id="L391" title="All 2 branches missed.">                if (! ok) {</span>
+<span class="nc bnc" id="L392" title="All 2 branches missed.">                    for (--i; i &gt;= 0; --i) {</span>
+<span class="nc" id="L393">                        identities[i].safePostAssociate();</span>
+                    }
+                }
+            }
+        }
+        try {
+<span class="nc" id="L399">            return callable.call();</span>
+        } finally {
+<span class="nc bnc" id="L401" title="All 2 branches missed.">            for (int i = length - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L402">                identities[i].safePostAssociate();</span>
+            }
+        }
+    }
+
+    /**
+     * Run an action under a series of identities.
+     *
+     * @param privilegedAction the action to run
+     * @param identities the identities to use
+     * @param &lt;T&gt; the action return type
+     */
+    public static &lt;T&gt; T runAsAll(PrivilegedAction&lt;T&gt; privilegedAction, PeerIdentity... identities) {
+<span class="nc" id="L415">        int length = identities.length;</span>
+<span class="nc bnc" id="L416" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i ++) {</span>
+<span class="nc" id="L417">            PeerIdentity identity = identities[i];</span>
+<span class="nc" id="L418">            boolean ok = false;</span>
+            try {
+<span class="nc" id="L420">                identity.preAssociate();</span>
+<span class="nc" id="L421">                ok = true;</span>
+            } finally {
+<span class="nc bnc" id="L423" title="All 2 branches missed.">                if (! ok) {</span>
+<span class="nc bnc" id="L424" title="All 2 branches missed.">                    for (--i; i &gt;= 0; --i) {</span>
+<span class="nc" id="L425">                        identities[i].safePostAssociate();</span>
+                    }
+                }
+            }
+        }
+        try {
+<span class="nc" id="L431">            return privilegedAction.run();</span>
+        } finally {
+<span class="nc bnc" id="L433" title="All 2 branches missed.">            for (int i = length - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L434">                identities[i].safePostAssociate();</span>
+            }
+        }
+    }
+
+    /**
+     * Run an action under a series of identities.
+     *
+     * @param privilegedAction the action to run
+     * @param identities the identities to use
+     * @param &lt;T&gt; the action return type
+     * @throws PrivilegedActionException if the action throws an exception
+     */
+    public static &lt;T&gt; T runAsAll(PrivilegedExceptionAction&lt;T&gt; privilegedAction, PeerIdentity... identities) throws PrivilegedActionException {
+<span class="nc" id="L448">        int length = identities.length;</span>
+<span class="nc bnc" id="L449" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i ++) {</span>
+<span class="nc" id="L450">            PeerIdentity identity = identities[i];</span>
+<span class="nc" id="L451">            boolean ok = false;</span>
+            try {
+<span class="nc" id="L453">                identity.preAssociate();</span>
+<span class="nc" id="L454">                ok = true;</span>
+            } finally {
+<span class="nc bnc" id="L456" title="All 2 branches missed.">                if (! ok) {</span>
+<span class="nc bnc" id="L457" title="All 2 branches missed.">                    for (--i; i &gt;= 0; --i) {</span>
+<span class="nc" id="L458">                        identities[i].safePostAssociate();</span>
+                    }
+                }
+            }
+        }
+        try {
+<span class="nc" id="L464">            return privilegedAction.run();</span>
+<span class="nc" id="L465">        } catch (RuntimeException | PrivilegedActionException e) {</span>
+<span class="nc" id="L466">            throw e;</span>
+<span class="nc" id="L467">        } catch (Exception e) {</span>
+<span class="nc" id="L468">            throw new PrivilegedActionException(e);</span>
+        } finally {
+<span class="nc bnc" id="L470" title="All 2 branches missed.">            for (int i = length - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L471">                identities[i].safePostAssociate();</span>
+            }
+        }
+    }
+
+    /**
+     * Run an action under a series of identities.
+     *
+     * @param parameter the parameter to pass to the action
+     * @param privilegedAction the action to run
+     * @param identities the identities to use
+     * @param &lt;T&gt; the action return type
+     * @param &lt;P&gt; the action parameter type
+     */
+    public static &lt;T, P&gt; T runAsAll(P parameter, ParametricPrivilegedAction&lt;T, P&gt; privilegedAction, PeerIdentity... identities) {
+<span class="nc" id="L486">        int length = identities.length;</span>
+<span class="nc bnc" id="L487" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i ++) {</span>
+<span class="nc" id="L488">            PeerIdentity identity = identities[i];</span>
+<span class="nc" id="L489">            boolean ok = false;</span>
+            try {
+<span class="nc" id="L491">                identity.preAssociate();</span>
+<span class="nc" id="L492">                ok = true;</span>
+            } finally {
+<span class="nc bnc" id="L494" title="All 2 branches missed.">                if (! ok) {</span>
+<span class="nc bnc" id="L495" title="All 2 branches missed.">                    for (--i; i &gt;= 0; --i) {</span>
+<span class="nc" id="L496">                        identities[i].safePostAssociate();</span>
+                    }
+                }
+            }
+        }
+        try {
+<span class="nc" id="L502">            return privilegedAction.run(parameter);</span>
+        } finally {
+<span class="nc bnc" id="L504" title="All 2 branches missed.">            for (int i = length - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L505">                identities[i].safePostAssociate();</span>
+            }
+        }
+    }
+
+    /**
+     * Run an action under a series of identities.
+     *
+     * @param parameter the parameter to pass to the action
+     * @param privilegedAction the action to run
+     * @param identities the identities to use
+     * @param &lt;T&gt; the action return type
+     * @param &lt;P&gt; the action parameter type
+     * @throws PrivilegedActionException if the action throws an exception
+     */
+    public static &lt;T, P&gt; T runAsAll(P parameter, ParametricPrivilegedExceptionAction&lt;T, P&gt; privilegedAction, PeerIdentity... identities) throws PrivilegedActionException {
+<span class="nc" id="L521">        int length = identities.length;</span>
+<span class="nc bnc" id="L522" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i ++) {</span>
+<span class="nc" id="L523">            PeerIdentity identity = identities[i];</span>
+<span class="nc" id="L524">            boolean ok = false;</span>
+            try {
+<span class="nc" id="L526">                identity.preAssociate();</span>
+<span class="nc" id="L527">                ok = true;</span>
+            } finally {
+<span class="nc bnc" id="L529" title="All 2 branches missed.">                if (! ok) {</span>
+<span class="nc bnc" id="L530" title="All 2 branches missed.">                    for (--i; i &gt;= 0; --i) {</span>
+<span class="nc" id="L531">                        identities[i].safePostAssociate();</span>
+                    }
+                }
+            }
+        }
+        try {
+<span class="nc" id="L537">            return privilegedAction.run(parameter);</span>
+<span class="nc" id="L538">        } catch (RuntimeException | PrivilegedActionException e) {</span>
+<span class="nc" id="L539">            throw e;</span>
+<span class="nc" id="L540">        } catch (Exception e) {</span>
+<span class="nc" id="L541">            throw new PrivilegedActionException(e);</span>
+        } finally {
+<span class="nc bnc" id="L543" title="All 2 branches missed.">            for (int i = length - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L544">                identities[i].safePostAssociate();</span>
+            }
+        }
+    }
+
+    /**
+     * Run an action under a series of identities.
+     *
+     * @param parameter the parameter to pass to the action
+     * @param privilegedAction the action to run
+     * @param identities the identities to use
+     * @param &lt;R&gt; the action return type
+     * @param &lt;T&gt; the action parameter type
+     */
+    public static &lt;R, T&gt; R runAsAllFunction(T parameter, Function&lt;T, R&gt; privilegedAction, PeerIdentity... identities) {
+<span class="nc" id="L559">        return runAsAllFunction(privilegedAction, parameter, Function::apply, identities);</span>
+    }
+
+    /**
+     * Run an action under a series of identities.
+     *
+     * @param parameter1 the first parameter to pass to the action
+     * @param parameter2 the second parameter to pass to the action
+     * @param privilegedAction the action to run
+     * @param identities the identities to use
+     * @param &lt;T&gt; the action first parameter type
+     * @param &lt;U&gt; the action second parameter type
+     * @param &lt;R&gt; the action return type
+     */
+    public static &lt;T, U, R&gt; R runAsAllFunction(T parameter1, U parameter2, BiFunction&lt;T, U, R&gt; privilegedAction, PeerIdentity... identities) {
+<span class="nc" id="L574">        int length = identities.length;</span>
+<span class="nc bnc" id="L575" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i ++) {</span>
+<span class="nc" id="L576">            PeerIdentity identity = identities[i];</span>
+<span class="nc" id="L577">            boolean ok = false;</span>
+            try {
+<span class="nc" id="L579">                identity.preAssociate();</span>
+<span class="nc" id="L580">                ok = true;</span>
+            } finally {
+<span class="nc bnc" id="L582" title="All 2 branches missed.">                if (! ok) {</span>
+<span class="nc bnc" id="L583" title="All 2 branches missed.">                    for (--i; i &gt;= 0; --i) {</span>
+<span class="nc" id="L584">                        identities[i].safePostAssociate();</span>
+                    }
+                }
+            }
+        }
+        try {
+<span class="nc" id="L590">            return privilegedAction.apply(parameter1, parameter2);</span>
+        } finally {
+<span class="nc bnc" id="L592" title="All 2 branches missed.">            for (int i = length - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L593">                identities[i].safePostAssociate();</span>
+            }
+        }
+    }
+
+    /**
+     * Run an action under a series of identities.
+     *
+     * @param parameter the parameter to pass to the action
+     * @param privilegedAction the action to run
+     * @param identities the identities to use
+     * @param &lt;T&gt; the action parameter type
+     */
+    public static &lt;T&gt; void runAsAllConsumer(T parameter, Consumer&lt;T&gt; privilegedAction, PeerIdentity... identities) {
+<span class="nc" id="L607">        runAsAllConsumer(privilegedAction, parameter, Consumer::accept, identities);</span>
+<span class="nc" id="L608">    }</span>
+
+    /**
+     * Run an action under a series of identities.
+     *
+     * @param parameter1 the first parameter to pass to the action
+     * @param parameter2 the second parameter to pass to the action
+     * @param privilegedAction the action to run
+     * @param identities the identities to use
+     * @param &lt;T&gt; the action first parameter type
+     * @param &lt;U&gt; the action second parameter type
+     */
+    public static &lt;T, U&gt; void runAsAllConsumer(T parameter1, U parameter2, BiConsumer&lt;T, U&gt; privilegedAction, PeerIdentity... identities) {
+<span class="nc" id="L621">        int length = identities.length;</span>
+<span class="nc bnc" id="L622" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i ++) {</span>
+<span class="nc" id="L623">            PeerIdentity identity = identities[i];</span>
+<span class="nc" id="L624">            boolean ok = false;</span>
+            try {
+<span class="nc" id="L626">                identity.preAssociate();</span>
+<span class="nc" id="L627">                ok = true;</span>
+            } finally {
+<span class="nc bnc" id="L629" title="All 2 branches missed.">                if (! ok) {</span>
+<span class="nc bnc" id="L630" title="All 2 branches missed.">                    for (--i; i &gt;= 0; --i) {</span>
+<span class="nc" id="L631">                        identities[i].safePostAssociate();</span>
+                    }
+                }
+            }
+        }
+        try {
+<span class="nc" id="L637">            privilegedAction.accept(parameter1, parameter2);</span>
+        } finally {
+<span class="nc bnc" id="L639" title="All 2 branches missed.">            for (int i = length - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L640">                identities[i].safePostAssociate();</span>
+            }
+        }
+<span class="nc" id="L643">    }</span>
+
+    /**
+     * Run an action under a series of identities.
+     *
+     * @param parameter1 the first parameter to pass to the action
+     * @param parameter2 the second parameter to pass to the action
+     * @param privilegedAction the action to run
+     * @param identities the identities to use
+     * @param &lt;T&gt; the action first parameter type
+     */
+    public static &lt;T&gt; void runAsAllObjIntConsumer(T parameter1, int parameter2, ObjIntConsumer&lt;T&gt; privilegedAction, PeerIdentity... identities) {
+<span class="nc" id="L655">        int length = identities.length;</span>
+<span class="nc bnc" id="L656" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i ++) {</span>
+<span class="nc" id="L657">            PeerIdentity identity = identities[i];</span>
+<span class="nc" id="L658">            boolean ok = false;</span>
+            try {
+<span class="nc" id="L660">                identity.preAssociate();</span>
+<span class="nc" id="L661">                ok = true;</span>
+            } finally {
+<span class="nc bnc" id="L663" title="All 2 branches missed.">                if (! ok) {</span>
+<span class="nc bnc" id="L664" title="All 2 branches missed.">                    for (--i; i &gt;= 0; --i) {</span>
+<span class="nc" id="L665">                        identities[i].safePostAssociate();</span>
+                    }
+                }
+            }
+        }
+        try {
+<span class="nc" id="L671">            privilegedAction.accept(parameter1, parameter2);</span>
+        } finally {
+<span class="nc bnc" id="L673" title="All 2 branches missed.">            for (int i = length - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L674">                identities[i].safePostAssociate();</span>
+            }
+        }
+<span class="nc" id="L677">    }</span>
+
+    /**
+     * Run an action under a series of identities.
+     *
+     * @param action the action to run
+     * @param identities the identities to use
+     * @param &lt;T&gt; the action return type
+     */
+    public static &lt;T&gt; T runAsAllSupplier(Supplier&lt;T&gt; action, PeerIdentity... identities) {
+<span class="nc" id="L687">        int length = identities.length;</span>
+<span class="nc bnc" id="L688" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i ++) {</span>
+<span class="nc" id="L689">            PeerIdentity identity = identities[i];</span>
+<span class="nc" id="L690">            boolean ok = false;</span>
+            try {
+<span class="nc" id="L692">                identity.preAssociate();</span>
+<span class="nc" id="L693">                ok = true;</span>
+            } finally {
+<span class="nc bnc" id="L695" title="All 2 branches missed.">                if (! ok) {</span>
+<span class="nc bnc" id="L696" title="All 2 branches missed.">                    for (--i; i &gt;= 0; --i) {</span>
+<span class="nc" id="L697">                        identities[i].safePostAssociate();</span>
+                    }
+                }
+            }
+        }
+        try {
+<span class="nc" id="L703">            return action.get();</span>
+        } finally {
+<span class="nc bnc" id="L705" title="All 2 branches missed.">            for (int i = length - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L706">                identities[i].safePostAssociate();</span>
+            }
+        }
+    }
+
+    /**
+     * Get the peer principal.
+     *
+     * @return the peer principal (not {@code null})
+     */
+    public Principal getPeerPrincipal() {
+<span class="nc" id="L717">        return peerPrincipal;</span>
+    }
+
+    /**
+     * Get the peer identity roles.  The default implementation returns an empty set.
+     *
+     * @return the peer identity role set (not {@code null})
+     */
+    public Set&lt;String&gt; getPeerRoles() {
+<span class="nc" id="L726">        return Collections.emptySet();</span>
+    }
+
+    /**
+     * Determine whether the peer identity has a given role name.  The default implementation returns {@code false}.
+     *
+     * @param roleName the role name
+     * @return {@code true} if the peer identity has the role, {@code false} otherwise
+     */
+    public boolean hasPeerRole(final String roleName) {
+<span class="nc" id="L736">        return false;</span>
+    }
+
+    /**
+     * Get the attribute set for the peer identity.  The default implementation returns an empty attributes set.
+     *
+     * @return the peer identity attributes
+     */
+    public Attributes getPeerAttributes() {
+<span class="nc" id="L745">        return Attributes.EMPTY;</span>
+    }
+
+    /**
+     * Get a specific attribute value for the peer identity.  The default implementation returns {@code null}.
+     *
+     * @param key the attribute name
+     * @return the attribute value entry, or {@code null} if there is no matching entry
+     */
+    public Attributes.Entry getPeerAttribute(final String key) {
+<span class="nc" id="L755">        return null;</span>
+    }
+
+    /**
+     * Get the peer identity context for this identity.
+     *
+     * @return the peer identity context for this identity (not {@code null})
+     */
+    protected final PeerIdentityContext getPeerIdentityContext() {
+<span class="nc" id="L764">        return context;</span>
+    }
+
+    /**
+     * The opaque configuration to apply to a peer identity.
+     */
+    public static final class Configuration {
+        private final PeerIdentityContext context;
+<span class="nc" id="L772">        private final Thread thread = Thread.currentThread();</span>
+        private boolean terminated;
+
+<span class="nc" id="L775">        Configuration(final PeerIdentityContext context) {</span>
+<span class="nc" id="L776">            this.context = context;</span>
+<span class="nc" id="L777">        }</span>
+
+        PeerIdentityContext getContext() {
+<span class="nc bnc" id="L780" title="All 4 branches missed.">            if (thread != Thread.currentThread() || terminated) {</span>
+<span class="nc" id="L781">                throw new SecurityException();</span>
+            }
+<span class="nc" id="L783">            return context;</span>
+        }
+
+        void terminate() {
+<span class="nc" id="L787">            terminated = true;</span>
+<span class="nc" id="L788">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OAuth2SaslClient.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl-oauth2</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.oauth2</a> &gt; <span class="el_source">OAuth2SaslClient.java</span></div><h1>OAuth2SaslClient.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.oauth2;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.mechanism.AuthenticationMechanismException;
+import org.wildfly.security.mechanism.oauth2.OAuth2Client;
+import org.wildfly.security.mechanism.oauth2.OAuth2InitialClientMessage;
+import org.wildfly.security.sasl.util.AbstractSaslClient;
+
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.sasl.SaslException;
+
+import static org.wildfly.security.mechanism._private.ElytronMessages.saslOAuth2;
+
+/**
+ * An OAuth2 Sasl Client based on RFC-7628.
+ *
+ * @author &lt;a href=&quot;mailto:psilva@redhat.com&quot;&gt;Pedro Igor&lt;/a&gt;
+ */
+final class OAuth2SaslClient extends AbstractSaslClient {
+
+    private static final int S_FIRST_MESSAGE = 1;
+    private static final int S_FINAL_SERVER_RESPONSE = 2;
+    private final OAuth2Client oauth2Client;
+
+    OAuth2SaslClient(final String mechanismName, final String protocol, final String serverName, final CallbackHandler callbackHandler, final String authorizationId, OAuth2Client oauth2Client) {
+<span class="nc" id="L44">        super(mechanismName, protocol, serverName, callbackHandler, authorizationId, true, saslOAuth2);</span>
+<span class="nc" id="L45">        this.oauth2Client = oauth2Client;</span>
+<span class="nc" id="L46">        setNegotiationState(S_FIRST_MESSAGE);</span>
+<span class="nc" id="L47">    }</span>
+
+    public void dispose() throws SaslException {
+<span class="nc" id="L50">        setNegotiationState(FAILED_STATE);</span>
+<span class="nc" id="L51">    }</span>
+
+    protected byte[] evaluateMessage(final int state, final byte[] challenge) throws SaslException {
+<span class="nc" id="L54">        boolean ok = false;</span>
+        try {
+<span class="nc bnc" id="L56" title="All 3 branches missed.">            switch (state) {</span>
+                case S_FIRST_MESSAGE: {
+<span class="nc bnc" id="L58" title="All 2 branches missed.">                    if (challenge.length != 0) {</span>
+<span class="nc" id="L59">                        throw saslOAuth2.mechInitialChallengeMustBeEmpty().toSaslException();</span>
+                    }
+
+<span class="nc" id="L62">                    OAuth2InitialClientMessage initialResponse = this.oauth2Client.getInitialResponse();</span>
+
+<span class="nc" id="L64">                    setNegotiationState(S_FINAL_SERVER_RESPONSE);</span>
+<span class="nc" id="L65">                    ok = true;</span>
+
+<span class="nc" id="L67">                    return initialResponse.getMessage();</span>
+                }
+                case S_FINAL_SERVER_RESPONSE: {
+<span class="nc" id="L70">                    byte[] finalMessage = this.oauth2Client.handleServerResponse(challenge);</span>
+
+                    // successful authentication
+<span class="nc bnc" id="L73" title="All 2 branches missed.">                    if (finalMessage == null) {</span>
+<span class="nc" id="L74">                        negotiationComplete();</span>
+<span class="nc" id="L75">                        ok = true;</span>
+                    }
+
+<span class="nc" id="L78">                    return finalMessage;</span>
+                }
+            }
+<span class="nc" id="L81">            throw Assert.impossibleSwitchCase(state);</span>
+<span class="nc" id="L82">        } catch (AuthenticationMechanismException e) {</span>
+<span class="nc" id="L83">            throw e.toSaslException();</span>
+        } finally {
+<span class="nc bnc" id="L85" title="All 2 branches missed.">            if (! ok) {</span>
+<span class="nc" id="L86">                setNegotiationState(FAILED_STATE);</span>
+            }
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

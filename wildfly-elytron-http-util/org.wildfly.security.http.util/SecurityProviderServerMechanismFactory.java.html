@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SecurityProviderServerMechanismFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-util</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.util</a> &gt; <span class="el_source">SecurityProviderServerMechanismFactory.java</span></div><h1>SecurityProviderServerMechanismFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.http.util;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+import static org.wildfly.security.http.util.ElytronMessages.log;
+import static org.wildfly.security.provider.util.ProviderUtil.INSTALLED_PROVIDERS;
+
+import java.security.NoSuchAlgorithmException;
+import java.security.Provider;
+import java.security.Provider.Service;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Supplier;
+
+import javax.security.auth.callback.CallbackHandler;
+
+import org.wildfly.security.http.HttpAuthenticationException;
+import org.wildfly.security.http.HttpServerAuthenticationMechanism;
+import org.wildfly.security.http.HttpServerAuthenticationMechanismFactory;
+
+/**
+ * A {@link HttpServerAuthenticationMechanismFactory} that loads factories from a supplied array of {@link Provider} instances.
+ * The provider service instances may or may not be cached.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public final class SecurityProviderServerMechanismFactory implements HttpServerAuthenticationMechanismFactory {
+
+<span class="nc" id="L51">    private static final String SERVICE_TYPE = HttpServerAuthenticationMechanismFactory.class.getSimpleName();</span>
+
+    private final Supplier&lt;Provider[]&gt; providerSupplier;
+    private volatile Provider[] providers;
+    private volatile Map&lt;String, List&lt;Service&gt;&gt; services;
+
+    /**
+     * Construct a new instance which uses the globally registered {@link Provider} instances.
+     */
+    public SecurityProviderServerMechanismFactory() {
+<span class="nc" id="L61">        this(INSTALLED_PROVIDERS);</span>
+<span class="nc" id="L62">    }</span>
+
+    /**
+     * Construct a new instance of {@code SecurityProviderServerMechanismFactory}.
+     *
+     * @param providerSupplier a supplier of providers to use for locating the factories
+     */
+<span class="nc" id="L69">    public SecurityProviderServerMechanismFactory(Supplier&lt;Provider[]&gt; providerSupplier) {</span>
+<span class="nc" id="L70">        this.providerSupplier = checkNotNullParam(&quot;providerSupplier&quot;, providerSupplier);</span>
+<span class="nc" id="L71">    }</span>
+
+    /**
+     * Construct a new instance of {@code SecurityProviderServerMechanismFactory}.
+     *
+     * @param providers the provider instances this factory should use.
+     */
+<span class="nc" id="L78">    public SecurityProviderServerMechanismFactory(Provider[] providers) {</span>
+<span class="nc" id="L79">        this.providerSupplier = null;</span>
+<span class="nc" id="L80">        this.providers = checkNotNullParam(&quot;providers&quot;, providers);</span>
+<span class="nc" id="L81">    }</span>
+
+    /**
+     * Construct a new instance of {@code SecurityProviderServerMechanismFactory}.
+     *
+     * @param provider the provider instance this factory should use.
+     */
+    public SecurityProviderServerMechanismFactory(Provider provider) {
+<span class="nc" id="L89">        this(new Provider[] { checkNotNullParam(&quot;provider&quot;, provider) });</span>
+<span class="nc" id="L90">    }</span>
+
+    /**
+     * @see org.wildfly.security.http.HttpServerAuthenticationMechanismFactory#getMechanismNames(java.util.Map)
+     */
+    @Override
+    public String[] getMechanismNames(Map&lt;String, ?&gt; properties) {
+<span class="nc" id="L97">        Map&lt;String, List&lt;Service&gt;&gt; services = getServices();</span>
+        final Set&lt;String&gt; names;
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        if (properties.isEmpty()) {</span>
+            /*
+             * If no properties are provided that could filter the names return them all.
+             */
+<span class="nc" id="L103">            names = services.keySet();</span>
+        } else {
+<span class="nc" id="L105">            names = new LinkedHashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            for (List&lt;Service&gt; currentServices : services.values()) {</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">                for (Service currentService : currentServices) {</span>
+                    try {
+<span class="nc" id="L109">                        String[] serviceMechNames = ((HttpServerAuthenticationMechanismFactory) currentService.newInstance(null)).getMechanismNames(properties);</span>
+<span class="nc" id="L110">                        Collections.addAll(names, serviceMechNames);</span>
+<span class="nc" id="L111">                    } catch (NoSuchAlgorithmException e) {</span>
+<span class="nc" id="L112">                        log.debug(&quot;Unable to create instance&quot;, e);</span>
+<span class="nc" id="L113">                    }</span>
+<span class="nc" id="L114">                }</span>
+<span class="nc" id="L115">            }</span>
+        }
+<span class="nc bnc" id="L117" title="All 4 branches missed.">        if (names.size() == 0 &amp;&amp; log.isTraceEnabled()) {</span>
+<span class="nc" id="L118">            log.tracef(&quot;No %s provided by provider loader in %s: %s&quot;, SERVICE_TYPE, getClass().getSimpleName(),</span>
+<span class="nc" id="L119">                    Arrays.toString(providerSupplier.get()));</span>
+        }
+<span class="nc" id="L121">        return names.toArray(new String[names.size()]);</span>
+    }
+
+    /**
+     * @see org.wildfly.security.http.HttpServerAuthenticationMechanismFactory#createAuthenticationMechanism(java.lang.String, java.util.Map, javax.security.auth.callback.CallbackHandler)
+     */
+    @Override
+    public HttpServerAuthenticationMechanism createAuthenticationMechanism(String mechanismName, Map&lt;String, ?&gt; properties, CallbackHandler callbackHandler) throws HttpAuthenticationException {
+<span class="nc" id="L129">        List&lt;Service&gt; services = getServices().get(mechanismName);</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">        if (services != null) {</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">            for (Service currentService : services) {</span>
+                try {
+<span class="nc" id="L133">                    HttpServerAuthenticationMechanismFactory factory = (HttpServerAuthenticationMechanismFactory) currentService.newInstance(null);</span>
+<span class="nc" id="L134">                    HttpServerAuthenticationMechanism mechanism = factory.createAuthenticationMechanism(mechanismName, properties, callbackHandler);</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">                    if (mechanism != null) {</span>
+<span class="nc" id="L136">                        return mechanism;</span>
+                    }
+<span class="nc" id="L138">                } catch (NoSuchAlgorithmException e) {</span>
+<span class="nc" id="L139">                    log.debug(&quot;Unable to create instance&quot;, e);</span>
+<span class="nc" id="L140">                }</span>
+<span class="nc" id="L141">            }</span>
+        }
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L144">            log.tracef(&quot;No %s provided by provider loader in %s&quot;, SERVICE_TYPE, getClass().getSimpleName());</span>
+        }
+<span class="nc" id="L146">        return null;</span>
+    }
+
+    private Map&lt;String, List&lt;Service&gt;&gt; getServices() {
+<span class="nc bnc" id="L150" title="All 2 branches missed.">        if (services == null) {</span>
+<span class="nc" id="L151">            synchronized(this) {</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">                if (services == null) {</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">                    if (providers == null) {</span>
+<span class="nc" id="L154">                        providers = providerSupplier.get();</span>
+                    }
+<span class="nc" id="L156">                    Map&lt;String, List&lt;Service&gt;&gt; services = new HashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">                    for (Provider provider : providers) {</span>
+<span class="nc" id="L158">                        Set&lt;Service&gt; providerServices = provider.getServices();</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">                        for (Service currentService : providerServices) {</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">                            if (SERVICE_TYPE.equals(currentService.getType())) {</span>
+<span class="nc" id="L161">                                String algorithm = currentService.getAlgorithm();</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">                                if (services.containsKey(algorithm)) {</span>
+<span class="nc" id="L163">                                    services.get(algorithm).add(currentService);</span>
+                                } else {
+<span class="nc" id="L165">                                    List&lt;Service&gt; serviceList = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L166">                                    serviceList.add(currentService);</span>
+<span class="nc" id="L167">                                    services.put(algorithm, serviceList);</span>
+                                }
+                            }
+<span class="nc" id="L170">                        }</span>
+                    }
+<span class="nc" id="L172">                    this.services = services;</span>
+                }
+<span class="nc" id="L174">            }</span>
+        }
+
+<span class="nc" id="L177">        return services;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

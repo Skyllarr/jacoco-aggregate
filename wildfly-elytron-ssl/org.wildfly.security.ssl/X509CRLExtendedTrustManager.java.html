@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>X509CRLExtendedTrustManager.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-ssl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.ssl</a> &gt; <span class="el_source">X509CRLExtendedTrustManager.java</span></div><h1>X509CRLExtendedTrustManager.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2017 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.ssl;
+
+import static org.wildfly.common.Assert.checkMinimumParameter;
+import static org.wildfly.common.Assert.checkNotNullParam;
+
+import java.io.InputStream;
+import java.net.Socket;
+import java.security.GeneralSecurityException;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.KeyStore;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CRL;
+import java.security.cert.CertStore;
+import java.security.cert.CertStoreParameters;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.CollectionCertStoreParameters;
+import java.security.cert.PKIXBuilderParameters;
+import java.security.cert.X509CertSelector;
+import java.security.cert.X509Certificate;
+import java.util.Collection;
+import java.util.Objects;
+import java.util.stream.Stream;
+
+import javax.net.ssl.CertPathTrustManagerParameters;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509ExtendedTrustManager;
+import javax.net.ssl.X509TrustManager;
+
+import org.wildfly.security.x500.X500;
+
+/**
+ * Extension to the {@link X509TrustManager} interface to support CRL verification.
+ *
+ * @author &lt;a href=&quot;mailto:psilva@redhat.com&quot;&gt;Pedro Igor&lt;/a&gt;
+ * @deprecated use {@link X509RevocationTrustManager} instead
+ */
+@Deprecated
+public final class X509CRLExtendedTrustManager extends X509ExtendedTrustManager {
+
+    private static final int DEFAULT_MAX_CERT_PATH_LENGTH = 5;
+
+    private final X509TrustManager trustManager;
+    private final X509Certificate[] acceptedIssuers;
+
+    /**
+     * Creates a new instance.
+     *
+     * @param trustStore a {@link KeyStore} with the trusted certificates (must not be {@code null})
+     * @param trustManagerFactory the trust manager factory
+     * @param crlStream the input stream pointing to a certificate revocation list (may be {@code null}). The stream will be automatically closed after the invocation
+     * @param maxCertPath the maximum number of non-self-issued intermediate certificates that may exist in a certification path. The value must be equal or greater than 1.
+     * @param acceptedIssuers an array of certificate authority certificates which are trusted for authenticating peers (may be {@code null}).
+     */
+<span class="nc" id="L74">    public X509CRLExtendedTrustManager(KeyStore trustStore, TrustManagerFactory trustManagerFactory, InputStream crlStream, int maxCertPath, X509Certificate[] acceptedIssuers) {</span>
+<span class="nc" id="L75">        checkNotNullParam(&quot;trustStore&quot;, trustStore);</span>
+<span class="nc" id="L76">        checkNotNullParam(&quot;trustManagerFactory&quot;, trustManagerFactory);</span>
+<span class="nc" id="L77">        checkMinimumParameter(&quot;maxCertPath&quot;, 1, maxCertPath);</span>
+        try {
+<span class="nc" id="L79">            PKIXBuilderParameters params = new PKIXBuilderParameters(trustStore, new X509CertSelector());</span>
+
+<span class="nc bnc" id="L81" title="All 2 branches missed.">            if (crlStream != null) {</span>
+<span class="nc" id="L82">                CertStoreParameters csp = new CollectionCertStoreParameters(getCRLs(crlStream));</span>
+<span class="nc" id="L83">                CertStore store = CertStore.getInstance(&quot;Collection&quot;, csp);</span>
+<span class="nc" id="L84">                params.addCertStore(store);</span>
+            }
+
+<span class="nc" id="L87">            params.setRevocationEnabled(true);</span>
+<span class="nc" id="L88">            params.setMaxPathLength(maxCertPath);</span>
+
+
+<span class="nc" id="L91">            trustManagerFactory.init(new CertPathTrustManagerParameters(params));</span>
+
+<span class="nc bnc" id="L93" title="All 2 branches missed.">            X509TrustManager[] trustManagers = Stream.of(trustManagerFactory.getTrustManagers()).map(trustManager -&gt; trustManager instanceof X509TrustManager ? (X509TrustManager) trustManager : null).filter(Objects::nonNull).toArray(X509TrustManager[]::new);</span>
+
+<span class="nc bnc" id="L95" title="All 2 branches missed.">            if (trustManagers.length == 0) {</span>
+<span class="nc" id="L96">                throw ElytronMessages.log.noDefaultTrustManager();</span>
+            }
+
+<span class="nc" id="L99">            this.trustManager = trustManagers[0];</span>
+<span class="nc" id="L100">        } catch (InvalidAlgorithmParameterException e) {</span>
+<span class="nc" id="L101">            throw ElytronMessages.log.sslErrorCreatingRevocationTrustManager(trustManagerFactory.getAlgorithm(), e);</span>
+<span class="nc" id="L102">        } catch (GeneralSecurityException e) {</span>
+<span class="nc" id="L103">            throw ElytronMessages.log.sslErrorCreatingTrustManager(getClass().getName(), e);</span>
+<span class="nc" id="L104">        }</span>
+
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        if (acceptedIssuers != null) {</span>
+<span class="nc" id="L107">            this.acceptedIssuers = acceptedIssuers;</span>
+        } else {
+<span class="nc" id="L109">            this.acceptedIssuers = X500.NO_CERTIFICATES;</span>
+        }
+<span class="nc" id="L111">    }</span>
+
+    /**
+     * Creates a new instance using with a default trust manager factory. The factory's algorithm is {@link TrustManagerFactory#getDefaultAlgorithm()}.
+     *
+     * @param trustStore a {@link KeyStore} with the trusted certificates (must not be {@code null})
+     * @param crlStream the input stream pointing to a certificate revocation list (may be {@code null}). The stream will be automatically closed after the invocation
+     *
+     * @throws NoSuchAlgorithmException in case the default trust manager factory can not be obtained
+     */
+    public X509CRLExtendedTrustManager(KeyStore trustStore, InputStream crlStream) throws NoSuchAlgorithmException {
+<span class="nc" id="L122">        this(trustStore, TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm()), crlStream, DEFAULT_MAX_CERT_PATH_LENGTH, null);</span>
+<span class="nc" id="L123">    }</span>
+
+    /**
+     * &lt;p&gt;Creates a new instance using with a default trust manager factory. The factory's algorithm is {@link TrustManagerFactory#getDefaultAlgorithm()}.
+     *
+     * &lt;p&gt;When using this constructor, the instance is going to obtain CRLs from the distribution points
+     * within the certificates being validated. Make sure you have system property &lt;code&gt;com.sun.security.enableCRLDP&lt;/code&gt; set.
+     *
+     * @param trustStore a {@link KeyStore} with the trusted certificates (must not be {@code null})
+     * @throws NoSuchAlgorithmException in case the default trust manager factory can not be obtained
+     */
+    public X509CRLExtendedTrustManager(KeyStore trustStore) throws NoSuchAlgorithmException {
+<span class="nc" id="L135">        this(trustStore, null);</span>
+<span class="nc" id="L136">    }</span>
+
+    @Override
+    public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+<span class="nc" id="L140">        trustManager.checkClientTrusted(chain, authType);</span>
+<span class="nc" id="L141">    }</span>
+
+    @Override
+    public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+<span class="nc" id="L145">        trustManager.checkServerTrusted(chain, authType);</span>
+<span class="nc" id="L146">    }</span>
+
+    @Override
+    public X509Certificate[] getAcceptedIssuers() {
+<span class="nc" id="L150">        return acceptedIssuers;</span>
+    }
+
+    @Override
+    public void checkClientTrusted(X509Certificate[] chain, String authType, Socket socket) throws CertificateException {
+<span class="nc" id="L155">        trustManager.checkClientTrusted(chain, authType);</span>
+<span class="nc" id="L156">    }</span>
+
+    @Override
+    public void checkServerTrusted(X509Certificate[] chain, String authType, Socket socket) throws CertificateException {
+<span class="nc" id="L160">        trustManager.checkServerTrusted(chain, authType);</span>
+<span class="nc" id="L161">    }</span>
+
+    @Override
+    public void checkClientTrusted(X509Certificate[] chain, String authType, SSLEngine sslEngine) throws CertificateException {
+<span class="nc" id="L165">        trustManager.checkClientTrusted(chain, authType);</span>
+<span class="nc" id="L166">    }</span>
+
+    @Override
+    public void checkServerTrusted(X509Certificate[] chain, String authType, SSLEngine sslEngine) throws CertificateException {
+<span class="nc" id="L170">        trustManager.checkServerTrusted(chain, authType);</span>
+<span class="nc" id="L171">    }</span>
+
+    private Collection&lt;? extends CRL&gt; getCRLs(InputStream crlStream) throws GeneralSecurityException {
+<span class="nc" id="L174">        CertificateFactory cf = CertificateFactory.getInstance(&quot;X.509&quot;);</span>
+        try {
+<span class="nc" id="L176">            return cf.generateCRLs(crlStream);</span>
+        } finally {
+            try {
+<span class="nc" id="L179">                crlStream.close();</span>
+<span class="nc" id="L180">            } catch (Exception ignore) {}</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

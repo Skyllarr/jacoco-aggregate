@@ -1,0 +1,278 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ServerRequest.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-oidc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.oidc</a> &gt; <span class="el_source">ServerRequest.java</span></div><h1>ServerRequest.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2021 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.http.oidc;
+
+import static org.wildfly.security.http.oidc.ElytronMessages.log;
+import static org.wildfly.security.http.oidc.Oidc.AUTHORIZATION_CODE;
+import static org.wildfly.security.http.oidc.Oidc.CODE;
+import static org.wildfly.security.http.oidc.Oidc.GRANT_TYPE;
+import static org.wildfly.security.http.oidc.Oidc.KEYCLOAK_CLIENT_CLUSTER_HOST;
+import static org.wildfly.security.http.oidc.Oidc.PASSWORD;
+import static org.wildfly.security.http.oidc.Oidc.REDIRECT_URI;
+import static org.wildfly.security.http.oidc.Oidc.USERNAME;
+
+import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.util.EntityUtils;
+import org.wildfly.security.jose.util.JsonSerialization;
+
+/**
+ * @author &lt;a href=&quot;mailto:bill@burkecentral.com&quot;&gt;Bill Burke&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+<span class="nc" id="L55">public class ServerRequest {</span>
+
+    private static final int BUFFER_LENGTH = 4096;
+
+    public static AccessAndIDTokenResponse invokeRefresh(OidcClientConfiguration deployment, String refreshToken) throws IOException, HttpFailure {
+<span class="nc" id="L60">        List&lt;NameValuePair&gt; formparams = new ArrayList&lt;NameValuePair&gt;();</span>
+<span class="nc" id="L61">        formparams.add(new BasicNameValuePair(GRANT_TYPE, Oidc.REFRESH_TOKEN));</span>
+<span class="nc" id="L62">        formparams.add(new BasicNameValuePair(Oidc.REFRESH_TOKEN, refreshToken));</span>
+
+<span class="nc" id="L64">        HttpPost post = new HttpPost(deployment.getTokenUrl());</span>
+<span class="nc" id="L65">        ClientCredentialsProviderUtils.setClientCredentials(deployment, post, formparams);</span>
+
+<span class="nc" id="L67">        UrlEncodedFormEntity form = new UrlEncodedFormEntity(formparams, StandardCharsets.UTF_8);</span>
+<span class="nc" id="L68">        post.setEntity(form);</span>
+<span class="nc" id="L69">        HttpResponse response = deployment.getClient().execute(post);</span>
+<span class="nc" id="L70">        int status = response.getStatusLine().getStatusCode();</span>
+<span class="nc" id="L71">        HttpEntity entity = response.getEntity();</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        if (status != 200) {</span>
+<span class="nc" id="L73">            error(status, entity);</span>
+        }
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        if (entity == null) {</span>
+<span class="nc" id="L76">            throw new HttpFailure(status, null);</span>
+        }
+<span class="nc" id="L78">        InputStream is = entity.getContent();</span>
+        try {
+<span class="nc" id="L80">            ByteArrayOutputStream os = new ByteArrayOutputStream();</span>
+            int c;
+<span class="nc bnc" id="L82" title="All 2 branches missed.">            while ((c = is.read()) != -1) {</span>
+<span class="nc" id="L83">                os.write(c);</span>
+            }
+<span class="nc" id="L85">            byte[] bytes = os.toByteArray();</span>
+<span class="nc" id="L86">            String json = new String(bytes);</span>
+            try {
+<span class="nc" id="L88">                return JsonSerialization.readValue(json, AccessAndIDTokenResponse.class);</span>
+<span class="nc" id="L89">            } catch (IOException e) {</span>
+<span class="nc" id="L90">                throw new IOException(json, e);</span>
+            }
+        } finally {
+            try {
+<span class="nc" id="L94">                is.close();</span>
+<span class="nc" id="L95">            } catch (IOException ignored) {</span>
+<span class="nc" id="L96">            }</span>
+        }
+    }
+
+    public static void invokeLogout(OidcClientConfiguration deployment, String refreshToken) throws IOException, HttpFailure {
+<span class="nc" id="L101">        HttpClient client = deployment.getClient();</span>
+<span class="nc" id="L102">        String uri = deployment.getLogoutUrl();</span>
+<span class="nc" id="L103">        List&lt;NameValuePair&gt; formparams = new ArrayList&lt;&gt;();</span>
+
+<span class="nc" id="L105">        formparams.add(new BasicNameValuePair(Oidc.REFRESH_TOKEN, refreshToken));</span>
+<span class="nc" id="L106">        HttpPost post = new HttpPost(uri);</span>
+<span class="nc" id="L107">        ClientCredentialsProviderUtils.setClientCredentials(deployment, post, formparams);</span>
+
+<span class="nc" id="L109">        UrlEncodedFormEntity form = new UrlEncodedFormEntity(formparams, StandardCharsets.UTF_8);</span>
+<span class="nc" id="L110">        post.setEntity(form);</span>
+<span class="nc" id="L111">        HttpResponse response = client.execute(post);</span>
+<span class="nc" id="L112">        int status = response.getStatusLine().getStatusCode();</span>
+<span class="nc" id="L113">        HttpEntity entity = response.getEntity();</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        if (status != 204) {</span>
+<span class="nc" id="L115">            error(status, entity);</span>
+        }
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        if (entity == null) {</span>
+<span class="nc" id="L118">            return;</span>
+        }
+<span class="nc" id="L120">        InputStream is = entity.getContent();</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        if (is != null) is.close();</span>
+<span class="nc" id="L122">    }</span>
+
+    public static AccessAndIDTokenResponse invokeAccessCodeToToken(OidcClientConfiguration deployment, String code, String redirectUri) throws IOException, HttpFailure {
+<span class="nc" id="L125">        List&lt;NameValuePair&gt; formparams = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L126">        formparams.add(new BasicNameValuePair(GRANT_TYPE, AUTHORIZATION_CODE));</span>
+<span class="nc" id="L127">        formparams.add(new BasicNameValuePair(CODE, code));</span>
+<span class="nc" id="L128">        formparams.add(new BasicNameValuePair(REDIRECT_URI, redirectUri));</span>
+
+<span class="nc" id="L130">        HttpPost post = new HttpPost(deployment.getTokenUrl());</span>
+<span class="nc" id="L131">        ClientCredentialsProviderUtils.setClientCredentials(deployment, post, formparams);</span>
+
+<span class="nc" id="L133">        UrlEncodedFormEntity form = new UrlEncodedFormEntity(formparams, StandardCharsets.UTF_8);</span>
+<span class="nc" id="L134">        post.setEntity(form);</span>
+<span class="nc" id="L135">        HttpResponse response = deployment.getClient().execute(post);</span>
+<span class="nc" id="L136">        int status = response.getStatusLine().getStatusCode();</span>
+<span class="nc" id="L137">        HttpEntity entity = response.getEntity();</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">        if (status != HttpStatus.SC_OK) {</span>
+<span class="nc" id="L139">            error(status, entity);</span>
+        }
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        if (entity == null) {</span>
+<span class="nc" id="L142">            throw new HttpFailure(status, null);</span>
+        }
+<span class="nc" id="L144">        InputStream is = entity.getContent();</span>
+        try {
+<span class="nc" id="L146">            ByteArrayOutputStream os = new ByteArrayOutputStream();</span>
+            int c;
+<span class="nc bnc" id="L148" title="All 2 branches missed.">            while ((c = is.read()) != -1) {</span>
+<span class="nc" id="L149">                os.write(c);</span>
+            }
+<span class="nc" id="L151">            byte[] bytes = os.toByteArray();</span>
+<span class="nc" id="L152">            String json = new String(bytes);</span>
+            try {
+<span class="nc" id="L154">                return JsonSerialization.readValue(json, AccessAndIDTokenResponse.class);</span>
+<span class="nc" id="L155">            } catch (IOException e) {</span>
+<span class="nc" id="L156">                throw new IOException(json, e);</span>
+            }
+        } finally {
+            try {
+<span class="nc" id="L160">                is.close();</span>
+<span class="nc" id="L161">            } catch (IOException ignored) {</span>
+<span class="nc" id="L162">            }</span>
+        }
+    }
+
+    public static void invokeRegisterNodeForKeycloak(OidcClientConfiguration deployment, String host) throws HttpFailure, IOException {
+<span class="nc" id="L167">        String registerNodeUrl = deployment.getRegisterNodeUrl();</span>
+<span class="nc" id="L168">        invokeClientManagementRequestForKeycloak(deployment, host, registerNodeUrl);</span>
+<span class="nc" id="L169">    }</span>
+
+    public static void invokeUnregisterNodeForKeycloak(OidcClientConfiguration deployment, String host) throws HttpFailure, IOException {
+<span class="nc" id="L172">        String unregisterNodeUrl = deployment.getUnregisterNodeUrl();</span>
+<span class="nc" id="L173">        invokeClientManagementRequestForKeycloak(deployment, host, unregisterNodeUrl);</span>
+<span class="nc" id="L174">    }</span>
+
+    public static void invokeClientManagementRequestForKeycloak(OidcClientConfiguration deployment, String host, String endpointUrl) throws HttpFailure, IOException {
+<span class="nc bnc" id="L177" title="All 2 branches missed.">        if (endpointUrl == null) {</span>
+<span class="nc" id="L178">            throw new IOException(&quot;You need to configure URI for register/unregister node for application &quot; + deployment.getResourceName());</span>
+        }
+
+<span class="nc" id="L181">        List&lt;NameValuePair&gt; formparams = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L182">        formparams.add(new BasicNameValuePair(KEYCLOAK_CLIENT_CLUSTER_HOST, host));</span>
+
+<span class="nc" id="L184">        HttpPost post = new HttpPost(endpointUrl);</span>
+<span class="nc" id="L185">        ClientCredentialsProviderUtils.setClientCredentials(deployment, post, formparams);</span>
+
+<span class="nc" id="L187">        UrlEncodedFormEntity form = new UrlEncodedFormEntity(formparams, &quot;UTF-8&quot;);</span>
+<span class="nc" id="L188">        post.setEntity(form);</span>
+<span class="nc" id="L189">        HttpResponse response = deployment.getClient().execute(post);</span>
+<span class="nc" id="L190">        int status = response.getStatusLine().getStatusCode();</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        if (status != 204) {</span>
+<span class="nc" id="L192">            HttpEntity entity = response.getEntity();</span>
+<span class="nc" id="L193">            error(status, entity);</span>
+        }
+<span class="nc" id="L195">    }</span>
+
+    public static void error(int status, HttpEntity entity) throws HttpFailure, IOException {
+<span class="nc" id="L198">        String body = null;</span>
+<span class="nc bnc" id="L199" title="All 2 branches missed.">        if (entity != null) {</span>
+<span class="nc" id="L200">            InputStream is = entity.getContent();</span>
+            try {
+<span class="nc" id="L202">                body = readString(is, Charset.defaultCharset());</span>
+<span class="nc" id="L203">            } catch (IOException e) {</span>
+
+            } finally {
+                try {
+<span class="nc" id="L207">                    is.close();</span>
+<span class="nc" id="L208">                } catch (IOException ignored) {</span>
+<span class="nc" id="L209">                }</span>
+            }
+        }
+<span class="nc" id="L212">        throw new HttpFailure(status, body);</span>
+    }
+
+    private static String readString(InputStream in, Charset charset) throws IOException {
+<span class="nc" id="L216">        char[] buffer = new char[BUFFER_LENGTH];</span>
+<span class="nc" id="L217">        StringBuilder builder = new StringBuilder();</span>
+<span class="nc" id="L218">        BufferedReader reader = new BufferedReader(new InputStreamReader(in, charset));</span>
+        int wasRead;
+        do {
+<span class="nc" id="L221">            wasRead = reader.read(buffer, 0, BUFFER_LENGTH);</span>
+<span class="nc bnc" id="L222" title="All 2 branches missed.">            if (wasRead &gt; 0) {</span>
+<span class="nc" id="L223">                builder.append(buffer, 0, wasRead);</span>
+            }
+        }
+<span class="nc bnc" id="L226" title="All 2 branches missed.">        while (wasRead &gt; -1);</span>
+<span class="nc" id="L227">        return builder.toString();</span>
+    }
+
+    public static class HttpFailure extends Exception {
+        private int status;
+        private String error;
+
+<span class="nc" id="L234">        public HttpFailure(int status, String error) {</span>
+<span class="nc" id="L235">            this.status = status;</span>
+<span class="nc" id="L236">            this.error = error;</span>
+<span class="nc" id="L237">        }</span>
+
+        public int getStatus() {
+<span class="nc" id="L240">            return status;</span>
+        }
+
+        public String getError() {
+<span class="nc" id="L244">            return error;</span>
+        }
+    }
+
+    public static AccessAndIDTokenResponse getBearerToken(OidcClientConfiguration oidcClientConfiguration, String username, String password) throws Exception {
+        AccessAndIDTokenResponse tokenResponse;
+<span class="nc" id="L250">        HttpClient client = oidcClientConfiguration.getClient();</span>
+
+<span class="nc" id="L252">        HttpPost post = new HttpPost(oidcClientConfiguration.getTokenUrl());</span>
+<span class="nc" id="L253">        List&lt;NameValuePair&gt; formparams = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L254">        formparams.add(new BasicNameValuePair(GRANT_TYPE, PASSWORD));</span>
+<span class="nc" id="L255">        formparams.add(new BasicNameValuePair(USERNAME, username));</span>
+<span class="nc" id="L256">        formparams.add(new BasicNameValuePair(PASSWORD, password));</span>
+
+<span class="nc" id="L258">        ClientCredentialsProviderUtils.setClientCredentials(oidcClientConfiguration, post, formparams);</span>
+<span class="nc" id="L259">        UrlEncodedFormEntity form = new UrlEncodedFormEntity(formparams, &quot;UTF-8&quot;);</span>
+<span class="nc" id="L260">        post.setEntity(form);</span>
+
+<span class="nc" id="L262">        HttpResponse response = client.execute(post);</span>
+<span class="nc" id="L263">        int status = response.getStatusLine().getStatusCode();</span>
+<span class="nc" id="L264">        HttpEntity entity = response.getEntity();</span>
+<span class="nc bnc" id="L265" title="All 2 branches missed.">        if (status != HttpStatus.SC_OK) {</span>
+<span class="nc" id="L266">            EntityUtils.consumeQuietly(entity);</span>
+<span class="nc" id="L267">            throw log.unableToObtainToken(status);</span>
+        }
+<span class="nc bnc" id="L269" title="All 2 branches missed.">        if (entity == null) {</span>
+<span class="nc" id="L270">            throw log.noMessageEntity();</span>
+        }
+<span class="nc" id="L272">        try (InputStream is = entity.getContent()) {</span>
+<span class="nc" id="L273">            tokenResponse = JsonSerialization.readValue(is, AccessAndIDTokenResponse.class);</span>
+        }
+<span class="nc" id="L275">        return tokenResponse;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

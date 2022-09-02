@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-keystore</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.keystore</a> &gt; <span class="el_source">ElytronMessages.java</span></div><h1>ElytronMessages.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.keystore;
+
+import java.io.EOFException;
+import java.io.IOException;
+import java.security.InvalidKeyException;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.UnrecoverableKeyException;
+
+import org.jboss.logging.BasicLogger;
+import org.jboss.logging.Logger;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageLogger;
+import org.jboss.logging.annotations.ValidIdRange;
+import org.jboss.logging.annotations.ValidIdRanges;
+
+/**
+ * Log messages and exceptions for Elytron.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+@MessageLogger(projectCode = &quot;ELY&quot;, length = 5)
+@ValidIdRanges({
+    @ValidIdRange(min = 2001, max = 2035),
+    @ValidIdRange(min = 8027, max = 8027)
+})
+interface ElytronMessages extends BasicLogger {
+
+<span class="fc" id="L49">    ElytronMessages log = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security&quot;);</span>
+<span class="fc" id="L50">    ElytronMessages tls = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.tls&quot;);</span>
+
+    @Message(id = 2001, value = &quot;Invalid key store entry password for alias \&quot;%s\&quot;&quot;)
+    UnrecoverableKeyException invalidKeyStoreEntryPassword(String alias);
+
+    @Message(id = 2002, value = &quot;Invalid key store entry type for alias \&quot;%s\&quot; (expected %s, got %s)&quot;)
+    KeyStoreException invalidKeyStoreEntryType(String alias, Class&lt;?&gt; expectedClass, Class&lt;?&gt; actualClass);
+
+    @Message(id = 2003, value = &quot;Key store key for alias \&quot;%s\&quot; cannot be protected&quot;)
+    KeyStoreException keyCannotBeProtected(String alias);
+
+    @Message(id = 2004, value = &quot;Key store failed to translate password for alias \&quot;%s\&quot;&quot;)
+    IOException keyStoreFailedToTranslate(String alias, @Cause Throwable cause);
+
+    @Message(id = 2005, value = &quot;Key store failed to identify a suitable algorithm for alias \&quot;%s\&quot;&quot;)
+    NoSuchAlgorithmException noAlgorithmForPassword(String alias);
+
+    @Message(id = 2006, value = &quot;Unexpected whitespace in password file&quot;)
+    IOException unexpectedWhitespaceInPasswordFile();
+
+    @Message(id = 2007, value = &quot;Unexpected end of file&quot;)
+    EOFException unexpectedEof();
+
+    @Message(id = 2008, value = &quot;A reversible load is not possible until the KeyStore has first been initialized&quot;)
+    IllegalStateException reversibleLoadNotPossible();
+
+    @Message(id = 2009, value = &quot;Unable to create a new KeyStore instance&quot;)
+    IOException unableToCreateKeyStore(@Cause Exception cause);
+
+    @Message(id = 2012, value = &quot;An empty alias filter was supplied&quot;)
+    IllegalArgumentException emptyFilter();
+
+    @Message(id = 2013, value = &quot;Filter is missing '+' or '-' at offset %d&quot;)
+    IllegalArgumentException missingPlusMinusAt(long position);
+
+    @Message(id = 2014, value = &quot;Invalid first word '%s', must be one of ALL/NONE&quot;)
+    IllegalArgumentException invalidFirstWord(String firstWord);
+
+    @Message(id = 2015, value = &quot;Failed to obtain DirContext&quot;)
+    IllegalStateException failedToObtainDirContext(@Cause Throwable cause);
+
+    @Message(id = 2016, value = &quot;Failed to return DirContext&quot;)
+    IllegalStateException failedToReturnDirContext(@Cause Throwable cause);
+
+    @Message(id = 2017, value = &quot;LdapKeyStore failed to obtain alias [%s]&quot;)
+    IllegalStateException ldapKeyStoreFailedToObtainAlias(String alias, @Cause Throwable cause);
+
+    @Message(id = 2018, value = &quot;LdapKeyStore failed to obtain certificate [%s]&quot;)
+    IllegalStateException ldapKeyStoreFailedToObtainCertificate(String alias, @Cause Throwable cause);
+
+    @Message(id = 2019, value = &quot;LdapKeyStore failed to obtain certificate chain [%s]&quot;)
+    IllegalStateException ldapKeyStoreFailedToObtainCertificateChain(String alias, @Cause Throwable cause);
+
+    @Message(id = 2020, value = &quot;LdapKeyStore failed to recover key of alias [%s]&quot;)
+    IllegalStateException ldapKeyStoreFailedToObtainKey(String alias, @Cause Throwable cause);
+
+    @Message(id = 2021, value = &quot;LdapKeyStore failed to obtain alias by certificate&quot;)
+    IllegalStateException ldapKeyStoreFailedToObtainAliasByCertificate(@Cause Throwable cause);
+
+    @Message(id = 2022, value = &quot;LdapKeyStore failed to recover key of alias [%s]&quot;)
+    UnrecoverableKeyException ldapKeyStoreFailedToRecoverKey(String alias, @Cause Throwable cause);
+
+    @Message(id = 2023, value = &quot;LdapKeyStore failed to obtain creation date of alias [%s]&quot;)
+    IllegalStateException ldapKeyStoreFailedToObtainCreationDate(String alias, @Cause Throwable cause);
+
+    @Message(id = 2024, value = &quot;Alias [%s] does not exist in LdapKeyStore and not configured for creation&quot;)
+    KeyStoreException creationNotConfigured(String alias);
+
+    @Message(id = 2025, value = &quot;LdapKeyStore failed store alias [%s]&quot;)
+    KeyStoreException ldapKeyStoreFailedToStore(String alias, @Cause Throwable cause);
+
+    @Message(id = 2026, value = &quot;LdapKeyStore failed to serialize certificate of alias [%s]&quot;)
+    KeyStoreException ldapKeyStoreFailedToSerializeCertificate(String alias, @Cause Throwable cause);
+
+    @Message(id = 2027, value = &quot;LdapKeyStore failed to protect (pack into keystore) key of alias [%s]&quot;)
+    KeyStoreException ldapKeyStoreFailedToSerializeKey(String alias, @Cause Throwable cause);
+
+    @Message(id = 2028, value = &quot;LdapKeyStore failed to delete alias [%s]&quot;)
+    KeyStoreException ldapKeyStoreFailedToDelete(String alias, @Cause Throwable cause);
+
+    @Message(id = 2029, value = &quot;LdapKeyStore failed to delete alias [%s] - alias not found&quot;)
+    KeyStoreException ldapKeyStoreFailedToDeleteNonExisting(String alias);
+
+    @Message(id = 2030, value = &quot;LdapKeyStore failed to test alias [%s] existence&quot;)
+    IllegalStateException ldapKeyStoreFailedToTestAliasExistence(String alias, @Cause Throwable cause);
+
+    @Message(id = 2031, value = &quot;LdapKeyStore failed to iterate aliases&quot;)
+    IllegalStateException ldapKeyStoreFailedToIterateAliases(@Cause Throwable cause);
+
+    @Message(id = 2035, value = &quot;KeyStore type could not be detected&quot;)
+    KeyStoreException keyStoreTypeNotDetected();
+
+    @Message(id = 8027, value = &quot;Unknown password type or algorithm&quot;)
+    InvalidKeyException invalidKeyUnknownUnknownPasswordTypeOrAlgorithm();
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

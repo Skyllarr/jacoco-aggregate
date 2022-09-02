@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AggregateSecurityRealm.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-realm</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.realm</a> &gt; <span class="el_source">AggregateSecurityRealm.java</span></div><h1>AggregateSecurityRealm.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.realm;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+
+import java.security.Principal;
+import java.security.spec.AlgorithmParameterSpec;
+import java.util.function.Function;
+
+import org.wildfly.security.auth.SupportLevel;
+import org.wildfly.security.auth.server.RealmIdentity;
+import org.wildfly.security.auth.server.RealmUnavailableException;
+import org.wildfly.security.auth.server.SecurityRealm;
+import org.wildfly.security.auth.server.event.RealmAuthenticationEvent;
+import org.wildfly.security.auth.server.event.RealmAuthorizationEvent;
+import org.wildfly.security.auth.server.event.RealmEvent;
+import org.wildfly.security.authz.AggregateAttributes;
+import org.wildfly.security.authz.Attributes;
+import org.wildfly.security.authz.AuthorizationIdentity;
+import org.wildfly.security.credential.Credential;
+import org.wildfly.security.evidence.Evidence;
+
+/**
+ * A realm which directs authentication to one realm and authorization to another.  The authentication realm need
+ * not provide any authorization information.  Likewise the authorization realm need not provide any authentication
+ * credential acquisition or verification capabilities.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class AggregateSecurityRealm implements SecurityRealm {
+    private final SecurityRealm authenticationRealm;
+    private final SecurityRealm[] authorizationRealms;
+    private final Function&lt;Principal, Principal&gt; principalTransformer;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param authenticationRealm the realm to use for authentication
+     * @param authorizationRealm the realm to use for authorization
+     */
+<span class="nc" id="L58">    public AggregateSecurityRealm(final SecurityRealm authenticationRealm, final SecurityRealm authorizationRealm) {</span>
+<span class="nc" id="L59">        this.authenticationRealm = checkNotNullParam(&quot;authenticationRealm&quot;, authenticationRealm);</span>
+<span class="nc" id="L60">        checkNotNullParam(&quot;authorizationRealm&quot;, authorizationRealm);</span>
+<span class="nc" id="L61">        this.authorizationRealms = new SecurityRealm[] { authorizationRealm };</span>
+<span class="nc" id="L62">        this.principalTransformer = null;</span>
+<span class="nc" id="L63">    }</span>
+
+<span class="nc" id="L65">    public AggregateSecurityRealm(final SecurityRealm authenticationRealm, final SecurityRealm... authorizationRealms) {</span>
+<span class="nc" id="L66">        this.authenticationRealm = checkNotNullParam(&quot;authenticationRealm&quot;, authenticationRealm);</span>
+<span class="nc" id="L67">        this.authorizationRealms = checkNotNullParam(&quot;authorizationRealms&quot;, authorizationRealms);</span>
+<span class="nc" id="L68">        this.principalTransformer = null;</span>
+
+<span class="nc" id="L70">    }</span>
+<span class="fc" id="L71">    public AggregateSecurityRealm(final SecurityRealm authenticationRealm, Function&lt;Principal, Principal&gt; principalTransformer, final SecurityRealm... authorizationRealms) {</span>
+<span class="fc" id="L72">        this.authenticationRealm = checkNotNullParam(&quot;authenticationRealm&quot;, authenticationRealm);</span>
+<span class="fc" id="L73">        this.authorizationRealms = checkNotNullParam(&quot;authorizationRealms&quot;, authorizationRealms);</span>
+<span class="fc" id="L74">        this.principalTransformer = principalTransformer;</span>
+<span class="fc" id="L75">    }</span>
+
+    public RealmIdentity getRealmIdentity(final Evidence evidence) throws RealmUnavailableException {
+<span class="fc" id="L78">        boolean ok = false;</span>
+<span class="fc" id="L79">        final RealmIdentity authenticationIdentity = authenticationRealm.getRealmIdentity(evidence);</span>
+<span class="fc" id="L80">        final RealmIdentity[] authorizationIdentities = new RealmIdentity[authorizationRealms.length];</span>
+        try {
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            for (int i = 0; i &lt; authorizationIdentities.length; i++) {</span>
+<span class="fc" id="L83">                SecurityRealm authorizationRealm = authorizationRealms[i];</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">                authorizationIdentities[i] = (authorizationRealm == authenticationRealm) ? authenticationIdentity</span>
+<span class="fc" id="L85">                        : getAuthorizationIdentity(authorizationRealm, evidence, principalTransformer, authenticationIdentity);</span>
+            }
+
+<span class="fc" id="L88">            final Identity identity = new Identity(authenticationIdentity, authorizationIdentities);</span>
+<span class="fc" id="L89">            ok = true;</span>
+<span class="fc" id="L90">            return identity;</span>
+        } finally {
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">            if (!ok) {</span>
+<span class="nc" id="L93">                authenticationIdentity.dispose();</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">                for (RealmIdentity current : authorizationIdentities) {</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">                    if (current != null)</span>
+<span class="nc" id="L96">                        current.dispose();</span>
+                }
+            }
+        }
+    }
+
+    public RealmIdentity getRealmIdentity(final Principal principal) throws RealmUnavailableException {
+<span class="fc" id="L103">        boolean ok = false;</span>
+<span class="fc" id="L104">        final RealmIdentity authenticationIdentity = authenticationRealm.getRealmIdentity(principal);</span>
+
+<span class="fc" id="L106">        Principal authorizationPrincipal = principal;</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (principalTransformer != null) {</span>
+<span class="fc" id="L108">            authorizationPrincipal = principalTransformer.apply(authorizationPrincipal);</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">            if (authorizationPrincipal == null) throw ElytronMessages.log.transformedPrincipalCannotBeNull();</span>
+        }
+
+<span class="fc" id="L112">        final RealmIdentity[] authorizationIdentities = new RealmIdentity[authorizationRealms.length];</span>
+        try {
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            for (int i = 0; i &lt; authorizationIdentities.length; i++) {</span>
+<span class="fc" id="L115">                SecurityRealm authorizationRealm = authorizationRealms[i];</span>
+<span class="pc bpc" id="L116" title="1 of 4 branches missed.">                authorizationIdentities[i] = (authorizationRealm == authenticationRealm) &amp;&amp; (principalTransformer == null) ? authenticationIdentity : authorizationRealm.getRealmIdentity(authorizationPrincipal);</span>
+            }
+
+<span class="fc" id="L119">            final Identity identity = new Identity(authenticationIdentity, authorizationIdentities);</span>
+<span class="fc" id="L120">            ok = true;</span>
+<span class="fc" id="L121">            return identity;</span>
+        } finally {
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">            if (!ok) {</span>
+<span class="nc" id="L124">                authenticationIdentity.dispose();</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">                for (RealmIdentity current : authorizationIdentities) {</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">                    if (current != null)</span>
+<span class="nc" id="L127">                        current.dispose();</span>
+                }
+            }
+        }
+    }
+
+    @Override
+    public SupportLevel getCredentialAcquireSupport(final Class&lt;? extends Credential&gt; credentialType, final String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc" id="L135">        return authenticationRealm.getCredentialAcquireSupport(credentialType, algorithmName, parameterSpec);</span>
+    }
+
+    @Override
+    public SupportLevel getEvidenceVerifySupport(final Class&lt;? extends Evidence&gt; evidenceType, final String algorithmName) throws RealmUnavailableException {
+<span class="nc" id="L140">        return authenticationRealm.getEvidenceVerifySupport(evidenceType, algorithmName);</span>
+    }
+
+    private RealmIdentity getAuthorizationIdentity(SecurityRealm authorizationRealm, Evidence evidence, Function&lt;Principal, Principal&gt; principalTransformer,
+                                                   RealmIdentity authenticationIdentity) throws RealmUnavailableException {
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (principalTransformer == null) {</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">            if (evidence.getPrincipal() == null) {</span>
+<span class="nc" id="L147">                return authorizationRealm.getRealmIdentity(authenticationIdentity.getRealmIdentityPrincipal());</span>
+            } else {
+<span class="fc" id="L149">                return authorizationRealm.getRealmIdentity(evidence);</span>
+            }
+        } else {
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">            if (evidence.getPrincipal() == null) {</span>
+<span class="nc" id="L153">                Principal authorizationPrincipal = authenticationIdentity.getRealmIdentityPrincipal();</span>
+<span class="nc" id="L154">                authorizationPrincipal = principalTransformer.apply(authorizationPrincipal);</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">                if (authorizationPrincipal == null) throw ElytronMessages.log.transformedPrincipalCannotBeNull();</span>
+<span class="nc" id="L156">                return authorizationRealm.getRealmIdentity(authorizationPrincipal);</span>
+            } else {
+<span class="fc" id="L158">                return authorizationRealm.getRealmIdentity(evidence, principalTransformer);</span>
+            }
+        }
+    }
+
+    public void handleRealmEvent(final RealmEvent event) {
+<span class="nc bnc" id="L164" title="All 2 branches missed.">        if (event instanceof RealmAuthenticationEvent) {</span>
+<span class="nc" id="L165">            authenticationRealm.handleRealmEvent(event);</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">        } else if (event instanceof RealmAuthorizationEvent) {</span>
+<span class="nc bnc" id="L167" title="All 2 branches missed.">            for (SecurityRealm current : authorizationRealms) {</span>
+<span class="nc" id="L168">                SecurityRealm.safeHandleRealmEvent(current, event);</span>
+            }
+        } else {
+            // use safe wrapper to ensure both are called
+<span class="nc" id="L172">            SecurityRealm.safeHandleRealmEvent(authenticationRealm, event);</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">            for (SecurityRealm current : authorizationRealms) {</span>
+<span class="nc" id="L174">                SecurityRealm.safeHandleRealmEvent(current, event);</span>
+            }
+        }
+<span class="nc" id="L177">    }</span>
+
+    static final class Identity implements RealmIdentity {
+
+        private final RealmIdentity authenticationIdentity;
+        private final RealmIdentity[] authorizationIdentities;
+
+<span class="fc" id="L184">        Identity(final RealmIdentity authenticationIdentity, final RealmIdentity[] authorizationIdentities) {</span>
+<span class="fc" id="L185">            this.authenticationIdentity = authenticationIdentity;</span>
+<span class="fc" id="L186">            this.authorizationIdentities = authorizationIdentities;</span>
+<span class="fc" id="L187">        }</span>
+
+        @Override
+        public Principal getRealmIdentityPrincipal() {
+<span class="nc" id="L191">            return authenticationIdentity.getRealmIdentityPrincipal();</span>
+        }
+
+        @Override
+        public SupportLevel getCredentialAcquireSupport(final Class&lt;? extends Credential&gt; credentialType, final String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc" id="L196">            return authenticationIdentity.getCredentialAcquireSupport(credentialType, algorithmName, parameterSpec);</span>
+        }
+
+        @Override
+        public SupportLevel getEvidenceVerifySupport(final Class&lt;? extends Evidence&gt; evidenceType, final String algorithmName) throws RealmUnavailableException {
+<span class="nc" id="L201">            return authenticationIdentity.getEvidenceVerifySupport(evidenceType, algorithmName);</span>
+        }
+
+        @Override
+        public &lt;C extends Credential&gt; C getCredential(final Class&lt;C&gt; credentialType, final String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc" id="L206">            return authenticationIdentity.getCredential(credentialType, algorithmName, parameterSpec);</span>
+        }
+
+        @Override
+        public &lt;C extends Credential&gt; C getCredential(final Class&lt;C&gt; credentialType, final String algorithmName) throws RealmUnavailableException {
+<span class="nc" id="L211">            return authenticationIdentity.getCredential(credentialType, algorithmName);</span>
+        }
+
+        @Override
+        public &lt;C extends Credential&gt; C getCredential(final Class&lt;C&gt; credentialType) throws RealmUnavailableException {
+<span class="nc" id="L216">            return authenticationIdentity.getCredential(credentialType);</span>
+        }
+
+        @Override
+        public boolean verifyEvidence(final Evidence evidence) throws RealmUnavailableException {
+<span class="nc" id="L221">            return authenticationIdentity.verifyEvidence(evidence);</span>
+        }
+
+        public boolean exists() throws RealmUnavailableException {
+<span class="fc" id="L225">            return authenticationIdentity.exists();</span>
+        }
+
+        public AuthorizationIdentity getAuthorizationIdentity() throws RealmUnavailableException {
+<span class="fc bfc" id="L229" title="All 2 branches covered.">            if (authorizationIdentities.length == 1) {</span>
+<span class="fc" id="L230">                return authorizationIdentities[0].getAuthorizationIdentity();</span>
+            }
+
+<span class="fc" id="L233">            final AuthorizationIdentity[] authorizationIdentities = new AuthorizationIdentity[this.authorizationIdentities.length];</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">            for (int i = 0; i &lt; authorizationIdentities.length; i++) {</span>
+<span class="fc" id="L235">                authorizationIdentities[i] = this.authorizationIdentities[i].getAuthorizationIdentity();</span>
+            }
+
+            // Use a Supplier here so we only load and aggregate the attributes if they are actually used.
+<span class="fc" id="L239">            return AuthorizationIdentity.basicIdentity(() -&gt; combineAttributes(authorizationIdentities), &quot;Aggregated&quot;);</span>
+        }
+
+        private Attributes combineAttributes(AuthorizationIdentity[] authorizationIdentities) {
+<span class="fc" id="L243">            Attributes[] attributes = new Attributes[authorizationIdentities.length];</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">            for (int i = 0; i &lt; attributes.length; i++) {</span>
+<span class="fc" id="L245">                attributes[i] = authorizationIdentities[i].getAttributes();</span>
+            }
+
+<span class="fc" id="L248">            return AggregateAttributes.aggregateOf(attributes);</span>
+        }
+
+        public void dispose() {
+<span class="nc" id="L252">            authenticationIdentity.dispose();</span>
+<span class="nc bnc" id="L253" title="All 2 branches missed.">            for (RealmIdentity current : authorizationIdentities) {</span>
+<span class="nc" id="L254">                current.dispose();</span>
+            }
+<span class="nc" id="L256">        }</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

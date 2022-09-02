@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronPermission.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-permission</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.permission</a> &gt; <span class="el_source">ElytronPermission.java</span></div><h1>ElytronPermission.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.permission;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.util.StringEnumeration;
+import org.wildfly.security.util.StringMapping;
+
+/**
+ * A general Elytron permission.  The permission {@code name} must be one of the following:
+ * &lt;ul&gt;
+ *     &lt;li&gt;{@code authenticate}&lt;/li&gt;
+ *     &lt;li&gt;{@code createAuthenticator}&lt;/li&gt;
+ *     &lt;li&gt;{@code createAuthenticationContextConfigurationClient}&lt;/li&gt;
+ *     &lt;li&gt;{@code createSecurityDomain}&lt;/li&gt;
+ *     &lt;li&gt;{@code createSecurityRealm}&lt;/li&gt;
+ *     &lt;li&gt;{@code registerSecurityDomain}&lt;/li&gt;
+ *     &lt;li&gt;{@code getSecurityDomain}&lt;/li&gt;
+ *     &lt;li&gt;{@code unregisterSecurityDomain}&lt;/li&gt;
+ *     &lt;li&gt;{@code setRunAsPrincipal}&lt;/li&gt;
+ *     &lt;li&gt;{@code createServerAuthenticationContext}&lt;/li&gt;
+ *     &lt;li&gt;{@code getPrivateCredentials}&lt;/li&gt;
+ *     &lt;li&gt;{@code getIdentity}&lt;/li&gt;
+ *     &lt;li&gt;{@code getIdentityForUpdate}&lt;/li&gt;
+ *     &lt;li&gt;{@code createAdHocIdentity}&lt;/li&gt;
+ *     &lt;li&gt;{@code withDefaultRoleMapper}&lt;/li&gt;
+ *     &lt;li&gt;{@code handleSecurityEvent}&lt;/li&gt;
+ * &lt;/ul&gt;
+ * The {@code actions} are not used and should be empty or {@code null}.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class ElytronPermission extends AbstractNameSetOnlyPermission&lt;ElytronPermission&gt; {
+
+    private static final long serialVersionUID = 6124294238228442419L;
+
+<span class="fc" id="L53">    private static final StringEnumeration strings = StringEnumeration.of(</span>
+        &quot;authenticate&quot;,
+        &quot;createAuthenticator&quot;,
+        &quot;createAuthenticationContextConfigurationClient&quot;,
+        &quot;createSecurityDomain&quot;,
+        &quot;createSecurityRealm&quot;,
+        &quot;registerSecurityDomain&quot;,
+        &quot;getSecurityDomain&quot;,
+        &quot;unregisterSecurityDomain&quot;,
+        &quot;setRunAsPrincipal&quot;,
+        &quot;createServerAuthenticationContext&quot;,
+        &quot;getPrivateCredentials&quot;,
+        &quot;getIdentity&quot;,
+        &quot;getIdentityForUpdate&quot;,
+        &quot;createAdHocIdentity&quot;,
+        &quot;withDefaultRoleMapper&quot;,
+        &quot;handleSecurityEvent&quot;
+    );
+
+<span class="fc" id="L72">    static final StringMapping&lt;ElytronPermission&gt; mapping = new StringMapping&lt;&gt;(strings, ElytronPermission::new);</span>
+
+<span class="fc" id="L74">    private static final ElytronPermission allPermission = new ElytronPermission(&quot;*&quot;);</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param name the name of the permission
+     */
+    public ElytronPermission(final String name) {
+<span class="fc" id="L82">        this(name, null);</span>
+<span class="fc" id="L83">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param name the name of the permission
+     * @param actions the actions (should be empty)
+     */
+    public ElytronPermission(final String name, final String actions) {
+<span class="fc" id="L92">        super(name, strings);</span>
+<span class="fc" id="L93">        requireEmptyActions(actions);</span>
+<span class="fc" id="L94">    }</span>
+
+    public ElytronPermission withName(final String name) {
+<span class="nc" id="L97">        return forName(name);</span>
+    }
+
+    /**
+     * Get the permission with the given name.
+     *
+     * @param name the name (must not be {@code null})
+     * @return the permission (not {@code null})
+     * @throws IllegalArgumentException if the name is not valid
+     */
+    public static ElytronPermission forName(final String name) {
+<span class="fc" id="L108">        Assert.checkNotNullParam(&quot;name&quot;, name);</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        return name.equals(&quot;*&quot;) ? allPermission : mapping.getItemByString(name);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

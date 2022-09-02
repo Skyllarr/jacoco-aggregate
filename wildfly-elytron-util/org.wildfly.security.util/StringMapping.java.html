@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>StringMapping.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-util</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.util</a> &gt; <span class="el_source">StringMapping.java</span></div><h1>StringMapping.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.util;
+
+import java.util.function.Function;
+
+import org.wildfly.common.Assert;
+
+/**
+ * An efficient mapping of enumerated strings to some other object.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class StringMapping&lt;T&gt; {
+    private final StringEnumeration stringEnumeration;
+    private final T[] items;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param stringEnumeration the string enumeration (must not be {@code null})
+     * @param mapping the mapping function (must not be {@code null})
+     */
+<span class="fc" id="L40">    public StringMapping(final StringEnumeration stringEnumeration, final Function&lt;String, T&gt; mapping) {</span>
+<span class="fc" id="L41">        Assert.checkNotNullParam(&quot;stringEnumeration&quot;, stringEnumeration);</span>
+<span class="fc" id="L42">        Assert.checkNotNullParam(&quot;mapping&quot;, mapping);</span>
+<span class="fc" id="L43">        this.stringEnumeration = stringEnumeration;</span>
+        @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L45">        final T[] items = (T[]) new Object[stringEnumeration.size()];</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        for (int i = 0; i &lt; stringEnumeration.size(); i ++) {</span>
+<span class="fc" id="L47">            items[i] = mapping.apply(stringEnumeration.nameOf(i));</span>
+        }
+<span class="fc" id="L49">        this.items = items;</span>
+<span class="fc" id="L50">    }</span>
+
+    /**
+     * Get an item from this mapping by ID.
+     *
+     * @param index the index to look up
+     * @return the mapped item for the given ID
+     * @throws IllegalArgumentException if the given index is out of range
+     */
+    public T getItemById(int index) throws IllegalArgumentException {
+<span class="nc" id="L60">        Assert.checkMinimumParameter(&quot;index&quot;, 0, index);</span>
+<span class="nc" id="L61">        Assert.checkMaximumParameter(&quot;index&quot;, stringEnumeration.size() - 1, index);</span>
+<span class="nc" id="L62">        return items[index];</span>
+    }
+
+    /**
+     * Get an item from this mapping by the corresponding string name.
+     *
+     * @param str the string name
+     * @return the item
+     * @throws IllegalArgumentException if the string name is unknown
+     */
+    public T getItemByString(String str) throws IllegalArgumentException {
+<span class="fc" id="L73">        Assert.checkNotNullParam(&quot;str&quot;, str);</span>
+<span class="fc" id="L74">        return items[stringEnumeration.indexOf(str)];</span>
+    }
+
+    /**
+     * Get the string enumeration for this mapping.
+     *
+     * @return the string enumeration for this mapping (not {@code null})
+     */
+    public StringEnumeration getStringEnumeration() {
+<span class="nc" id="L83">        return stringEnumeration;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

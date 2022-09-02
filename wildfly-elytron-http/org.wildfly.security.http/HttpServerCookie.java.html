@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>HttpServerCookie.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http</a> &gt; <span class="el_source">HttpServerCookie.java</span></div><h1>HttpServerCookie.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.http;
+
+/**
+ * Server side representation of a HTTP Cookie.
+ *
+ * @author &lt;a href=&quot;mailto:psilva@redhat.com&quot;&gt;Pedro Igor&lt;/a&gt;
+ */
+public interface HttpServerCookie {
+
+    /**
+     * Returns a new instance representing &lt;code&gt;HttpServerCookie&lt;/code&gt;
+     *
+     * @param name the name of the cookie
+     * @param value the current value of this cookie
+     * @param domain the domain name of this cookie
+     * @param maxAge specifying the maximum age of the cookie in seconds
+     * @param path a &lt;code&gt;String&lt;/code&gt; specifying a path on the server
+     * @param secure &lt;code&gt;true&lt;/code&gt; if the browser uses a secure protocol, &lt;code&gt;false&lt;/code&gt; otherwise
+     * @param version the version of the protocol this cookie complies with
+     * @param httpOnly true if this cookie has been marked as &lt;i&gt;HttpOnly&lt;/i&gt;, false otherwise
+     * @return a new instance representing &lt;code&gt;HttpServerCookie&lt;/code&gt;
+     */
+    static HttpServerCookie getInstance(String name, String value, String domain, int maxAge, String path, boolean secure, int version, boolean httpOnly) {
+<span class="nc" id="L42">        return new HttpServerCookie() {</span>
+            @Override
+            public String getName() {
+<span class="nc" id="L45">                return name;</span>
+            }
+
+            @Override
+            public String getValue() {
+<span class="nc" id="L50">                return value;</span>
+            }
+
+            @Override
+            public String getDomain() {
+<span class="nc" id="L55">                return domain;</span>
+            }
+
+            @Override
+            public int getMaxAge() {
+<span class="nc" id="L60">                return maxAge;</span>
+            }
+
+            @Override
+            public String getPath() {
+<span class="nc" id="L65">                return path;</span>
+            }
+
+            @Override
+            public boolean isSecure() {
+<span class="nc" id="L70">                return secure;</span>
+            }
+
+            @Override
+            public int getVersion() {
+<span class="nc" id="L75">                return version;</span>
+            }
+
+            @Override
+            public boolean isHttpOnly() {
+<span class="nc" id="L80">                return httpOnly;</span>
+            }
+        };
+    }
+
+    /**
+     * Returns the name of the cookie.
+     *
+     * @return the name of the cookie
+     */
+    String getName();
+
+    /**
+     * Returns the current value of this cookie.
+     *
+     * @return the current value of this cookie
+     */
+    String getValue();
+
+    /**
+     * Gets the domain name of this cookie.
+     *
+     * @return the domain name of this cookie
+     */
+    String getDomain();
+
+    /**
+     * Gets the maximum age in seconds of this Cookie.
+     *
+     * @return an integer specifying the maximum age of the cookie in seconds
+     */
+    int getMaxAge();
+
+    /**
+     * Returns the path on the server to which the browser returns this cookie.
+     *
+     * @return a &lt;code&gt;String&lt;/code&gt; specifying a path on the server
+     */
+    String getPath();
+
+    /**
+     * Returns &lt;code&gt;true&lt;/code&gt; if the browser is sending cookies only over a secure protocol, or &lt;code&gt;false&lt;/code&gt; if the
+     * browser can send cookies using any protocol.
+     *
+     * @return &lt;code&gt;true&lt;/code&gt; if the browser uses a secure protocol, &lt;code&gt;false&lt;/code&gt; otherwise
+     */
+    boolean isSecure();
+
+    /**
+     * Returns the version of the protocol this cookie complies with.
+     *
+     * @return the version of the protocol this cookie complies with.
+     */
+    int getVersion();
+
+    /**
+     * Checks whether this cookie has been marked as &lt;i&gt;HttpOnly&lt;/i&gt;.
+     *
+     * @return true if this cookie has been marked as &lt;i&gt;HttpOnly&lt;/i&gt;, false otherwise
+     */
+    boolean isHttpOnly();
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

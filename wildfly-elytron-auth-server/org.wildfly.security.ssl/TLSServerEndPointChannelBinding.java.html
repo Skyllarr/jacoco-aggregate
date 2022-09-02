@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TLSServerEndPointChannelBinding.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.ssl</a> &gt; <span class="el_source">TLSServerEndPointChannelBinding.java</span></div><h1>TLSServerEndPointChannelBinding.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2017 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.ssl;
+
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateEncodingException;
+import java.security.cert.X509Certificate;
+
+import javax.security.auth.callback.UnsupportedCallbackException;
+
+import org.wildfly.security.asn1.ASN1;
+import org.wildfly.security.auth.callback.CallbackUtil;
+import org.wildfly.security.auth.callback.ChannelBindingCallback;
+
+/**
+ * Utilities for handling the &quot;tls-server-end-point&quot; channel binding strategy used by various types
+ * of authentication mechanisms.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class TLSServerEndPointChannelBinding {
+    public static final String TLS_SERVER_ENDPOINT = &quot;tls-server-end-point&quot;;
+
+    private TLSServerEndPointChannelBinding() {}
+
+    /**
+     * Get the digest algorithm that would be used for a given signature algorithm OID.
+     *
+     * @param sigAlgOID the signature algorithm OID (must not be {@code null})
+     * @return the digest algorithm, or {@code null} if the OID is not recognized
+     */
+    public static String getDigestAlgorithm(final String sigAlgOID) {
+<span class="nc bnc" id="L50" title="All 4 branches missed.">        switch (sigAlgOID) {</span>
+            case ASN1.OID_MD2:
+            case ASN1.OID_MD2_WITH_RSA:
+            case ASN1.OID_MD4_WITH_RSA:
+            case ASN1.OID_MD5:
+            case ASN1.OID_MD5_WITH_RSA:
+            case ASN1.OID_SHA1_WITH_DSA:
+            case ASN1.OID_SHA1_WITH_RSA:
+            case ASN1.OID_SHA1_WITH_ECDSA:
+            case ASN1.OID_SHA1:
+            case ASN1.OID_SHA224_WITH_ECDSA:
+            case ASN1.OID_SHA256_WITH_RSA:
+            case ASN1.OID_SHA256_WITH_ECDSA:
+<span class="nc" id="L63">                return &quot;SHA-256&quot;;</span>
+            case ASN1.OID_SHA384_WITH_ECDSA:
+            case ASN1.OID_SHA384_WITH_RSA:
+<span class="nc" id="L66">                return &quot;SHA-384&quot;;</span>
+            case ASN1.OID_SHA512_WITH_ECDSA:
+            case ASN1.OID_SHA512_WITH_RSA:
+<span class="nc" id="L69">                return &quot;SHA-512&quot;;</span>
+            default: {
+<span class="nc" id="L71">                return null;</span>
+            }
+        }
+    }
+
+    /**
+     * Convenience method to handle a channel binding callback.
+     *
+     * @param channelBindingCallback the callback (must not be {@code null})
+     * @param serverCerts the server certificate chain
+     * @throws UnsupportedCallbackException if the server certificates are not present or unsupported and the callback is not optional
+     */
+    public static void handleChannelBindingCallback(ChannelBindingCallback channelBindingCallback, X509Certificate[] serverCerts) throws UnsupportedCallbackException {
+<span class="nc bnc" id="L84" title="All 4 branches missed.">        if (serverCerts != null &amp;&amp; serverCerts.length &gt; 0) {</span>
+            // tls-server-end-point
+            try {
+<span class="nc" id="L87">                final byte[] bindingData = getChannelBindingData(serverCerts[0]);</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">                if (bindingData != null) {</span>
+<span class="nc" id="L89">                    channelBindingCallback.setBindingData(bindingData);</span>
+<span class="nc" id="L90">                    channelBindingCallback.setBindingType(TLS_SERVER_ENDPOINT);</span>
+<span class="nc" id="L91">                    return;</span>
+                }
+<span class="nc" id="L93">            } catch (CertificateEncodingException | NoSuchAlgorithmException e) {</span>
+                // fail silently
+<span class="nc" id="L95">            }</span>
+        }
+<span class="nc" id="L97">        CallbackUtil.unsupported(channelBindingCallback);</span>
+<span class="nc" id="L98">    }</span>
+
+    static byte[] getChannelBindingData(X509Certificate serverCert) throws NoSuchAlgorithmException, CertificateEncodingException {
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        if (serverCert == null) {</span>
+<span class="nc" id="L102">            return null;</span>
+        }
+<span class="nc" id="L104">        final String digestAlgorithm = TLSServerEndPointChannelBinding.getDigestAlgorithm(serverCert.getSigAlgOID());</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        if (digestAlgorithm == null) {</span>
+<span class="nc" id="L106">            return null;</span>
+        }
+<span class="nc" id="L108">        return MessageDigest.getInstance(digestAlgorithm).digest(serverCert.getEncoded());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

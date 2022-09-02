@@ -1,0 +1,438 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DigestAuthenticationMechanism.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-digest</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.digest</a> &gt; <span class="el_source">DigestAuthenticationMechanism.java</span></div><h1>DigestAuthenticationMechanism.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.http.digest;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.wildfly.security.http.HttpConstants.ALGORITHM;
+import static org.wildfly.security.http.HttpConstants.AUTH;
+import static org.wildfly.security.http.HttpConstants.AUTHORIZATION;
+import static org.wildfly.security.http.HttpConstants.BAD_REQUEST;
+import static org.wildfly.security.http.HttpConstants.CNONCE;
+import static org.wildfly.security.http.HttpConstants.NC;
+import static org.wildfly.security.http.HttpConstants.QOP;
+import static org.wildfly.security.http.HttpConstants.URI;
+import static org.wildfly.security.http.HttpConstants.DOMAIN;
+import static org.wildfly.security.http.HttpConstants.MD5;
+import static org.wildfly.security.http.HttpConstants.NONCE;
+import static org.wildfly.security.http.HttpConstants.OPAQUE;
+import static org.wildfly.security.http.HttpConstants.REALM;
+import static org.wildfly.security.http.HttpConstants.RESPONSE;
+import static org.wildfly.security.http.HttpConstants.STALE;
+import static org.wildfly.security.http.HttpConstants.UNAUTHORIZED;
+import static org.wildfly.security.http.HttpConstants.USERNAME;
+import static org.wildfly.security.http.HttpConstants.USERNAME_STAR;
+import static org.wildfly.security.http.HttpConstants.WWW_AUTHENTICATE;
+import static org.wildfly.security.mechanism._private.ElytronMessages.httpDigest;
+import static org.wildfly.security.mechanism.digest.DigestUtil.parseResponse;
+
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.Provider;
+import java.util.HashMap;
+import java.util.List;
+import java.util.function.Supplier;
+
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.sasl.AuthorizeCallback;
+
+import org.wildfly.common.iteration.ByteIterator;
+import org.wildfly.security.auth.callback.AuthenticationCompleteCallback;
+import org.wildfly.security.auth.callback.AvailableRealmsCallback;
+import org.wildfly.security.http.HttpAuthenticationException;
+import org.wildfly.security.http.HttpConstants;
+import org.wildfly.security.http.HttpServerAuthenticationMechanism;
+import org.wildfly.security.http.HttpServerMechanismsResponder;
+import org.wildfly.security.http.HttpServerRequest;
+import org.wildfly.security.http.HttpServerResponse;
+import org.wildfly.security.mechanism.AuthenticationMechanismException;
+import org.wildfly.security.mechanism.digest.DigestQuote;
+import org.wildfly.security.mechanism.digest.PasswordDigestObtainer;
+import org.wildfly.security.password.interfaces.DigestPassword;
+
+/**
+ * Implementation of the HTTP DIGEST authentication mechanism as defined in RFC 7616.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+final class DigestAuthenticationMechanism implements HttpServerAuthenticationMechanism {
+
+    private static final String CHALLENGE_PREFIX = &quot;Digest &quot;;
+    private static final String OPAQUE_VALUE = &quot;00000000000000000000000000000000&quot;;
+    private static final byte COLON = ':';
+
+    private final Supplier&lt;Provider[]&gt; providers;
+    private final CallbackHandler callbackHandler;
+    private final NonceManager nonceManager;
+    private final String configuredRealm;
+    private final String domain;
+    private final String mechanismName;
+    private final String algorithm;
+    private final boolean validateUri;
+
+    /**
+     *
+     * @param callbackHandler
+     * @param nonceManager
+     * @param configuredRealm
+     */
+<span class="nc" id="L99">    DigestAuthenticationMechanism(CallbackHandler callbackHandler, NonceManager nonceManager, String configuredRealm, String domain, String mechanismName, String algorithm, Supplier&lt;Provider[]&gt; providers, String validateUri) {</span>
+<span class="nc" id="L100">        this.callbackHandler = callbackHandler;</span>
+<span class="nc" id="L101">        this.nonceManager = nonceManager;</span>
+<span class="nc" id="L102">        this.configuredRealm = configuredRealm;</span>
+<span class="nc" id="L103">        this.domain = domain;</span>
+<span class="nc" id="L104">        this.mechanismName = mechanismName;</span>
+<span class="nc" id="L105">        this.algorithm = algorithm;</span>
+<span class="nc" id="L106">        this.providers = providers;</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        this.validateUri = validateUri == null ? true : Boolean.parseBoolean(validateUri);</span>
+<span class="nc" id="L108">    }</span>
+
+    @Override
+    public String getMechanismName() {
+<span class="nc" id="L112">        return mechanismName;</span>
+    }
+
+    @Override
+    public void evaluateRequest(final HttpServerRequest request) throws HttpAuthenticationException {
+<span class="nc" id="L117">        List&lt;String&gt; authorizationValues = request.getRequestHeaderValues(AUTHORIZATION);</span>
+
+<span class="nc bnc" id="L119" title="All 2 branches missed.">        if (authorizationValues != null) {</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">            for (String current : authorizationValues) {</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">                if (current.regionMatches(true, 0, CHALLENGE_PREFIX, 0, CHALLENGE_PREFIX.length())) {</span>
+<span class="nc" id="L122">                    byte[] rawHeader = current.substring(CHALLENGE_PREFIX.length()).getBytes(UTF_8);</span>
+                    try {
+<span class="nc" id="L124">                        HashMap&lt;String, byte[]&gt; responseTokens = parseResponse(rawHeader, UTF_8, false, httpDigest);</span>
+<span class="nc" id="L125">                        validateResponse(responseTokens, request);</span>
+<span class="nc" id="L126">                        return;</span>
+<span class="nc" id="L127">                    } catch (AuthenticationMechanismException e) {</span>
+<span class="nc" id="L128">                        httpDigest.trace(&quot;Failed to parse or validate the response&quot;, e);</span>
+<span class="nc" id="L129">                        request.badRequest(e.toHttpAuthenticationException(), response -&gt; prepareResponse(selectRealm(), response, false));</span>
+<span class="nc" id="L130">                        return;</span>
+                    }
+                }
+<span class="nc" id="L133">            }</span>
+        }
+
+<span class="nc" id="L136">        request.noAuthenticationInProgress(response -&gt; prepareResponse(selectRealm(), response, false));</span>
+<span class="nc" id="L137">    }</span>
+
+    private void validateResponse(HashMap&lt;String, byte[]&gt; responseTokens, final HttpServerRequest request) throws AuthenticationMechanismException, HttpAuthenticationException {
+<span class="nc" id="L140">        String nonce = convertToken(NONCE, responseTokens.get(NONCE));</span>
+<span class="nc" id="L141">        String messageRealm = convertToken(REALM, responseTokens.get(REALM));</span>
+        int nonceCount;
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        if (!responseTokens.containsKey(NC)) {</span>
+<span class="nc" id="L144">            nonceCount = -1;</span>
+        } else {
+<span class="nc" id="L146">            String nonceCountHex = convertToken(REALM, responseTokens.get(NC));</span>
+<span class="nc" id="L147">            nonceCount = Integer.parseInt(nonceCountHex, 16);</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">            if (nonceCount &lt; 0) {</span>
+<span class="nc" id="L149">                throw httpDigest.invalidNonceCount(nonceCount);</span>
+            }
+        }
+        /*
+         * We want to get the nonce checked ASAP so it is recorded as used in case some intermittent failure prevents validation.
+         *
+         * We act on the validity at the end where we can let the client know if it is stale.
+         */
+<span class="nc" id="L157">        byte[] salt = messageRealm.getBytes(UTF_8);</span>
+<span class="nc" id="L158">        boolean nonceValid = nonceManager.useNonce(nonce, salt, nonceCount);</span>
+
+        String username;
+<span class="nc bnc" id="L161" title="All 4 branches missed.">        if (responseTokens.containsKey(USERNAME) &amp;&amp; !responseTokens.containsKey(USERNAME_STAR)) {</span>
+<span class="nc" id="L162">            username = convertToken(USERNAME, responseTokens.get(USERNAME));</span>
+<span class="nc bnc" id="L163" title="All 4 branches missed.">        } else if (responseTokens.containsKey(USERNAME_STAR) &amp;&amp; !responseTokens.containsKey(USERNAME)) {</span>
+            try {
+<span class="nc" id="L165">                username = decodeRfc2231(convertToken(USERNAME_STAR, responseTokens.get(USERNAME_STAR)));</span>
+<span class="nc" id="L166">            } catch (UnsupportedEncodingException e) {</span>
+<span class="nc" id="L167">                throw httpDigest.mechInvalidClientMessageWithCause(e);</span>
+<span class="nc" id="L168">            }</span>
+        } else {
+<span class="nc" id="L170">            throw httpDigest.mechOneOfDirectivesHasToBeDefined(USERNAME, USERNAME_STAR);</span>
+        }
+
+        byte[] digestUri;
+<span class="nc bnc" id="L174" title="All 2 branches missed.">        if (responseTokens.containsKey(URI)) {</span>
+<span class="nc" id="L175">            digestUri = responseTokens.get(URI);</span>
+        } else {
+<span class="nc" id="L177">            throw httpDigest.mechMissingDirective(URI);</span>
+        }
+
+<span class="nc bnc" id="L180" title="All 2 branches missed.">        if (!digestUriMatchesRequestUri(request, digestUri)) {</span>
+<span class="nc" id="L181">            fail();</span>
+<span class="nc" id="L182">            request.authenticationFailed(httpDigest.mechResponseTokenMismatch(getMechanismName()), httpResponse -&gt; httpResponse.setStatusCode(BAD_REQUEST));</span>
+<span class="nc" id="L183">            return;</span>
+        }
+
+        byte[] response;
+<span class="nc bnc" id="L187" title="All 2 branches missed.">        if (responseTokens.containsKey(RESPONSE)) {</span>
+<span class="nc" id="L188">            response = ByteIterator.ofBytes(responseTokens.get(RESPONSE)).asUtf8String().hexDecode().drain();</span>
+        } else {
+<span class="nc" id="L190">            throw httpDigest.mechMissingDirective(RESPONSE);</span>
+        }
+<span class="nc bnc" id="L192" title="All 2 branches missed.">        String algorithm = responseTokens.containsKey(ALGORITHM) ?</span>
+<span class="nc" id="L193">                convertToken(ALGORITHM, responseTokens.get(ALGORITHM)) : MD5;</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">        if ( ! this.algorithm.equals(algorithm)) {</span>
+<span class="nc" id="L195">            throw httpDigest.mechUnsupportedAlgorithm(algorithm);</span>
+        }
+
+        MessageDigest messageDigest;
+        try {
+<span class="nc" id="L200">            messageDigest = MessageDigest.getInstance(algorithm);</span>
+<span class="nc" id="L201">        } catch (NoSuchAlgorithmException e) {</span>
+<span class="nc" id="L202">            throw httpDigest.mechMacAlgorithmNotSupported(e);</span>
+<span class="nc" id="L203">        }</span>
+
+<span class="nc bnc" id="L205" title="All 2 branches missed.">        if (!checkRealm(messageRealm)) {</span>
+<span class="nc" id="L206">            throw httpDigest.mechDisallowedClientRealm(messageRealm);</span>
+        }
+
+<span class="nc" id="L209">        String selectedRealm = selectRealm();</span>
+
+<span class="nc bnc" id="L211" title="All 2 branches missed.">        if (username.length() == 0) {</span>
+<span class="nc" id="L212">            httpDigest.trace(&quot;Failed: no username&quot;);</span>
+<span class="nc" id="L213">            fail();</span>
+<span class="nc" id="L214">            request.authenticationFailed(httpDigest.authenticationFailed(), httpResponse -&gt; prepareResponse(selectedRealm, httpResponse, false));</span>
+<span class="nc" id="L215">            return;</span>
+        }
+
+<span class="nc" id="L218">        byte[] hA1 = getH_A1(messageDigest, username, messageRealm);</span>
+
+<span class="nc bnc" id="L220" title="All 2 branches missed.">        if (hA1 == null) {</span>
+<span class="nc" id="L221">            httpDigest.trace(&quot;Failed: unable to get expected proof&quot;);</span>
+<span class="nc" id="L222">            fail();</span>
+<span class="nc" id="L223">            request.authenticationFailed(httpDigest.authenticationFailed(), httpResponse -&gt; prepareResponse(selectedRealm, httpResponse, false));</span>
+<span class="nc" id="L224">            return;</span>
+        }
+
+<span class="nc" id="L227">        byte[] calculatedResponse = calculateResponseDigest(messageDigest, hA1, nonce, request.getRequestMethod(), digestUri, responseTokens.get(QOP), responseTokens.get(CNONCE), responseTokens.get(NC));</span>
+
+<span class="nc bnc" id="L229" title="All 2 branches missed.">        if (MessageDigest.isEqual(response, calculatedResponse) == false) {</span>
+<span class="nc" id="L230">            httpDigest.trace(&quot;Failed: invalid proof&quot;);</span>
+<span class="nc" id="L231">            fail();</span>
+<span class="nc" id="L232">            request.authenticationFailed(httpDigest.mechResponseTokenMismatch(getMechanismName()), httpResponse -&gt; prepareResponse(selectedRealm, httpResponse, false));</span>
+<span class="nc" id="L233">            return;</span>
+        }
+
+<span class="nc bnc" id="L236" title="All 2 branches missed.">        if (nonceValid == false) {</span>
+<span class="nc" id="L237">            httpDigest.trace(&quot;Failed: invalid nonce&quot;);</span>
+<span class="nc" id="L238">            request.authenticationInProgress(httpResponse -&gt; prepareResponse(selectedRealm, httpResponse, true));</span>
+<span class="nc" id="L239">            return;</span>
+        }
+
+<span class="nc bnc" id="L242" title="All 2 branches missed.">        if (authorize(username)) {</span>
+<span class="nc" id="L243">            httpDigest.trace(&quot;Succeed&quot;);</span>
+<span class="nc" id="L244">            succeed();</span>
+<span class="nc bnc" id="L245" title="All 2 branches missed.">            if (nonceCount &lt; 0) {</span>
+<span class="nc" id="L246">                request.authenticationComplete(new HttpServerMechanismsResponder() {</span>
+                    @Override
+                    public void sendResponse(HttpServerResponse response) throws HttpAuthenticationException {
+<span class="nc" id="L249">                        sendAuthenticationInfoHeader(response, salt);</span>
+<span class="nc" id="L250">                    }</span>
+                });
+            } else {
+                // If we had a nonce count using it would extend the life of the nonce so we don't need to issue a new one.
+<span class="nc" id="L254">                request.authenticationComplete();</span>
+            }
+        } else {
+<span class="nc" id="L257">            httpDigest.trace(&quot;Failed: not authorized&quot;);</span>
+<span class="nc" id="L258">            fail();</span>
+<span class="nc" id="L259">            request.authenticationFailed(httpDigest.authorizationFailed(username), httpResponse -&gt; httpResponse.setStatusCode(HttpConstants.FORBIDDEN));</span>
+        }
+<span class="nc" id="L261">    }</span>
+
+    private void sendAuthenticationInfoHeader(final HttpServerResponse response, byte[] salt) {
+<span class="nc" id="L264">        String nextNonce = nonceManager.generateNonce(salt);</span>
+<span class="nc" id="L265">        response.addResponseHeader(HttpConstants.AUTHENTICATION_INFO, HttpConstants.NEXT_NONCE + &quot;=\&quot;&quot; + nextNonce + &quot;\&quot;&quot;);</span>
+<span class="nc" id="L266">    }</span>
+
+    private boolean digestUriMatchesRequestUri(HttpServerRequest request, byte[] digestUri) {
+<span class="nc bnc" id="L269" title="All 2 branches missed.">        if (!validateUri) {</span>
+<span class="nc" id="L270">            return true;</span>
+        }
+
+<span class="nc" id="L273">        java.net.URI requestURI = request.getRequestURI();</span>
+<span class="nc" id="L274">        String digestUriStr = new String(digestUri, UTF_8);</span>
+
+<span class="nc bnc" id="L276" title="All 2 branches missed.">        if (requestURI.toString().equals(digestUriStr)) {</span>
+<span class="nc" id="L277">            return true;</span>
+        } else {
+            // digestUri is relative &amp; request is absolute
+            String relativeRequestUri;
+<span class="nc" id="L281">            String query = requestURI.getQuery();</span>
+<span class="nc bnc" id="L282" title="All 4 branches missed.">            if (query == null || query.isEmpty()) {</span>
+<span class="nc" id="L283">                relativeRequestUri = requestURI.getRawPath();</span>
+            } else {
+<span class="nc" id="L285">                relativeRequestUri = requestURI.getRawPath() + &quot;?&quot; + requestURI.getRawQuery();</span>
+            }
+
+<span class="nc" id="L288">            return relativeRequestUri.equals(digestUriStr);</span>
+        }
+    }
+
+    /**
+     * Check if realm is offered by the server
+     */
+    private boolean checkRealm(String realm) throws AuthenticationMechanismException {
+<span class="nc" id="L296">        String[] realms = getAvailableRealms();</span>
+<span class="nc bnc" id="L297" title="All 2 branches missed.">        if (realms != null) {</span>
+<span class="nc bnc" id="L298" title="All 2 branches missed.">            for (String current : realms) {</span>
+<span class="nc bnc" id="L299" title="All 2 branches missed.">                if (realm.equals(current)) {</span>
+<span class="nc" id="L300">                    return true;</span>
+                }
+            }
+        }
+<span class="nc" id="L304">        return false;</span>
+    }
+
+    private byte[] calculateResponseDigest(MessageDigest messageDigest, byte[] hA1, String nonce, String method, byte[] digestUri, byte[] qop, byte[] cnonce, byte[] nc) {
+<span class="nc" id="L308">        messageDigest.update(method.getBytes(UTF_8));</span>
+<span class="nc" id="L309">        messageDigest.update(COLON);</span>
+<span class="nc" id="L310">        byte[] hA2 = messageDigest.digest(digestUri);</span>
+
+<span class="nc" id="L312">        messageDigest.update(ByteIterator.ofBytes(hA1).hexEncode().drainToString().getBytes(UTF_8));</span>
+<span class="nc" id="L313">        messageDigest.update(COLON);</span>
+<span class="nc" id="L314">        messageDigest.update(nonce.getBytes(UTF_8));</span>
+<span class="nc bnc" id="L315" title="All 2 branches missed.">        if(qop != null) {</span>
+<span class="nc" id="L316">            messageDigest.update(COLON);</span>
+<span class="nc" id="L317">            messageDigest.update(nc);</span>
+<span class="nc" id="L318">            messageDigest.update(COLON);</span>
+<span class="nc" id="L319">            messageDigest.update(cnonce);</span>
+<span class="nc" id="L320">            messageDigest.update(COLON);</span>
+<span class="nc" id="L321">            messageDigest.update(qop);</span>
+        }
+<span class="nc" id="L323">        messageDigest.update(COLON);</span>
+
+<span class="nc" id="L325">        return messageDigest.digest(ByteIterator.ofBytes(hA2).hexEncode().drainToString().getBytes(UTF_8));</span>
+    }
+
+    private byte[] getH_A1(final MessageDigest messageDigest, final String username, final String messageRealm) throws AuthenticationMechanismException {
+<span class="nc" id="L329">        PasswordDigestObtainer obtainer = new PasswordDigestObtainer(callbackHandler, username, messageRealm, httpDigest, DigestPassword.ALGORITHM_DIGEST_MD5, messageDigest, providers, null, true, false);</span>
+<span class="nc" id="L330">        return obtainer.handleUserRealmPasswordCallbacks();</span>
+    }
+
+    private String convertToken(final String name, final byte[] value) throws AuthenticationMechanismException {
+<span class="nc bnc" id="L334" title="All 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L335">            throw httpDigest.mechMissingDirective(name);</span>
+        }
+
+<span class="nc" id="L338">        return new String(value, UTF_8);</span>
+    }
+
+    /**
+     * Select the realm which should be sent to the client in the challenge.
+     *
+     * If a realm has been configured it takes priority.
+     * Next the first available mechanism realm is selected.
+     * If no mechanism is available or mechanism configured realm is not offered by the server, {@link IllegalStateException} is thrown.
+     * @throws HttpAuthenticationException
+     *
+     */
+    private String selectRealm() throws HttpAuthenticationException {
+        try {
+<span class="nc bnc" id="L352" title="All 2 branches missed.">            if (configuredRealm != null) {</span>
+<span class="nc bnc" id="L353" title="All 2 branches missed.">                if (!checkRealm(configuredRealm)) {</span>
+<span class="nc" id="L354">                    throw httpDigest.digestMechanismInvalidRealm(configuredRealm);</span>
+                }
+<span class="nc" id="L356">                return configuredRealm;</span>
+            }
+<span class="nc" id="L358">            String[] realms = getAvailableRealms();</span>
+<span class="nc bnc" id="L359" title="All 4 branches missed.">            if (realms != null &amp;&amp; realms.length &gt; 0) {</span>
+<span class="nc" id="L360">                return realms[0];</span>
+            }
+<span class="nc" id="L362">            throw httpDigest.digestMechanismRequireRealm();</span>
+<span class="nc" id="L363">        } catch (AuthenticationMechanismException e) {</span>
+<span class="nc" id="L364">            throw e.toHttpAuthenticationException();</span>
+        }
+    }
+
+    private String[] getAvailableRealms() throws AuthenticationMechanismException {
+<span class="nc" id="L369">        final AvailableRealmsCallback availableRealmsCallback = new AvailableRealmsCallback();</span>
+        try {
+<span class="nc" id="L371">            callbackHandler.handle(new Callback[] { availableRealmsCallback });</span>
+<span class="nc" id="L372">            return availableRealmsCallback.getRealmNames();</span>
+<span class="nc" id="L373">        } catch (UnsupportedCallbackException ignored) {</span>
+<span class="nc" id="L374">            return new String[0];</span>
+<span class="nc" id="L375">        } catch (AuthenticationMechanismException e) {</span>
+<span class="nc" id="L376">            throw e;</span>
+<span class="nc" id="L377">        } catch (IOException e) {</span>
+<span class="nc" id="L378">            throw httpDigest.mechCallbackHandlerFailedForUnknownReason(e);</span>
+        }
+    }
+
+    private void prepareResponse(String realmName, HttpServerResponse response, boolean stale) throws HttpAuthenticationException {
+<span class="nc" id="L383">        StringBuilder sb = new StringBuilder(CHALLENGE_PREFIX);</span>
+<span class="nc" id="L384">        sb.append(REALM).append(&quot;=\&quot;&quot;).append(DigestQuote.quote(realmName)).append(&quot;\&quot;&quot;);</span>
+
+<span class="nc bnc" id="L386" title="All 2 branches missed.">        if (domain != null) {</span>
+<span class="nc" id="L387">            sb.append(&quot;, &quot;).append(DOMAIN).append(&quot;=\&quot;&quot;).append(domain).append(&quot;\&quot;&quot;);</span>
+        }
+<span class="nc" id="L389">        sb.append(&quot;, &quot;).append(NONCE).append(&quot;=\&quot;&quot;).append(nonceManager.generateNonce(realmName.getBytes(StandardCharsets.UTF_8))).append(&quot;\&quot;&quot;);</span>
+<span class="nc" id="L390">        sb.append(&quot;, &quot;).append(OPAQUE).append(&quot;=\&quot;&quot;).append(OPAQUE_VALUE).append(&quot;\&quot;&quot;);</span>
+<span class="nc bnc" id="L391" title="All 2 branches missed.">        if (stale) {</span>
+<span class="nc" id="L392">            sb.append(&quot;, &quot;).append(STALE).append(&quot;=true&quot;);</span>
+        }
+<span class="nc" id="L394">        sb.append(&quot;, &quot;).append(ALGORITHM).append(&quot;=&quot;).append(algorithm);</span>
+<span class="nc" id="L395">        sb.append(&quot;, &quot;).append(QOP).append(&quot;=&quot;).append(AUTH);</span>
+
+<span class="nc" id="L397">        response.addResponseHeader(WWW_AUTHENTICATE, sb.toString());</span>
+<span class="nc" id="L398">        response.setStatusCode(UNAUTHORIZED);</span>
+<span class="nc" id="L399">    }</span>
+
+    private boolean authorize(String username) throws AuthenticationMechanismException {
+<span class="nc" id="L402">        AuthorizeCallback authorizeCallback = new AuthorizeCallback(username, username);</span>
+
+        try {
+<span class="nc" id="L405">            callbackHandler.handle(new Callback[] {authorizeCallback});</span>
+
+<span class="nc" id="L407">            return authorizeCallback.isAuthorized();</span>
+<span class="nc" id="L408">        } catch (UnsupportedCallbackException e) {</span>
+<span class="nc" id="L409">            return false;</span>
+<span class="nc" id="L410">        } catch (Throwable t) {</span>
+<span class="nc" id="L411">            throw httpDigest.mechCallbackHandlerFailedForUnknownReason(t);</span>
+        }
+    }
+
+    private void succeed() throws AuthenticationMechanismException {
+        try {
+<span class="nc" id="L417">            callbackHandler.handle(new Callback[] { AuthenticationCompleteCallback.SUCCEEDED });</span>
+<span class="nc" id="L418">        } catch (Throwable t) {</span>
+<span class="nc" id="L419">            throw httpDigest.mechCallbackHandlerFailedForUnknownReason(t);</span>
+<span class="nc" id="L420">        }</span>
+<span class="nc" id="L421">    }</span>
+
+    private void fail() throws AuthenticationMechanismException {
+        try {
+<span class="nc" id="L425">            callbackHandler.handle(new Callback[] { AuthenticationCompleteCallback.FAILED });</span>
+<span class="nc" id="L426">        } catch (Throwable t) {</span>
+<span class="nc" id="L427">            throw httpDigest.mechCallbackHandlerFailedForUnknownReason(t);</span>
+<span class="nc" id="L428">        }</span>
+<span class="nc" id="L429">    }</span>
+
+    private static String decodeRfc2231(String encoded) throws UnsupportedEncodingException {
+<span class="nc" id="L432">        int charsetEnd = encoded.indexOf('\'');</span>
+<span class="nc" id="L433">        int languageEnd = encoded.indexOf('\'', charsetEnd + 1);</span>
+<span class="nc" id="L434">        String charset = encoded.substring(0, charsetEnd);</span>
+<span class="nc" id="L435">        return URLDecoder.decode(encoded.substring(languageEnd + 1), charset);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

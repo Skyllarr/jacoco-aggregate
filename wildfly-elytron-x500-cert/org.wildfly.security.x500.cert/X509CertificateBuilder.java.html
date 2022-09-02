@@ -1,0 +1,501 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>X509CertificateBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-x500-cert</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.x500.cert</a> &gt; <span class="el_source">X509CertificateBuilder.java</span></div><h1>X509CertificateBuilder.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.x500.cert;
+
+import static org.wildfly.security.x500.cert._private.ElytronMessages.log;
+
+import java.io.ByteArrayInputStream;
+import java.math.BigInteger;
+import java.security.InvalidKeyException;
+import java.security.Key;
+import java.security.KeyFactory;
+import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.Signature;
+import java.security.SignatureException;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.X509EncodedKeySpec;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import javax.security.auth.x500.X500Principal;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.asn1.ASN1;
+import org.wildfly.security.asn1.DEREncoder;
+
+/**
+ * A builder for X.509 certificates.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class X509CertificateBuilder {
+
+<span class="fc" id="L56">    private static final ZonedDateTime LATEST_VALID = ZonedDateTime.of(9999, 12, 31, 23, 59, 59, 0, ZoneOffset.UTC);</span>
+
+<span class="fc" id="L58">    private int version = 3;</span>
+<span class="fc" id="L59">    private BigInteger serialNumber = BigInteger.ONE;</span>
+    private X500Principal subjectDn;
+    private byte[] subjectUniqueId;
+    private X500Principal issuerDn;
+    private byte[] issuerUniqueId;
+<span class="fc" id="L64">    private ZonedDateTime notValidBefore = ZonedDateTime.now();</span>
+<span class="fc" id="L65">    private ZonedDateTime notValidAfter = LATEST_VALID;</span>
+<span class="fc" id="L66">    private final Map&lt;String, X509CertificateExtension&gt; extensionsByOid = new LinkedHashMap&lt;&gt;();</span>
+    private PublicKey publicKey;
+    private PrivateKey signingKey;
+    private String signatureAlgorithmName;
+
+    /**
+     * Construct a new uninitialized instance.
+     */
+<span class="fc" id="L74">    public X509CertificateBuilder() {</span>
+<span class="fc" id="L75">    }</span>
+
+    /**
+     * Add a certificate extension.  If an extension with the same OID already exists, an exception is thrown.
+     *
+     * @param extension the extension to add (must not be {@code null})
+     * @return this builder instance
+     */
+    public X509CertificateBuilder addExtension(X509CertificateExtension extension) {
+<span class="fc" id="L84">        Assert.checkNotNullParam(&quot;extension&quot;, extension);</span>
+<span class="fc" id="L85">        final String oid = extension.getId();</span>
+<span class="fc" id="L86">        Assert.checkNotNullParam(&quot;extension.getOid()&quot;, oid);</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (extensionsByOid.putIfAbsent(oid, extension) != null) {</span>
+<span class="nc" id="L88">            throw log.extensionAlreadyExists(oid);</span>
+        }
+<span class="fc" id="L90">        return this;</span>
+    }
+
+    /**
+     * Add or replace a certificate extension.  If an extension with the same OID already exists, it is replaced
+     * and returned.
+     *
+     * @param extension the extension to add (must not be {@code null})
+     * @return the existing extension, or {@code null} if no other extension with the same OID was existent
+     */
+    public X509CertificateExtension addOrReplaceExtension(X509CertificateExtension extension) {
+<span class="nc" id="L101">        Assert.checkNotNullParam(&quot;extension&quot;, extension);</span>
+<span class="nc" id="L102">        final String oid = extension.getId();</span>
+<span class="nc" id="L103">        Assert.checkNotNullParam(&quot;extension.getOid()&quot;, oid);</span>
+<span class="nc" id="L104">        return extensionsByOid.put(oid, extension);</span>
+    }
+
+    /**
+     * Remove the extension with the given OID, if it is registered.
+     *
+     * @param oid the OID of the extension to remove
+     * @return the extension, or {@code null} if no extension with the same OID was existent
+     */
+    public X509CertificateExtension removeExtension(String oid) {
+<span class="nc" id="L114">        Assert.checkNotNullParam(&quot;oid&quot;, oid);</span>
+<span class="nc" id="L115">        return extensionsByOid.remove(oid);</span>
+    }
+
+    /**
+     * Get the certificate version.
+     *
+     * @return the certificate version
+     */
+    public int getVersion() {
+<span class="nc" id="L124">        return version;</span>
+    }
+
+    /**
+     * Set the certificate version.
+     *
+     * @param version the certificate version (must be between 1 and 3, inclusive)
+     * @return this builder instance
+     */
+    public X509CertificateBuilder setVersion(final int version) {
+<span class="fc" id="L134">        Assert.checkMinimumParameter(&quot;version&quot;, 1, version);</span>
+<span class="fc" id="L135">        Assert.checkMaximumParameter(&quot;version&quot;, 3, version);</span>
+<span class="fc" id="L136">        this.version = version;</span>
+<span class="fc" id="L137">        return this;</span>
+    }
+
+    /**
+     * Get the serial number of the certificate being built.
+     *
+     * @return the serial number of the certificate being built (must not be {@code null})
+     */
+    public BigInteger getSerialNumber() {
+<span class="nc" id="L146">        return serialNumber;</span>
+    }
+
+    /**
+     * Set the serial number of the certificate being built.  The serial number must be positive and no larger
+     * than 20 octets (or 2^160).
+     *
+     * @param serialNumber the serial number of the certificate being built
+     * @return this builder instance
+     */
+    public X509CertificateBuilder setSerialNumber(final BigInteger serialNumber) {
+<span class="fc" id="L157">        Assert.checkNotNullParam(&quot;serialNumber&quot;, serialNumber);</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">        if (BigInteger.ONE.compareTo(serialNumber) &gt; 0) {</span>
+<span class="nc" id="L159">            throw log.serialNumberTooSmall();</span>
+        }
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">        if (serialNumber.bitLength() &gt; 20*8) {</span>
+<span class="nc" id="L162">            throw log.serialNumberTooLarge();</span>
+        }
+<span class="fc" id="L164">        this.serialNumber = serialNumber;</span>
+<span class="fc" id="L165">        return this;</span>
+    }
+
+    /**
+     * Get the subject DN.
+     *
+     * @return the subject DN
+     */
+    public X500Principal getSubjectDn() {
+<span class="nc" id="L174">        return subjectDn;</span>
+    }
+
+    /**
+     * Set the subject DN.
+     *
+     * @param subjectDn the subject DN (must not be {@code null})
+     * @return this builder instance
+     */
+    public X509CertificateBuilder setSubjectDn(final X500Principal subjectDn) {
+<span class="fc" id="L184">        Assert.checkNotNullParam(&quot;subjectDn&quot;, subjectDn);</span>
+<span class="fc" id="L185">        this.subjectDn = subjectDn;</span>
+<span class="fc" id="L186">        return this;</span>
+    }
+
+    /**
+     * Get the subject unique ID.
+     *
+     * @return the subject unique ID
+     */
+    public byte[] getSubjectUniqueId() {
+<span class="nc" id="L195">        return subjectUniqueId;</span>
+    }
+
+    /**
+     * Set the subject unique ID.
+     *
+     * @param subjectUniqueId the subject unique ID (must not be {@code null})
+     * @return this builder instance
+     */
+    public X509CertificateBuilder setSubjectUniqueId(final byte[] subjectUniqueId) {
+<span class="nc" id="L205">        Assert.checkNotNullParam(&quot;subjectUniqueId&quot;, subjectUniqueId);</span>
+<span class="nc" id="L206">        this.subjectUniqueId = subjectUniqueId;</span>
+<span class="nc" id="L207">        return this;</span>
+    }
+
+    /**
+     * Get the issuer DN.
+     *
+     * @return the issuer DN
+     */
+    public X500Principal getIssuerDn() {
+<span class="nc" id="L216">        return issuerDn;</span>
+    }
+
+    /**
+     * Set the issuer DN.
+     *
+     * @param issuerDn the issuer DN (must not be {@code null})
+     * @return this builder instance
+     */
+    public X509CertificateBuilder setIssuerDn(final X500Principal issuerDn) {
+<span class="fc" id="L226">        Assert.checkNotNullParam(&quot;issuerDn&quot;, issuerDn);</span>
+<span class="fc" id="L227">        this.issuerDn = issuerDn;</span>
+<span class="fc" id="L228">        return this;</span>
+    }
+
+    /**
+     * Get the issuer unique ID.
+     *
+     * @return the issuer unique ID
+     */
+    public byte[] getIssuerUniqueId() {
+<span class="nc" id="L237">        return issuerUniqueId;</span>
+    }
+
+    /**
+     * Set the issuer unique ID.
+     *
+     * @param issuerUniqueId the issuer unique ID (must not be {@code null})
+     * @return this builder instance
+     */
+    public X509CertificateBuilder setIssuerUniqueId(final byte[] issuerUniqueId) {
+<span class="nc" id="L247">        Assert.checkNotNullParam(&quot;issuerUniqueId&quot;, issuerUniqueId);</span>
+<span class="nc" id="L248">        this.issuerUniqueId = issuerUniqueId;</span>
+<span class="nc" id="L249">        return this;</span>
+    }
+
+    /**
+     * Get the not-valid-before date.  The default is the date when this builder was constructed.
+     *
+     * @return the not-valid-before date
+     */
+    public ZonedDateTime getNotValidBefore() {
+<span class="nc" id="L258">        return notValidBefore;</span>
+    }
+
+    /**
+     * Set the not-valid-before date.
+     *
+     * @param notValidBefore the not-valid-before date (must not be {@code null})
+     * @return this builder instance
+     */
+    public X509CertificateBuilder setNotValidBefore(final ZonedDateTime notValidBefore) {
+<span class="fc" id="L268">        Assert.checkNotNullParam(&quot;notValidBefore&quot;, notValidBefore);</span>
+<span class="fc" id="L269">        this.notValidBefore = notValidBefore;</span>
+<span class="fc" id="L270">        return this;</span>
+    }
+
+    /**
+     * Get the not-valid-after date.  The default is equal to {@code 99991231235959Z} as specified in {@code RFC 5280}.
+     *
+     * @return the not-valid-after date
+     */
+    public ZonedDateTime getNotValidAfter() {
+<span class="nc" id="L279">        return notValidAfter;</span>
+    }
+
+    /**
+     * Set the not-valid-after date.
+     *
+     * @param notValidAfter the not-valid-after date (must not be {@code null})
+     * @return this builder instance
+     */
+    public X509CertificateBuilder setNotValidAfter(final ZonedDateTime notValidAfter) {
+<span class="fc" id="L289">        Assert.checkNotNullParam(&quot;notValidAfter&quot;, notValidAfter);</span>
+<span class="fc" id="L290">        this.notValidAfter = notValidAfter;</span>
+<span class="fc" id="L291">        return this;</span>
+    }
+
+    /**
+     * Get the public key.
+     *
+     * @return the public key
+     */
+    public PublicKey getPublicKey() {
+<span class="nc" id="L300">        return publicKey;</span>
+    }
+
+    /**
+     * Set the public key.
+     *
+     * @param publicKey the public key (must not be {@code null})
+     * @return this builder instance
+     */
+    public X509CertificateBuilder setPublicKey(final PublicKey publicKey) {
+<span class="fc" id="L310">        Assert.checkNotNullParam(&quot;publicKey&quot;, publicKey);</span>
+<span class="fc" id="L311">        this.publicKey = publicKey;</span>
+<span class="fc" id="L312">        return this;</span>
+    }
+
+    /**
+     * Get the signing key.
+     *
+     * @return the signing key
+     */
+    public PrivateKey getSigningKey() {
+<span class="nc" id="L321">        return signingKey;</span>
+    }
+
+    /**
+     * Set the signing key.
+     *
+     * @param signingKey the signing key (must not be {@code null})
+     * @return this builder instance
+     */
+    public X509CertificateBuilder setSigningKey(final PrivateKey signingKey) {
+<span class="fc" id="L331">        Assert.checkNotNullParam(&quot;signingKey&quot;, signingKey);</span>
+<span class="fc" id="L332">        this.signingKey = signingKey;</span>
+<span class="fc" id="L333">        return this;</span>
+    }
+
+    /**
+     * Get the signature algorithm name.
+     *
+     * @return the signature algorithm name
+     */
+    public String getSignatureAlgorithmName() {
+<span class="nc" id="L342">        return signatureAlgorithmName;</span>
+    }
+
+    /**
+     * Set the signature algorithm name.
+     *
+     * @param signatureAlgorithmName the signature algorithm name (must not be {@code null})
+     * @return this builder instance
+     */
+    public X509CertificateBuilder setSignatureAlgorithmName(final String signatureAlgorithmName) {
+<span class="fc" id="L352">        Assert.checkNotNullParam(&quot;signatureAlgorithmName&quot;, signatureAlgorithmName);</span>
+<span class="fc" id="L353">        this.signatureAlgorithmName = signatureAlgorithmName;</span>
+<span class="fc" id="L354">        return this;</span>
+    }
+
+    /**
+     * Attempt to construct and sign an X.509 certificate according to the information in this builder.
+     *
+     * @return the constructed certificate
+     * @throws IllegalArgumentException if one or more of the builder parameters are invalid or missing
+     * @throws CertificateException if the certificate failed to be constructed
+     */
+    public X509Certificate build() throws CertificateException {
+<span class="fc" id="L365">        byte[] tbsCertificate = getTBSBytes();</span>
+
+<span class="fc" id="L367">        DEREncoder derEncoder = new DEREncoder();</span>
+<span class="fc" id="L368">        derEncoder.startSequence(); // Certificate</span>
+<span class="fc" id="L369">        derEncoder.writeEncoded(tbsCertificate);</span>
+
+        // signatureAlgorithm
+<span class="fc" id="L372">        final String signatureAlgorithmName = this.signatureAlgorithmName;</span>
+<span class="fc" id="L373">        final String signatureAlgorithmOid = ASN1.oidFromSignatureAlgorithm(signatureAlgorithmName);</span>
+<span class="pc bpc" id="L374" title="1 of 2 branches missed.">        if (signatureAlgorithmOid == null) {</span>
+<span class="nc" id="L375">            throw log.asnUnrecognisedAlgorithm(signatureAlgorithmName);</span>
+        }
+
+<span class="fc" id="L378">        derEncoder.startSequence(); // AlgorithmIdentifier</span>
+<span class="fc" id="L379">        derEncoder.encodeObjectIdentifier(signatureAlgorithmOid);</span>
+<span class="fc" id="L380">        derEncoder.endSequence(); // AlgorithmIdentifier</span>
+        try {
+<span class="fc" id="L382">            final Signature signature = Signature.getInstance(signatureAlgorithmName);</span>
+<span class="fc" id="L383">            signature.initSign(signingKey);</span>
+<span class="fc" id="L384">            signature.update(tbsCertificate);</span>
+<span class="fc" id="L385">            derEncoder.encodeBitString(signature.sign());</span>
+<span class="nc" id="L386">        } catch (NoSuchAlgorithmException | SignatureException | InvalidKeyException e) {</span>
+<span class="nc" id="L387">            throw log.certSigningFailed(e);</span>
+<span class="fc" id="L388">        }</span>
+<span class="fc" id="L389">        derEncoder.endSequence(); // Certificate</span>
+
+<span class="fc" id="L391">        byte[] bytes = derEncoder.getEncoded();</span>
+<span class="fc" id="L392">        final CertificateFactory factory = CertificateFactory.getInstance(&quot;X.509&quot;);</span>
+<span class="fc" id="L393">        return (X509Certificate) factory.generateCertificate(new ByteArrayInputStream(bytes));</span>
+    }
+
+    byte[] getTBSBytes() {
+<span class="fc" id="L397">        final BigInteger serialNumber = this.serialNumber;</span>
+        // Cache and/or validate all fields.
+<span class="fc" id="L399">        final int version = this.version;</span>
+<span class="fc" id="L400">        final String signatureAlgorithmName = this.signatureAlgorithmName;</span>
+<span class="pc bpc" id="L401" title="1 of 2 branches missed.">        if (signatureAlgorithmName == null) {</span>
+<span class="nc" id="L402">            throw log.noSignatureAlgorithmNameGiven();</span>
+        }
+<span class="fc" id="L404">        final String signatureAlgorithmOid = ASN1.oidFromSignatureAlgorithm(signatureAlgorithmName);</span>
+<span class="pc bpc" id="L405" title="1 of 2 branches missed.">        if (signatureAlgorithmOid == null) {</span>
+<span class="nc" id="L406">            throw log.unknownSignatureAlgorithmName(signatureAlgorithmName);</span>
+        }
+<span class="fc" id="L408">        final PrivateKey signingKey = this.signingKey;</span>
+<span class="pc bpc" id="L409" title="1 of 2 branches missed.">        if (signingKey == null) {</span>
+<span class="nc" id="L410">            throw log.noSigningKeyGiven();</span>
+        }
+<span class="fc" id="L412">        String signingKeyAlgorithm = signingKey.getAlgorithm();</span>
+<span class="fc bfc" id="L413" title="All 2 branches covered.">        if (signingKeyAlgorithm.equals(&quot;EC&quot;)) {</span>
+<span class="fc" id="L414">            signingKeyAlgorithm = &quot;ECDSA&quot;;</span>
+        }
+<span class="pc bpc" id="L416" title="1 of 4 branches missed.">        if (! signatureAlgorithmName.endsWith(&quot;with&quot; + signingKeyAlgorithm) || signatureAlgorithmName.contains(&quot;with&quot; + signingKeyAlgorithm + &quot;and&quot;)) {</span>
+<span class="fc" id="L417">            throw log.signingKeyNotCompatWithSig(signingKey.getAlgorithm(), signatureAlgorithmName);</span>
+        }
+<span class="fc" id="L419">        final ZonedDateTime notValidBefore = this.notValidBefore;</span>
+<span class="fc" id="L420">        final ZonedDateTime notValidAfter = this.notValidAfter;</span>
+<span class="pc bpc" id="L421" title="1 of 2 branches missed.">        if (notValidBefore.compareTo(notValidAfter) &gt; 0) {</span>
+<span class="nc" id="L422">            throw log.validAfterBeforeValidBefore(notValidBefore, notValidAfter);</span>
+        }
+<span class="fc" id="L424">        final X500Principal issuerDn = this.issuerDn;</span>
+<span class="pc bpc" id="L425" title="1 of 2 branches missed.">        if (issuerDn == null) {</span>
+<span class="nc" id="L426">            throw log.noIssuerDnGiven();</span>
+        }
+<span class="fc" id="L428">        final X500Principal subjectDn = this.subjectDn;</span>
+<span class="fc" id="L429">        final PublicKey publicKey = this.publicKey;</span>
+<span class="pc bpc" id="L430" title="1 of 2 branches missed.">        if (publicKey == null) {</span>
+<span class="nc" id="L431">            throw log.noPublicKeyGiven();</span>
+        }
+<span class="fc" id="L433">        final byte[] issuerUniqueId = this.issuerUniqueId;</span>
+<span class="fc" id="L434">        final byte[] subjectUniqueId = this.subjectUniqueId;</span>
+<span class="pc bpc" id="L435" title="5 of 6 branches missed.">        if (version &lt; 2 &amp;&amp; (issuerUniqueId != null || subjectUniqueId != null)) {</span>
+<span class="nc" id="L436">            throw log.uniqueIdNotAllowed();</span>
+        }
+<span class="fc" id="L438">        final Map&lt;String, X509CertificateExtension&gt; extensionsByOid = this.extensionsByOid;</span>
+<span class="pc bpc" id="L439" title="3 of 4 branches missed.">        if (version &lt; 3 &amp;&amp; ! extensionsByOid.isEmpty()) {</span>
+<span class="nc" id="L440">            throw log.extensionsNotAllowed();</span>
+        }
+
+<span class="fc" id="L443">        DEREncoder derEncoder = new DEREncoder();</span>
+
+<span class="fc" id="L445">        derEncoder.startSequence(); // TBSCertificate</span>
+
+<span class="fc" id="L447">        derEncoder.startExplicit(0);</span>
+<span class="fc" id="L448">        derEncoder.encodeInteger(version - 1);</span>
+<span class="fc" id="L449">        derEncoder.endExplicit();</span>
+<span class="fc" id="L450">        derEncoder.encodeInteger(serialNumber);</span>
+<span class="fc" id="L451">        derEncoder.startSequence(); // AlgorithmIdentifier</span>
+<span class="fc" id="L452">        derEncoder.encodeObjectIdentifier(signatureAlgorithmOid);</span>
+<span class="fc" id="L453">        derEncoder.endSequence(); // AlgorithmIdentifier</span>
+<span class="fc" id="L454">        derEncoder.writeEncoded(issuerDn.getEncoded()); // already a SEQUENCE of SET of SEQUENCE of { OBJECT IDENTIFIER, ANY }</span>
+<span class="fc" id="L455">        derEncoder.startSequence(); // Validity</span>
+<span class="fc" id="L456">        derEncoder.encodeGeneralizedTime(notValidBefore.withZoneSameInstant(ZoneOffset.UTC));</span>
+<span class="fc" id="L457">        derEncoder.encodeGeneralizedTime(notValidAfter.withZoneSameInstant(ZoneOffset.UTC));</span>
+<span class="fc" id="L458">        derEncoder.endSequence(); // Validity</span>
+<span class="pc bpc" id="L459" title="1 of 2 branches missed.">        if (subjectDn != null) derEncoder.writeEncoded(subjectDn.getEncoded()); // already a SEQUENCE of SET of SEQUENCE of { OBJECT IDENTIFIER, ANY }</span>
+
+        final X509EncodedKeySpec keySpec;
+<span class="fc" id="L462">        final String publicKeyAlgorithm = publicKey.getAlgorithm();</span>
+        try {
+<span class="fc" id="L464">            final KeyFactory keyFactory = KeyFactory.getInstance(publicKeyAlgorithm);</span>
+<span class="fc" id="L465">            final Key translatedKey = keyFactory.translateKey(publicKey);</span>
+<span class="fc" id="L466">            keySpec = keyFactory.getKeySpec(translatedKey, X509EncodedKeySpec.class);</span>
+<span class="nc" id="L467">        } catch (NoSuchAlgorithmException | InvalidKeyException | InvalidKeySpecException e) {</span>
+<span class="nc" id="L468">            throw log.invalidKeyForCert(publicKeyAlgorithm, e);</span>
+<span class="fc" id="L469">        }</span>
+<span class="fc" id="L470">        derEncoder.writeEncoded(keySpec.getEncoded()); // SubjectPublicKeyInfo</span>
+
+<span class="pc bpc" id="L472" title="1 of 2 branches missed.">        if (issuerUniqueId != null) {</span>
+<span class="nc" id="L473">            derEncoder.encodeImplicit(1);</span>
+<span class="nc" id="L474">            derEncoder.encodeBitString(issuerUniqueId);</span>
+        }
+<span class="pc bpc" id="L476" title="1 of 2 branches missed.">        if (subjectUniqueId != null) {</span>
+<span class="nc" id="L477">            derEncoder.encodeImplicit(2);</span>
+<span class="nc" id="L478">            derEncoder.encodeBitString(subjectUniqueId);</span>
+        }
+<span class="fc bfc" id="L480" title="All 2 branches covered.">        if (! extensionsByOid.isEmpty()) {</span>
+<span class="fc" id="L481">            derEncoder.startExplicit(3);</span>
+<span class="fc" id="L482">            derEncoder.startSequence();</span>
+<span class="fc bfc" id="L483" title="All 2 branches covered.">            for (X509CertificateExtension extension : extensionsByOid.values()) {</span>
+<span class="fc" id="L484">                derEncoder.startSequence();</span>
+<span class="fc" id="L485">                derEncoder.encodeObjectIdentifier(extension.getId());</span>
+<span class="fc bfc" id="L486" title="All 2 branches covered.">                if (extension.isCritical()) derEncoder.encodeBoolean(true);</span>
+<span class="fc" id="L487">                final DEREncoder subEncoder = new DEREncoder();</span>
+<span class="fc" id="L488">                extension.encodeTo(subEncoder);</span>
+<span class="fc" id="L489">                derEncoder.encodeOctetString(subEncoder.getEncoded());</span>
+<span class="fc" id="L490">                derEncoder.endSequence();</span>
+<span class="fc" id="L491">            }</span>
+<span class="fc" id="L492">            derEncoder.endSequence();</span>
+<span class="fc" id="L493">            derEncoder.endExplicit();</span>
+        }
+
+<span class="fc" id="L496">        derEncoder.endSequence(); // TBSCertificate</span>
+
+<span class="fc" id="L498">        return derEncoder.getEncoded();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

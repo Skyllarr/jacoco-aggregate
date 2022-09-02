@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>X500PrincipalUtil.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-x500</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.x500.util</a> &gt; <span class="el_source">X500PrincipalUtil.java</span></div><h1>X500PrincipalUtil.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.x500.util;
+
+import static org.wildfly.security.x500._private.ElytronMessages.log;
+import static org.wildfly.security.asn1.ASN1.BMP_STRING_TYPE;
+import static org.wildfly.security.asn1.ASN1.IA5_STRING_TYPE;
+import static org.wildfly.security.asn1.ASN1.PRINTABLE_STRING_TYPE;
+import static org.wildfly.security.asn1.ASN1.UNIVERSAL_STRING_TYPE;
+import static org.wildfly.security.asn1.ASN1.UTF8_STRING_TYPE;
+
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.reflect.UndeclaredThrowableException;
+import java.security.Principal;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
+import javax.security.auth.x500.X500Principal;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.asn1.ASN1Decoder;
+import org.wildfly.security.asn1.DERDecoder;
+
+/**
+ * A utility class for easily accessing details of an {@link X500Principal}.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class X500PrincipalUtil {
+
+<span class="fc" id="L49">    private static final String[] NO_STRINGS = new String[0];</span>
+    private static final Class&lt;?&gt; X500_NAME_CLASS;
+    private static final MethodHandle AS_X500_PRINCIPAL_HANDLE;
+
+    static {
+<span class="fc" id="L54">        Class&lt;?&gt; x500Name = null;</span>
+<span class="fc" id="L55">        MethodHandle asX500PrincipalHandle = null;</span>
+        try {
+<span class="fc" id="L57">            x500Name = Class.forName(&quot;sun.security.x509.X500Name&quot;, true, X500PrincipalUtil.class.getClassLoader());</span>
+<span class="nc" id="L58">            asX500PrincipalHandle = MethodHandles.publicLookup().unreflect(x500Name.getDeclaredMethod(&quot;asX500Principal&quot;));</span>
+<span class="fc" id="L59">        } catch (Throwable t) {</span>
+            /*
+             * This is intended to be a best efforts optimisation, if it fails for ANY reason we don't support the optimisation
+             * and resort to default behaviour.
+             *
+             * Throwing any Exception or Error from this static block results in a NoClassDefFoundError for any access to the
+             * class and subsequently even the non-optimised scenario is unavailable.
+             */
+<span class="fc" id="L67">            log.trace(&quot;X550Name.asX500Principal() is not available.&quot;, t);</span>
+<span class="nc" id="L68">        }</span>
+
+<span class="fc" id="L70">        X500_NAME_CLASS = x500Name;</span>
+<span class="fc" id="L71">        AS_X500_PRINCIPAL_HANDLE = asX500PrincipalHandle;</span>
+<span class="fc" id="L72">    }</span>
+
+    private X500PrincipalUtil() {
+    }
+
+    /**
+     * Get all the values of the attribute with the given OID in the given principal.  This includes occurrences within
+     * multi-valued RDNs.
+     *
+     * @param principal the principal to examine
+     * @param oid the OID whose values are to be returned
+     * @return the list of values associated with the OID
+     */
+    public static String[] getAttributeValues(X500Principal principal, String oid) {
+<span class="fc" id="L86">        return getAttributeValues(principal, oid, false);</span>
+    }
+
+    /**
+     * Get all the values of the attribute with the given OID in the given principal.  This includes occurrences within
+     * multi-valued RDNs.
+     *
+     * @param principal the principal to examine
+     * @param oid the OID whose values are to be returned
+     * @param reverse {@code true} if the values in the returned list should be in reverse order
+     * @return the list of values associated with the OID
+     */
+    public static String[] getAttributeValues(X500Principal principal, String oid, boolean reverse) {
+<span class="fc" id="L99">        final ASN1Decoder decoder = new DERDecoder(principal.getEncoded());</span>
+<span class="fc" id="L100">        String[] strings = NO_STRINGS;</span>
+<span class="fc" id="L101">        int len = 0;</span>
+<span class="fc" id="L102">        decoder.startSequence();</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        while (decoder.hasNextElement()) {</span>
+<span class="fc" id="L104">            decoder.startSet();</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            while (decoder.hasNextElement()) {</span>
+<span class="fc" id="L106">                decoder.startSequence();</span>
+                // first item is the attribute
+<span class="fc" id="L108">                String testOid = decoder.decodeObjectIdentifier();</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">                if (oid.equals(testOid)) {</span>
+                    // second item is the value
+<span class="pc bpc" id="L111" title="1 of 6 branches missed.">                    switch (decoder.peekType()) {</span>
+                        case IA5_STRING_TYPE: {
+<span class="fc bfc" id="L113" title="All 2 branches covered.">                            if (strings.length == len) {</span>
+<span class="fc" id="L114">                                strings = Arrays.copyOf(strings, Math.max(2, strings.length) * 2);</span>
+                            }
+<span class="fc" id="L116">                            strings[len++] = decoder.decodeIA5String();</span>
+<span class="fc" id="L117">                            break;</span>
+                        }
+                        case PRINTABLE_STRING_TYPE: {
+<span class="fc bfc" id="L120" title="All 2 branches covered.">                            if (strings.length == len) {</span>
+<span class="fc" id="L121">                                strings = Arrays.copyOf(strings, Math.max(2, strings.length) * 2);</span>
+                            }
+<span class="fc" id="L123">                            strings[len++] = decoder.decodePrintableString();</span>
+<span class="fc" id="L124">                            break;</span>
+                        }
+                        case UNIVERSAL_STRING_TYPE: {
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">                            if (strings.length == len) {</span>
+<span class="nc" id="L128">                                strings = Arrays.copyOf(strings, Math.max(2, strings.length) * 2);</span>
+                            }
+<span class="fc" id="L130">                            strings[len++] = decoder.decodeUniversalString();</span>
+<span class="fc" id="L131">                            break;</span>
+                        }
+                        case UTF8_STRING_TYPE: {
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">                            if (strings.length == len) {</span>
+<span class="nc" id="L135">                                strings = Arrays.copyOf(strings, Math.max(2, strings.length) * 2);</span>
+                            }
+<span class="fc" id="L137">                            strings[len++] = decoder.decodeUtf8String();</span>
+<span class="fc" id="L138">                            break;</span>
+                        }
+                        case BMP_STRING_TYPE: {
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">                            if (strings.length == len) {</span>
+<span class="nc" id="L142">                                strings = Arrays.copyOf(strings, Math.max(2, strings.length) * 2);</span>
+                            }
+<span class="fc" id="L144">                            strings[len++] = decoder.decodeBMPString();</span>
+<span class="fc" id="L145">                            break;</span>
+                        }
+                        default: {
+<span class="nc" id="L148">                            decoder.skipElement();</span>
+<span class="nc" id="L149">                            break;</span>
+                        }
+                    }
+                } else {
+<span class="fc" id="L153">                    decoder.skipElement();</span>
+                }
+<span class="fc" id="L155">                decoder.endSequence();</span>
+<span class="fc" id="L156">            }</span>
+<span class="fc" id="L157">            decoder.endSet();</span>
+        }
+<span class="fc" id="L159">        decoder.endSequence();</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">        if (decoder.hasNextElement()) {</span>
+<span class="nc" id="L161">            throw log.unexpectedTrailingGarbageInX500principal();</span>
+        }
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        String[] result = len == 0 ? NO_STRINGS : new String[len];</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        if (! reverse) {</span>
+            // The attribute values will be in the same order they appear in the string representation of the X.500 principal
+<span class="fc bfc" id="L166" title="All 2 branches covered.">            for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L167">                result[len - i - 1] = strings[i];</span>
+            }
+        } else {
+            // The attribute values will be in reverse order
+<span class="fc bfc" id="L171" title="All 2 branches covered.">            for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L172">                result[i] = strings[i];</span>
+            }
+        }
+<span class="fc" id="L175">        return result;</span>
+    }
+
+    /**
+     * Determine if the given principal contains all of the attributes specified by the given OIDs.
+     * This includes occurrences within multi-valued RDNs.
+     *
+     * @param principal the principal to examine
+     * @param oids the OIDs of the attributes that must be present in the given principal (must not be {@code null},
+     *  cannot have {@code null} elements)
+     * @return {@code true} if the given principal contains all of the attributes specified by the given OIDs,
+     *  {@code false} otherwise
+     */
+    public static boolean containsAllAttributes(X500Principal principal, String... oids) {
+<span class="fc" id="L189">        Assert.checkNotNullParam(&quot;principal&quot;, principal);</span>
+<span class="fc" id="L190">        Assert.checkNotNullParam(&quot;oids&quot;, oids);</span>
+<span class="fc" id="L191">        final Set&lt;String&gt; requiredAttributes = new HashSet&lt;&gt;(Arrays.asList(oids));</span>
+<span class="fc" id="L192">        final ASN1Decoder decoder = new DERDecoder(principal.getEncoded());</span>
+<span class="fc" id="L193">        decoder.startSequence();</span>
+<span class="pc bpc" id="L194" title="1 of 4 branches missed.">        while (decoder.hasNextElement() &amp;&amp; ! requiredAttributes.isEmpty()) {</span>
+<span class="fc" id="L195">            decoder.startSet();</span>
+<span class="pc bpc" id="L196" title="1 of 4 branches missed.">            while (decoder.hasNextElement() &amp;&amp; ! requiredAttributes.isEmpty()) {</span>
+<span class="fc" id="L197">                decoder.startSequence();</span>
+                // first item is the attribute
+<span class="fc" id="L199">                String testOid = decoder.decodeObjectIdentifier();</span>
+<span class="fc" id="L200">                requiredAttributes.remove(testOid);</span>
+                // skip over the attribute value
+<span class="fc" id="L202">                decoder.skipElement();</span>
+<span class="fc" id="L203">                decoder.endSequence();</span>
+<span class="fc" id="L204">            }</span>
+<span class="fc" id="L205">            decoder.endSet();</span>
+        }
+<span class="fc" id="L207">        decoder.endSequence();</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">        if (decoder.hasNextElement()) {</span>
+<span class="nc" id="L209">            throw log.unexpectedTrailingGarbageInX500principal();</span>
+        }
+<span class="fc" id="L211">        return requiredAttributes.isEmpty();</span>
+    }
+
+    /**
+     * Attempt to convert the given principal to an X.500 principal.
+     *
+     * @param principal the original principal
+     * @return the X.500 principal or {@code null} if the principal can not be converted.
+     */
+    public static X500Principal asX500Principal(Principal principal) {
+<span class="nc" id="L221">        return asX500Principal(principal, false);</span>
+    }
+
+    /**
+     * Attempt to convert the given principal to an X.500 principal.
+     *
+     * @param principal the original principal
+     * @param convert {@code true} if the principal should be converted to a {@link X500Principal} if not one already.
+     * @return the X.500 principal or {@code null} if the principal can not be converted.
+     */
+    public static X500Principal asX500Principal(Principal principal, boolean convert) {
+<span class="nc bnc" id="L232" title="All 2 branches missed.">        if (principal instanceof X500Principal) {</span>
+<span class="nc" id="L233">            return (X500Principal) principal;</span>
+        }
+<span class="nc bnc" id="L235" title="All 4 branches missed.">        if (X500_NAME_CLASS != null &amp;&amp; X500_NAME_CLASS.isAssignableFrom(principal.getClass())) {</span>
+            try {
+<span class="nc" id="L237">                return (X500Principal) AS_X500_PRINCIPAL_HANDLE.invoke(principal);</span>
+<span class="nc" id="L238">            } catch (RuntimeException | Error ex) {</span>
+<span class="nc" id="L239">                throw ex;</span>
+<span class="nc" id="L240">            } catch (Throwable t) {</span>
+<span class="nc" id="L241">                throw new UndeclaredThrowableException(t);</span>
+            }
+        }
+<span class="nc bnc" id="L244" title="All 2 branches missed.">        if (convert) {</span>
+            try {
+<span class="nc" id="L246">                return new X500Principal(principal.getName());</span>
+<span class="nc" id="L247">            } catch (IllegalArgumentException ignored) {</span>
+<span class="nc" id="L248">                log.trace(&quot;Unable to convert to X500Principal&quot;, ignored);</span>
+            }
+        }
+
+<span class="nc" id="L252">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

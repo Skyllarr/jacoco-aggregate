@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OTPSaslClient.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl-otp</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.otp</a> &gt; <span class="el_source">OTPSaslClient.java</span></div><h1>OTPSaslClient.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.otp;
+
+import static org.wildfly.security.mechanism._private.ElytronMessages.saslOTP;
+import static org.wildfly.security.sasl.otp.OTP.*;
+import static org.wildfly.security.sasl.otp.OTPUtil.*;
+
+import java.nio.charset.StandardCharsets;
+import java.security.NoSuchAlgorithmException;
+import java.security.Provider;
+import java.security.SecureRandom;
+import java.security.spec.InvalidKeySpecException;
+import java.util.Arrays;
+import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Supplier;
+
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.NameCallback;
+import javax.security.auth.callback.PasswordCallback;
+import javax.security.sasl.SaslException;
+
+import org.wildfly.common.Assert;
+import org.wildfly.common.bytes.ByteStringBuilder;
+import org.wildfly.common.iteration.CodePointIterator;
+import org.wildfly.security.auth.callback.ExtendedChoiceCallback;
+import org.wildfly.security.auth.callback.ParameterCallback;
+import org.wildfly.security.password.PasswordFactory;
+import org.wildfly.security.password.interfaces.OneTimePassword;
+import org.wildfly.security.password.spec.EncryptablePasswordSpec;
+import org.wildfly.security.password.spec.OneTimePasswordAlgorithmSpec;
+import org.wildfly.security.sasl.util.AbstractSaslClient;
+import org.wildfly.security.sasl.util.StringPrep;
+
+/**
+ * SaslClient for the OTP SASL mechanism as defined by
+ * &lt;a href=&quot;https://tools.ietf.org/html/rfc2444&quot;&gt;RFC 2444&lt;/a&gt;.
+ *
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+final class OTPSaslClient extends AbstractSaslClient {
+
+    private static final int ST_NEW = 1;
+    private static final int ST_CHALLENGE_RESPONSE = 2;
+
+    private final SecureRandom secureRandom;
+    private final String[] alternateDictionary;
+    private NameCallback nameCallback;
+    private String userName;
+    private Supplier&lt;Provider[]&gt; providers;
+
+    OTPSaslClient(final String mechanismName, final SecureRandom secureRandom, final String[] alternateDictionary,
+            final String protocol, final String serverName, final CallbackHandler callbackHandler, final String authorizationId, Supplier&lt;Provider[]&gt; providers) {
+<span class="nc" id="L71">        super(mechanismName, protocol, serverName, callbackHandler, authorizationId, true, saslOTP);</span>
+<span class="nc" id="L72">        this.secureRandom = secureRandom;</span>
+<span class="nc" id="L73">        this.alternateDictionary = alternateDictionary;</span>
+<span class="nc" id="L74">        this.providers = providers;</span>
+<span class="nc" id="L75">    }</span>
+
+    @Override
+    public void init() {
+<span class="nc" id="L79">        setNegotiationState(ST_NEW);</span>
+<span class="nc" id="L80">    }</span>
+
+    @Override
+    protected byte[] evaluateMessage(final int state, final byte[] challenge) throws SaslException {
+<span class="nc bnc" id="L84" title="All 3 branches missed.">        switch (state) {</span>
+            case ST_NEW: {
+<span class="nc bnc" id="L86" title="All 4 branches missed.">                if ((challenge != null) &amp;&amp; (challenge.length != 0)) {</span>
+<span class="nc" id="L87">                    throw saslOTP.mechInitialChallengeMustBeEmpty().toSaslException();</span>
+                }
+
+                // Construct the initial response which consists of the authorization identity, if provided,
+                // followed by a NUL (0) octet, followed by the username
+<span class="nc" id="L92">                final ByteStringBuilder response = new ByteStringBuilder();</span>
+<span class="nc" id="L93">                final String authorizationId = getAuthorizationId();</span>
+<span class="nc" id="L94">                validateAuthorizationId(authorizationId);</span>
+<span class="nc bnc" id="L95" title="All 4 branches missed.">                nameCallback = authorizationId == null || authorizationId.isEmpty() ?</span>
+<span class="nc" id="L96">                        new NameCallback(&quot;User name&quot;) : new NameCallback(&quot;User name&quot;, authorizationId);</span>
+<span class="nc" id="L97">                handleCallbacks(nameCallback);</span>
+<span class="nc" id="L98">                userName = nameCallback.getName();</span>
+<span class="nc" id="L99">                validateUserName(userName);</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">                if (authorizationId != null) {</span>
+<span class="nc" id="L101">                    StringPrep.encode(authorizationId, response, StringPrep.PROFILE_SASL_STORED);</span>
+                }
+<span class="nc" id="L103">                response.append((byte) 0);</span>
+<span class="nc" id="L104">                StringPrep.encode(userName, response, StringPrep.PROFILE_SASL_STORED);</span>
+<span class="nc" id="L105">                setNegotiationState(ST_CHALLENGE_RESPONSE);</span>
+<span class="nc" id="L106">                return response.toArray();</span>
+            }
+            case ST_CHALLENGE_RESPONSE: {
+<span class="nc" id="L109">                final CodePointIterator cpi = CodePointIterator.ofUtf8Bytes(challenge);</span>
+<span class="nc" id="L110">                final CodePointIterator di = cpi.delimitedBy(' ');</span>
+                final String otp;
+
+                // Parse challenge
+<span class="nc" id="L114">                final String algorithm = di.drainToString();</span>
+<span class="nc" id="L115">                validateAlgorithm(algorithm);</span>
+<span class="nc" id="L116">                skipDelims(di, cpi);</span>
+<span class="nc" id="L117">                final int sequenceNumber = Integer.parseInt(di.drainToString());</span>
+<span class="nc" id="L118">                validateSequenceNumber(sequenceNumber);</span>
+<span class="nc" id="L119">                skipDelims(di, cpi);</span>
+<span class="nc" id="L120">                final String seed = di.drainToString();</span>
+<span class="nc" id="L121">                validateSeed(seed);</span>
+<span class="nc" id="L122">                skipDelims(di, cpi);</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">                if (! di.drainToString().startsWith(EXT)) {</span>
+<span class="nc" id="L124">                    throw saslOTP.mechInvalidMessageReceived().toSaslException();</span>
+                }
+<span class="nc bnc" id="L126" title="All 2 branches missed.">                if (cpi.hasNext()) {</span>
+<span class="nc" id="L127">                    skipDelims(di, cpi);</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">                    if (cpi.hasNext()) {</span>
+<span class="nc" id="L129">                        throw saslOTP.mechInvalidMessageReceived().toSaslException();</span>
+                    }
+                }
+
+<span class="nc bnc" id="L133" title="All 2 branches missed.">                int defaultResponseTypeChoice = (sequenceNumber &lt; MIN_SEQUENCE_NUMBER) ? getResponseTypeChoiceIndex(INIT_WORD_RESPONSE) : getResponseTypeChoiceIndex(WORD_RESPONSE);</span>
+<span class="nc" id="L134">                final ExtendedChoiceCallback responseTypeChoiceCallback = new ExtendedChoiceCallback(RESPONSE_TYPE_PROMPT,</span>
+                        RESPONSE_TYPES, defaultResponseTypeChoice, false, true);
+<span class="nc" id="L136">                final ExtendedChoiceCallback passwordFormatTypeChoiceCallback = new ExtendedChoiceCallback(PASSWORD_FORMAT_TYPE_PROMPT,</span>
+<span class="nc" id="L137">                        PASSWORD_FORMAT_TYPES, getPasswordFormatTypeChoiceIndex(PASS_PHRASE), false, true);</span>
+<span class="nc" id="L138">                handleCallbacks(nameCallback, responseTypeChoiceCallback, passwordFormatTypeChoiceCallback);</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">                String responseType = responseTypeChoiceCallback.getSelectedIndexes() != null ? RESPONSE_TYPES[responseTypeChoiceCallback.getSelectedIndexes()[0]]</span>
+<span class="nc" id="L140">                        : RESPONSE_TYPES[responseTypeChoiceCallback.getDefaultChoice()];</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">                String passwordFormatType = passwordFormatTypeChoiceCallback.getSelectedIndexes() != null ? PASSWORD_FORMAT_TYPES[passwordFormatTypeChoiceCallback.getSelectedIndexes()[0]]</span>
+<span class="nc" id="L142">                        : PASSWORD_FORMAT_TYPES[passwordFormatTypeChoiceCallback.getDefaultChoice()];</span>
+
+<span class="nc" id="L144">                PasswordCallback passwordCallback = new PasswordCallback(PASSWORD_PROMPT, false);</span>
+<span class="nc bnc" id="L145" title="All 3 branches missed.">                switch (passwordFormatType) {</span>
+                    case PASS_PHRASE:
+                        // Try obtaining a pass phrase
+<span class="nc" id="L148">                        handleCallbacks(nameCallback, passwordCallback);</span>
+<span class="nc" id="L149">                        final char[] passPhraseChars = passwordCallback.getPassword();</span>
+<span class="nc" id="L150">                        passwordCallback.clearPassword();</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">                        if (passPhraseChars != null) {</span>
+                            // Generate the OTP using the pass phrase and format it appropriately
+<span class="nc" id="L153">                            final String passPhrase = getPasswordFromPasswordChars(passPhraseChars);</span>
+<span class="nc" id="L154">                            validatePassPhrase(passPhrase);</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">                            if (seed.equals(passPhrase)) {</span>
+<span class="nc" id="L156">                                throw saslOTP.mechOTPPassPhraseAndSeedMustNotMatch().toSaslException();</span>
+                            }
+                            try {
+<span class="nc" id="L159">                                otp = formatOTP(generateOtpHash(algorithm, passPhrase, seed, sequenceNumber), responseType, alternateDictionary);</span>
+<span class="nc" id="L160">                            } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {</span>
+<span class="nc" id="L161">                                throw saslOTP.mechUnableToRetrievePassword(userName).toSaslException();</span>
+<span class="nc" id="L162">                            }</span>
+<span class="nc" id="L163">                        } else {</span>
+<span class="nc" id="L164">                            throw saslOTP.mechNoPasswordGiven().toSaslException();</span>
+                        }
+                        break;
+                    case DIRECT_OTP:
+                        // Try obtaining the OTP directly
+<span class="nc" id="L169">                        final ParameterCallback parameterCallback = new ParameterCallback(OneTimePasswordAlgorithmSpec.class);</span>
+<span class="nc" id="L170">                        parameterCallback.setParameterSpec(new OneTimePasswordAlgorithmSpec(algorithm, seed, sequenceNumber));</span>
+<span class="nc" id="L171">                        handleCallbacks(nameCallback, parameterCallback, passwordCallback);</span>
+<span class="nc" id="L172">                        otp = getOTP(passwordCallback);</span>
+<span class="nc" id="L173">                        break;</span>
+                    default:
+<span class="nc" id="L175">                        throw saslOTP.mechInvalidOTPPasswordFormatType().toSaslException();</span>
+                }
+<span class="nc" id="L177">                negotiationComplete();</span>
+<span class="nc" id="L178">                return createOTPResponse(algorithm, seed, otp, responseType);</span>
+            }
+<span class="nc" id="L180">            default: throw Assert.impossibleSwitchCase(state);</span>
+        }
+    }
+
+    @Override
+    public void dispose() throws SaslException {
+<span class="nc" id="L186">    }</span>
+
+    /**
+     * Create an OTP response using the extended response syntax, where:
+     *
+     *      hex response = hex:&lt;hexadecimal number&gt;
+     *      word response = word:&lt;six dictionary words&gt;
+     *      init-hex response = init-hex:&amp;lt;current-OTP&amp;gt;&amp;lt;new-params&amp;gt;:&amp;lt;new-OTP&amp;gt;
+     *      init-word response = init-word:&amp;lt;current-OTP&amp;gt;&amp;lt;new-params&amp;gt;:&amp;lt;new-OTP&amp;gt;
+     *      new-params = &amp;lt;algorithm identifier&amp;gt; &amp;lt;sequence integer&amp;gt; &amp;lt;seed&amp;gt;
+     *
+     * @param algorithm the OTP algorithm, must be either &quot;otp-md5&quot; or &quot;otp-sha1&quot;
+     * @param seed the seed
+     * @param otp the OTP as a string in either hex or multi-word format
+     * @param responseType the response type, must be &quot;hex&quot;, &quot;word&quot;, &quot;init-hex&quot;, or &quot;init-word&quot;
+     * @return the OTP response
+     * @throws SaslException if the given response type is invalid or if an error occurs while creating
+     * the response
+     */
+    private byte[] createOTPResponse(final String algorithm, final String seed, final String otp,
+            final String responseType) throws SaslException {
+<span class="nc" id="L207">        final ByteStringBuilder response = new ByteStringBuilder();</span>
+<span class="nc" id="L208">        response.append(responseType);</span>
+<span class="nc" id="L209">        response.append(':');</span>
+<span class="nc bnc" id="L210" title="All 3 branches missed.">        switch (responseType) {</span>
+            case HEX_RESPONSE:
+            case WORD_RESPONSE: {
+<span class="nc" id="L213">                response.append(otp);</span>
+<span class="nc" id="L214">                break;</span>
+            }
+            case INIT_HEX_RESPONSE:
+            case INIT_WORD_RESPONSE: {
+<span class="nc" id="L218">                response.append(otp);</span>
+<span class="nc" id="L219">                response.append(':');</span>
+
+                // == Attempt to re-initialize the sequence ==
+                String newOTP, newSeed, newAlgorithm;
+                int newSequenceNumber;
+                do {
+<span class="nc bnc" id="L225" title="All 2 branches missed.">                    Random random = secureRandom != null ? secureRandom : ThreadLocalRandom.current();</span>
+<span class="nc" id="L226">                    newSeed = generateRandomAlphanumericString(DEFAULT_SEED_LENGTH, random);</span>
+<span class="nc bnc" id="L227" title="All 2 branches missed.">                } while (newSeed.equals(seed));</span>
+
+<span class="nc" id="L229">                final ExtendedChoiceCallback passwordFormatTypeChoiceCallback = new ExtendedChoiceCallback(NEW_PASSWORD_FORMAT_TYPE_PROMPT,</span>
+<span class="nc" id="L230">                        PASSWORD_FORMAT_TYPES, getPasswordFormatTypeChoiceIndex(PASS_PHRASE), false, true);</span>
+<span class="nc" id="L231">                handleCallbacks(nameCallback, passwordFormatTypeChoiceCallback);</span>
+<span class="nc bnc" id="L232" title="All 2 branches missed.">                String newPasswordFormatType = passwordFormatTypeChoiceCallback.getSelectedIndexes() != null ? PASSWORD_FORMAT_TYPES[passwordFormatTypeChoiceCallback.getSelectedIndexes()[0]]</span>
+<span class="nc" id="L233">                        : PASSWORD_FORMAT_TYPES[passwordFormatTypeChoiceCallback.getDefaultChoice()];</span>
+
+<span class="nc" id="L235">                PasswordCallback passwordCallback = new PasswordCallback(NEW_PASSWORD_PROMPT, false);</span>
+<span class="nc bnc" id="L236" title="All 3 branches missed.">                switch (newPasswordFormatType) {</span>
+                    case PASS_PHRASE:
+                        // Try to obtain a new pass phrase
+<span class="nc" id="L239">                        handleCallbacks(nameCallback, passwordCallback);</span>
+<span class="nc" id="L240">                        final char[] newPassPhraseChars = passwordCallback.getPassword();</span>
+<span class="nc" id="L241">                        passwordCallback.clearPassword();</span>
+<span class="nc bnc" id="L242" title="All 2 branches missed.">                        if (newPassPhraseChars != null) {</span>
+                            // Generate the new OTP using the new pass phrase and format it appropriately
+<span class="nc" id="L244">                            newSequenceNumber = DEFAULT_SEQUENCE_NUMBER;</span>
+<span class="nc" id="L245">                            newAlgorithm = algorithm;</span>
+<span class="nc" id="L246">                            final String newPassPhrase = getPasswordFromPasswordChars(newPassPhraseChars);</span>
+<span class="nc" id="L247">                            validatePassPhrase(newPassPhrase);</span>
+<span class="nc bnc" id="L248" title="All 2 branches missed.">                            if (newSeed.equals(newPassPhrase)) {</span>
+<span class="nc" id="L249">                                throw saslOTP.mechOTPPassPhraseAndSeedMustNotMatch().toSaslException();</span>
+                            }
+                            try {
+<span class="nc" id="L252">                                newOTP = formatOTP(generateOtpHash(newAlgorithm, newPassPhrase, newSeed, newSequenceNumber), responseType, alternateDictionary);</span>
+<span class="nc" id="L253">                            } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {</span>
+<span class="nc" id="L254">                                throw saslOTP.mechUnableToUpdatePassword(userName).toSaslException();</span>
+<span class="nc" id="L255">                            }</span>
+<span class="nc" id="L256">                        } else {</span>
+<span class="nc" id="L257">                            throw saslOTP.mechNoPasswordGiven().toSaslException();</span>
+                        }
+                        break;
+                    case DIRECT_OTP:
+                        // Try obtaining the new OTP directly
+<span class="nc" id="L262">                        ParameterCallback parameterCallback = new ParameterCallback(OneTimePasswordAlgorithmSpec.class);</span>
+<span class="nc" id="L263">                        handleCallbacks(nameCallback, parameterCallback, passwordCallback);</span>
+<span class="nc" id="L264">                        newOTP = getOTP(passwordCallback);</span>
+<span class="nc" id="L265">                        OneTimePasswordAlgorithmSpec algorithmSpec = (OneTimePasswordAlgorithmSpec) parameterCallback.getParameterSpec();</span>
+<span class="nc bnc" id="L266" title="All 2 branches missed.">                        if (algorithmSpec == null) {</span>
+<span class="nc" id="L267">                            throw saslOTP.mechNoPasswordGiven().toSaslException();</span>
+                        }
+<span class="nc" id="L269">                        newAlgorithm = algorithmSpec.getAlgorithm();</span>
+<span class="nc" id="L270">                        validateAlgorithm(newAlgorithm);</span>
+<span class="nc" id="L271">                        newSequenceNumber = algorithmSpec.getSequenceNumber();</span>
+<span class="nc" id="L272">                        validateSequenceNumber(newSequenceNumber);</span>
+<span class="nc" id="L273">                        newSeed = algorithmSpec.getSeed();</span>
+<span class="nc" id="L274">                        validateSeed(newSeed);</span>
+<span class="nc" id="L275">                        break;</span>
+                    default:
+<span class="nc" id="L277">                        throw saslOTP.mechInvalidOTPPasswordFormatType().toSaslException();</span>
+                }
+<span class="nc" id="L279">                response.append(createInitResponse(newAlgorithm, newSeed, newSequenceNumber, newOTP));</span>
+<span class="nc" id="L280">                break;</span>
+            }
+            default:
+<span class="nc" id="L283">                throw saslOTP.mechInvalidOTPResponseType().toSaslException();</span>
+        }
+<span class="nc" id="L285">        return response.toArray();</span>
+    }
+
+    /**
+     * Create an init response, excluding the response type specifier and current OTP, where:
+     *
+     *      init-hex response = init-hex:&amp;lt;current-OTP&amp;gt;:&amp;lt;new-params&amp;gt;:&amp;lt;new-OTP&amp;gt;
+     *      init-word response = init-word:&amp;lt;current-OTP&amp;gt;:&amp;lt;new-params&amp;gt;:&amp;lt;new-OTP&amp;gt;
+     *      new-params = &amp;lt;algorithm identifier&amp;gt; &amp;lt;sequence integer&amp;gt; &lt;seed&gt;
+     *
+     * @param newAlgorithm the new OTP algorithm, must be either &quot;otp-md5&quot; or &quot;otp-sha1&quot;
+     * @param newSeed the new seed
+     * @param newSequenceNumber the new sequence number
+     * @param newOTP the new OTP as a string in either hex or multi-word format
+     * @return the init response, excluding the response type specifier and current OTP
+     * @throws SaslException if the given OTP algorithm is invalid
+     */
+    private ByteStringBuilder createInitResponse(final String newAlgorithm, final String newSeed,
+            final int newSequenceNumber, final String newOTP) throws SaslException {
+<span class="nc" id="L304">        final ByteStringBuilder initResponse = new ByteStringBuilder();</span>
+        String newDigestAlgorithm;
+        try {
+<span class="nc" id="L307">            newDigestAlgorithm = messageDigestAlgorithm(newAlgorithm);</span>
+<span class="nc" id="L308">        } catch (NoSuchAlgorithmException e) {</span>
+<span class="nc" id="L309">            throw saslOTP.mechInvalidOTPAlgorithm(newAlgorithm).toSaslException();</span>
+<span class="nc" id="L310">        }</span>
+<span class="nc" id="L311">        initResponse.append(newDigestAlgorithm);</span>
+<span class="nc" id="L312">        initResponse.append(' ');</span>
+<span class="nc" id="L313">        initResponse.appendNumber(newSequenceNumber);</span>
+<span class="nc" id="L314">        initResponse.append(' ');</span>
+<span class="nc" id="L315">        initResponse.append(newSeed);</span>
+<span class="nc" id="L316">        initResponse.append(':');</span>
+<span class="nc" id="L317">        initResponse.append(newOTP);</span>
+<span class="nc" id="L318">        return initResponse;</span>
+    }
+
+    private String getOTP(PasswordCallback passwordCallback) throws SaslException {
+<span class="nc" id="L322">        final char[] passwordChars = passwordCallback.getPassword();</span>
+<span class="nc" id="L323">        passwordCallback.clearPassword();</span>
+<span class="nc bnc" id="L324" title="All 2 branches missed.">        if (passwordChars != null) {</span>
+<span class="nc" id="L325">            return getPasswordFromPasswordChars(passwordChars);</span>
+        } else {
+<span class="nc" id="L327">            throw saslOTP.mechNoPasswordGiven().toSaslException();</span>
+        }
+    }
+
+    private String getPasswordFromPasswordChars(char[] passwordChars) {
+<span class="nc" id="L332">        final ByteStringBuilder b = new ByteStringBuilder();</span>
+<span class="nc" id="L333">        StringPrep.encode(passwordChars, b, StringPrep.PROFILE_SASL_STORED);</span>
+<span class="nc" id="L334">        Arrays.fill(passwordChars, (char) 0); // Wipe out the password</span>
+<span class="nc" id="L335">        return new String(b.toArray(), StandardCharsets.UTF_8);</span>
+    }
+
+    private byte[] generateOtpHash(final String algorithm, final String passPhrase, final String seed, final int newSequenceNumber) throws NoSuchAlgorithmException, InvalidKeySpecException {
+<span class="nc" id="L339">        PasswordFactory otpFactory = PasswordFactory.getInstance(algorithm, providers);</span>
+<span class="nc" id="L340">        OneTimePasswordAlgorithmSpec otpSpec = new OneTimePasswordAlgorithmSpec(algorithm, seed, newSequenceNumber);</span>
+<span class="nc" id="L341">        EncryptablePasswordSpec passwordSpec = new EncryptablePasswordSpec(passPhrase.toCharArray(), otpSpec);</span>
+<span class="nc" id="L342">        OneTimePassword otPassword = (OneTimePassword) otpFactory.generatePassword(passwordSpec);</span>
+
+<span class="nc" id="L344">        return otPassword.getHash();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

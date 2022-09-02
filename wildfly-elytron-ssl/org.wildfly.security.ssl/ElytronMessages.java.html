@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-ssl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.ssl</a> &gt; <span class="el_source">ElytronMessages.java</span></div><h1>ElytronMessages.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.ssl;
+
+import static org.jboss.logging.Logger.Level.WARN;
+
+import java.security.NoSuchAlgorithmException;
+import java.security.Principal;
+import java.security.cert.CertificateException;
+
+import javax.net.ssl.SSLException;
+import javax.net.ssl.SSLHandshakeException;
+import javax.net.ssl.SSLProtocolException;
+
+import org.jboss.logging.BasicLogger;
+import org.jboss.logging.Logger;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.LogMessage;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageLogger;
+import org.jboss.logging.annotations.ValidIdRange;
+import org.jboss.logging.annotations.ValidIdRanges;
+import org.wildfly.security.auth.server.RealmUnavailableException;
+
+/**
+ * Log messages and exceptions for Elytron.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+@MessageLogger(projectCode = &quot;ELY&quot;, length = 5)
+@ValidIdRanges({
+    @ValidIdRange(min = 1066, max = 1077),
+    @ValidIdRange(min = 4001, max = 4031),
+    @ValidIdRange(min = 5015, max = 5017),
+    @ValidIdRange(min = 15000, max = 15999)
+})
+interface ElytronMessages extends BasicLogger {
+
+<span class="fc" id="L56">    ElytronMessages log = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security&quot;);</span>
+<span class="fc" id="L57">    ElytronMessages tls = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.tls&quot;);</span>
+
+    @LogMessage(level = WARN)
+    @Message(id = 1066, value = &quot;Invalid string count for mechanism database entry \&quot;%s\&quot;&quot;)
+    void warnInvalidStringCountForMechanismDatabaseEntry(String name);
+
+    @LogMessage(level = WARN)
+    @Message(id = 1067, value = &quot;Invalid key exchange \&quot;%s\&quot; for mechanism database entry \&quot;%s\&quot;&quot;)
+    void warnInvalidKeyExchangeForMechanismDatabaseEntry(String value, String name);
+
+    @LogMessage(level = WARN)
+    @Message(id = 1068, value = &quot;Invalid authentication \&quot;%s\&quot; for mechanism database entry \&quot;%s\&quot;&quot;)
+    void warnInvalidAuthenticationForMechanismDatabaseEntry(String value, String name);
+
+    @LogMessage(level = WARN)
+    @Message(id = 1069, value = &quot;Invalid encryption \&quot;%s\&quot; for mechanism database entry \&quot;%s\&quot;&quot;)
+    void warnInvalidEncryptionForMechanismDatabaseEntry(String value, String name);
+
+    @LogMessage(level = WARN)
+    @Message(id = 1070, value = &quot;Invalid digest \&quot;%s\&quot; for mechanism database entry \&quot;%s\&quot;&quot;)
+    void warnInvalidDigestForMechanismDatabaseEntry(String value, String name);
+
+    @LogMessage(level = WARN)
+    @Message(id = 1071, value = &quot;Invalid protocol \&quot;%s\&quot; for mechanism database entry \&quot;%s\&quot;&quot;)
+    void warnInvalidProtocolForMechanismDatabaseEntry(String value, String name);
+
+    @LogMessage(level = WARN)
+    @Message(id = 1072, value = &quot;Invalid level \&quot;%s\&quot; for mechanism database entry \&quot;%s\&quot;&quot;)
+    void warnInvalidLevelForMechanismDatabaseEntry(String value, String name);
+
+    @LogMessage(level = WARN)
+    @Message(id = 1073, value = &quot;Invalid strength bits \&quot;%s\&quot; for mechanism database entry \&quot;%s\&quot;&quot;)
+    void warnInvalidStrengthBitsForMechanismDatabaseEntry(String value, String name);
+
+    @LogMessage(level = WARN)
+    @Message(id = 1074, value = &quot;Invalid algorithm bits \&quot;%s\&quot; for mechanism database entry \&quot;%s\&quot;&quot;)
+    void warnInvalidAlgorithmBitsForMechanismDatabaseEntry(String value, String name);
+
+    @LogMessage(level = WARN)
+    @Message(id = 1075, value = &quot;Invalid duplicate mechanism database entry \&quot;%s\&quot;&quot;)
+    void warnInvalidDuplicateMechanismDatabaseEntry(String name);
+
+    @LogMessage(level = WARN)
+    @Message(id = 1076, value = &quot;Invalid duplicate OpenSSL-style alias \&quot;%s\&quot; for mechanism database entry \&quot;%s\&quot; (original is \&quot;%s\&quot;)&quot;)
+    void warnInvalidDuplicateOpenSslStyleAliasForMechanismDatabaseEntry(String alias, String name, String originalName);
+
+    @LogMessage(level = WARN)
+    @Message(id = 1077, value = &quot;Invalid alias \&quot;%s\&quot; for missing mechanism database entry \&quot;%s\&quot;&quot;)
+    void warnInvalidAliasForMissingMechanismDatabaseEntry(String value, String name);
+
+    @Message(id = 4001, value = &quot;No algorithm found matching TLS/SSL protocol selection criteria&quot;)
+    NoSuchAlgorithmException noAlgorithmForSslProtocol();
+
+    @Message(id = 4002, value = &quot;Empty certificate chain is not trusted&quot;)
+    CertificateException emptyChainNotTrusted();
+
+    @Message(id = 4003, value = &quot;Certificate not trusted due to realm failure for principal [%s]&quot;)
+    CertificateException notTrustedRealmProblem(@Cause RealmUnavailableException e, Principal principal);
+
+    @Message(id = 4004, value = &quot;Credential validation failed: certificate is not trusted for principal [%s]&quot;)
+    CertificateException notTrusted(Principal principal);
+
+    @Message(id = 4005, value = &quot;No default trust manager available&quot;)
+    NoSuchAlgorithmException noDefaultTrustManager();
+
+    @Message(id = 4006, value = &quot;No context for SSL connection&quot;)
+    SSLHandshakeException noContextForSslConnection();
+
+    @Message(id = 4007, value = &quot;SSL channel is closed&quot;)
+    SSLException sslClosed();
+
+    @Message(id = 4008, value = &quot;Initial SSL/TLS data is not a handshake record&quot;)
+    SSLHandshakeException notHandshakeRecord();
+
+    @Message(id = 4009, value = &quot;Initial SSL/TLS handshake record is invalid&quot;)
+    SSLHandshakeException invalidHandshakeRecord();
+
+    @Message(id = 4010, value = &quot;Initial SSL/TLS handshake spans multiple records&quot;)
+    SSLHandshakeException multiRecordSSLHandshake();
+
+    @Message(id = 4011, value = &quot;Expected \&quot;client hello\&quot; record&quot;)
+    SSLHandshakeException expectedClientHello();
+
+    @Message(id = 4012, value = &quot;Unsupported SSL/TLS record&quot;)
+    SSLHandshakeException unsupportedSslRecord();
+
+    @Message(id = 4013, value = &quot;Invalid TLS extension data&quot;)
+    SSLProtocolException invalidTlsExt();
+
+    @Message(id = 4014, value = &quot;Not enough data in record to fill declared item size&quot;)
+    SSLProtocolException notEnoughData();
+
+    @Message(id = 4015, value = &quot;Empty host name in SNI record data&quot;)
+    SSLProtocolException emptyHostNameSni();
+
+    @Message(id = 4016, value = &quot;Duplicated SNI server name of type %d&quot;)
+    SSLProtocolException duplicatedSniServerName(int type);
+
+    @Message(id = 4017, value = &quot;Unknown authentication name \&quot;%s\&quot;&quot;)
+    IllegalArgumentException unknownAuthenticationName(String name);
+
+    @Message(id = 4018, value = &quot;Unknown encryption name \&quot;%s\&quot;&quot;)
+    IllegalArgumentException unknownEncryptionName(String name);
+
+    @Message(id = 4019, value = &quot;Unknown key exchange name \&quot;%s\&quot;&quot;)
+    IllegalArgumentException unknownKeyExchangeName(String name);
+
+    @Message(id = 4024, value = &quot;Invalid client mode, expected %s, got %s&quot;)
+    IllegalArgumentException invalidClientMode(boolean expectedMode, boolean givenMode);
+
+    @Message(id = 4026, value = &quot;Could not create trust manager [%s]&quot;)
+    IllegalStateException sslErrorCreatingTrustManager(String name, @Cause Throwable cause);
+
+    @Message(id = 4027, value = &quot;SecurityDomain of SSLContext does not support X509PeerCertificateChainEvidence verification&quot;)
+    IllegalArgumentException securityDomainOfSSLContextDoesNotSupportX509();
+
+    @Message(id = 4029, value = &quot;Default context cannot be null&quot;)
+    IllegalStateException defaultContextCannotBeNull();
+
+    @Message(id = 4030, value = &quot;No context for SSL connection&quot;)
+    SSLException noSNIContextForSslConnection(); // TODO Compare with noContextForSslConnection.
+
+    @Message(id = 4031, value = &quot;TrustManagerFactory algorithm [%s] does not support certificate revocation&quot;)
+    IllegalStateException sslErrorCreatingRevocationTrustManager(String name, @Cause Throwable cause);
+
+    @Message(id = 5015, value = &quot;Unexpected character U+%04x at offset %d of mechanism selection string \&quot;%s\&quot;&quot;)
+    IllegalArgumentException mechSelectorUnexpectedChar(int codePoint, long offset, String string);
+
+    @Message(id = 5016, value = &quot;Unrecognized token \&quot;%s\&quot; in mechanism selection string \&quot;%s\&quot;&quot;)
+    IllegalArgumentException mechSelectorUnknownToken(String word, String string);
+
+    @Message(id = 5017, value = &quot;Token \&quot;%s\&quot; not allowed at offset %d of mechanism selection string \&quot;%s\&quot;&quot;)
+    IllegalArgumentException mechSelectorTokenNotAllowed(String token, long offset, String string);
+
+    @Message(id = 15000, value = &quot;Unknown cipher suite name '%s' in names string '%s'&quot;)
+    IllegalArgumentException unknownCipherSuiteName(String name, String string);
+
+    @Message(id = 15001, value = &quot;No '%s' provided by the configured providers&quot;)
+    NoSuchAlgorithmException noSslContextProvided(String type);
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NonceManager.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-digest</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.digest</a> &gt; <span class="el_source">NonceManager.java</span></div><h1>NonceManager.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.http.digest;
+
+import java.nio.ByteBuffer;
+import java.security.DigestException;
+import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.wildfly.common.iteration.ByteIterator;
+import org.wildfly.common.iteration.CodePointIterator;
+import org.wildfly.security.mechanism._private.ElytronMessages;
+import org.wildfly.security.mechanism.AuthenticationMechanismException;
+
+/**
+ * A utility responsible for managing nonces.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public class NonceManager {
+
+    private static final int PREFIX_LENGTH = Integer.BYTES + Long.BYTES;
+
+    private final ScheduledExecutorService executor;
+<span class="nc" id="L51">    private final AtomicInteger nonceCounter = new AtomicInteger();</span>
+<span class="nc" id="L52">    private final Map&lt;String, NonceState&gt; usedNonces = new HashMap&lt;&gt;();</span>
+
+    private final byte[] privateKey;
+
+    private final long validityPeriodNano;
+    private final long nonceSessionTime;
+    private final boolean singleUse;
+    private final String algorithm;
+    private ElytronMessages log;
+
+
+    /**
+     * @param validityPeriod the time in ms that nonces are valid for in ms.
+     * @param nonceSessionTime the time in ms a nonce is usable for after it's last use where nonce counts are in use.
+     * @param singleUse are nonces single use?
+     * @param keySize the number of bytes to use in the private key of this node.
+     * @param algorithm the message digest algorithm to use when creating the digest portion of the nonce.
+     */
+
+    @Deprecated
+<span class="nc" id="L72">    NonceManager(long validityPeriod, long nonceSessionTime, boolean singleUse, int keySize, String algorithm) {</span>
+<span class="nc" id="L73">        this.validityPeriodNano = validityPeriod * 1000000;</span>
+<span class="nc" id="L74">        this.nonceSessionTime = nonceSessionTime;</span>
+<span class="nc" id="L75">        this.singleUse = singleUse;</span>
+<span class="nc" id="L76">        this.algorithm = algorithm;</span>
+<span class="nc" id="L77">        this.log = ElytronMessages.log;</span>
+
+<span class="nc" id="L79">        this.privateKey = new byte[keySize];</span>
+<span class="nc" id="L80">        new SecureRandom().nextBytes(privateKey);</span>
+<span class="nc" id="L81">        ScheduledThreadPoolExecutor INSTANCE = new ScheduledThreadPoolExecutor(1);</span>
+<span class="nc" id="L82">        INSTANCE.setRemoveOnCancelPolicy(true);</span>
+<span class="nc" id="L83">        INSTANCE.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);</span>
+<span class="nc" id="L84">        executor = INSTANCE;</span>
+<span class="nc" id="L85">    }</span>
+
+    /**
+     * @param validityPeriod the time in ms that nonces are valid for in ms.
+     * @param nonceSessionTime the time in ms a nonce is usable for after it's last use where nonce counts are in use.
+     * @param singleUse are nonces single use?
+     * @param keySize the number of bytes to use in the private key of this node.
+     * @param algorithm the message digest algorithm to use when creating the digest portion of the nonce.
+     * @param log mechanism specific logger.
+     */
+<span class="nc" id="L95">    NonceManager(long validityPeriod, long nonceSessionTime, boolean singleUse, int keySize, String algorithm, ElytronMessages log) {</span>
+<span class="nc" id="L96">        this.validityPeriodNano = validityPeriod * 1000000;</span>
+<span class="nc" id="L97">        this.nonceSessionTime = nonceSessionTime;</span>
+<span class="nc" id="L98">        this.singleUse = singleUse;</span>
+<span class="nc" id="L99">        this.algorithm = algorithm;</span>
+<span class="nc" id="L100">        this.log = log;</span>
+
+<span class="nc" id="L102">        this.privateKey = new byte[keySize];</span>
+<span class="nc" id="L103">        new SecureRandom().nextBytes(privateKey);</span>
+<span class="nc" id="L104">        ScheduledThreadPoolExecutor INSTANCE = new ScheduledThreadPoolExecutor(1);</span>
+<span class="nc" id="L105">        INSTANCE.setRemoveOnCancelPolicy(true);</span>
+<span class="nc" id="L106">        INSTANCE.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);</span>
+<span class="nc" id="L107">        executor = INSTANCE;</span>
+<span class="nc" id="L108">    }</span>
+
+    /**
+     * @param validityPeriod the time in ms that nonces are valid for in ms.
+     * @param nonceSessionTime the time in ms a nonce is usable for after it's last use where nonce counts are in use.
+     * @param singleUse are nonces single use?
+     * @param keySize the number of bytes to use in the private key of this node.
+     * @param algorithm the message digest algorithm to use when creating the digest portion of the nonce.
+     * @param log mechanism specific logger.
+     * @param customExecutor a custom ScheduledExecutorService to be used
+     */
+<span class="nc" id="L119">    NonceManager(long validityPeriod, long nonceSessionTime, boolean singleUse, int keySize, String algorithm, ElytronMessages log, ScheduledExecutorService customExecutor) {</span>
+<span class="nc" id="L120">        this.validityPeriodNano = validityPeriod * 1000000;</span>
+<span class="nc" id="L121">        this.nonceSessionTime = nonceSessionTime;</span>
+<span class="nc" id="L122">        this.singleUse = singleUse;</span>
+<span class="nc" id="L123">        this.algorithm = algorithm;</span>
+<span class="nc" id="L124">        this.log = log;</span>
+
+<span class="nc" id="L126">        this.privateKey = new byte[keySize];</span>
+<span class="nc" id="L127">        new SecureRandom().nextBytes(privateKey);</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        if (customExecutor == null) {</span>
+<span class="nc" id="L129">            ScheduledThreadPoolExecutor INSTANCE = new ScheduledThreadPoolExecutor(1);</span>
+<span class="nc" id="L130">            INSTANCE.setRemoveOnCancelPolicy(true);</span>
+<span class="nc" id="L131">            INSTANCE.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);</span>
+<span class="nc" id="L132">            executor = INSTANCE;</span>
+<span class="nc" id="L133">        }</span>
+        else {
+<span class="nc" id="L135">            executor = customExecutor;</span>
+        }
+<span class="nc" id="L137">    }</span>
+
+    /**
+     * Generate a new encoded nonce to send to the client.
+     *
+     * @return a new encoded nonce to send to the client.
+     */
+    String generateNonce() {
+<span class="nc" id="L145">        return generateNonce(null);</span>
+    }
+
+    /**
+     * Generate a new encoded nonce to send to the client.
+     *
+     * @param salt additional data to use when creating the overall signature for the nonce.
+     * @return a new encoded nonce to send to the client.
+     */
+    String generateNonce(byte[] salt) {
+        try {
+<span class="nc" id="L156">            MessageDigest messageDigest = MessageDigest.getInstance(algorithm);</span>
+
+<span class="nc" id="L158">            ByteBuffer byteBuffer = ByteBuffer.allocate(PREFIX_LENGTH + messageDigest.getDigestLength());</span>
+<span class="nc" id="L159">            byteBuffer.putInt(nonceCounter.incrementAndGet());</span>
+<span class="nc" id="L160">            byteBuffer.putLong(System.nanoTime());</span>
+<span class="nc" id="L161">            byteBuffer.put(digest(byteBuffer.array(), 0, PREFIX_LENGTH, salt, messageDigest));</span>
+
+<span class="nc" id="L163">            String nonce = ByteIterator.ofBytes(byteBuffer.array()).base64Encode().drainToString();</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">            if (log.isTraceEnabled()) {</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">                String saltString = salt == null ? &quot;null&quot; : ByteIterator.ofBytes(salt).hexEncode().drainToString();</span>
+<span class="nc" id="L166">                log.tracef(&quot;New nonce generated %s, using seed %s&quot;, nonce, saltString);</span>
+            }
+<span class="nc" id="L168">            return nonce;</span>
+<span class="nc" id="L169">        } catch (GeneralSecurityException e) {</span>
+<span class="nc" id="L170">            throw new IllegalStateException(e);</span>
+        }
+    }
+
+    private byte[] digest(byte[] prefix, int prefixOffset, int prefixLength, byte[] salt, MessageDigest messageDigest) throws DigestException {
+<span class="nc" id="L175">        messageDigest.update(prefix, prefixOffset, prefixLength);</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        if (salt != null) {</span>
+<span class="nc" id="L177">            messageDigest.update(salt);</span>
+        }
+
+<span class="nc" id="L180">        return messageDigest.digest(privateKey);</span>
+    }
+
+    /**
+     * Attempt to use the supplied nonce.
+     *
+     * A nonce might not be usable for a couple of different reasons: -
+     *
+     * &lt;ul&gt;
+     *     &lt;li&gt;It was created too far in the past.
+     *     &lt;li&gt;Validation of the signature fails.
+     *     &lt;li&gt;The nonce has been used previously and re-use is disabled.
+     * &lt;/ul&gt;
+     *
+     * @param nonce the nonce supplied by the client.
+     * @param nonceCount the nonce count, or -1 if not present
+     * @return {@code true} if the nonce can be used, {@code false} otherwise.
+     * @throws AuthenticationMechanismException
+     */
+    boolean useNonce(String nonce, int nonceCount) throws AuthenticationMechanismException {
+<span class="nc" id="L200">        return useNonce(nonce, null, nonceCount);</span>
+    }
+
+    /**
+     * Attempt to use the supplied nonce.
+     *
+     * A nonce might not be usable for a couple of different reasons: -
+     *
+     * &lt;ul&gt;
+     *     &lt;li&gt;It was created too far in the past.
+     *     &lt;li&gt;Validation of the signature fails.
+     *     &lt;li&gt;The nonce has been used previously and re-use is disabled.
+     * &lt;/ul&gt;
+     *
+     * @param nonce the nonce supplied by the client.
+     * @param salt additional data to use when creating the overall signature for the nonce.
+     * @return {@code true} if the nonce can be used, {@code false} otherwise.
+     * @throws AuthenticationMechanismException
+     */
+    boolean useNonce(final String nonce, byte[] salt, int nonceCount) throws AuthenticationMechanismException {
+        try {
+<span class="nc" id="L221">            MessageDigest messageDigest = MessageDigest.getInstance(algorithm);</span>
+<span class="nc" id="L222">            ByteIterator byteIterator = CodePointIterator.ofChars(nonce.toCharArray()).base64Decode();</span>
+<span class="nc" id="L223">            byte[] nonceBytes = byteIterator.drain();</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">            if (nonceBytes.length != PREFIX_LENGTH + messageDigest.getDigestLength()) {</span>
+<span class="nc" id="L225">                throw log.invalidNonceLength();</span>
+            }
+
+<span class="nc" id="L228">            byte[] nonceBytesWithoutPrefix = Arrays.copyOfRange(nonceBytes, PREFIX_LENGTH, nonceBytes.length);</span>
+<span class="nc" id="L229">            byte[] expectedNonce = digest(nonceBytes, 0, PREFIX_LENGTH, salt, messageDigest);</span>
+<span class="nc bnc" id="L230" title="All 2 branches missed.">            if (MessageDigest.isEqual(nonceBytesWithoutPrefix, expectedNonce) == false) {</span>
+<span class="nc bnc" id="L231" title="All 2 branches missed.">                if (log.isTraceEnabled()) {</span>
+<span class="nc bnc" id="L232" title="All 2 branches missed.">                    String saltString = salt == null ? &quot;null&quot; : ByteIterator.ofBytes(salt).hexEncode().drainToString();</span>
+<span class="nc" id="L233">                    log.tracef(&quot;Nonce %s rejected due to failed comparison using secret key with seed %s.&quot;, nonce,</span>
+                            saltString);
+                }
+<span class="nc" id="L236">                return false;</span>
+            }
+
+<span class="nc" id="L239">            long age = System.nanoTime() - ByteBuffer.wrap(nonceBytes, Integer.BYTES, Long.BYTES).getLong();</span>
+<span class="nc bnc" id="L240" title="All 2 branches missed.">            if(nonceCount &gt; 0) {</span>
+<span class="nc" id="L241">                synchronized (usedNonces) {</span>
+<span class="nc" id="L242">                    NonceState nonceState = usedNonces.get(nonce);</span>
+<span class="nc bnc" id="L243" title="All 4 branches missed.">                    if (nonceState != null &amp;&amp; nonceState.highestNonceCount &lt; 0) {</span>
+<span class="nc" id="L244">                        log.tracef(&quot;Nonce %s rejected due to previously being used without a nonce count&quot;, nonce);</span>
+<span class="nc" id="L245">                        return false;</span>
+<span class="nc bnc" id="L246" title="All 2 branches missed.">                    } else if (nonceState != null) {</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">                        if (nonceCount &gt; nonceState.highestNonceCount) {</span>
+<span class="nc bnc" id="L248" title="All 2 branches missed.">                            if (nonceState.futureCleanup.cancel(true)) {</span>
+<span class="nc" id="L249">                                nonceState.highestNonceCount = nonceCount;</span>
+                            } else {
+<span class="nc" id="L251">                                log.tracef(&quot;Nonce %s rejected as unable to cancel clean up, likely at expiration time&quot;, nonce);</span>
+<span class="nc" id="L252">                                return false;</span>
+                            }
+                        } else {
+<span class="nc" id="L255">                            log.tracef(&quot;Nonce %s rejected due to highest seen nonce count %d being equal to or higher than the nonce count received %d&quot;,</span>
+<span class="nc" id="L256">                                    nonce, nonceState.highestNonceCount, nonceCount);</span>
+<span class="nc" id="L257">                            return false;</span>
+                        }
+                    } else {
+<span class="nc bnc" id="L260" title="All 4 branches missed.">                        if (age &lt; 0 || age &gt; validityPeriodNano) {</span>
+<span class="nc" id="L261">                            log.tracef(&quot;Nonce %s rejected due to age %d (ns) being less than 0 or greater than the validity period %d (ns)&quot;,</span>
+<span class="nc" id="L262">                                    nonce, age, validityPeriodNano);</span>
+<span class="nc" id="L263">                            return false;</span>
+                        }
+<span class="nc" id="L265">                        nonceState = new NonceState();</span>
+<span class="nc" id="L266">                        nonceState.highestNonceCount = nonceCount;</span>
+<span class="nc" id="L267">                        usedNonces.put(nonce, nonceState);</span>
+<span class="nc bnc" id="L268" title="All 2 branches missed.">                        if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L269">                            log.tracef(&quot;Currently %d nonces being tracked&quot;, usedNonces.size());</span>
+                        }
+                    }
+
+<span class="nc" id="L273">                    nonceState.futureCleanup = executor.schedule(() -&gt; {</span>
+<span class="nc" id="L274">                        synchronized (usedNonces) {</span>
+<span class="nc" id="L275">                            usedNonces.remove(nonce);</span>
+<span class="nc" id="L276">                        }</span>
+<span class="nc" id="L277">                    }, nonceSessionTime, TimeUnit.MILLISECONDS);</span>
+<span class="nc" id="L278">                }</span>
+            } else {
+<span class="nc bnc" id="L280" title="All 4 branches missed.">                if (age &lt; 0 || age &gt; validityPeriodNano) {</span>
+<span class="nc" id="L281">                    log.tracef(&quot;Nonce %s rejected due to age %d (ns) being less than 0 or greater than the validity period %d (ns)&quot;, nonce, age, validityPeriodNano);</span>
+<span class="nc" id="L282">                    return false;</span>
+                }
+
+<span class="nc bnc" id="L285" title="All 2 branches missed.">                if (singleUse) {</span>
+<span class="nc" id="L286">                    synchronized(usedNonces) {</span>
+<span class="nc" id="L287">                        NonceState nonceState = usedNonces.get(nonce);</span>
+<span class="nc bnc" id="L288" title="All 2 branches missed.">                        if (nonceState != null) {</span>
+<span class="nc" id="L289">                            log.tracef(&quot;Nonce %s rejected due to previously being used&quot;, nonce);</span>
+<span class="nc" id="L290">                            return false;</span>
+                        } else {
+<span class="nc" id="L292">                            nonceState = new NonceState();</span>
+<span class="nc" id="L293">                            usedNonces.put(nonce, nonceState);</span>
+<span class="nc bnc" id="L294" title="All 2 branches missed.">                            if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L295">                                log.tracef(&quot;Currently %d nonces being tracked&quot;, usedNonces.size());</span>
+                            }
+<span class="nc" id="L297">                            executor.schedule(() -&gt; {</span>
+<span class="nc" id="L298">                                synchronized(usedNonces) {</span>
+<span class="nc" id="L299">                                    usedNonces.remove(nonce);</span>
+<span class="nc" id="L300">                                }</span>
+<span class="nc" id="L301">                            }, validityPeriodNano - age, TimeUnit.NANOSECONDS);</span>
+                        }
+<span class="nc" id="L303">                    }</span>
+                }
+            }
+
+<span class="nc" id="L307">            return true;</span>
+
+<span class="nc" id="L309">        } catch (GeneralSecurityException e) {</span>
+<span class="nc" id="L310">            throw new IllegalStateException(e);</span>
+        }
+    }
+
+    public void shutdown() {
+<span class="nc bnc" id="L315" title="All 2 branches missed.">        if (executor != null) { executor.shutdown(); }</span>
+<span class="nc" id="L316">    }</span>
+
+<span class="nc" id="L318">    private static class NonceState {</span>
+        private ScheduledFuture&lt;?&gt; futureCleanup;
+<span class="nc" id="L320">        private int highestNonceCount = -1;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

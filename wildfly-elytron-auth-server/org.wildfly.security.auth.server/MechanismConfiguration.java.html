@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MechanismConfiguration.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.server</a> &gt; <span class="el_source">MechanismConfiguration.java</span></div><h1>MechanismConfiguration.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.server;
+
+import static java.util.Arrays.asList;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.unmodifiableList;
+import static org.wildfly.common.Assert.checkNotNullParam;
+
+import java.security.Principal;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+
+import org.wildfly.security.SecurityFactory;
+import org.wildfly.security.credential.Credential;
+import org.wildfly.security.credential.source.CredentialSource;
+
+/**
+ * A configuration that applies to an authentication mechanism.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class MechanismConfiguration {
+    private final Function&lt;Principal, Principal&gt; preRealmRewriter;
+    private final Function&lt;Principal, Principal&gt; postRealmRewriter;
+    private final Function&lt;Principal, Principal&gt; finalRewriter;
+    private final RealmMapper realmMapper;
+    private final Map&lt;String, MechanismRealmConfiguration&gt; mechanismRealms;
+    private final CredentialSource serverCredentialSource;
+
+<span class="fc" id="L53">    MechanismConfiguration(final Function&lt;Principal, Principal&gt; preRealmRewriter, final Function&lt;Principal, Principal&gt; postRealmRewriter, final Function&lt;Principal, Principal&gt; finalRewriter, final RealmMapper realmMapper, final Collection&lt;MechanismRealmConfiguration&gt; mechanismRealms, final CredentialSource serverCredentialSource) {</span>
+<span class="fc" id="L54">        checkNotNullParam(&quot;mechanismRealms&quot;, mechanismRealms);</span>
+<span class="fc" id="L55">        this.preRealmRewriter = preRealmRewriter;</span>
+<span class="fc" id="L56">        this.postRealmRewriter = postRealmRewriter;</span>
+<span class="fc" id="L57">        this.finalRewriter = finalRewriter;</span>
+<span class="fc" id="L58">        this.realmMapper = realmMapper;</span>
+<span class="fc" id="L59">        final Iterator&lt;MechanismRealmConfiguration&gt; iterator = mechanismRealms.iterator();</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (! iterator.hasNext()) {</span>
+            // zero
+<span class="fc" id="L62">            this.mechanismRealms = Collections.emptyMap();</span>
+        } else {
+<span class="nc" id="L64">            MechanismRealmConfiguration item = iterator.next();</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">            if (! iterator.hasNext()) {</span>
+                // one
+<span class="nc" id="L67">                this.mechanismRealms = Collections.singletonMap(item.getRealmName(), item);</span>
+            } else {
+                // two or more
+<span class="nc" id="L70">                Map&lt;String, MechanismRealmConfiguration&gt; map = new LinkedHashMap&lt;&gt;(mechanismRealms.size());</span>
+<span class="nc" id="L71">                map.put(item.getRealmName(), item);</span>
+                do {
+<span class="nc" id="L73">                    item = iterator.next();</span>
+<span class="nc" id="L74">                    map.put(item.getRealmName(), item);</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">                } while (iterator.hasNext());</span>
+<span class="nc" id="L76">                this.mechanismRealms = Collections.unmodifiableMap(map);</span>
+            }
+        }
+<span class="fc" id="L79">        this.serverCredentialSource = serverCredentialSource;</span>
+<span class="fc" id="L80">    }</span>
+
+    /**
+     * Get the pre-realm rewriter for this mechanism realm.
+     *
+     * @return the pre-realm rewriter for this mechanism realm, or {@code null} to use the default
+     */
+    public Function&lt;Principal, Principal&gt; getPreRealmRewriter() {
+<span class="fc" id="L88">        return preRealmRewriter;</span>
+    }
+
+    /**
+     * Get the post-realm rewriter for this mechanism realm.
+     *
+     * @return the post-realm rewriter for this mechanism realm, or {@code null} to use the default
+     */
+    public Function&lt;Principal, Principal&gt; getPostRealmRewriter() {
+<span class="fc" id="L97">        return postRealmRewriter;</span>
+    }
+
+    /**
+     * Get the final rewriter for this mechanism realm.
+     *
+     * @return the final rewriter for this mechanism realm, or {@code null} to use the default
+     */
+    public Function&lt;Principal, Principal&gt; getFinalRewriter() {
+<span class="fc" id="L106">        return finalRewriter;</span>
+    }
+
+    /**
+     * Get the realm mapper.
+     *
+     * @return the realm mapper, or {@code null} to use the default
+     */
+    public RealmMapper getRealmMapper() {
+<span class="fc" id="L115">        return realmMapper;</span>
+    }
+
+    /**
+     * Get the collection of mechanism realm names, in order.  If no realms are configured, the collection will be
+     * empty.
+     *
+     * @return the mechanism realm names to offer (may be empty; not {@code null})
+     */
+    public Collection&lt;String&gt; getMechanismRealmNames() {
+<span class="fc" id="L125">        return mechanismRealms.keySet();</span>
+    }
+
+    /**
+     * Get the server credential source.
+     *
+     * @return the server credential source
+     */
+    public CredentialSource getServerCredentialSource() {
+<span class="nc" id="L134">        return serverCredentialSource;</span>
+    }
+
+    /**
+     * Get the mechanism realm configuration for the offered realm with the given name.  If the realm name is not known,
+     * {@code null} is returned.  If the realm name is equal to one of the names returned by {@link #getMechanismRealmNames()}
+     * on this same instance then it is guaranteed that {@code null} is never returned.
+     *
+     * @param realmName the realm name
+     * @return the realm configuration, or {@code null} if the realm name is unknown
+     */
+    public MechanismRealmConfiguration getMechanismRealmConfiguration(String realmName) {
+<span class="nc" id="L146">        return mechanismRealms.get(realmName);</span>
+    }
+
+    /**
+     * Obtain a new {@link Builder} capable of building a {@link MechanismConfiguration}.
+     *
+     * @return a new {@link Builder} capable of building a {@link MechanismConfiguration}.
+     */
+    public static Builder builder() {
+<span class="nc" id="L155">        return new Builder();</span>
+    }
+
+    /**
+     * A builder for authentication mechanism configuration.
+     */
+    public static final class Builder {
+<span class="nc" id="L162">        private static final MechanismRealmConfiguration[] NO_REALM_CONFIGS = new MechanismRealmConfiguration[0];</span>
+
+<span class="nc" id="L164">        private Function&lt;Principal, Principal&gt; preRealmRewriter = Function.identity();</span>
+<span class="nc" id="L165">        private Function&lt;Principal, Principal&gt; postRealmRewriter = Function.identity();</span>
+<span class="nc" id="L166">        private Function&lt;Principal, Principal&gt; finalRewriter = Function.identity();</span>
+        private RealmMapper realmMapper;
+        private List&lt;MechanismRealmConfiguration&gt; mechanismRealms;
+<span class="nc" id="L169">        private CredentialSource serverCredentialSource = CredentialSource.NONE;</span>
+
+        /**
+         * Construct a new instance.
+         */
+<span class="nc" id="L174">        Builder() {</span>
+<span class="nc" id="L175">        }</span>
+
+        /**
+         * Set a principal transformer to apply before the realm is selected.
+         *
+         * @param preRealmRewriter a principal transformer to apply before the realm is selected
+         * @return this builder
+         */
+        public Builder setPreRealmRewriter(final Function&lt;Principal, Principal&gt; preRealmRewriter) {
+<span class="nc" id="L184">            checkNotNullParam(&quot;preRealmRewriter&quot;, preRealmRewriter);</span>
+<span class="nc" id="L185">            this.preRealmRewriter = preRealmRewriter;</span>
+<span class="nc" id="L186">            return this;</span>
+        }
+
+        /**
+         * Set a principal transformer to apply after the realm is selected.  Any previously set credential source will be overwritten.
+         *
+         * @param postRealmRewriter a principal transformer to apply after the realm is selected
+         * @return this builder
+         */
+        public Builder setPostRealmRewriter(final Function&lt;Principal, Principal&gt; postRealmRewriter) {
+<span class="nc" id="L196">            checkNotNullParam(&quot;postRealmRewriter&quot;, postRealmRewriter);</span>
+<span class="nc" id="L197">            this.postRealmRewriter = postRealmRewriter;</span>
+<span class="nc" id="L198">            return this;</span>
+        }
+
+        /**
+         * Set a final principal transformer to apply for this mechanism realm.  Any previously set credential source will be overwritten.
+         *
+         * @param finalRewriter a final principal transformer to apply for this mechanism realm
+         * @return this builder
+         */
+        public Builder setFinalRewriter(final Function&lt;Principal, Principal&gt; finalRewriter) {
+<span class="nc" id="L208">            checkNotNullParam(&quot;finalRewriter&quot;, finalRewriter);</span>
+<span class="nc" id="L209">            this.finalRewriter = finalRewriter;</span>
+<span class="nc" id="L210">            return this;</span>
+        }
+
+        /**
+         * Sets a realm mapper to be used by the mechanism.  Any previously set credential source will be overwritten.
+         *
+         * @param realmMapper a realm mapper to be used by the mechanism
+         * @return this builder
+         */
+        public Builder setRealmMapper(final RealmMapper realmMapper) {
+<span class="nc" id="L220">            this.realmMapper = realmMapper;</span>
+<span class="nc" id="L221">            return this;</span>
+        }
+
+        /**
+         * Adds a configuration for one of realms of this mechanism.
+         *
+         * @param configuration a configuration for one of realms of this mechanism
+         * @return this builder
+         */
+        public Builder addMechanismRealm(MechanismRealmConfiguration configuration) {
+<span class="nc" id="L231">            checkNotNullParam(&quot;configuration&quot;, configuration);</span>
+<span class="nc" id="L232">            List&lt;MechanismRealmConfiguration&gt; mechanismRealms = this.mechanismRealms;</span>
+<span class="nc bnc" id="L233" title="All 2 branches missed.">            if (mechanismRealms == null) {</span>
+<span class="nc" id="L234">                mechanismRealms = this.mechanismRealms = new ArrayList&lt;&gt;(1);</span>
+            }
+<span class="nc" id="L236">            mechanismRealms.add(configuration);</span>
+<span class="nc" id="L237">            return this;</span>
+        }
+
+        /**
+         * Set a single server credential.  Any previously set credential source will be overwritten.
+         *
+         * @param credential the credential to set (must not be {@code null})
+         * @return this builder
+         */
+        public Builder setServerCredential(Credential credential) {
+<span class="nc" id="L247">            checkNotNullParam(&quot;credential&quot;, credential);</span>
+<span class="nc" id="L248">            return setServerCredentialSource(IdentityCredentials.NONE.withCredential(credential));</span>
+        }
+
+        /**
+         * Set a single server credential factory.  Any previously set credential source will be overwritten.
+         *
+         * @param credentialFactory the credential factory to set (must not be {@code null})
+         * @return this builder
+         */
+        public Builder setServerCredential(SecurityFactory&lt;? extends Credential&gt; credentialFactory) {
+<span class="nc" id="L258">            checkNotNullParam(&quot;credential&quot;, credentialFactory);</span>
+<span class="nc" id="L259">            return setServerCredentialSource(CredentialSource.fromSecurityFactory(credentialFactory));</span>
+        }
+
+        /**
+         * Set the server credential source.  Any previously set credential source will be overwritten.
+         *
+         * @param serverCredentialSource the server credential source (must not be {@code null})
+         * @return this builder
+         */
+        public Builder setServerCredentialSource(final CredentialSource serverCredentialSource) {
+<span class="nc" id="L269">            checkNotNullParam(&quot;serverCredentialSource&quot;, serverCredentialSource);</span>
+<span class="nc" id="L270">            this.serverCredentialSource = serverCredentialSource;</span>
+<span class="nc" id="L271">            return this;</span>
+        }
+
+        /**
+         * Build a new instance.  If no mechanism realms are offered, an empty collection should be provided for
+         * {@code mechanismRealms}; otherwise, if the mechanism only supports one realm, the first will be used.  If the
+         * mechanism does not support realms, {@code mechanismRealms} is ignored.
+         *
+         * @return a new instance
+         */
+        public MechanismConfiguration build() {
+<span class="nc" id="L282">            List&lt;MechanismRealmConfiguration&gt; mechanismRealms = this.mechanismRealms;</span>
+<span class="nc bnc" id="L283" title="All 2 branches missed.">            if (mechanismRealms == null) {</span>
+<span class="nc" id="L284">                mechanismRealms = emptyList();</span>
+            } else {
+<span class="nc" id="L286">                mechanismRealms = unmodifiableList(asList(mechanismRealms.toArray(NO_REALM_CONFIGS)));</span>
+            }
+<span class="nc" id="L288">            return new MechanismConfiguration(preRealmRewriter, postRealmRewriter, finalRewriter, realmMapper, mechanismRealms, serverCredentialSource);</span>
+        }
+    }
+
+    /**
+     * An empty mechanism configuration..
+     */
+<span class="fc" id="L295">    public static final MechanismConfiguration EMPTY = new MechanismConfiguration(Function.identity(), Function.identity(), Function.identity(), null, emptyList(), CredentialSource.NONE);</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

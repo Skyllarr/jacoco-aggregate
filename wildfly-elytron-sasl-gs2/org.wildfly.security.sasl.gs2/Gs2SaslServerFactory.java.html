@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Gs2SaslServerFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl-gs2</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.gs2</a> &gt; <span class="el_source">Gs2SaslServerFactory.java</span></div><h1>Gs2SaslServerFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.gs2;
+
+import static org.wildfly.security.mechanism._private.ElytronMessages.saslGs2;
+import static org.wildfly.security.sasl.gs2.Gs2.*;
+
+import java.io.IOException;
+import java.util.Map;
+
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.sasl.SaslException;
+import javax.security.sasl.SaslServer;
+import javax.security.sasl.SaslServerFactory;
+
+import org.ietf.jgss.GSSException;
+import org.ietf.jgss.GSSManager;
+import org.kohsuke.MetaInfServices;
+import org.wildfly.common.Assert;
+import org.wildfly.security.auth.callback.ChannelBindingCallback;
+import org.wildfly.security.sasl.WildFlySasl;
+
+/**
+ * SaslServerFactory for the GS2 mechanism family as defined by RFC 5801.
+ *
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+@MetaInfServices(value = SaslServerFactory.class)
+public final class Gs2SaslServerFactory implements SaslServerFactory {
+    private final GSSManager gssManager;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param gssManager the GSS manager to use
+     */
+<span class="nc" id="L55">    public Gs2SaslServerFactory(final GSSManager gssManager) {</span>
+<span class="nc" id="L56">        this.gssManager = gssManager;</span>
+<span class="nc" id="L57">    }</span>
+
+    /**
+     * Construct a new instance with the default GSS manager.
+     */
+    public Gs2SaslServerFactory() {
+<span class="nc" id="L63">        this(GSSManager.getInstance());</span>
+<span class="nc" id="L64">    }</span>
+
+    public SaslServer createSaslServer(final String mechanism, final String protocol, final String serverName, final Map&lt;String, ?&gt; props,
+            final CallbackHandler cbh) throws SaslException {
+<span class="nc" id="L68">        Assert.checkNotNullParam(&quot;cbh&quot;, cbh);</span>
+<span class="nc" id="L69">        GSSManager gssManager = this.gssManager;</span>
+        final String[] supportedMechs;
+        try {
+<span class="nc" id="L72">            supportedMechs = Gs2Util.getSupportedSaslNamesForMechanisms(gssManager.getMechs());</span>
+<span class="nc" id="L73">        } catch (GSSException e) {</span>
+<span class="nc" id="L74">            throw saslGs2.mechGettingSupportedMechanismsFailed(e).toSaslException();</span>
+<span class="nc" id="L75">        }</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">        if (! Gs2Util.isIncluded(mechanism, supportedMechs)) return null;</span>
+
+<span class="nc" id="L78">        boolean plus = false;</span>
+<span class="nc" id="L79">        final ChannelBindingCallback channelBindingCallback = new ChannelBindingCallback();</span>
+        try {
+<span class="nc" id="L81">            cbh.handle(new Callback[] { channelBindingCallback });</span>
+<span class="nc" id="L82">        } catch (SaslException e) {</span>
+<span class="nc" id="L83">            throw e;</span>
+<span class="nc" id="L84">        } catch (IOException e) {</span>
+<span class="nc" id="L85">            throw saslGs2.mechFailedToDetermineChannelBindingStatus(e).toSaslException();</span>
+<span class="nc" id="L86">        } catch (UnsupportedCallbackException e) {</span>
+            // Ignored
+<span class="nc" id="L88">        }</span>
+<span class="nc" id="L89">        final String bindingType = channelBindingCallback.getBindingType();</span>
+<span class="nc" id="L90">        final byte[] bindingData = channelBindingCallback.getBindingData();</span>
+<span class="nc bnc" id="L91" title="All 4 branches missed.">        boolean bindingOk = (bindingType != null) &amp;&amp; (bindingData != null);</span>
+<span class="nc bnc" id="L92" title="All 4 branches missed.">        boolean bindingRequired = props != null &amp;&amp; &quot;true&quot;.equals(props.get(WildFlySasl.CHANNEL_BINDING_REQUIRED));</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        if (mechanism.endsWith(PLUS_SUFFIX)) {</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">            if (! bindingOk) return null;</span>
+<span class="nc" id="L95">            plus = true;</span>
+        }
+<span class="nc bnc" id="L97" title="All 4 branches missed.">        if (bindingRequired &amp;&amp; ! plus) return null;</span>
+<span class="nc" id="L98">        final Gs2SaslServer server = new Gs2SaslServer(mechanism, protocol, serverName, cbh, gssManager, plus, bindingType, bindingData);</span>
+<span class="nc" id="L99">        server.init();</span>
+<span class="nc" id="L100">        return server;</span>
+    }
+
+    public String[] getMechanismNames(final Map&lt;String, ?&gt; props) {
+        String[] names;
+        try {
+<span class="nc" id="L106">            names = Gs2Util.getSupportedSaslNamesForMechanisms(gssManager.getMechs());</span>
+<span class="nc" id="L107">        } catch (GSSException e) {</span>
+<span class="nc" id="L108">            return WildFlySasl.NO_NAMES;</span>
+<span class="nc" id="L109">        }</span>
+<span class="nc bnc" id="L110" title="All 6 branches missed.">        if (props != null &amp;&amp; !&quot;true&quot;.equals(props.get(WildFlySasl.MECHANISM_QUERY_ALL)) &amp;&amp; &quot;true&quot;.equals(props.get(WildFlySasl.CHANNEL_BINDING_REQUIRED))) {</span>
+<span class="nc" id="L111">            return Gs2Util.getPlusMechanisms(names);</span>
+        } else {
+<span class="nc" id="L113">            return names;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,1268 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SecurityDomain.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.server</a> &gt; <span class="el_source">SecurityDomain.java</span></div><h1>SecurityDomain.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source
+ * Copyright 2013 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.server;
+
+import static java.security.AccessController.doPrivileged;
+import static java.util.Collections.emptyMap;
+import static org.wildfly.common.Assert.checkNotNullParam;
+import static org.wildfly.security.auth.server._private.ElytronMessages.log;
+
+import java.security.Principal;
+import java.security.PrivilegedAction;
+import java.security.spec.AlgorithmParameterSpec;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
+
+import org.wildfly.common.Assert;
+import org.wildfly.common.function.ExceptionBiFunction;
+import org.wildfly.common.function.ExceptionFunction;
+import org.wildfly.security.auth.SupportLevel;
+import org.wildfly.security.auth.principal.AnonymousPrincipal;
+import org.wildfly.security.auth.principal.NamePrincipal;
+import org.wildfly.security.auth.principal.RealmNestedPrincipal;
+import org.wildfly.security.auth.server.event.SecurityEvent;
+import org.wildfly.security.authz.AuthorizationIdentity;
+import org.wildfly.security.authz.PermissionMapper;
+import org.wildfly.security.authz.RoleDecoder;
+import org.wildfly.security.authz.RoleMapper;
+import org.wildfly.security.authz.Roles;
+import org.wildfly.security.credential.BearerTokenCredential;
+import org.wildfly.security.credential.Credential;
+import org.wildfly.security.credential.PasswordCredential;
+import org.wildfly.security.evidence.BearerTokenEvidence;
+import org.wildfly.security.evidence.Evidence;
+import org.wildfly.security.evidence.PasswordGuessEvidence;
+import org.wildfly.security.password.interfaces.ClearPassword;
+import org.wildfly.security.permission.ElytronPermission;
+import org.wildfly.security.permission.PermissionVerifier;
+
+/**
+ * A security domain.  Security domains encapsulate a set of security policies.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">public final class SecurityDomain {</span>
+
+<span class="fc" id="L76">    private static final ConcurrentHashMap&lt;ClassLoader, SecurityDomain&gt; CLASS_LOADER_DOMAIN_MAP = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="fc" id="L77">    private static final RealmInfo EMPTY_REALM_INFO = new RealmInfo();</span>
+
+<span class="fc" id="L79">    static final ElytronPermission AUTHENTICATE = ElytronPermission.forName(&quot;authenticate&quot;);</span>
+<span class="fc" id="L80">    static final ElytronPermission CREATE_SECURITY_DOMAIN = ElytronPermission.forName(&quot;createSecurityDomain&quot;);</span>
+<span class="fc" id="L81">    static final ElytronPermission REGISTER_SECURITY_DOMAIN = ElytronPermission.forName(&quot;registerSecurityDomain&quot;);</span>
+<span class="fc" id="L82">    static final ElytronPermission GET_SECURITY_DOMAIN = ElytronPermission.forName(&quot;getSecurityDomain&quot;);</span>
+<span class="fc" id="L83">    static final ElytronPermission UNREGISTER_SECURITY_DOMAIN = ElytronPermission.forName(&quot;unregisterSecurityDomain&quot;);</span>
+<span class="fc" id="L84">    static final ElytronPermission CREATE_AUTH_CONTEXT = ElytronPermission.forName(&quot;createServerAuthenticationContext&quot;);</span>
+<span class="fc" id="L85">    static final ElytronPermission GET_IDENTITY = ElytronPermission.forName(&quot;getIdentity&quot;);</span>
+<span class="fc" id="L86">    static final ElytronPermission GET_IDENTITY_FOR_UPDATE = ElytronPermission.forName(&quot;getIdentityForUpdate&quot;);</span>
+<span class="fc" id="L87">    static final ElytronPermission CREATE_AD_HOC_IDENTITY = ElytronPermission.forName(&quot;createAdHocIdentity&quot;);</span>
+<span class="fc" id="L88">    static final ElytronPermission HANDLE_SECURITY_EVENT = ElytronPermission.forName(&quot;handleSecurityEvent&quot;);</span>
+
+    private final Map&lt;String, RealmInfo&gt; realmMap;
+    private final String defaultRealmName;
+    private final Function&lt;Principal, Principal&gt; preRealmPrincipalRewriter;
+    private final RealmMapper realmMapper;
+    private final Function&lt;Principal, Principal&gt; postRealmPrincipalRewriter;
+    private final ThreadLocal&lt;Supplier&lt;SecurityIdentity&gt;&gt; currentSecurityIdentity;
+    private final RoleMapper roleMapper;
+    private final SecurityIdentity anonymousIdentity;
+    private final PermissionMapper permissionMapper;
+    private final Map&lt;String, RoleMapper&gt; categoryRoleMappers;
+    private final UnaryOperator&lt;SecurityIdentity&gt; securityIdentityTransformer;
+    private final Predicate&lt;SecurityDomain&gt; trustedSecurityDomain;
+    private final Consumer&lt;SecurityEvent&gt; securityEventListener;
+    private final Function&lt;Evidence, Principal&gt; evidenceDecoder;
+    private final RoleDecoder roleDecoder;
+
+<span class="fc" id="L106">    SecurityDomain(Builder builder, final LinkedHashMap&lt;String, RealmInfo&gt; realmMap) {</span>
+<span class="fc" id="L107">        this.realmMap = realmMap;</span>
+<span class="fc" id="L108">        this.defaultRealmName = builder.defaultRealmName;</span>
+<span class="fc" id="L109">        this.preRealmPrincipalRewriter = builder.principalDecoder.andThen(builder.preRealmRewriter);</span>
+<span class="fc" id="L110">        this.realmMapper = builder.realmMapper;</span>
+<span class="fc" id="L111">        this.roleMapper = builder.roleMapper;</span>
+<span class="fc" id="L112">        this.permissionMapper = builder.permissionMapper;</span>
+<span class="fc" id="L113">        this.postRealmPrincipalRewriter = builder.postRealmRewriter;</span>
+<span class="fc" id="L114">        this.securityIdentityTransformer = builder.securityIdentityTransformer;</span>
+<span class="fc" id="L115">        this.trustedSecurityDomain = builder.trustedSecurityDomain;</span>
+<span class="fc" id="L116">        this.securityEventListener = builder.securityEventListener;</span>
+<span class="fc" id="L117">        this.evidenceDecoder = builder.evidenceDecoder;</span>
+<span class="fc" id="L118">        this.roleDecoder = builder.roleDecoder;</span>
+<span class="fc" id="L119">        final Map&lt;String, RoleMapper&gt; originalRoleMappers = builder.categoryRoleMappers;</span>
+        final Map&lt;String, RoleMapper&gt; copiedRoleMappers;
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (originalRoleMappers.isEmpty()) {</span>
+<span class="fc" id="L122">            copiedRoleMappers = emptyMap();</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        } else if (originalRoleMappers.size() == 1) {</span>
+<span class="nc" id="L124">            final Map.Entry&lt;String, RoleMapper&gt; entry = originalRoleMappers.entrySet().iterator().next();</span>
+<span class="nc" id="L125">            copiedRoleMappers = Collections.singletonMap(entry.getKey(), entry.getValue());</span>
+<span class="nc" id="L126">        } else {</span>
+<span class="nc" id="L127">            copiedRoleMappers = new LinkedHashMap&lt;&gt;(originalRoleMappers);</span>
+        }
+<span class="fc" id="L129">        this.categoryRoleMappers = copiedRoleMappers;</span>
+        // todo configurable
+<span class="fc" id="L131">        anonymousIdentity = Assert.assertNotNull(securityIdentityTransformer.apply(new SecurityIdentity(this, AnonymousPrincipal.getInstance(), EMPTY_REALM_INFO, AuthorizationIdentity.EMPTY, copiedRoleMappers, IdentityCredentials.NONE, IdentityCredentials.NONE)));</span>
+<span class="fc" id="L132">        currentSecurityIdentity = ThreadLocal.withInitial(() -&gt; anonymousIdentity);</span>
+<span class="fc" id="L133">    }</span>
+
+    /**
+     * Register this {@link SecurityDomain} with the specified {@link ClassLoader}.
+     *
+     * Registration with enabled security manager requires {@code registerSecurityDomain} {@link ElytronPermission}.
+     *
+     * @throws IllegalStateException If a {@link SecurityDomain} is already associated with the specified {@link ClassLoader}.
+     * @param classLoader the non {@code null} {@link ClassLoader} to associate this {@link SecurityDomain} with.
+     */
+    public void registerWithClassLoader(ClassLoader classLoader) {
+<span class="fc" id="L144">        checkNotNullParam(&quot;classLoader&quot;, classLoader);</span>
+<span class="fc" id="L145">        final SecurityManager sm = System.getSecurityManager();</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if (sm != null) {</span>
+<span class="nc" id="L147">            sm.checkPermission(REGISTER_SECURITY_DOMAIN);</span>
+        }
+
+<span class="fc" id="L150">        final SecurityDomain classLoaderDomain = CLASS_LOADER_DOMAIN_MAP.putIfAbsent(classLoader, this);</span>
+<span class="pc bpc" id="L151" title="3 of 4 branches missed.">        if ((classLoaderDomain != null) &amp;&amp; (classLoaderDomain != this)) {</span>
+<span class="nc" id="L152">            throw log.classLoaderSecurityDomainExists();</span>
+        }
+<span class="fc" id="L154">    }</span>
+
+    /**
+     * Get the {@link SecurityDomain} associated with the context class loader of the calling Thread or {@code null} if one is
+     * not associated.
+     *
+     * Obtaining security domain with enabled security manager requires {@code getSecurityDomain} {@link ElytronPermission}.
+     *
+     * @return the {@link SecurityDomain} associated with the context class loader of the calling Thread or {@code null} if one
+     *         is not associated.
+     */
+    public static SecurityDomain getCurrent() {
+<span class="fc" id="L166">        final SecurityManager sm = System.getSecurityManager();</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        if (sm != null) {</span>
+<span class="nc" id="L168">            sm.checkPermission(GET_SECURITY_DOMAIN);</span>
+        }
+
+<span class="fc" id="L171">        final Thread currentThread = Thread.currentThread();</span>
+        ClassLoader classLoader;
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        if (sm != null) {</span>
+<span class="nc" id="L174">            classLoader = doPrivileged((PrivilegedAction&lt;ClassLoader&gt;) currentThread::getContextClassLoader);</span>
+        } else {
+<span class="fc" id="L176">            classLoader = currentThread.getContextClassLoader();</span>
+        }
+
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">        return classLoader != null ? CLASS_LOADER_DOMAIN_MAP.get(classLoader) : null;</span>
+    }
+
+    /**
+     * Get the security domain associated with the given identity.
+     *
+     * Obtaining security domain with enabled security manager requires {@code getSecurityDomain} {@link ElytronPermission}.
+     *
+     * @param identity the security identity (must not be {@code null})
+     * @return the identity's security domain (not {@code null})
+     */
+    public static SecurityDomain forIdentity(SecurityIdentity identity) {
+<span class="nc" id="L191">        checkNotNullParam(&quot;identity&quot;, identity);</span>
+<span class="nc" id="L192">        final SecurityManager sm = System.getSecurityManager();</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        if (sm != null) {</span>
+<span class="nc" id="L194">            sm.checkPermission(GET_SECURITY_DOMAIN);</span>
+        }
+<span class="nc" id="L196">        return identity.getSecurityDomain();</span>
+    }
+
+    /**
+     * Unregister any {@link SecurityDomain} associated with the specified {@link ClassLoader}.
+     *
+     * Unregistration with enabled security manager requires {@code unregisterSecurityDomain} {@link ElytronPermission}.
+     *
+     * @param classLoader the non {@code null} {@link ClassLoader} to clear any {@link SecurityDomain} association.
+     */
+    public static void unregisterClassLoader(ClassLoader classLoader) {
+<span class="fc" id="L207">        checkNotNullParam(&quot;classLoader&quot;, classLoader);</span>
+<span class="fc" id="L208">        final SecurityManager sm = System.getSecurityManager();</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">        if (sm != null) {</span>
+<span class="nc" id="L210">            sm.checkPermission(UNREGISTER_SECURITY_DOMAIN);</span>
+        }
+
+<span class="fc" id="L213">        CLASS_LOADER_DOMAIN_MAP.remove(classLoader);</span>
+<span class="fc" id="L214">    }</span>
+
+    /**
+     * Create a new security domain builder.
+     *
+     * @return the builder
+     */
+    public static Builder builder() {
+<span class="fc" id="L222">        return new Builder();</span>
+    }
+
+    /**
+     * Create a new authentication context for this security domain which can be used to carry out a single authentication
+     * operation.
+     *
+     * Calling with enabled security manager requires {@code createServerAuthenticationContext} {@link ElytronPermission}.
+     *
+     * @return the new authentication context
+     */
+    public ServerAuthenticationContext createNewAuthenticationContext() {
+<span class="fc" id="L234">        final SecurityManager sm = System.getSecurityManager();</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">        if (sm != null) {</span>
+<span class="nc" id="L236">            sm.checkPermission(CREATE_AUTH_CONTEXT);</span>
+        }
+<span class="fc" id="L238">        return new ServerAuthenticationContext(this, MechanismConfigurationSelector.constantSelector(MechanismConfiguration.EMPTY));</span>
+    }
+
+    /**
+     * Create a new authentication context for this security domain which can be used to carry out a single authentication
+     * operation.
+     *
+     * Calling with enabled security manager requires {@code createServerAuthenticationContext} {@link ElytronPermission}.
+     *
+     * @param mechanismConfigurationSelector the selector to use to obtain the mechanism configuration
+     * @return the new authentication context
+     */
+    public ServerAuthenticationContext createNewAuthenticationContext(MechanismConfigurationSelector mechanismConfigurationSelector) {
+<span class="nc" id="L251">        final SecurityManager sm = System.getSecurityManager();</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">        if (sm != null) {</span>
+<span class="nc" id="L253">            sm.checkPermission(CREATE_AUTH_CONTEXT);</span>
+        }
+<span class="nc" id="L255">        return new ServerAuthenticationContext(this, mechanismConfigurationSelector);</span>
+    }
+
+    ServerAuthenticationContext createNewAuthenticationContext(SecurityIdentity capturedIdentity, MechanismConfigurationSelector mechanismConfigurationSelector) {
+<span class="pc bpc" id="L259" title="2 of 4 branches missed.">        assert capturedIdentity.getSecurityDomain() == this;</span>
+<span class="fc" id="L260">        return new ServerAuthenticationContext(capturedIdentity, mechanismConfigurationSelector);</span>
+    }
+
+    /**
+     * Perform an authentication based on {@link Evidence} alone.
+     *
+     * Note:  It is the caller's responsibility to destroy any evidence passed into this method.
+     *
+     * @param evidence the {@link Evidence} to use for authentication.
+     * @return the authenticated identity.
+     * @throws RealmUnavailableException if the requires {@link SecurityRealm} is not available.
+     * @throws SecurityException if authentication fails.
+     */
+    public SecurityIdentity authenticate(Evidence evidence) throws RealmUnavailableException, SecurityException {
+<span class="nc" id="L274">        return authenticate((Principal) null, evidence);</span>
+    }
+
+    /**
+     * Perform an authentication based on {@link Evidence} for the specified identity name.
+     *
+     * Note:  It is the caller's responsibility to destroy any evidence passed into this method.
+     *
+     * @param name the name of the identity to authenticate or {@code null} if the identity is to be derived from the evidence.
+     * @param evidence the {@link Evidence} to use for authentication.
+     * @return the authenticated identity.
+     * @throws RealmUnavailableException if the requires {@link SecurityRealm} is not available.
+     * @throws SecurityException if authentication fails.
+     */
+    public SecurityIdentity authenticate(String name, Evidence evidence) throws RealmUnavailableException, SecurityException {
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">        return authenticate(name != null ? new NamePrincipal(name) : null, evidence);</span>
+    }
+
+    /**
+     * Perform an authentication based on {@link Evidence} for the specified identity {@link Principal}.
+     *
+     * Note:  It is the caller's responsibility to destroy any evidence passed into this method.
+     *
+     * Calling with enabled security manager requires {@code authenticate} {@link ElytronPermission}.
+     *
+     * @param principal the principal of the identity to authenticate or {@code null} if the identity is to be derived from the evidence.
+     * @param evidence the {@link Evidence} to use for authentication.
+     * @return the authenticated identity.
+     * @throws RealmUnavailableException if the requires {@link SecurityRealm} is not available.
+     * @throws SecurityException if authentication fails.
+     */
+    public SecurityIdentity authenticate(Principal principal, Evidence evidence) throws RealmUnavailableException, SecurityException {
+<span class="fc" id="L306">        final SecurityManager securityManager = System.getSecurityManager();</span>
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">        if (securityManager != null) {</span>
+<span class="nc" id="L308">            securityManager.checkPermission(AUTHENTICATE);</span>
+        }
+
+<span class="fc" id="L311">        try (final ServerAuthenticationContext serverAuthenticationContext = new ServerAuthenticationContext(this,</span>
+<span class="fc" id="L312">                MechanismConfigurationSelector.constantSelector(MechanismConfiguration.EMPTY))) {</span>
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">            if (principal != null)</span>
+<span class="fc" id="L314">                serverAuthenticationContext.setAuthenticationPrincipal(principal);</span>
+<span class="fc bfc" id="L315" title="All 2 branches covered.">            if (serverAuthenticationContext.verifyEvidence(evidence)) {</span>
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">                if (serverAuthenticationContext.authorize()) {</span>
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">                    if (evidence instanceof PasswordGuessEvidence) {</span>
+<span class="fc" id="L318">                        PasswordGuessEvidence passwordGuessEvidence = PasswordGuessEvidence.class.cast(evidence);</span>
+<span class="fc" id="L319">                        serverAuthenticationContext.addPrivateCredential(new PasswordCredential(</span>
+<span class="fc" id="L320">                                ClearPassword.createRaw(ClearPassword.ALGORITHM_CLEAR, passwordGuessEvidence.getGuess())));</span>
+<span class="pc bnc" id="L321" title="All 2 branches missed.">                    } else if (evidence instanceof BearerTokenEvidence) {</span>
+<span class="nc" id="L322">                        BearerTokenEvidence tokenEvidence = BearerTokenEvidence.class.cast(evidence);</span>
+<span class="nc" id="L323">                        serverAuthenticationContext.addPrivateCredential(new BearerTokenCredential(tokenEvidence.getToken()));</span>
+<span class="nc" id="L324">                    } else {</span>
+<span class="nc" id="L325">                        log.tracef(</span>
+                                &quot;Evidence [%s] does not map to a supported credential type. Credentials are not available from authorized identity and identity propagation may not work&quot;,
+<span class="nc" id="L327">                                evidence.getClass().getName());</span>
+                    }
+<span class="fc" id="L329">                    serverAuthenticationContext.succeed();</span>
+<span class="fc" id="L330">                    return serverAuthenticationContext.getAuthorizedIdentity();</span>
+                } else {
+<span class="nc" id="L332">                    serverAuthenticationContext.fail();</span>
+<span class="nc" id="L333">                    throw log.authenticationFailedAuthorization();</span>
+                }
+            } else {
+<span class="fc" id="L336">                serverAuthenticationContext.fail();</span>
+<span class="fc" id="L337">                throw log.authenticationFailedEvidenceVerification();</span>
+            }
+        }
+    }
+
+    /**
+     * Look up a {@link RealmIdentity} by name by wrapping the name in a {@link NamePrincipal} and calling {@link #getIdentity(Principal)}.
+     * The returned identity must be {@linkplain RealmIdentity#dispose() disposed}.
+     *
+     * @param name the name to map (must not be {@code null})
+     * @return the identity for the name (not {@code null}, may be non-existent)
+     * @throws RealmUnavailableException if the realm is not able to perform the mapping
+     * @throws IllegalArgumentException if the name is not valid
+     * @throws SecurityException if the caller is not authorized to perform the operation
+     */
+    public RealmIdentity getIdentity(String name) throws RealmUnavailableException {
+<span class="nc" id="L353">        Assert.checkNotNullParam(&quot;name&quot;, name);</span>
+<span class="nc" id="L354">        return getIdentity(new NamePrincipal(name));</span>
+    }
+
+    /**
+     * Look up a {@link RealmIdentity} by principal.
+     * The returned identity must be {@linkplain RealmIdentity#dispose() disposed}.
+     *
+     * Calling with enabled security manager requires {@code getIdentity} {@link ElytronPermission}.
+     *
+     * @param principal the principal to map (must not be {@code null})
+     * @return the identity for the name (not {@code null}, may be non-existent)
+     * @throws IllegalArgumentException if the principal could not be successfully decoded to a name
+     * @throws RealmUnavailableException if the realm is not able to perform the mapping
+     * @throws SecurityException if the caller is not authorized to perform the operation
+     */
+    public RealmIdentity getIdentity(Principal principal) throws RealmUnavailableException, IllegalArgumentException {
+<span class="nc" id="L370">        final SecurityManager sm = System.getSecurityManager();</span>
+<span class="nc bnc" id="L371" title="All 2 branches missed.">        if (sm != null) {</span>
+<span class="nc" id="L372">            sm.checkPermission(GET_IDENTITY);</span>
+        }
+<span class="nc" id="L374">        return getIdentityPrivileged(principal, SecurityRealm.class, SecurityRealm::getRealmIdentity, () -&gt; RealmIdentity.NON_EXISTENT, () -&gt; RealmIdentity.ANONYMOUS);</span>
+    }
+
+    /**
+     * Look up a {@link ModifiableRealmIdentity} by principal.
+     * The returned identity must be {@linkplain RealmIdentity#dispose() disposed}.
+     *
+     * Calling with enabled security manager requires {@code getIdentityForUpdate} {@link ElytronPermission}.
+     *
+     * @param principal the principal to map (must not be {@code null})
+     * @return the identity for the name (not {@code null}, may be non-existent)
+     * @throws IllegalArgumentException if the principal could not be successfully decoded to a name
+     * @throws RealmUnavailableException if the realm is not able to perform the mapping
+     * @throws SecurityException if the caller is not authorized to perform the operation
+     */
+    public ModifiableRealmIdentity getIdentityForUpdate(Principal principal) throws RealmUnavailableException, IllegalArgumentException {
+<span class="nc" id="L390">        final SecurityManager sm = System.getSecurityManager();</span>
+<span class="nc bnc" id="L391" title="All 2 branches missed.">        if (sm != null) {</span>
+<span class="nc" id="L392">            sm.checkPermission(GET_IDENTITY_FOR_UPDATE);</span>
+        }
+<span class="nc" id="L394">        return getIdentityPrivileged(principal, ModifiableSecurityRealm.class, ModifiableSecurityRealm::getRealmIdentityForUpdate, () -&gt; ModifiableRealmIdentity.NON_EXISTENT, () -&gt; ModifiableRealmIdentity.NON_EXISTENT);</span>
+    }
+
+    /**
+     * Get a function which can be used to look up principals without a security manager permission check.
+     * All returned identities must be {@linkplain RealmIdentity#dispose() disposed}.
+     *
+     * Calling with enabled security manager requires {@code getIdentity} {@link ElytronPermission}.
+     *
+     * @return the lookup function (not {@code null})
+     * @throws SecurityException if the caller is not authorized to perform the operation
+     */
+    public ExceptionFunction&lt;Principal, RealmIdentity, RealmUnavailableException&gt; getIdentityLookupFunction() {
+<span class="nc" id="L407">        final SecurityManager sm = System.getSecurityManager();</span>
+<span class="nc bnc" id="L408" title="All 2 branches missed.">        if (sm != null) {</span>
+<span class="nc" id="L409">            sm.checkPermission(GET_IDENTITY);</span>
+        }
+<span class="nc" id="L411">        return p -&gt; getIdentityPrivileged(p, SecurityRealm.class, SecurityRealm::getRealmIdentity, () -&gt; RealmIdentity.NON_EXISTENT, () -&gt; RealmIdentity.ANONYMOUS);</span>
+    }
+
+    /**
+     * Get a function which can be used to look up principals for update without a security manager permission check.
+     * All returned identities must be {@linkplain RealmIdentity#dispose() disposed}.
+     * Calling with enabled security manager requires {@code getIdentityForUpdate} {@link ElytronPermission}.
+     *
+     * @return the lookup function (not {@code null})
+     * @throws SecurityException if the caller is not authorized to perform the operation
+     */
+    public ExceptionFunction&lt;Principal, ModifiableRealmIdentity, RealmUnavailableException&gt; getIdentityLookupForUpdateFunction() {
+<span class="nc" id="L423">        final SecurityManager sm = System.getSecurityManager();</span>
+<span class="nc bnc" id="L424" title="All 2 branches missed.">        if (sm != null) {</span>
+<span class="nc" id="L425">            sm.checkPermission(GET_IDENTITY_FOR_UPDATE);</span>
+        }
+<span class="nc" id="L427">        return p -&gt; getIdentityPrivileged(p, ModifiableSecurityRealm.class, ModifiableSecurityRealm::getRealmIdentityForUpdate, () -&gt; ModifiableRealmIdentity.NON_EXISTENT, () -&gt; ModifiableRealmIdentity.NON_EXISTENT);</span>
+    }
+
+    &lt;I, R extends SecurityRealm&gt; I getIdentityPrivileged(Principal principal, Class&lt;R&gt; realmType, ExceptionBiFunction&lt;R, Principal, I, RealmUnavailableException&gt; fn, Supplier&lt;I&gt; nonExistent, Supplier&lt;I&gt; anonymous) throws RealmUnavailableException {
+<span class="nc" id="L431">        Assert.checkNotNullParam(&quot;principal&quot;, principal);</span>
+<span class="nc bnc" id="L432" title="All 2 branches missed.">        if (principal instanceof AnonymousPrincipal) {</span>
+<span class="nc" id="L433">            return anonymous.get();</span>
+        }
+<span class="nc bnc" id="L435" title="All 2 branches missed.">        if (principal instanceof RealmNestedPrincipal) {</span>
+<span class="nc" id="L436">            final RealmNestedPrincipal realmNestedPrincipal = (RealmNestedPrincipal) principal;</span>
+<span class="nc" id="L437">            final SecurityRealm securityRealm = getRealmInfo(realmNestedPrincipal.getRealmName()).getSecurityRealm();</span>
+<span class="nc bnc" id="L438" title="All 2 branches missed.">            if (realmType.isInstance(securityRealm)) {</span>
+<span class="nc" id="L439">                return fn.apply(realmType.cast(securityRealm), realmNestedPrincipal.getNestedPrincipal());</span>
+            } else {
+<span class="nc" id="L441">                return nonExistent.get();</span>
+            }
+        }
+<span class="nc" id="L444">        Principal preRealmPrincipal = preRealmPrincipalRewriter.apply(principal);</span>
+<span class="nc bnc" id="L445" title="All 2 branches missed.">        if (preRealmPrincipal == null) {</span>
+<span class="nc" id="L446">            throw log.invalidName();</span>
+        }
+
+<span class="nc" id="L449">        String realmName = mapRealmName(preRealmPrincipal, null);</span>
+<span class="nc" id="L450">        RealmInfo realmInfo = getRealmInfo(realmName);</span>
+<span class="nc" id="L451">        SecurityRealm securityRealm = realmInfo.getSecurityRealm();</span>
+<span class="nc bnc" id="L452" title="All 4 branches missed.">        assert securityRealm != null;</span>
+
+<span class="nc" id="L454">        Principal postRealmPrincipal = postRealmPrincipalRewriter.apply(preRealmPrincipal);</span>
+<span class="nc bnc" id="L455" title="All 2 branches missed.">        if (postRealmPrincipal == null) {</span>
+<span class="nc" id="L456">            throw log.invalidName();</span>
+        }
+
+<span class="nc" id="L459">        Principal realmRewrittenPrincipal = realmInfo.getPrincipalRewriter().apply(postRealmPrincipal);</span>
+<span class="nc bnc" id="L460" title="All 2 branches missed.">        if (realmRewrittenPrincipal == null) {</span>
+<span class="nc" id="L461">            throw log.invalidName();</span>
+        }
+
+<span class="nc" id="L464">        log.tracef(&quot;Principal mapping: [%s], pre-realm rewritten: [%s], realm name: [%s], post realm rewritten: [%s], realm rewritten: [%s]&quot;,</span>
+                principal, preRealmPrincipal, realmName, postRealmPrincipal, realmRewrittenPrincipal);
+
+<span class="nc bnc" id="L467" title="All 2 branches missed.">        if (realmType.isInstance(securityRealm)) {</span>
+<span class="nc" id="L468">            return fn.apply(realmType.cast(securityRealm), realmRewrittenPrincipal);</span>
+        } else {
+<span class="nc" id="L470">            return nonExistent.get();</span>
+        }
+    }
+
+    SecurityRealm getRealm(final String realmName) {
+<span class="nc" id="L475">        return getRealmInfo(realmName).getSecurityRealm();</span>
+    }
+
+    RealmInfo getRealmInfo(final String realmName) {
+<span class="fc" id="L479">        RealmInfo realmInfo = this.realmMap.get(realmName);</span>
+
+<span class="pc bpc" id="L481" title="1 of 2 branches missed.">        if (realmInfo == null) {</span>
+<span class="nc" id="L482">            realmInfo = this.realmMap.get(this.defaultRealmName);</span>
+        }
+<span class="pc bpc" id="L484" title="1 of 2 branches missed.">        if (realmInfo == null) {</span>
+<span class="nc" id="L485">            log.tracef(&quot;Unable to obtain RealmInfo [%s] and no default set - using empty&quot;, realmName);</span>
+<span class="nc" id="L486">            realmInfo = EMPTY_REALM_INFO;</span>
+        }
+<span class="fc" id="L488">        return realmInfo;</span>
+    }
+
+    Collection&lt;RealmInfo&gt; getRealmInfos() {
+<span class="nc" id="L492">        return realmMap.values();</span>
+    }
+
+    /**
+     * Determine whether a credential of the given type and algorithm is definitely obtainable, possibly obtainable (for
+     * some identities), or definitely not obtainable.
+     *
+     * Credential is {@link SupportLevel#SUPPORTED}, if it is supported by all realms of the domain.
+     * Credential is {@link SupportLevel#POSSIBLY_SUPPORTED} if it is supported or possibly supported by at least one realm of the domain.
+     * Otherwise it is {@link SupportLevel#UNSUPPORTED}.
+     *
+     * @param credentialType the exact credential type (must not be {@code null})
+     * @param algorithmName the algorithm name, or {@code null} if any algorithm is acceptable or the credential type does
+     *  not support algorithm names
+     * @param parameterSpec the algorithm parameters to match, or {@code null} if any parameters are acceptable or the credential type
+     *  does not support algorithm parameters
+     * @return the level of support for this credential
+     */
+    public SupportLevel getCredentialAcquireSupport(Class&lt;? extends Credential&gt; credentialType, String algorithmName, AlgorithmParameterSpec parameterSpec) {
+<span class="nc" id="L511">        return getSupportLevel(r -&gt; {</span>
+            try {
+<span class="nc" id="L513">                return r.getCredentialAcquireSupport(credentialType, algorithmName, parameterSpec);</span>
+<span class="nc" id="L514">            } catch (RealmUnavailableException e) {</span>
+<span class="nc" id="L515">                log.trace(&quot;Failed to obtain credential acquire support from realm&quot;, e);</span>
+<span class="nc" id="L516">                return null;</span>
+            }
+        });
+    }
+
+    /**
+     * Determine whether a credential of the given type and algorithm is definitely obtainable, possibly obtainable (for
+     * some identities), or definitely not obtainable.
+     *
+     * Credential is {@link SupportLevel#SUPPORTED}, if it is supported by all realms of the domain.
+     * Credential is {@link SupportLevel#POSSIBLY_SUPPORTED} if it is supported or possibly supported by at least one realm of the domain.
+     * Otherwise it is {@link SupportLevel#UNSUPPORTED}.
+     *
+     * @param credentialType the exact credential type (must not be {@code null})
+     * @param algorithmName the algorithm name, or {@code null} if any algorithm is acceptable or the credential type does
+     *  not support algorithm names
+     * @return the level of support for this credential
+     */
+    public SupportLevel getCredentialAcquireSupport(Class&lt;? extends Credential&gt; credentialType, String algorithmName) {
+<span class="nc" id="L535">        return getCredentialAcquireSupport(credentialType, algorithmName, null);</span>
+    }
+
+    /**
+     * Determine whether a credential of the given type and algorithm is definitely obtainable, possibly obtainable (for
+     * some identities), or definitely not obtainable.
+     *
+     * Credential is {@link SupportLevel#SUPPORTED}, if it is supported by all realms of the domain.
+     * Credential is {@link SupportLevel#POSSIBLY_SUPPORTED} if it is supported or possibly supported by at least one realm of the domain.
+     * Otherwise it is {@link SupportLevel#UNSUPPORTED}.
+     *
+     * @param credentialType the exact credential type (must not be {@code null})
+     * @return the level of support for this credential
+     */
+    public SupportLevel getCredentialAcquireSupport(Class&lt;? extends Credential&gt; credentialType) {
+<span class="nc" id="L550">        return getCredentialAcquireSupport(credentialType, null);</span>
+    }
+
+    /**
+     * Determine whether a given type of evidence is definitely verifiable, possibly verifiable (for some identities),
+     * or definitely not verifiable.
+     *
+     * Evidence is {@link SupportLevel#SUPPORTED}, if it is supported by all realms of the domain.
+     * Evidence is {@link SupportLevel#POSSIBLY_SUPPORTED} if it is supported or possibly supported by at least one realm of the domain.
+     * Otherwise it is {@link SupportLevel#UNSUPPORTED}.
+     *
+     * @param evidenceType the type of evidence to be verified (must not be {@code null})
+     * @param algorithmName the algorithm name, or {@code null} if any algorithm is acceptable or the evidence type does
+     *  not support algorithm names
+     * @return the level of support for this evidence type
+     */
+    public SupportLevel getEvidenceVerifySupport(Class&lt;? extends Evidence&gt; evidenceType, String algorithmName) {
+<span class="nc" id="L567">        return getSupportLevel(r -&gt; {</span>
+            try {
+<span class="nc" id="L569">                return r.getEvidenceVerifySupport(evidenceType, algorithmName);</span>
+<span class="nc" id="L570">            } catch (RealmUnavailableException e) {</span>
+<span class="nc" id="L571">                log.trace(&quot;Failed to obtain evidence verify support from realm&quot;, e);</span>
+<span class="nc" id="L572">                return null;</span>
+            }
+        });
+    }
+
+    /**
+     * Determine whether a given type of evidence is definitely verifiable, possibly verifiable (for some identities),
+     * or definitely not verifiable.
+     *
+     * Evidence is {@link SupportLevel#SUPPORTED}, if it is supported by all realms of the domain.
+     * Evidence is {@link SupportLevel#POSSIBLY_SUPPORTED} if it is supported or possibly supported by at least one realm of the domain.
+     * Otherwise it is {@link SupportLevel#UNSUPPORTED}.
+     *
+     * @param evidenceType the type of evidence to be verified (must not be {@code null})
+     * @return the level of support for this evidence type
+     */
+    public SupportLevel getEvidenceVerifySupport(Class&lt;? extends Evidence&gt; evidenceType) {
+<span class="nc" id="L589">        return getEvidenceVerifySupport(evidenceType, null);</span>
+    }
+
+    private SupportLevel getSupportLevel(final Function&lt;SecurityRealm, SupportLevel&gt; getSupportLevel) {
+        SupportLevel min, max;
+<span class="nc" id="L594">        min = max = null;</span>
+<span class="nc" id="L595">        Iterator&lt;RealmInfo&gt; iterator = realmMap.values().iterator();</span>
+
+<span class="nc bnc" id="L597" title="All 2 branches missed.">        while (iterator.hasNext()) {</span>
+<span class="nc" id="L598">            RealmInfo realmInfo = iterator.next();</span>
+<span class="nc" id="L599">            SecurityRealm realm = realmInfo.getSecurityRealm();</span>
+<span class="nc" id="L600">            final SupportLevel support = getSupportLevel.apply(realm);</span>
+
+<span class="nc bnc" id="L602" title="All 2 branches missed.">            if (support != null) {</span>
+<span class="nc bnc" id="L603" title="All 4 branches missed.">                if (min == null || max == null) {</span>
+<span class="nc" id="L604">                    min = max = support;</span>
+                } else {
+<span class="nc bnc" id="L606" title="All 2 branches missed.">                    if (support.compareTo(min) &lt; 0) { min = support; }</span>
+<span class="nc bnc" id="L607" title="All 2 branches missed.">                    if (support.compareTo(max) &gt; 0) { max = support; }</span>
+                }
+            }
+<span class="nc" id="L610">        }</span>
+
+<span class="nc bnc" id="L612" title="All 4 branches missed.">        if (min == null || max == null) {</span>
+<span class="nc" id="L613">            return SupportLevel.UNSUPPORTED;</span>
+        } else {
+<span class="nc" id="L615">            return minMax(min, max);</span>
+        }
+    }
+
+    private SupportLevel minMax(SupportLevel min, SupportLevel max) {
+<span class="nc bnc" id="L620" title="All 2 branches missed.">        if (min == max) return min;</span>
+<span class="nc bnc" id="L621" title="All 2 branches missed.">        if (max == SupportLevel.UNSUPPORTED) {</span>
+<span class="nc" id="L622">            return SupportLevel.UNSUPPORTED;</span>
+<span class="nc bnc" id="L623" title="All 2 branches missed.">        } else if (min == SupportLevel.SUPPORTED) {</span>
+<span class="nc" id="L624">            return SupportLevel.SUPPORTED;</span>
+        } else {
+<span class="nc" id="L626">            return SupportLevel.POSSIBLY_SUPPORTED;</span>
+        }
+    }
+
+    /**
+     * Get the current security identity for this domain.
+     *
+     * Code can be executed with given identity using {@code SecurityIdentity.runAs*} methods.
+     *
+     * @return the current security identity for this domain (not {@code null})
+     */
+    public SecurityIdentity getCurrentSecurityIdentity() {
+<span class="fc" id="L638">        final SecurityIdentity identity = currentSecurityIdentity.get().get();</span>
+<span class="pc bpc" id="L639" title="1 of 2 branches missed.">        return identity == null ? anonymousIdentity : identity;</span>
+    }
+
+    /**
+     * Get the anonymous security identity for this realm.
+     *
+     * @return the anonymous security identity for this realm (not {@code null})
+     */
+    public SecurityIdentity getAnonymousSecurityIdentity() {
+<span class="fc" id="L648">        return anonymousIdentity;</span>
+    }
+
+    /**
+     * Create an empty ad-hoc identity.  The identity will have no authorization information and no credentials associated
+     * with it.
+     *
+     * @param name the identity name (must not be {@code null})
+     * @return the ad-hoc identity
+     */
+    public SecurityIdentity createAdHocIdentity(String name) {
+<span class="nc" id="L659">        checkNotNullParam(&quot;name&quot;, name);</span>
+<span class="nc" id="L660">        return createAdHocIdentity(new NamePrincipal(name));</span>
+    }
+
+    /**
+     * Create an empty ad-hoc identity.  The identity will have no authorization information and no credentials associated
+     * with it.
+     *
+     * Calling with enabled security manager requires {@code createAdHocIdentity} {@link ElytronPermission}.
+     *
+     * @param principal the identity principal (must not be {@code null})
+     * @return the ad-hoc identity
+     */
+    public SecurityIdentity createAdHocIdentity(Principal principal) {
+<span class="fc" id="L673">        checkNotNullParam(&quot;principal&quot;, principal);</span>
+<span class="fc" id="L674">        final SecurityManager sm = System.getSecurityManager();</span>
+<span class="pc bpc" id="L675" title="1 of 2 branches missed.">        if (sm != null) {</span>
+<span class="nc" id="L676">            sm.checkPermission(CREATE_AD_HOC_IDENTITY);</span>
+        }
+<span class="fc" id="L678">        return new SecurityIdentity(this, principal, EMPTY_REALM_INFO, AuthorizationIdentity.EMPTY, emptyMap(), IdentityCredentials.NONE, IdentityCredentials.NONE);</span>
+    }
+
+    Supplier&lt;SecurityIdentity&gt; getAndSetCurrentSecurityIdentity(Supplier&lt;SecurityIdentity&gt; newIdentity) {
+        try {
+<span class="fc" id="L683">            final Supplier&lt;SecurityIdentity&gt; oldIdentity = currentSecurityIdentity.get();</span>
+<span class="pc bpc" id="L684" title="1 of 2 branches missed.">            return oldIdentity == null ? anonymousIdentity : oldIdentity;</span>
+        } finally {
+<span class="pc bpc" id="L686" title="1 of 2 branches missed.">            if (newIdentity == anonymousIdentity) {</span>
+<span class="nc" id="L687">                currentSecurityIdentity.remove();</span>
+            } else {
+<span class="fc" id="L689">                currentSecurityIdentity.set(newIdentity);</span>
+            }
+        }
+    }
+
+    void setCurrentSecurityIdentity(Supplier&lt;SecurityIdentity&gt; newIdentity) {
+<span class="pc bpc" id="L695" title="1 of 2 branches missed.">        if (newIdentity == anonymousIdentity) {</span>
+<span class="fc" id="L696">            currentSecurityIdentity.remove();</span>
+        } else {
+<span class="nc" id="L698">            currentSecurityIdentity.set(newIdentity);</span>
+        }
+<span class="fc" id="L700">    }</span>
+
+    Roles mapRoles(SecurityIdentity securityIdentity) {
+<span class="fc" id="L703">        Assert.checkNotNullParam(&quot;securityIdentity&quot;, securityIdentity);</span>
+
+<span class="fc" id="L705">        AuthorizationIdentity identity = securityIdentity.getAuthorizationIdentity();</span>
+<span class="fc" id="L706">        RealmInfo realmInfo = securityIdentity.getRealmInfo();</span>
+
+        // zeroth role mapping, just grab roles from the identity
+<span class="fc" id="L709">        Roles decodedRoles = realmInfo.getRoleDecoder().decodeRoles(identity);</span>
+
+        // determine roles based on any runtime attributes associated with the identity
+<span class="fc" id="L712">        Roles domainDecodedRoles = securityIdentity.getSecurityDomain().getRoleDecoder().decodeRoles(identity);</span>
+<span class="fc" id="L713">        Roles combinedRoles = decodedRoles.or(domainDecodedRoles);</span>
+
+        // apply the first level mapping, which is based on the role mapper associated with a realm.
+<span class="fc" id="L716">        Roles realmMappedRoles = realmInfo.getRoleMapper().mapRoles(combinedRoles);</span>
+
+        // apply the second level mapping, which is based on the role mapper associated with this security domain.
+<span class="fc" id="L719">        Roles domainMappedRoles = roleMapper.mapRoles(realmMappedRoles);</span>
+
+<span class="pc bpc" id="L721" title="1 of 2 branches missed.">        if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L722">            log.tracef(&quot;Role mapping: principal [%s] -&gt; decoded roles [%s] -&gt; domain decoded roles [%s] -&gt; realm mapped roles [%s] -&gt; domain mapped roles [%s]&quot;,</span>
+<span class="nc" id="L723">                    securityIdentity.getPrincipal(), String.join(&quot;, &quot;, decodedRoles), String.join(&quot;, &quot;, domainDecodedRoles), String.join(&quot;, &quot;, realmMappedRoles), String.join(&quot;, &quot;, domainMappedRoles));</span>
+        }
+
+<span class="fc" id="L726">        return domainMappedRoles;</span>
+    }
+
+    PermissionVerifier mapPermissions(final SecurityIdentity securityIdentity) {
+<span class="fc" id="L730">        Assert.checkNotNullParam(&quot;securityIdentity&quot;, securityIdentity);</span>
+<span class="fc" id="L731">        final Roles roles = securityIdentity.getRoles();</span>
+<span class="fc" id="L732">        PermissionVerifier verifier = permissionMapper.mapPermissions(securityIdentity, roles);</span>
+
+<span class="pc bpc" id="L734" title="1 of 2 branches missed.">        if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L735">            return (permission) -&gt; {</span>
+<span class="nc" id="L736">                boolean decision = verifier.implies(permission);</span>
+<span class="nc" id="L737">                log.tracef(&quot;Permission mapping: identity [%s] with roles [%s] implies %s = %b&quot;,</span>
+<span class="nc" id="L738">                        securityIdentity.getPrincipal(), String.join(&quot;, &quot;, roles), permission, decision);</span>
+<span class="nc" id="L739">                return decision;</span>
+            };
+        } else {
+<span class="fc" id="L742">            return verifier;</span>
+        }
+    }
+
+    Function&lt;Principal, Principal&gt; getPreRealmRewriter() {
+<span class="fc" id="L747">        return preRealmPrincipalRewriter;</span>
+    }
+
+    String mapRealmName(final Principal principal, final Evidence evidence) {
+<span class="nc" id="L751">        String realm = realmMapper.getRealmMapping(principal, evidence);</span>
+<span class="nc bnc" id="L752" title="All 2 branches missed.">        return realm != null ? realm : defaultRealmName;</span>
+    }
+
+    String getDefaultRealmName() {
+<span class="fc" id="L756">        return defaultRealmName;</span>
+    }
+
+    RealmMapper getRealmMapper() {
+<span class="fc" id="L760">        return realmMapper;</span>
+    }
+
+    Function&lt;Principal, Principal&gt; getPostRealmRewriter() {
+<span class="fc" id="L764">        return postRealmPrincipalRewriter;</span>
+    }
+
+    RoleMapper getRoleMapper() {
+<span class="nc" id="L768">        return roleMapper;</span>
+    }
+
+    Map&lt;String, RoleMapper&gt; getCategoryRoleMappers() {
+<span class="fc" id="L772">        return categoryRoleMappers;</span>
+    }
+
+    SecurityIdentity transform(final SecurityIdentity securityIdentity) {
+<span class="fc" id="L776">        Assert.checkNotNullParam(&quot;securityIdentity&quot;, securityIdentity);</span>
+<span class="fc" id="L777">        return Assert.assertNotNull(securityIdentityTransformer.apply(securityIdentity));</span>
+    }
+
+    boolean trustsDomain(final SecurityDomain domain) {
+<span class="nc" id="L781">        Assert.checkNotNullParam(&quot;domain&quot;, domain);</span>
+<span class="nc bnc" id="L782" title="All 4 branches missed.">        return this == domain || trustedSecurityDomain.test(domain);</span>
+    }
+
+    /**
+     * Handle a {@link SecurityEvent}.
+     *
+     * Calling with enabled security manager requires {@code handleSecurityEvent} {@link ElytronPermission}.
+     *
+     * @param securityEvent {@link SecurityEvent} to be handled
+     * @see Builder#setSecurityEventListener(Consumer)
+     */
+    public void handleSecurityEvent(final SecurityEvent securityEvent) {
+<span class="fc" id="L794">        final SecurityManager sm = System.getSecurityManager();</span>
+<span class="pc bpc" id="L795" title="1 of 2 branches missed.">        if (sm != null) {</span>
+<span class="nc" id="L796">            sm.checkPermission(HANDLE_SECURITY_EVENT);</span>
+        }
+<span class="pc bpc" id="L798" title="1 of 2 branches missed.">        if (!securityEvent.getSecurityIdentity().getSecurityDomain().equals(this)) {</span>
+<span class="nc" id="L799">            log.securityEventIdentityWrongDomain();</span>
+        }
+<span class="fc" id="L801">        this.securityEventListener.accept(securityEvent);</span>
+<span class="fc" id="L802">    }</span>
+
+    static void safeHandleSecurityEvent(final SecurityDomain domain, final SecurityEvent event) {
+<span class="fc" id="L805">        checkNotNullParam(&quot;domain&quot;, domain);</span>
+<span class="fc" id="L806">        checkNotNullParam(&quot;event&quot;, event);</span>
+        try {
+<span class="fc" id="L808">            domain.handleSecurityEvent(event);</span>
+<span class="nc" id="L809">        } catch (Exception e) {</span>
+<span class="nc" id="L810">            log.eventHandlerFailed(e);</span>
+<span class="fc" id="L811">        }</span>
+<span class="fc" id="L812">    }</span>
+
+    Function&lt;Evidence, Principal&gt; getEvidenceDecoder() {
+<span class="nc" id="L815">        return evidenceDecoder;</span>
+    }
+
+    RoleDecoder getRoleDecoder() {
+<span class="fc" id="L819">        return roleDecoder;</span>
+    }
+
+    /**
+     * A builder for creating new security domains.
+     */
+    public static final class Builder {
+<span class="fc" id="L826">        private boolean built = false;</span>
+
+<span class="fc" id="L828">        private final HashMap&lt;String, RealmBuilder&gt; realms = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L829">        private Function&lt;Principal, Principal&gt; preRealmRewriter = Function.identity();</span>
+<span class="fc" id="L830">        private Function&lt;Principal, Principal&gt; principalDecoder = Function.identity();</span>
+<span class="fc" id="L831">        private Function&lt;Principal, Principal&gt; postRealmRewriter = Function.identity();</span>
+        private String defaultRealmName;
+<span class="fc" id="L833">        private RealmMapper realmMapper = RealmMapper.DEFAULT_REALM_MAPPER;</span>
+<span class="fc" id="L834">        private RoleMapper roleMapper = RoleMapper.IDENTITY_ROLE_MAPPER;</span>
+<span class="fc" id="L835">        private PermissionMapper permissionMapper = PermissionMapper.EMPTY_PERMISSION_MAPPER;</span>
+<span class="fc" id="L836">        private Map&lt;String, RoleMapper&gt; categoryRoleMappers = emptyMap();</span>
+<span class="fc" id="L837">        private UnaryOperator&lt;SecurityIdentity&gt; securityIdentityTransformer = UnaryOperator.identity();</span>
+<span class="pc" id="L838">        private Predicate&lt;SecurityDomain&gt; trustedSecurityDomain = domain -&gt; false;</span>
+<span class="fc" id="L839">        private Consumer&lt;SecurityEvent&gt; securityEventListener = e -&gt; {};</span>
+<span class="pc" id="L840">        private Function&lt;Evidence, Principal&gt; evidenceDecoder = evidence -&gt; evidence.getDefaultPrincipal();</span>
+<span class="fc" id="L841">        private RoleDecoder roleDecoder = RoleDecoder.EMPTY;</span>
+
+<span class="fc" id="L843">        Builder() {</span>
+<span class="fc" id="L844">        }</span>
+
+        /**
+         * Sets a pre-realm name rewriter, which rewrites the authentication name before a realm is selected.
+         *
+         * @param rewriter the name rewriter (must not be {@code null})
+         * @return this builder
+         */
+        public Builder setPreRealmRewriter(NameRewriter rewriter) {
+<span class="nc" id="L853">            return setPreRealmRewriter(rewriter.asPrincipalRewriter());</span>
+        }
+
+        /**
+         * Sets a pre-realm name rewriter, which rewrites the authentication name before a realm is selected.
+         *
+         * @param rewriter the name rewriter (must not be {@code null})
+         * @return this builder
+         */
+        public Builder setPreRealmRewriter(final Function&lt;Principal, Principal&gt; rewriter) {
+<span class="nc" id="L863">            Assert.checkNotNullParam(&quot;rewriter&quot;, rewriter);</span>
+<span class="nc" id="L864">            assertNotBuilt();</span>
+<span class="nc" id="L865">            this.preRealmRewriter = rewriter;</span>
+<span class="nc" id="L866">            return this;</span>
+        }
+
+        /**
+         * Sets a post-realm name rewriter, which rewrites the authentication name after a realm is selected.
+         *
+         * @param rewriter the name rewriter (must not be {@code null})
+         * @return this builder
+         */
+        public Builder setPostRealmRewriter(NameRewriter rewriter) {
+<span class="nc" id="L876">            return setPostRealmRewriter(rewriter.asPrincipalRewriter());</span>
+        }
+
+        /**
+         * Sets a post-realm name rewriter, which rewrites the authentication name after a realm is selected.
+         *
+         * @param rewriter the name rewriter (must not be {@code null})
+         * @return this builder
+         */
+        public Builder setPostRealmRewriter(Function&lt;Principal, Principal&gt; rewriter) {
+<span class="nc" id="L886">            Assert.checkNotNullParam(&quot;rewriter&quot;, rewriter);</span>
+<span class="nc" id="L887">            assertNotBuilt();</span>
+<span class="nc" id="L888">            this.postRealmRewriter = rewriter;</span>
+
+<span class="nc" id="L890">            return this;</span>
+        }
+
+        /**
+         * Set the realm mapper for this security domain, which selects a realm based on the authentication name.
+         *
+         * @param realmMapper the realm mapper (must not be {@code null})
+         * @return this builder
+         */
+        public Builder setRealmMapper(RealmMapper realmMapper) {
+<span class="nc" id="L900">            Assert.checkNotNullParam(&quot;realmMapper&quot;, realmMapper);</span>
+<span class="nc" id="L901">            assertNotBuilt();</span>
+<span class="nc" id="L902">            this.realmMapper = realmMapper;</span>
+
+<span class="nc" id="L904">            return this;</span>
+        }
+
+        /**
+         * Set the role mapper for this security domain, which will be used to perform the last mapping before
+         * returning the roles associated with an identity obtained from this security domain.
+         *
+         * @param roleMapper the role mapper (must not be {@code null})
+         * @return this builder
+         */
+        public Builder setRoleMapper(RoleMapper roleMapper) {
+<span class="fc" id="L915">            Assert.checkNotNullParam(&quot;roleMapper&quot;, roleMapper);</span>
+<span class="fc" id="L916">            assertNotBuilt();</span>
+<span class="fc" id="L917">            this.roleMapper = roleMapper;</span>
+<span class="fc" id="L918">            return this;</span>
+        }
+
+        /**
+         * Set the permission mapper for this security domain, which will be used to obtain and map permissions based on the
+         * identities from this security domain.
+         *
+         * @param permissionMapper the permission mapper (must not be {@code null})
+         * @return this builder
+         */
+        public Builder setPermissionMapper(PermissionMapper permissionMapper) {
+<span class="fc" id="L929">            Assert.checkNotNullParam(&quot;permissionMapper&quot;, permissionMapper);</span>
+<span class="fc" id="L930">            assertNotBuilt();</span>
+<span class="fc" id="L931">            this.permissionMapper = permissionMapper;</span>
+<span class="fc" id="L932">            return this;</span>
+        }
+
+        /**
+         * Set the principal decoder for this security domain, which will be used to convert {@link Principal} objects
+         * into names for handling in the realm.
+         *
+         * @param principalDecoder the principal decoder (must not be {@code null})
+         * @return this builder
+         */
+        public Builder setPrincipalDecoder(PrincipalDecoder principalDecoder) {
+<span class="nc" id="L943">            Assert.checkNotNullParam(&quot;principalDecoder&quot;, principalDecoder);</span>
+<span class="nc" id="L944">            assertNotBuilt();</span>
+<span class="nc" id="L945">            this.principalDecoder = principalDecoder.asPrincipalRewriter();</span>
+<span class="nc" id="L946">            return this;</span>
+        }
+
+        /**
+         * Add a realm to this security domain.
+         *
+         * @param name the realm's name in this configuration
+         * @param realm the realm
+         * @return the new realm builder
+         */
+        public RealmBuilder addRealm(String name, SecurityRealm realm) {
+<span class="fc" id="L957">            Assert.checkNotNullParam(&quot;name&quot;, name);</span>
+<span class="fc" id="L958">            Assert.checkNotNullParam(&quot;realm&quot;, realm);</span>
+<span class="fc" id="L959">            assertNotBuilt();</span>
+<span class="fc" id="L960">            final RealmBuilder realmBuilder = new RealmBuilder(this, name, realm);</span>
+<span class="fc" id="L961">            return realmBuilder;</span>
+        }
+
+        Builder addRealm(RealmBuilder realmBuilder) {
+<span class="fc" id="L965">            realms.put(realmBuilder.getName(), realmBuilder);</span>
+
+<span class="fc" id="L967">            return this;</span>
+        }
+
+        /**
+         * Get the default realm name.
+         *
+         * @return the default realm name
+         */
+        public String getDefaultRealmName() {
+<span class="nc" id="L976">            return defaultRealmName;</span>
+        }
+
+        /**
+         * Set the default realm name.
+         *
+         * @param defaultRealmName the default realm name (must not be {@code null})
+         */
+        public Builder setDefaultRealmName(final String defaultRealmName) {
+<span class="fc" id="L985">            Assert.checkNotNullParam(&quot;defaultRealmName&quot;, defaultRealmName);</span>
+<span class="fc" id="L986">            assertNotBuilt();</span>
+<span class="fc" id="L987">            this.defaultRealmName = defaultRealmName;</span>
+
+<span class="fc" id="L989">            return this;</span>
+        }
+
+        /**
+         * Get the category role mapper map.
+         *
+         * @return the category role mapper map
+         */
+        public Map&lt;String, RoleMapper&gt; getCategoryRoleMappers() {
+<span class="nc" id="L998">            return categoryRoleMappers;</span>
+        }
+
+        /**
+         * Set the category role mapper map.
+         *
+         * @param categoryRoleMappers the category role mapper map (must not be {@code null})
+         */
+        public void setCategoryRoleMappers(final Map&lt;String, RoleMapper&gt; categoryRoleMappers) {
+<span class="nc" id="L1007">            Assert.checkNotNullParam(&quot;categoryRoleMappers&quot;, categoryRoleMappers);</span>
+<span class="nc" id="L1008">            this.categoryRoleMappers = categoryRoleMappers;</span>
+<span class="nc" id="L1009">        }</span>
+
+        /**
+         * Set the security identity transformer to use.  The transformer must not return {@code null}, or authentication
+         * will fail.
+         *
+         * @param securityIdentityTransformer the security identity transformer to use (must not be {@code null})
+         * @return this builder
+         */
+        public Builder setSecurityIdentityTransformer(UnaryOperator&lt;SecurityIdentity&gt; securityIdentityTransformer) {
+<span class="nc" id="L1019">            Assert.checkNotNullParam(&quot;securityIdentityTransformer&quot;, securityIdentityTransformer);</span>
+<span class="nc" id="L1020">            this.securityIdentityTransformer = securityIdentityTransformer;</span>
+<span class="nc" id="L1021">            return this;</span>
+        }
+
+        /**
+         * Set the predicate that should be used to determine if a given domain is trusted by this domain.
+         *
+         * @param trustedSecurityDomain the predicate that should be used to determine if a given domain is
+         *                              trusted by this domain (must not be {@code null})
+         */
+        public Builder setTrustedSecurityDomainPredicate(final Predicate&lt;SecurityDomain&gt; trustedSecurityDomain) {
+<span class="nc" id="L1031">            Assert.checkNotNullParam(&quot;trustedSecurityDomain&quot;, trustedSecurityDomain);</span>
+<span class="nc" id="L1032">            this.trustedSecurityDomain = trustedSecurityDomain;</span>
+<span class="nc" id="L1033">            return this;</span>
+        }
+
+        /**
+         * Set the security event listener that will consume all {@link SecurityEvent} instances emitted but the domain.
+         *
+         * @param securityEventListener the security event listener that will consume all {@link SecurityEvent} instances emitted but the domain.
+         * @return this builder
+         */
+        public Builder setSecurityEventListener(final Consumer&lt;SecurityEvent&gt; securityEventListener) {
+<span class="nc" id="L1043">            this.securityEventListener = Assert.checkNotNullParam(&quot;securityEventListener&quot;, securityEventListener);</span>
+<span class="nc" id="L1044">            return this;</span>
+        }
+
+        /**
+         * Set the evidence decoder for this security domain which will be used to extract the principal from the given
+         * {@link Evidence}.
+         *
+         * @param evidenceDecoder the evidence decoder (must not be {@code null})
+         * @return this builder
+         * @since 1.10.0
+         */
+        public Builder setEvidenceDecoder(EvidenceDecoder evidenceDecoder) {
+<span class="nc" id="L1056">            Assert.checkNotNullParam(&quot;evidenceDecoder&quot;, evidenceDecoder);</span>
+<span class="nc" id="L1057">            assertNotBuilt();</span>
+<span class="nc" id="L1058">            this.evidenceDecoder = evidenceDecoder;</span>
+<span class="nc" id="L1059">            return this;</span>
+        }
+
+        /**
+         * Set the role decoder for this security domain.
+         *
+         * @param roleDecoder the role decoder (must not be {@code null})
+         * @return this builder
+         * @since 1.11.0
+         */
+        public Builder setRoleDecoder(RoleDecoder roleDecoder) {
+<span class="nc" id="L1070">            Assert.checkNotNullParam(&quot;roleDecoder&quot;, roleDecoder);</span>
+<span class="nc" id="L1071">            assertNotBuilt();</span>
+<span class="nc" id="L1072">            this.roleDecoder = roleDecoder;</span>
+<span class="nc" id="L1073">            return this;</span>
+        }
+
+        /**
+         * Construct this security domain.
+         *
+         * Construction requires {@code createSecurityDomain} {@link ElytronPermission}.
+         *
+         * @return the new security domain
+         */
+        public SecurityDomain build() {
+<span class="fc" id="L1084">            final SecurityManager sm = System.getSecurityManager();</span>
+<span class="pc bpc" id="L1085" title="1 of 2 branches missed.">            if (sm != null) {</span>
+<span class="nc" id="L1086">                sm.checkPermission(CREATE_SECURITY_DOMAIN);</span>
+            }
+
+<span class="fc" id="L1089">            final LinkedHashMap&lt;String, RealmInfo&gt; realmMap = new LinkedHashMap&lt;&gt;(realms.size());</span>
+
+<span class="fc bfc" id="L1091" title="All 2 branches covered.">            for (RealmBuilder realmBuilder : realms.values()) {</span>
+<span class="fc" id="L1092">                realmMap.put(realmBuilder.getName(), new RealmInfo(realmBuilder));</span>
+<span class="fc" id="L1093">            }</span>
+<span class="pc bpc" id="L1094" title="2 of 4 branches missed.">            if (defaultRealmName != null &amp;&amp; !realmMap.containsKey(defaultRealmName)) {</span>
+<span class="nc" id="L1095">                throw log.realmMapDoesNotContainDefault(defaultRealmName);</span>
+            }
+
+<span class="fc" id="L1098">            assertNotBuilt();</span>
+<span class="fc" id="L1099">            built = true;</span>
+
+<span class="pc bpc" id="L1101" title="1 of 2 branches missed.">            if(log.isTraceEnabled()) {</span>
+<span class="nc" id="L1102">                log.tracef(&quot;Building security domain with defaultRealmName %s.&quot;, defaultRealmName);</span>
+<span class="nc bnc" id="L1103" title="All 2 branches missed.">                if(realmMap.size() &gt; 1) {</span>
+<span class="nc" id="L1104">                    log.tracef(&quot;The following additional realms were added: %s.&quot;, realmMap.keySet().toString());</span>
+                }
+            }
+
+<span class="fc" id="L1108">            return new SecurityDomain(this, realmMap);</span>
+        }
+
+        void assertNotBuilt() {
+<span class="pc bpc" id="L1112" title="1 of 2 branches missed.">            if (built) {</span>
+<span class="nc" id="L1113">                throw log.builderAlreadyBuilt();</span>
+            }
+<span class="fc" id="L1115">        }</span>
+    }
+
+    /**
+     * A builder for a realm within a security domain.
+     */
+    public static class RealmBuilder {
+
+        private final Builder parent;
+        private final String name;
+        private final SecurityRealm realm;
+<span class="fc" id="L1126">        private RoleMapper roleMapper = RoleMapper.IDENTITY_ROLE_MAPPER;</span>
+<span class="fc" id="L1127">        private Function&lt;Principal, Principal&gt; principalRewriter = Function.identity();</span>
+<span class="fc" id="L1128">        private RoleDecoder roleDecoder = RoleDecoder.DEFAULT;</span>
+<span class="fc" id="L1129">        private boolean built = false;</span>
+
+<span class="fc" id="L1131">        RealmBuilder(final Builder parent, final String name, final SecurityRealm realm) {</span>
+<span class="fc" id="L1132">            this.parent = parent;</span>
+<span class="fc" id="L1133">            this.name = name;</span>
+<span class="fc" id="L1134">            this.realm = realm;</span>
+<span class="fc" id="L1135">        }</span>
+
+        /**
+         * Get the realm name.
+         *
+         * @return the realm name (not {@code null})
+         */
+        public String getName() {
+<span class="fc" id="L1143">            return name;</span>
+        }
+
+        /**
+         * Get the security realm.
+         *
+         * @return the security realm (not {@code null})
+         */
+        public SecurityRealm getRealm() {
+<span class="fc" id="L1152">            return realm;</span>
+        }
+
+        /**
+         * Get the role mapper.
+         *
+         * @return the role mapper (not {@code null})
+         */
+        public RoleMapper getRoleMapper() {
+<span class="fc" id="L1161">            return roleMapper;</span>
+        }
+
+        /**
+         * Set the role mapper.
+         *
+         * @param roleMapper the role mapper (may not be {@code null})
+         */
+        public RealmBuilder setRoleMapper(final RoleMapper roleMapper) {
+<span class="fc" id="L1170">            assertNotBuilt();</span>
+<span class="fc" id="L1171">            Assert.checkNotNullParam(&quot;roleMapper&quot;, roleMapper);</span>
+<span class="fc" id="L1172">            this.roleMapper = roleMapper;</span>
+
+<span class="fc" id="L1174">            return this;</span>
+        }
+
+        /**
+         * Get the name rewriter.
+         *
+         * @return the name rewriter (not {@code null})
+         */
+        public Function&lt;Principal, Principal&gt; getPrincipalRewriter() {
+<span class="fc" id="L1183">            return principalRewriter;</span>
+        }
+
+        /**
+         * Set the name rewriter.
+         *
+         * @param principalRewriter the name rewriter (may not be {@code null})
+         */
+        public RealmBuilder setPrincipalRewriter(final Function&lt;Principal, Principal&gt; principalRewriter) {
+<span class="nc" id="L1192">            Assert.checkNotNullParam(&quot;principalRewriter&quot;, principalRewriter);</span>
+<span class="nc" id="L1193">            assertNotBuilt();</span>
+<span class="nc" id="L1194">            this.principalRewriter = principalRewriter;</span>
+
+<span class="nc" id="L1196">            return this;</span>
+        }
+
+        @Deprecated
+        public RealmBuilder setNameRewriter(final NameRewriter nameRewriter) {
+<span class="nc" id="L1201">            return setPrincipalRewriter(nameRewriter.asPrincipalRewriter());</span>
+        }
+
+        /**
+         * Get the role decoder.
+         *
+         * @return the role decoder (not {@code null})
+         */
+        public RoleDecoder getRoleDecoder() {
+<span class="fc" id="L1210">            return roleDecoder;</span>
+        }
+
+        /**
+         * Set the role decoder.
+         *
+         * @param roleDecoder the role decoder (may not be {@code null})
+         */
+        public RealmBuilder setRoleDecoder(final RoleDecoder roleDecoder) {
+<span class="nc" id="L1219">            Assert.checkNotNullParam(&quot;roleDecoder&quot;, roleDecoder);</span>
+<span class="nc" id="L1220">            assertNotBuilt();</span>
+<span class="nc" id="L1221">            this.roleDecoder = roleDecoder;</span>
+
+<span class="nc" id="L1223">            return this;</span>
+        }
+
+        /**
+         * Constructs this realm info and adds it into the domain.
+         *
+         * @return the security domain builder
+         */
+        public Builder build() {
+<span class="fc" id="L1232">            assertNotBuilt();</span>
+<span class="fc" id="L1233">            return parent.addRealm(this);</span>
+        }
+
+        private void assertNotBuilt() {
+<span class="fc" id="L1237">            parent.assertNotBuilt();</span>
+<span class="pc bpc" id="L1238" title="1 of 2 branches missed.">            if (built) {</span>
+<span class="nc" id="L1239">                throw log.builderAlreadyBuilt();</span>
+            }
+<span class="fc" id="L1241">        }</span>
+    }
+
+    private static class ScheduledExecutorServiceProvider {
+
+<span class="nc" id="L1246">        private static final ScheduledThreadPoolExecutor INSTANCE = new ScheduledThreadPoolExecutor(1, runnable -&gt; {</span>
+            // use daemon thread
+<span class="nc" id="L1248">            Thread thread = Executors.defaultThreadFactory().newThread(runnable);</span>
+<span class="nc" id="L1249">            thread.setDaemon(true);</span>
+<span class="nc" id="L1250">            return thread;</span>
+        });
+
+        static {
+<span class="nc" id="L1254">            INSTANCE.setRemoveOnCancelPolicy(true);</span>
+<span class="nc" id="L1255">            INSTANCE.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);</span>
+<span class="nc" id="L1256">        }</span>
+    }
+
+    /**
+     * Gets {@link ScheduledExecutorService} for authentication related scheduled task (like authentication timeout).
+     *
+     * @return the executor service
+     */
+    public static ScheduledExecutorService getScheduledExecutorService() {
+<span class="nc" id="L1265">        return ScheduledExecutorServiceProvider.INSTANCE;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

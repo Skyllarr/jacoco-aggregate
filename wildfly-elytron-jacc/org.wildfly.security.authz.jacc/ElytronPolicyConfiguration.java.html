@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronPolicyConfiguration.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-jacc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.authz.jacc</a> &gt; <span class="el_source">ElytronPolicyConfiguration.java</span></div><h1>ElytronPolicyConfiguration.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source
+ *
+ * Copyright 2015 Red Hat, Inc. and/or its affiliates.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.authz.jacc;
+
+import javax.security.jacc.PolicyConfiguration;
+import javax.security.jacc.PolicyContextException;
+import java.security.Permission;
+import java.security.PermissionCollection;
+import java.security.Permissions;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Set;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+import static org.wildfly.security.authz.jacc.ElytronMessages.log;
+
+/**
+ * {@link javax.security.jacc.PolicyConfiguration} implementation.
+ *
+ * @author &lt;a href=&quot;mailto:psilva@redhat.com&quot;&gt;Pedro Igor&lt;/a&gt;
+ * @see org.wildfly.security.authz.jacc.ElytronPolicyConfigurationFactory
+ */
+class ElytronPolicyConfiguration implements PolicyConfiguration {
+
+    /**
+     * An enum with all the possible states accordingly with the specification.
+     */
+<span class="fc" id="L46">    enum State {</span>
+<span class="fc" id="L47">        OPEN,</span>
+<span class="fc" id="L48">        IN_SERVICE,</span>
+<span class="fc" id="L49">        DELETED</span>
+    }
+
+    private final String contextId;
+<span class="fc" id="L53">    private final Map&lt;String, Permissions&gt; rolePermissions = Collections.synchronizedMap(new HashMap&lt;&gt;());</span>
+<span class="fc" id="L54">    private State state = State.OPEN; // needs synchronization</span>
+<span class="fc" id="L55">    private volatile Permissions uncheckedPermissions = new Permissions(); // atomic reference + synchronized inside</span>
+<span class="fc" id="L56">    private volatile Permissions excludedPermissions = new Permissions(); // atomic reference + synchronized inside</span>
+<span class="fc" id="L57">    private volatile Set&lt;PolicyConfiguration&gt; linkedPolicies = Collections.synchronizedSet(new LinkedHashSet&lt;&gt;()); // atomic reference</span>
+
+<span class="fc" id="L59">    ElytronPolicyConfiguration(String contextID) {</span>
+<span class="fc" id="L60">        checkNotNullParam(&quot;contextID&quot;, contextID);</span>
+<span class="fc" id="L61">        this.contextId = contextID;</span>
+<span class="fc" id="L62">    }</span>
+
+    @Override
+    public void addToExcludedPolicy(Permission permission) throws PolicyContextException {
+<span class="fc" id="L66">        checkNotNullParam(&quot;permission&quot;, permission);</span>
+
+<span class="fc" id="L68">        synchronized (this) { // prevents state change while adding</span>
+<span class="fc" id="L69">            checkIfInOpenState();</span>
+<span class="fc" id="L70">            this.excludedPermissions.add(permission);</span>
+<span class="fc" id="L71">        }</span>
+<span class="fc" id="L72">    }</span>
+
+    @Override
+    public void addToExcludedPolicy(PermissionCollection permissions) throws PolicyContextException {
+<span class="nc" id="L76">        checkNotNullParam(&quot;permissions&quot;, permissions);</span>
+
+<span class="nc" id="L78">        Enumeration&lt;Permission&gt; elements = permissions.elements();</span>
+
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        while (elements.hasMoreElements()) {</span>
+<span class="nc" id="L81">            addToExcludedPolicy(elements.nextElement());</span>
+        }
+<span class="nc" id="L83">    }</span>
+
+    @Override
+    public void addToRole(String roleName, Permission permission) throws PolicyContextException {
+<span class="fc" id="L87">        checkNotNullParam(&quot;roleName&quot;, roleName);</span>
+<span class="fc" id="L88">        checkNotNullParam(&quot;permission&quot;, permission);</span>
+
+<span class="fc" id="L90">        synchronized (this) { // prevents state change while adding</span>
+<span class="fc" id="L91">            checkIfInOpenState();</span>
+<span class="fc" id="L92">            this.rolePermissions.computeIfAbsent(roleName, s -&gt; new Permissions()).add(permission);</span>
+<span class="fc" id="L93">        }</span>
+<span class="fc" id="L94">    }</span>
+
+    @Override
+    public void addToRole(String roleName, PermissionCollection permissions) throws PolicyContextException {
+<span class="nc" id="L98">        checkNotNullParam(&quot;roleName&quot;, roleName);</span>
+<span class="nc" id="L99">        checkNotNullParam(&quot;permissions&quot;, permissions);</span>
+
+<span class="nc" id="L101">        Enumeration&lt;Permission&gt; elements = permissions.elements();</span>
+
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        while (elements.hasMoreElements()) {</span>
+<span class="nc" id="L104">            addToRole(roleName, elements.nextElement());</span>
+        }
+<span class="nc" id="L106">    }</span>
+
+    @Override
+    public void addToUncheckedPolicy(Permission permission) throws PolicyContextException {
+<span class="fc" id="L110">        checkNotNullParam(&quot;permission&quot;, permission);</span>
+
+<span class="fc" id="L112">        synchronized (this) { // prevents state change while adding</span>
+<span class="fc" id="L113">            checkIfInOpenState();</span>
+<span class="fc" id="L114">            this.uncheckedPermissions.add(permission);</span>
+<span class="fc" id="L115">        }</span>
+<span class="fc" id="L116">    }</span>
+
+    @Override
+    public void addToUncheckedPolicy(PermissionCollection permissions) throws PolicyContextException {
+<span class="nc" id="L120">        checkNotNullParam(&quot;permissions&quot;, permissions);</span>
+
+<span class="nc" id="L122">        Enumeration&lt;Permission&gt; elements = permissions.elements();</span>
+
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        while (elements.hasMoreElements()) {</span>
+<span class="nc" id="L125">            addToUncheckedPolicy(elements.nextElement());</span>
+        }
+<span class="nc" id="L127">    }</span>
+
+    @Override
+    public void commit() throws PolicyContextException {
+<span class="fc" id="L131">        synchronized (this) { // prevents concurrent state changes</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">            if (isDeleted()) {</span>
+<span class="fc" id="L133">                throw log.authzInvalidStateForOperation(this.state.name());</span>
+            }
+
+<span class="fc" id="L136">            transitionTo(State.IN_SERVICE);</span>
+<span class="fc" id="L137">        }</span>
+<span class="fc" id="L138">    }</span>
+
+    @Override
+    public void delete() throws PolicyContextException {
+<span class="fc" id="L142">        synchronized (this) { // prevents concurrent state changes</span>
+<span class="fc" id="L143">            transitionTo(State.DELETED);</span>
+<span class="fc" id="L144">            this.uncheckedPermissions = new Permissions();</span>
+<span class="fc" id="L145">            this.excludedPermissions = new Permissions();</span>
+<span class="fc" id="L146">            this.rolePermissions.clear();</span>
+<span class="fc" id="L147">            this.linkedPolicies.remove(this);</span>
+<span class="fc" id="L148">        }</span>
+<span class="fc" id="L149">    }</span>
+
+    @Override
+    public String getContextID() throws PolicyContextException {
+<span class="nc" id="L153">        return this.contextId;</span>
+    }
+
+    @Override
+    public boolean inService() {
+<span class="fc" id="L158">        synchronized (this) {</span>
+<span class="fc" id="L159">            return State.IN_SERVICE.equals(this.state);</span>
+        }
+    }
+
+    @Override
+    public void linkConfiguration(PolicyConfiguration link) throws PolicyContextException {
+<span class="fc" id="L165">        checkNotNullParam(&quot;link&quot;, link);</span>
+
+<span class="fc" id="L167">        synchronized (this) { // prevents concurrent state changes</span>
+<span class="nc" id="L168">            checkIfInOpenState();</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">            if (getContextID().equals(link.getContextID())) {</span>
+<span class="nc" id="L170">                throw log.authzLinkSamePolicyConfiguration(getContextID());</span>
+            }
+
+<span class="nc" id="L173">            this.linkedPolicies.add(this);</span>
+
+<span class="nc bnc" id="L175" title="All 2 branches missed.">            if (!this.linkedPolicies.add(link)) {</span>
+<span class="nc" id="L176">                return;</span>
+            }
+
+<span class="nc" id="L179">            ElytronPolicyConfiguration linkedPolicyConfiguration = (ElytronPolicyConfiguration) link;</span>
+
+<span class="nc" id="L181">            linkedPolicyConfiguration.linkConfiguration(this);</span>
+            // policies share the same set of linked policies, so we can remove policies from the set when they are deleted.
+<span class="nc" id="L183">            this.linkedPolicies = linkedPolicyConfiguration.getLinkedPolicies();</span>
+<span class="nc" id="L184">        }</span>
+<span class="nc" id="L185">    }</span>
+
+    @Override
+    public void removeExcludedPolicy() throws PolicyContextException {
+<span class="fc" id="L189">        synchronized (this) { // prevents concurrent state changes</span>
+<span class="nc" id="L190">            checkIfInOpenState();</span>
+<span class="nc" id="L191">            this.excludedPermissions = new Permissions();</span>
+<span class="nc" id="L192">        }</span>
+<span class="nc" id="L193">    }</span>
+
+    @Override
+    public void removeRole(String roleName) throws PolicyContextException {
+<span class="fc" id="L197">        checkNotNullParam(&quot;roleName&quot;, roleName);</span>
+<span class="fc" id="L198">        checkNotNullParam(&quot;roleName&quot;, roleName);</span>
+
+<span class="fc" id="L200">        synchronized (this) { // prevents concurrent state changes</span>
+<span class="nc" id="L201">            checkIfInOpenState();</span>
+<span class="nc" id="L202">            this.rolePermissions.remove(roleName);</span>
+<span class="nc" id="L203">        }</span>
+<span class="nc" id="L204">    }</span>
+
+    @Override
+    public void removeUncheckedPolicy() throws PolicyContextException {
+<span class="fc" id="L208">        synchronized (this) { // prevents concurrent state changes</span>
+<span class="nc" id="L209">            checkIfInOpenState();</span>
+<span class="nc" id="L210">            this.uncheckedPermissions = new Permissions();</span>
+<span class="nc" id="L211">        }</span>
+<span class="nc" id="L212">    }</span>
+
+    Set&lt;PolicyConfiguration&gt; getLinkedPolicies() {
+<span class="nc" id="L215">        return this.linkedPolicies; // volatile/atomic reference - no synchronization needed</span>
+    }
+
+    Permissions getUncheckedPermissions() {
+<span class="fc" id="L219">        return this.uncheckedPermissions; // volatile/atomic reference - no synchronization needed</span>
+    }
+
+    Permissions getExcludedPermissions() {
+<span class="fc" id="L223">        return this.excludedPermissions; // volatile/atomic reference - no synchronization needed</span>
+    }
+
+    Map&lt;String, Permissions&gt; getRolePermissions() {
+<span class="fc" id="L227">        return this.rolePermissions;</span>
+    }
+
+    /* must not be called outside of synchronized(this) section */
+    void transitionTo(State state) {
+<span class="fc" id="L232">        this.state = state;</span>
+<span class="fc" id="L233">    }</span>
+
+    /* must not be called outside of synchronized(this) section */
+    private void checkIfInOpenState() {
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        if (!State.OPEN.equals(this.state)) {</span>
+<span class="fc" id="L238">            throw log.authzInvalidStateForOperation(this.state.name());</span>
+        }
+<span class="fc" id="L240">    }</span>
+
+    /* must not be called outside of synchronized(this) section */
+    private boolean isDeleted() {
+<span class="fc" id="L244">        return State.DELETED.equals(this.state);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

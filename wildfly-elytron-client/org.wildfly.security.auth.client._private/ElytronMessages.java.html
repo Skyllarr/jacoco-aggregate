@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-client</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.client._private</a> &gt; <span class="el_source">ElytronMessages.java</span></div><h1>ElytronMessages.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.client._private;
+
+import static org.jboss.logging.Logger.Level.WARN;
+
+import java.io.IOException;
+import java.security.NoSuchAlgorithmException;
+
+import javax.xml.namespace.QName;
+import javax.xml.stream.Location;
+import javax.xml.stream.XMLStreamReader;
+
+import org.jboss.logging.BasicLogger;
+import org.jboss.logging.Logger;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.LogMessage;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageLogger;
+import org.jboss.logging.annotations.Param;
+
+import org.jboss.logging.annotations.ValidIdRange;
+import org.jboss.logging.annotations.ValidIdRanges;
+import org.wildfly.client.config.ConfigXMLParseException;
+import org.wildfly.client.config.ConfigurationXMLStreamReader;
+import org.wildfly.client.config.XMLLocation;
+
+/**
+ * Log messages and exceptions for Elytron.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+@MessageLogger(projectCode = &quot;ELY&quot;, length = 5)
+@ValidIdRanges({
+        @ValidIdRange(min = 1001, max = 1002),
+        @ValidIdRange(min = 1028, max = 1029),
+        @ValidIdRange(min = 1035, max = 1036),
+        @ValidIdRange(min = 1041, max = 1041),
+        @ValidIdRange(min = 1064, max = 1064),
+        @ValidIdRange(min = 1091, max = 1091),
+        @ValidIdRange(min = 1129, max = 1144),
+        @ValidIdRange(min = 1159, max = 1159),
+        @ValidIdRange(min = 1162, max = 1164),
+        @ValidIdRange(min = 1166, max = 1166),
+        @ValidIdRange(min = 2034, max = 2034),
+        @ValidIdRange(min = 2010, max = 2010),
+        @ValidIdRange(min = 4005, max = 4005),
+        @ValidIdRange(min = 4028, max = 4028),
+        @ValidIdRange(min = 9501, max = 9503),
+        @ValidIdRange(min = 9527, max = 9527),
+        @ValidIdRange(min = 9529, max = 9529),
+        @ValidIdRange(min = 14000, max = 14999)
+})
+public interface ElytronMessages extends BasicLogger {
+
+<span class="fc" id="L73">    ElytronMessages log = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security&quot;);</span>
+<span class="fc" id="L74">    ElytronMessages xmlLog = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.xml&quot;);</span>
+
+    @Message(id = 1001, value = &quot;No module found for identifier \&quot;%s\&quot;&quot;)
+    ConfigXMLParseException xmlNoModuleFound(@Param XMLStreamReader reader, @Cause Exception e,
+            String moduleIdentifier);
+
+    @Message(id = 1002, value = &quot;Invalid port number \&quot;%s\&quot; specified for attribute \&quot;%s\&quot; of element \&quot;%s\&quot;; expected a numerical value between 1 and 65535 (inclusive)&quot;)
+    ConfigXMLParseException xmlInvalidPortNumber(@Param XMLStreamReader reader, String attributeValue,
+            String attributeName, QName elementName);
+
+    @Message(id = 1028, value = &quot;Invalid port number \&quot;%d\&quot;&quot;)
+    IllegalArgumentException invalidPortNumber(int port);
+
+    @Message(id = 1029, value = &quot;Invalid host specification \&quot;%s\&quot;&quot;)
+    IllegalArgumentException invalidHostSpec(String hostSpec);
+
+    @Message(id = 1035, value = &quot;Unable to create key manager&quot;)
+    IOException unableToCreateKeyManager(@Cause Exception e);
+
+    @Message(id = 1036, value = &quot;Unable to create trust manager&quot;)
+    IOException unableToCreateTrustManager(@Cause Exception e);
+
+    @Message(id = 1041, value = &quot;Could not obtain credential&quot;)
+    RuntimeException couldNotObtainCredential();
+
+    @Message(id = 1064, value = &quot;Invalid identity name&quot;)
+    IllegalArgumentException invalidName();
+
+    @LogMessage(level = WARN)
+    @Message(id = 1091, value = &quot;Post-association peer context action failed&quot;)
+    void postAssociationFailed(@Cause Throwable cause);
+
+    @Message(id = 1129, value = &quot;Unknown SSL context \&quot;%s\&quot; specified&quot;)
+    ConfigXMLParseException xmlUnknownSslContextSpecified(@Param Location location, String name);
+
+    @Message(id = 1130, value = &quot;Duplicate SSL context name \&quot;%s\&quot;&quot;)
+    ConfigXMLParseException xmlDuplicateSslContextName(String name, @Param ConfigurationXMLStreamReader reader);
+
+    @Message(id = 1132, value = &quot;Unknown authentication configuration \&quot;%s\&quot; specified&quot;)
+    ConfigXMLParseException xmlUnknownAuthenticationConfigurationSpecified(@Param Location location, String name);
+
+    @Message(id = 1133, value = &quot;Failed to create credential&quot;)
+    ConfigXMLParseException xmlFailedToCreateCredential(@Param Location location, @Cause Throwable cause);
+
+    @Message(id = 1134, value = &quot;Duplicate authentication configuration name \&quot;%s\&quot;&quot;)
+    ConfigXMLParseException xmlDuplicateAuthenticationConfigurationName(String name,
+            @Param ConfigurationXMLStreamReader reader);
+
+    @Message(id = 1135, value = &quot;Failed to load keystore data&quot;)
+    ConfigXMLParseException xmlFailedToLoadKeyStoreData(@Param Location location, @Cause Throwable cause);
+
+    @Message(id = 1136, value = &quot;Failed to create keystore&quot;)
+    ConfigXMLParseException xmlFailedToCreateKeyStore(@Param Location location, @Cause Throwable cause);
+
+    @Message(id = 1137, value = &quot;Invalid key store entry type for alias \&quot;%s\&quot; (expected %s, got %s)&quot;)
+    ConfigXMLParseException xmlInvalidKeyStoreEntryType(@Param Location location, String alias, Class&lt;?&gt; expectedClass,
+            Class&lt;?&gt; actualClass);
+
+    @Message(id = 1139, value = &quot;Failed to create credential store&quot;)
+    ConfigXMLParseException xmlFailedToCreateCredentialStore(@Param Location location, @Cause Throwable cause);
+
+    @Message(id = 1140, value = &quot;Wrong PEM content type; expected %s, actually was %s&quot;)
+    ConfigXMLParseException xmlWrongPemType(@Param ConfigurationXMLStreamReader reader, Class&lt;?&gt; expected,
+            Class&lt;?&gt; actual);
+
+    @Message(id = 1141, value = &quot;No PEM content found&quot;)
+    ConfigXMLParseException xmlNoPemContent(@Param ConfigurationXMLStreamReader reader);
+
+    @Message(id = 1143, value = &quot;Invalid URL [%s]&quot;)
+    ConfigXMLParseException xmlInvalidUrl(String url);
+
+    @Message(id = 1159, value = &quot;Key store entry for alias \&quot;%s\&quot; is missing.&quot;)
+    ConfigXMLParseException keyStoreEntryMissing(@Param Location location, String alias);
+
+    @Message(id = 1162, value = &quot;Invalid GSS mechanism name \&quot;%s\&quot; - unable to convert to mechanism OID&quot;)
+    ConfigXMLParseException xmlInvalidGssMechanismName(@Param XMLStreamReader reader, String mechanismName);
+
+    @Message(id = 1163, value = &quot;Mechanism OID conversion from string \&quot;%s\&quot; failed&quot;)
+    ConfigXMLParseException xmlGssMechanismOidConversionFailed(@Param XMLStreamReader reader, String mechanismOid,
+            @Cause Throwable cause);
+
+    @Message(id = 1164, value = &quot;Unable to identify provider name=%s, for service type=%s, algorithm=%s&quot;)
+    ConfigXMLParseException xmlUnableToIdentifyProvider(@Param Location location, String providerName,
+            String serviceType, String algorithm);
+
+    @LogMessage(level = WARN)
+    @Message(id = 1166, value = &quot;%2$s: Element \&quot;%1$s\&quot; is deprecated&quot;)
+    void xmlDeprecatedElement(String name, XMLLocation location);
+
+    @Message(id = 2034, value = &quot;Alias must be specified if more than one entry exist in keystore&quot;)
+    ConfigXMLParseException missingAlias(@Param Location location);
+
+    @Message(id = 2010, value = &quot;Unknown key store specified&quot;)
+    ConfigXMLParseException xmlUnknownKeyStoreSpecified(@Param Location location);
+
+    @Message(id = 4005, value = &quot;No default trust manager available&quot;)
+    NoSuchAlgorithmException noDefaultTrustManager();
+
+    @Message(id = 4028, value = &quot;No default key manager available&quot;)
+    NoSuchAlgorithmException noDefaultKeyManager();
+
+    @Message(id = 9501, value = &quot;Duplicate attribute (\&quot;%s\&quot;) found in configuration.&quot;)
+    ConfigXMLParseException duplicateAttributeFound(@Param XMLStreamReader reader, String attribute);
+
+    @Message(id = 9502, value = &quot;Duplicate credential store name found in configuration \&quot;%s\&quot;&quot;)
+    ConfigXMLParseException duplicateCredentialStoreName(@Param XMLStreamReader reader, String storeName);
+
+    @Message(id = 9503, value = &quot;Credential store name \&quot;%s\&quot; not defined&quot;)
+    ConfigXMLParseException xmlCredentialStoreNameNotDefined(@Param Location location, String storeName);
+
+    @Message(id = 9527, value = &quot;Invalid credential store reference&quot;)
+    ConfigXMLParseException xmlInvalidCredentialStoreRef(@Param Location location);
+
+    @Message(id = 9529, value = &quot;Unsupported algorithm \&quot;%s\&quot; for %s type&quot;)
+    ConfigXMLParseException xmlUnsupportedAlgorithmForType(@Param Location location, String algorithm, String type);
+
+    @Message(id = 14000, value = &quot;At least one of the '%s' and '%s' cipher-suite attributes must be provided&quot;)
+    ConfigXMLParseException atLeastOneCipherSuiteAttributeMustBeProvided(String attribute1, String attribute2);
+
+    @Message(id = 14001, value = &quot;Wrong Key content type; expected OpenSSH private key&quot;)
+    ConfigXMLParseException xmlInvalidOpenSSHKey(@Param ConfigurationXMLStreamReader reader);
+
+    @Message(id = 14002, value = &quot;Unable to obtain SSLContext&quot;)
+    ConfigXMLParseException unableToObtainSslContext();
+
+    @Message(id = 14003, value = &quot;Name callback handling was unsuccessful&quot;)
+    ConfigXMLParseException nameCallbackHandlingWasUnsuccessful();
+
+    @Message(id = 14004, value = &quot;Password callback handling was unsuccessful&quot;)
+    ConfigXMLParseException passwordCallbackHandlingWasUnsuccessful();
+
+    @Message(id = 14005, value = &quot;Default SSL context in security provider creates infinite loop&quot;)
+    NoSuchAlgorithmException sslContextForSecurityProviderCreatesInfiniteLoop();
+
+    @Message(id = 14006, value = &quot;Configuration file path passed to WildFlyElytronClientDefaultSSLContextProvider not found&quot;)
+    IllegalArgumentException clientConfigurationFileNotFound();
+
+    @Message(id = 14007, value = &quot;Invalid path passed to WildFlyElytronClientDefaultSSLContextProvider&quot;)
+    IllegalArgumentException clientConfigurationFileNotValid();
+
+    @Message(id = 14008, value = &quot;WildFlyElytronClientDefaultSSLContextProvider could not obtain client default SSLContext&quot;)
+    NoSuchAlgorithmException couldNotObtainClientDefaultSSLContext();
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

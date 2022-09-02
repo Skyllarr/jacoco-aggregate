@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DigestQuote.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-mechanism-digest</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.mechanism.digest</a> &gt; <span class="el_source">DigestQuote.java</span></div><h1>DigestQuote.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.mechanism.digest;
+
+import org.wildfly.common.bytes.ByteStringBuilder;
+
+/**
+ * Utility class used to convert string to quoted strings
+ *
+ * @author &lt;a href=&quot;mailto:pskopek@redhat.com&quot;&gt;Peter Skopek&lt;/a&gt;
+ *
+ */
+public class DigestQuote {
+
+    private static final char QUOTE = '\\';
+
+    private DigestQuote() {
+    }
+
+    private static boolean quoteNeeded(char ch) {
+<span class="nc bnc" id="L37" title="All 14 branches missed.">        return</span>
+                ch == '&quot;' || // escape char
+                ch == QUOTE || // quote
+                ch == 127 || // DEL
+
+                // 0 &lt;= ch &lt;= 31 except CR, LF and TAB
+                (ch &lt;= 31 &amp;&amp; ch != 13 &amp;&amp; ch != 10 &amp;&amp; ch != 9);
+    }
+
+    /**
+     * Creates new String quoted by SASL rules.
+     *
+     * @param inputStr String to be quoted
+     * @return
+     */
+    public static String quote(String inputStr) {
+<span class="nc" id="L53">        int len = inputStr.length();</span>
+<span class="nc" id="L54">        StringBuilder sb = new StringBuilder(len);</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L56">            char ch = inputStr.charAt(i);</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">            if (quoteNeeded(ch)) {</span>
+<span class="nc" id="L58">                sb.append(QUOTE).append(ch);</span>
+            }
+            else {
+<span class="nc" id="L61">                sb.append(ch);</span>
+            }
+        }
+<span class="nc" id="L64">        return sb.toString();</span>
+    }
+
+    public static byte[] quote(byte[] input) {
+<span class="nc" id="L68">        ByteStringBuilder bsb = new ByteStringBuilder();</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        for (int i = 0; i &lt; input.length; i++) {</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">            if (quoteNeeded((char)input[i])) {</span>
+<span class="nc" id="L71">              bsb.append(QUOTE);</span>
+<span class="nc" id="L72">              bsb.append(input, i, 1);</span>
+            }
+            else {
+<span class="nc" id="L75">                bsb.append(input, i, 1);</span>
+            }
+        }
+<span class="nc" id="L78">        return bsb.toArray();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

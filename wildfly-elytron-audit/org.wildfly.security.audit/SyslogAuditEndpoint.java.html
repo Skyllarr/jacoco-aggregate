@@ -1,0 +1,370 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SyslogAuditEndpoint.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-audit</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.audit</a> &gt; <span class="el_source">SyslogAuditEndpoint.java</span></div><h1>SyslogAuditEndpoint.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2017 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.audit;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+import static org.wildfly.security.audit.ElytronMessages.audit;
+
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.PortUnreachableException;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
+import java.util.logging.ErrorManager;
+import java.util.logging.Level;
+
+import org.jboss.logmanager.ExtLogRecord;
+import org.jboss.logmanager.handlers.SyslogHandler;
+import org.jboss.logmanager.handlers.SyslogHandler.Facility;
+import org.jboss.logmanager.handlers.SyslogHandler.Protocol;
+import org.jboss.logmanager.handlers.TcpOutputStream;
+
+import javax.net.SocketFactory;
+
+/**
+ * An audit endpoint that logs to syslog server.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public class SyslogAuditEndpoint implements AuditEndpoint {
+
+<span class="nc" id="L46">    private volatile boolean accepting = true;</span>
+
+    private final SyslogHandler syslogHandler;
+    private final TransportErrorManager errorManager;
+    private final SyslogHandler.Protocol protocol;
+    private final int maxReconnectAttempts;
+    private final TcpOutputStream tcpOutputStream;
+    private static final int INFINITE_RECONNECT_ATTEMPTS_OVERFLOW_NUMBER;
+    static {
+<span class="nc" id="L55">        INFINITE_RECONNECT_ATTEMPTS_OVERFLOW_NUMBER = AccessController.doPrivileged(new PrivilegedAction&lt;Integer&gt;() {</span>
+            @Override
+            public Integer run() {
+<span class="nc" id="L58">                return Integer.parseInt(System.getProperty(&quot;wildfly.elytron.infinite.reconnect.attempts.overflow.number&quot;, &quot;10000&quot;));</span>
+            }
+        });
+<span class="nc" id="L61">    }</span>
+<span class="nc" id="L62">    private int currentReconnectAttempts = 0;</span>
+
+    /**
+     * Creates a new audit endpoint that logs to syslog server.
+     */
+<span class="nc" id="L67">    SyslogAuditEndpoint(Builder builder) throws IOException {</span>
+<span class="nc" id="L68">        maxReconnectAttempts = builder.maxReconnectAttempts;</span>
+<span class="nc bnc" id="L69" title="All 4 branches missed.">        protocol = builder.ssl ? Protocol.SSL_TCP : builder.tcp ? Protocol.TCP : Protocol.UDP;</span>
+<span class="nc" id="L70">        syslogHandler = new SyslogHandler(checkNotNullParam(&quot;serverAddress&quot;, builder.serverAddress), builder.port, Facility.SECURITY,</span>
+<span class="nc" id="L71">                builder.format, protocol, checkNotNullParam(&quot;hostName&quot;, builder.hostName));</span>
+
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        if (builder.tcp) {</span>
+            // This is not the ideal way to handle it, but with the current state of the log manager we need to keep an
+            // accurate count of the failures. We'll use our own TcpOutputStream so we can use the
+            // TcpOutputStream.isConnected() method to determine if the stream is connected or not.
+<span class="nc bnc" id="L77" title="All 2 branches missed.">            if (builder.socketFactory != null) {</span>
+<span class="nc" id="L78">                tcpOutputStream = new TcpOutputStream(builder.socketFactory, builder.serverAddress, builder.port) {</span>
+                    // anonymous class to access protected constructor
+                };
+            } else {
+<span class="nc" id="L82">                tcpOutputStream = new TcpOutputStream(builder.serverAddress, builder.port);</span>
+            }
+<span class="nc" id="L84">            syslogHandler.setOutputStream(tcpOutputStream);</span>
+        } else {
+<span class="nc" id="L86">            tcpOutputStream = null;</span>
+        }
+<span class="nc" id="L88">        errorManager = new TransportErrorManager(protocol);</span>
+<span class="nc" id="L89">        syslogHandler.setErrorManager(errorManager);</span>
+<span class="nc" id="L90">        accept(EventPriority.INFORMATIONAL, &quot;Elytron audit logging enabled with RFC format: &quot; + builder.format);</span>
+<span class="nc" id="L91">    }</span>
+
+    @Override
+    public void accept(EventPriority priority, String message) throws IOException {
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        if (!accepting) return;</span>
+
+<span class="nc" id="L97">        synchronized (this) {</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            if (!accepting) return;</span>
+            // Ensure that the handler stops trying to connect if the thread is interrupted
+<span class="nc bnc" id="L100" title="All 2 branches missed.">            if (Thread.currentThread().isInterrupted()) {</span>
+<span class="nc" id="L101">                syslogHandler.close();</span>
+<span class="nc" id="L102">                return;</span>
+            }
+            try {
+<span class="nc" id="L105">                tryPublish(priority, message);</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">                if (tcpOutputStream == null) {</span>
+                    // This must be a UDP stream so we can assume a successful message was sent and reset the reconnect
+                    // attempts.
+<span class="nc" id="L109">                    currentReconnectAttempts = 0;</span>
+                } else {
+                    // If the TCP stream is now connected we can reset the reconnect attempts.
+<span class="nc bnc" id="L112" title="All 2 branches missed.">                    if (tcpOutputStream.isConnected()) {</span>
+<span class="nc" id="L113">                        currentReconnectAttempts = 0;</span>
+                    } else {
+<span class="nc" id="L115">                        checkAttempts();</span>
+                    }
+                }
+<span class="nc" id="L118">            } catch (IOException e) {</span>
+<span class="nc" id="L119">                checkAttempts();</span>
+                // TcpOutputStream has its' own reconnect handler, so just throw the error
+<span class="nc bnc" id="L121" title="All 2 branches missed.">                if (protocol != Protocol.UDP) {</span>
+<span class="nc" id="L122">                    throw e;</span>
+                }
+
+                // Infinite reconnect attempts so just eat the error
+<span class="nc" id="L126">                audit.tracef(e, &quot;Unable to send message on %d try.&quot;,  currentReconnectAttempts);</span>
+<span class="nc" id="L127">            }</span>
+<span class="nc" id="L128">        }</span>
+<span class="nc" id="L129">    }</span>
+
+    private void checkAttempts() throws IOException {
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        if (accepting) {</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">            if (currentReconnectAttempts == maxReconnectAttempts) {</span>
+<span class="nc" id="L134">                close();</span>
+<span class="nc" id="L135">                throw audit.syslogMaximumReconnectAttemptsReached(currentReconnectAttempts);</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">            } else if (maxReconnectAttempts != -1) {</span>
+                // Reconnect attempts are less than max so eat the error
+<span class="nc" id="L138">                currentReconnectAttempts++;</span>
+            } else {
+<span class="nc bnc" id="L140" title="All 2 branches missed.">                if (currentReconnectAttempts &lt; INFINITE_RECONNECT_ATTEMPTS_OVERFLOW_NUMBER) {</span>
+<span class="nc" id="L141">                    currentReconnectAttempts++;</span>
+                }
+            }
+        }
+<span class="nc" id="L145">    }</span>
+
+    /**
+     * Gets the current amount of reconnect attempts, with -1 signifying that the value for infinite reconnect attempts
+     * case has overflowed the maximum allowed amount
+     *
+     * @return The current reconnect attempts, or -1 if the maximum tracked value for infinite attempts has overflowed
+     */
+    public int getAttempts() {
+<span class="nc bnc" id="L154" title="All 2 branches missed.">        if (maxReconnectAttempts != -1) {</span>
+<span class="nc" id="L155">            return currentReconnectAttempts;</span>
+        } else {
+<span class="nc bnc" id="L157" title="All 2 branches missed.">            return currentReconnectAttempts == INFINITE_RECONNECT_ATTEMPTS_OVERFLOW_NUMBER ? -1 : currentReconnectAttempts;</span>
+        }
+    }
+
+    private static Level toLevel(EventPriority eventPriority) {
+<span class="nc bnc" id="L162" title="All 5 branches missed.">        switch (eventPriority) {</span>
+            case ALERT:
+            case EMERGENCY:
+            case CRITICAL:
+            case ERROR:
+<span class="nc" id="L167">                return Level.SEVERE;</span>
+            case WARNING:
+<span class="nc" id="L169">                return Level.WARNING;</span>
+            case INFORMATIONAL:
+<span class="nc" id="L171">                return Level.INFO;</span>
+            case OFF:
+<span class="nc" id="L173">                throw audit.invalidEventPriority(eventPriority);</span>
+            default:
+<span class="nc" id="L175">                return Level.FINEST;</span>
+        }
+    }
+
+    @Override
+    public void close() throws IOException {
+<span class="nc" id="L181">        accepting = false;</span>
+
+<span class="nc" id="L183">        synchronized(this) {</span>
+<span class="nc" id="L184">            syslogHandler.close();</span>
+<span class="nc" id="L185">        }</span>
+<span class="nc" id="L186">    }</span>
+
+    /**
+     * Obtain a new {@link Builder} capable of building a {@link SyslogAuditEndpoint}.
+     *
+     * @return a new {@link Builder} capable of building a {@link SyslogAuditEndpoint}.
+     */
+    public static Builder builder() {
+<span class="nc" id="L194">        return new Builder();</span>
+    }
+
+    /**
+     * A builder for syslog audit endpoint.
+     */
+    public static class Builder {
+
+        private InetAddress serverAddress;
+        private int port;
+<span class="nc" id="L204">        private boolean ssl = false;</span>
+<span class="nc" id="L205">        private boolean tcp = true;</span>
+        private String hostName;
+<span class="nc" id="L207">        private SocketFactory socketFactory = null;</span>
+<span class="nc" id="L208">        private SyslogHandler.SyslogType format = SyslogHandler.SyslogType.RFC5424;</span>
+<span class="nc" id="L209">        private int maxReconnectAttempts = 0;</span>
+
+<span class="nc" id="L211">        Builder() {</span>
+<span class="nc" id="L212">        }</span>
+
+        /**
+         * Set the server address syslog messages should be sent to.
+         *
+         * @param serverAddress the server address syslog messages should be sent to.
+         * @return this builder.
+         */
+        public Builder setServerAddress(InetAddress serverAddress) {
+<span class="nc" id="L221">            this.serverAddress = checkNotNullParam(&quot;serverAddress&quot;, serverAddress);</span>
+
+<span class="nc" id="L223">            return this;</span>
+        }
+
+        /**
+         * Set the port the syslog server is listening on.
+         *
+         * @param port the port the syslog server is listening on.
+         * @return this builder.
+         */
+        public Builder setPort(int port) {
+<span class="nc" id="L233">            this.port = port;</span>
+
+<span class="nc" id="L235">            return this;</span>
+        }
+
+        /**
+         * Set if the communication should be using TCP.
+         *
+         * @param tcp if the communication should be using TCP.
+         * @return this builder.
+         */
+        public Builder setTcp(boolean tcp) {
+<span class="nc" id="L245">            this.tcp = tcp;</span>
+
+<span class="nc" id="L247">            return this;</span>
+        }
+
+        /**
+         * Set if the communication should be using SSL.
+         *
+         * @param ssl if the communication should be using SSL.
+         * @return this builder.
+         */
+        public Builder setSsl(boolean ssl) {
+<span class="nc" id="L257">            this.ssl = ssl;</span>
+
+<span class="nc" id="L259">            return this;</span>
+        }
+
+        /**
+         * Set {@link SocketFactory} for TCP connections - usually to provide configured {@link javax.net.ssl.SSLSocketFactory}.
+         *
+         * @param socketFactory the {@link SocketFactory} or {@code null} for default {@link SocketFactory}.
+         * @return this builder.
+         */
+        public Builder setSocketFactory(SocketFactory socketFactory) {
+<span class="nc" id="L269">            this.socketFactory = socketFactory;</span>
+
+<span class="nc" id="L271">            return this;</span>
+        }
+
+        /**
+         * Set the host name that should be sent within the syslog messages.
+         *
+         * @param hostName the host name that should be sent within the syslog messages.
+         * @return this builder.
+         */
+        public Builder setHostName(String hostName) {
+<span class="nc" id="L281">            this.hostName = checkNotNullParam(&quot;hostName&quot;, hostName);</span>
+
+<span class="nc" id="L283">            return this;</span>
+        }
+
+        /**
+         * Sets the SyslogFormat that will be used.
+         *
+         * @param format The SyslogFormat that should be used
+         * @return this builder.
+         */
+        public Builder setFormat(SyslogHandler.SyslogType format) {
+<span class="nc" id="L293">            this.format = checkNotNullParam(&quot;format&quot;, format);</span>
+
+<span class="nc" id="L295">            return this;</span>
+        }
+
+        /**
+         * Sets the amount of reconnect-attempts that will be used.
+         *
+         * @param maxReconnectAttempts The maximum number of reconnect-attempts attempts with:
+         * -1 meaning indefinite attempts
+         * 0 meaning no attempts
+         * Any positive integer meaning that number of attempts
+         * @exception IllegalArgumentException throws an error in the case of a bad reconnect-attempts value of &amp;lt; -1
+         * @return this builder.
+         */
+        public Builder setMaxReconnectAttempts(int maxReconnectAttempts) throws IllegalArgumentException {
+<span class="nc bnc" id="L309" title="All 2 branches missed.">            if (maxReconnectAttempts &lt; -1) {</span>
+<span class="nc" id="L310">                throw audit.badReconnectAttemptsNumber(maxReconnectAttempts);</span>
+            }
+<span class="nc" id="L312">            this.maxReconnectAttempts = maxReconnectAttempts;</span>
+
+<span class="nc" id="L314">            return this;</span>
+        }
+
+        /**
+         * Build a new {@link AuditEndpoint} configured to pass all messages using Syslog.
+         *
+         * @return a new {@link AuditEndpoint} configured to pass all messages using Syslog.
+         * @throws IOException if an error occurs initialising the endpoint.
+         */
+        public AuditEndpoint build() throws IOException {
+<span class="nc" id="L324">            return new SyslogAuditEndpoint(this);</span>
+        }
+
+    }
+
+    private class TransportErrorManager extends ErrorManager {
+        private volatile Exception error;
+        private Protocol transport;
+
+<span class="nc" id="L333">        public TransportErrorManager(Protocol transport) {</span>
+<span class="nc" id="L334">            this.transport = transport;</span>
+<span class="nc" id="L335">        }</span>
+
+        @Override
+        public synchronized void error(String msg, Exception ex, int code) {
+<span class="nc" id="L339">            error = ex;</span>
+<span class="nc" id="L340">        }</span>
+
+        void getAndThrowError() throws IOException {
+<span class="nc" id="L343">            Exception error = this.error;</span>
+<span class="nc" id="L344">            this.error = null;</span>
+
+<span class="nc bnc" id="L346" title="All 2 branches missed.">            if (error != null) {</span>
+<span class="nc" id="L347">                throwAsIoOrRuntimeException(error);</span>
+            }
+<span class="nc" id="L349">        }</span>
+
+        void throwAsIoOrRuntimeException(Throwable t) throws IOException {
+<span class="nc bnc" id="L352" title="All 4 branches missed.">            if (t instanceof PortUnreachableException &amp;&amp; transport == Protocol.UDP) {</span>
+<span class="nc" id="L353">                throw audit.udpPortUnavailable(t.getCause());</span>
+            }
+<span class="nc bnc" id="L355" title="All 2 branches missed.">            if (t instanceof IOException) {</span>
+<span class="nc" id="L356">                throw (IOException)t;</span>
+            }
+<span class="nc bnc" id="L358" title="All 2 branches missed.">            if (t instanceof RuntimeException) {</span>
+<span class="nc" id="L359">                throw (RuntimeException)t;</span>
+            }
+<span class="nc" id="L361">            throw new RuntimeException(t);</span>
+        }
+    }
+
+    private void tryPublish(EventPriority priority, String message) throws IOException {
+<span class="nc" id="L366">        syslogHandler.doPublish(new ExtLogRecord(toLevel(priority), message, SyslogAuditEndpoint.class.getName()));</span>
+<span class="nc" id="L367">        errorManager.getAndThrowError();</span>
+<span class="nc" id="L368">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

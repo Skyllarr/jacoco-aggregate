@@ -1,0 +1,362 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages_$logger.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-realm-ldap</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.realm.ldap</a> &gt; <span class="el_source">ElytronMessages_$logger.java</span></div><h1>ElytronMessages_$logger.java</h1><pre class="source lang-java linenums">package org.wildfly.security.auth.realm.ldap;
+
+import java.util.Locale;
+import java.lang.IllegalStateException;
+import java.io.Serializable;
+import javax.annotation.Generated;
+import org.jboss.logging.DelegatingBasicLogger;
+import org.wildfly.security.auth.server.RealmUnavailableException;
+import java.lang.String;
+import org.jboss.logging.Logger;
+import java.lang.Exception;
+import java.lang.RuntimeException;
+import org.jboss.logging.BasicLogger;
+import java.lang.Throwable;
+import javax.naming.NamingException;
+import java.security.spec.InvalidKeySpecException;
+import java.util.Arrays;
+import java.lang.IllegalArgumentException;
+
+
+import static org.jboss.logging.Logger.Level.INFO;
+import static org.jboss.logging.Logger.Level.WARN;
+
+/**
+ * Warning this class consists of generated code.
+ */
+@Generated(value = &quot;org.jboss.logging.processor.generator.model.MessageLoggerImplementor&quot;, date = &quot;2022-09-02T20:22:20+0200&quot;)
+public class ElytronMessages_$logger extends DelegatingBasicLogger implements ElytronMessages, BasicLogger, Serializable {
+    private static final long serialVersionUID = 1L;
+<span class="nc" id="L30">    private static final String FQCN = ElytronMessages_$logger.class.getName();</span>
+    public ElytronMessages_$logger(final Logger log) {
+<span class="nc" id="L32">        super(log);</span>
+<span class="nc" id="L33">    }</span>
+<span class="nc" id="L34">    private static final Locale LOCALE = Locale.ROOT;</span>
+    protected Locale getLoggingLocale() {
+<span class="nc" id="L36">        return LOCALE;</span>
+    }
+    protected String emptyParameter$str() {
+<span class="nc" id="L39">        return &quot;ELY00002: Parameter %s is empty&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException emptyParameter(final String parameter) {
+<span class="nc" id="L43">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), emptyParameter$str(), parameter));</span>
+<span class="nc" id="L44">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L45">        return result;</span>
+    }
+    private static void _copyStackTraceMinusOne(final Throwable e) {
+<span class="nc" id="L48">        final StackTraceElement[] st = e.getStackTrace();</span>
+<span class="nc" id="L49">        e.setStackTrace(Arrays.copyOfRange(st, 1, st.length));</span>
+<span class="nc" id="L50">    }</span>
+    protected String builderAlreadyBuilt$str() {
+<span class="nc" id="L52">        return &quot;ELY00003: This builder has already been built&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException builderAlreadyBuilt() {
+<span class="nc" id="L56">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), builderAlreadyBuilt$str()));</span>
+<span class="nc" id="L57">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L58">        return result;</span>
+    }
+    protected String unrecognizedAlgorithm$str() {
+<span class="nc" id="L61">        return &quot;ELY00004: Unrecognized algorithm \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException unrecognizedAlgorithm(final String algorithm) {
+<span class="nc" id="L65">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), unrecognizedAlgorithm$str(), algorithm));</span>
+<span class="nc" id="L66">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L67">        return result;</span>
+    }
+    @Override
+    public final void credentialDestroyingFailed(final Throwable cause) {
+<span class="nc" id="L71">        super.log.logf(FQCN, WARN, cause, credentialDestroyingFailed$str());</span>
+<span class="nc" id="L72">    }</span>
+    protected String credentialDestroyingFailed$str() {
+<span class="nc" id="L74">        return &quot;ELY00007: Credential destroying failed&quot;;</span>
+    }
+    protected String couldNotObtainCredential$str() {
+<span class="nc" id="L77">        return &quot;ELY01041: Could not obtain credential&quot;;</span>
+    }
+    @Override
+    public final RuntimeException couldNotObtainCredential() {
+<span class="nc" id="L81">        final RuntimeException result = new RuntimeException(String.format(getLoggingLocale(), couldNotObtainCredential$str()));</span>
+<span class="nc" id="L82">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L83">        return result;</span>
+    }
+    protected String couldNotObtainCredentialWithCause$str() {
+<span class="nc" id="L86">        return &quot;ELY01042: Could not obtain credential&quot;;</span>
+    }
+    @Override
+    public final RuntimeException couldNotObtainCredentialWithCause(final Throwable cause) {
+<span class="nc" id="L90">        final RuntimeException result = new RuntimeException(String.format(getLoggingLocale(), couldNotObtainCredentialWithCause$str()), cause);</span>
+<span class="nc" id="L91">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L92">        return result;</span>
+    }
+    protected String insufficientDataToFormDigestAndSalt$str() {
+<span class="nc" id="L95">        return &quot;ELY01053: Insufficient data to form a digest and a salt&quot;;</span>
+    }
+    @Override
+    public final InvalidKeySpecException insufficientDataToFormDigestAndSalt() {
+<span class="nc" id="L99">        final InvalidKeySpecException result = new InvalidKeySpecException(String.format(getLoggingLocale(), insufficientDataToFormDigestAndSalt$str()));</span>
+<span class="nc" id="L100">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L101">        return result;</span>
+    }
+    protected String noDirContextSupplierSet$str() {
+<span class="nc" id="L104">        return &quot;ELY01057: No DirContext supplier set&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException noDirContextSupplierSet() {
+<span class="nc" id="L108">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), noDirContextSupplierSet$str()));</span>
+<span class="nc" id="L109">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L110">        return result;</span>
+    }
+    protected String noPrincipalMappingDefinition$str() {
+<span class="nc" id="L113">        return &quot;ELY01058: No principal mapping definition&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException noPrincipalMappingDefinition() {
+<span class="nc" id="L117">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), noPrincipalMappingDefinition$str()));</span>
+<span class="nc" id="L118">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L119">        return result;</span>
+    }
+    protected String couldNotObtainPrincipal$str() {
+<span class="nc" id="L122">        return &quot;ELY01060: Could not obtain principal&quot;;</span>
+    }
+    @Override
+    public final RuntimeException couldNotObtainPrincipal() {
+<span class="nc" id="L126">        final RuntimeException result = new RuntimeException(String.format(getLoggingLocale(), couldNotObtainPrincipal$str()));</span>
+<span class="nc" id="L127">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L128">        return result;</span>
+    }
+    protected String noProviderUrlSet$str() {
+<span class="nc" id="L131">        return &quot;ELY01062: No provider URL has been set&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException noProviderUrlSet() {
+<span class="nc" id="L135">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), noProviderUrlSet$str()));</span>
+<span class="nc" id="L136">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L137">        return result;</span>
+    }
+    protected String invalidName$str() {
+<span class="nc" id="L140">        return &quot;ELY01064: Invalid identity name&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidName() {
+<span class="nc" id="L144">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidName$str()));</span>
+<span class="nc" id="L145">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L146">        return result;</span>
+    }
+    protected String ldapRealmFailedObtainAttributes$str() {
+<span class="nc" id="L149">        return &quot;ELY01079: Ldap-backed realm failed to obtain attributes for entry [%s]&quot;;</span>
+    }
+    @Override
+    public final RuntimeException ldapRealmFailedObtainAttributes(final String dn, final Throwable cause) {
+<span class="nc" id="L153">        final RuntimeException result = new RuntimeException(String.format(getLoggingLocale(), ldapRealmFailedObtainAttributes$str(), dn), cause);</span>
+<span class="nc" id="L154">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L155">        return result;</span>
+    }
+    protected String ldapRealmInvalidRdnForAttribute$str() {
+<span class="nc" id="L158">        return &quot;ELY01080: Attribute [%s] value [%s] must be in X.500 format in order to obtain RDN [%s].&quot;;</span>
+    }
+    @Override
+    public final RuntimeException ldapRealmInvalidRdnForAttribute(final String attributeName, final String value, final String rdn, final Throwable cause) {
+<span class="nc" id="L162">        final RuntimeException result = new RuntimeException(String.format(getLoggingLocale(), ldapRealmInvalidRdnForAttribute$str(), attributeName, value, rdn), cause);</span>
+<span class="nc" id="L163">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L164">        return result;</span>
+    }
+    protected String ldapRealmIdentityNotExists$str() {
+<span class="nc" id="L167">        return &quot;ELY01083: Ldap-backed realm cannot to obtain not existing identity \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException ldapRealmIdentityNotExists(final String identity) {
+<span class="nc" id="L171">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), ldapRealmIdentityNotExists$str(), identity));</span>
+<span class="nc" id="L172">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L173">        return result;</span>
+    }
+    protected String ldapRealmErrorWhileConsumingResultsFromSearch$str() {
+<span class="nc" id="L176">        return &quot;ELY01084: Error while consuming results from search. SearchDn [%s], Filter [%s], Filter Args [%s].&quot;;</span>
+    }
+    @Override
+    public final RuntimeException ldapRealmErrorWhileConsumingResultsFromSearch(final String searchDn, final String filter, final String filterArgs, final Throwable cause) {
+<span class="nc" id="L180">        final RuntimeException result = new RuntimeException(String.format(getLoggingLocale(), ldapRealmErrorWhileConsumingResultsFromSearch$str(), searchDn, filter, filterArgs), cause);</span>
+<span class="nc" id="L181">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L182">        return result;</span>
+    }
+    protected String ldapRealmsPersisterNotSupported$str() {
+<span class="nc" id="L185">        return &quot;ELY01085: LDAP realm persister does not support given credential type&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException ldapRealmsPersisterNotSupported() {
+<span class="nc" id="L189">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), ldapRealmsPersisterNotSupported$str()));</span>
+<span class="nc" id="L190">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L191">        return result;</span>
+    }
+    protected String ldapRealmCredentialPersistingFailed$str() {
+<span class="nc" id="L194">        return &quot;ELY01086: Persisting credential %s into Ldap-backed realm failed. Identity dn: \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException ldapRealmCredentialPersistingFailed(final String credential, final String dn, final Throwable cause) {
+<span class="nc" id="L198">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), ldapRealmCredentialPersistingFailed$str(), credential, dn), cause);</span>
+<span class="nc" id="L199">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L200">        return result;</span>
+    }
+    protected String ldapRealmCredentialClearingFailed$str() {
+<span class="nc" id="L203">        return &quot;ELY01087: Clearing credentials from Ldap-backed realm failed. Identity dn: \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException ldapRealmCredentialClearingFailed(final String dn, final Throwable cause) {
+<span class="nc" id="L207">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), ldapRealmCredentialClearingFailed$str(), dn), cause);</span>
+<span class="nc" id="L208">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L209">        return result;</span>
+    }
+    protected String unknownLdapPasswordScheme$str() {
+<span class="nc" id="L212">        return &quot;ELY01090: Unknown LDAP password scheme&quot;;</span>
+    }
+    @Override
+    public final InvalidKeySpecException unknownLdapPasswordScheme() {
+<span class="nc" id="L216">        final InvalidKeySpecException result = new InvalidKeySpecException(String.format(getLoggingLocale(), unknownLdapPasswordScheme$str()));</span>
+<span class="nc" id="L217">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L218">        return result;</span>
+    }
+    protected String noSuchIdentity$str() {
+<span class="nc" id="L221">        return &quot;ELY01096: No such identity&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException noSuchIdentity() {
+<span class="nc" id="L225">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), noSuchIdentity$str()));</span>
+<span class="nc" id="L226">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L227">        return result;</span>
+    }
+    protected String ldapRealmFailedDeleteIdentityFromServer$str() {
+<span class="nc" id="L230">        return &quot;ELY01097: Ldap-backed realm failed to delete identity from server&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException ldapRealmFailedDeleteIdentityFromServer(final Throwable cause) {
+<span class="nc" id="L234">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), ldapRealmFailedDeleteIdentityFromServer$str()), cause);</span>
+<span class="nc" id="L235">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L236">        return result;</span>
+    }
+    protected String ldapRealmFailedCreateIdentityOnServer$str() {
+<span class="nc" id="L239">        return &quot;ELY01098: Ldap-backed realm failed to create identity on server&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException ldapRealmFailedCreateIdentityOnServer(final Throwable cause) {
+<span class="nc" id="L243">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), ldapRealmFailedCreateIdentityOnServer$str()), cause);</span>
+<span class="nc" id="L244">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L245">        return result;</span>
+    }
+    protected String ldapRealmNotConfiguredToSupportCreatingIdentities$str() {
+<span class="nc" id="L248">        return &quot;ELY01099: Ldap-backed realm is not configured to allow create new identities (new identity parent and attributes has to be set)&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException ldapRealmNotConfiguredToSupportCreatingIdentities() {
+<span class="nc" id="L252">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), ldapRealmNotConfiguredToSupportCreatingIdentities$str()));</span>
+<span class="nc" id="L253">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L254">        return result;</span>
+    }
+    protected String ldapRealmCannotSetAttributeWithoutMapping$str() {
+<span class="nc" id="L257">        return &quot;ELY01100: Ldap-backed realm does not contain mapping to set Elytron attribute \&quot;%s\&quot; of identity \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException ldapRealmCannotSetAttributeWithoutMapping(final String attribute, final String identity) {
+<span class="nc" id="L261">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), ldapRealmCannotSetAttributeWithoutMapping$str(), attribute, identity));</span>
+<span class="nc" id="L262">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L263">        return result;</span>
+    }
+    @Override
+    public final void ldapRealmDoesNotSupportSettingFilteredAttribute(final String attribute, final String identity) {
+<span class="nc" id="L267">        super.log.logf(FQCN, WARN, null, ldapRealmDoesNotSupportSettingFilteredAttribute$str(), attribute, identity);</span>
+<span class="nc" id="L268">    }</span>
+    protected String ldapRealmDoesNotSupportSettingFilteredAttribute$str() {
+<span class="nc" id="L270">        return &quot;ELY01101: Ldap-backed realm does not support setting of filtered attribute \&quot;%s\&quot; (identity \&quot;%s\&quot;)&quot;;</span>
+    }
+    protected String ldapRealmRequiresExactlyOneRdnAttribute$str() {
+<span class="nc" id="L273">        return &quot;ELY01102: Ldap-backed realm requires exactly one value of attribute \&quot;%s\&quot; mapped to RDN (identity \&quot;%s\&quot;)&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException ldapRealmRequiresExactlyOneRdnAttribute(final String attribute, final String identity) {
+<span class="nc" id="L277">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), ldapRealmRequiresExactlyOneRdnAttribute$str(), attribute, identity));</span>
+<span class="nc" id="L278">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L279">        return result;</span>
+    }
+    protected String ldapRealmAttributesSettingFailed$str() {
+<span class="nc" id="L282">        return &quot;ELY01103: Ldap-backed realm failed to set attributes of identity \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException ldapRealmAttributesSettingFailed(final String identity, final Throwable cause) {
+<span class="nc" id="L286">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), ldapRealmAttributesSettingFailed$str(), identity), cause);</span>
+<span class="nc" id="L287">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L288">        return result;</span>
+    }
+    protected String ldapRealmIdentitySearchFailed$str() {
+<span class="nc" id="L291">        return &quot;ELY01108: Ldap-backed realm identity search failed&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException ldapRealmIdentitySearchFailed(final Throwable cause) {
+<span class="nc" id="L295">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), ldapRealmIdentitySearchFailed$str()), cause);</span>
+<span class="nc" id="L296">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L297">        return result;</span>
+    }
+    protected String ldapRealmNotConfiguredToSupportIteratingOverIdentities$str() {
+<span class="nc" id="L300">        return &quot;ELY01109: Ldap-backed realm is not configured to allow iterate over identities (iterator filter has to be set)&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException ldapRealmNotConfiguredToSupportIteratingOverIdentities() {
+<span class="nc" id="L304">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), ldapRealmNotConfiguredToSupportIteratingOverIdentities$str()));</span>
+<span class="nc" id="L305">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L306">        return result;</span>
+    }
+    protected String ldapRealmFailedToObtainContext$str() {
+<span class="nc" id="L309">        return &quot;ELY01125: Ldap-backed realm failed to obtain context&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException ldapRealmFailedToObtainContext(final Throwable cause) {
+<span class="nc" id="L313">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), ldapRealmFailedToObtainContext$str()), cause);</span>
+<span class="nc" id="L314">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L315">        return result;</span>
+    }
+    @Override
+    public final void ldapRealmDeferRegistration() {
+<span class="nc" id="L319">        super.log.logf(FQCN, INFO, null, ldapRealmDeferRegistration$str());</span>
+<span class="nc" id="L320">    }</span>
+    protected String ldapRealmDeferRegistration$str() {
+<span class="nc" id="L322">        return &quot;ELY01146: LDAP Realm unable to register listener, defering action.&quot;;</span>
+    }
+    protected String ldapInvalidLdapName$str() {
+<span class="nc" id="L325">        return &quot;ELY01147: Invalid LDAP name [%s]&quot;;</span>
+    }
+    @Override
+    public final RuntimeException ldapInvalidLdapName(final String name, final Throwable cause) {
+<span class="nc" id="L329">        final RuntimeException result = new RuntimeException(String.format(getLoggingLocale(), ldapInvalidLdapName$str(), name), cause);</span>
+<span class="nc" id="L330">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L331">        return result;</span>
+    }
+    protected String obtainingDirContextCredentialFromAuthenticationContextFailed$str() {
+<span class="nc" id="L334">        return &quot;ELY01150: Obtaining DirContext credentials from AuthenticationContext failed.&quot;;</span>
+    }
+    @Override
+    public final NamingException obtainingDirContextCredentialFromAuthenticationContextFailed(final Throwable cause) {
+<span class="nc" id="L338">        final NamingException result = new NamingException(String.format(getLoggingLocale(), obtainingDirContextCredentialFromAuthenticationContextFailed$str()));</span>
+<span class="nc" id="L339">        result.initCause(cause);</span>
+<span class="nc" id="L340">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L341">        return result;</span>
+    }
+    protected String directLdapVerificationFailed$str() {
+<span class="nc" id="L344">        return &quot;ELY01153: Direct LDAP verification failed with DN [%s] and absolute DN [%s]&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException directLdapVerificationFailed(final String distinguishedName, final String absoluteName, final Exception e) {
+<span class="nc" id="L348">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), directLdapVerificationFailed$str(), distinguishedName, absoluteName), e);</span>
+<span class="nc" id="L349">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L350">        return result;</span>
+    }
+    protected String threadLocalSslSocketFactoryThreadLocalNotSet$str() {
+<span class="nc" id="L353">        return &quot;ELY04025: DirContext tries to connect without ThreadLocalSSLSocketFactory thread local setting&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException threadLocalSslSocketFactoryThreadLocalNotSet() {
+<span class="nc" id="L357">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), threadLocalSslSocketFactoryThreadLocalNotSet$str()));</span>
+<span class="nc" id="L358">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L359">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

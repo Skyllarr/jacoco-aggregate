@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SSLConfigurator.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-ssl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.ssl</a> &gt; <span class="el_source">SSLConfigurator.java</span></div><h1>SSLConfigurator.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.ssl;
+
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLSocket;
+
+/**
+ * A configurator for SSL contexts and their produced objects.  Instances of this interface can be used to preconfigure,
+ * limit, or modify the behavior of the SSL context.
+ */
+public interface SSLConfigurator {
+
+    // configuration
+
+    default void configure(SSLContext context, SSLServerSocket sslServerSocket) {
+<span class="nc" id="L36">    }</span>
+
+    default void configure(SSLContext context, SSLSocket sslSocket) {
+<span class="nc" id="L39">    }</span>
+
+    default void configure(SSLContext context, SSLEngine sslEngine) {
+<span class="nc" id="L42">    }</span>
+
+    default void configure(SSLContext context) {
+<span class="nc" id="L45">    }</span>
+
+    // SSLContext
+
+    default SSLParameters getDefaultSSLParameters(SSLContext sslContext, SSLParameters original) {
+<span class="nc" id="L50">        return original;</span>
+    }
+
+    default SSLParameters getSupportedSSLParameters(SSLContext sslContext, SSLParameters original) {
+<span class="nc" id="L54">        return original;</span>
+    }
+
+    // SSLSocket/SSLEngine
+
+    default void setWantClientAuth(SSLContext context, SSLSocket sslSocket, boolean value) {
+<span class="nc" id="L60">        sslSocket.setWantClientAuth(value);</span>
+<span class="nc" id="L61">    }</span>
+
+    default void setWantClientAuth(SSLContext context, SSLEngine sslEngine, boolean value) {
+<span class="nc" id="L64">        sslEngine.setWantClientAuth(value);</span>
+<span class="nc" id="L65">    }</span>
+
+    default void setWantClientAuth(SSLContext sslContext, SSLServerSocket sslServerSocket, boolean value) {
+<span class="nc" id="L68">        sslServerSocket.setNeedClientAuth(value);</span>
+<span class="nc" id="L69">    }</span>
+
+    default void setNeedClientAuth(SSLContext context, SSLSocket sslSocket, boolean value) {
+<span class="nc" id="L72">        sslSocket.setNeedClientAuth(value);</span>
+<span class="nc" id="L73">    }</span>
+
+    default void setNeedClientAuth(SSLContext context, SSLEngine sslEngine, boolean value) {
+<span class="nc" id="L76">        sslEngine.setNeedClientAuth(value);</span>
+<span class="nc" id="L77">    }</span>
+
+    default void setNeedClientAuth(SSLContext sslContext, SSLServerSocket sslServerSocket, boolean value) {
+<span class="nc" id="L80">        sslServerSocket.setNeedClientAuth(value);</span>
+<span class="nc" id="L81">    }</span>
+
+    default void setEnabledCipherSuites(SSLContext sslContext, SSLSocket sslSocket, String[] cipherSuites) {
+<span class="nc" id="L84">        sslSocket.setEnabledCipherSuites(cipherSuites);</span>
+<span class="nc" id="L85">    }</span>
+
+    default void setEnabledCipherSuites(SSLContext sslContext, SSLEngine sslEngine, String[] cipherSuites) {
+<span class="nc" id="L88">        sslEngine.setEnabledCipherSuites(cipherSuites);</span>
+<span class="nc" id="L89">    }</span>
+
+    default void setEnabledCipherSuites(SSLContext sslContext, SSLServerSocket sslServerSocket, String[] suites) {
+<span class="nc" id="L92">        sslServerSocket.setEnabledCipherSuites(suites);</span>
+<span class="nc" id="L93">    }</span>
+
+    default void setEnabledProtocols(SSLContext sslContext, SSLSocket sslSocket, String[] protocols) {
+<span class="nc" id="L96">        sslSocket.setEnabledProtocols(protocols);</span>
+<span class="nc" id="L97">    }</span>
+
+    default void setEnabledProtocols(SSLContext sslContext, SSLEngine sslEngine, String[] protocols) {
+<span class="nc" id="L100">        sslEngine.setEnabledProtocols(protocols);</span>
+<span class="nc" id="L101">    }</span>
+
+    default void setEnabledProtocols(SSLContext sslContext, SSLServerSocket sslServerSocket, String[] protocols) {
+<span class="nc" id="L104">        sslServerSocket.setEnabledProtocols(protocols);</span>
+<span class="nc" id="L105">    }</span>
+
+    default void setSSLParameters(SSLContext sslContext, SSLSocket sslSocket, SSLParameters parameters) {
+<span class="nc" id="L108">        sslSocket.setSSLParameters(parameters);</span>
+<span class="nc" id="L109">    }</span>
+
+    default void setSSLParameters(SSLContext sslContext, SSLEngine sslEngine, SSLParameters parameters) {
+<span class="nc" id="L112">        sslEngine.setSSLParameters(parameters);</span>
+<span class="nc" id="L113">    }</span>
+
+    default void setSSLParameters(SSLContext sslContext, SSLServerSocket sslServerSocket, SSLParameters parameters) {
+<span class="nc" id="L116">        sslServerSocket.setSSLParameters(parameters);</span>
+<span class="nc" id="L117">    }</span>
+
+    default void setUseClientMode(SSLContext sslContext, SSLSocket sslSocket, boolean mode) {
+<span class="nc" id="L120">        sslSocket.setUseClientMode(mode);</span>
+<span class="nc" id="L121">    }</span>
+
+    default void setUseClientMode(SSLContext sslContext, SSLEngine sslEngine, boolean mode) {
+<span class="nc" id="L124">        sslEngine.setUseClientMode(mode);</span>
+<span class="nc" id="L125">    }</span>
+
+    default void setUseClientMode(SSLContext sslContext, SSLServerSocket sslServerSocket, boolean mode) {
+<span class="nc" id="L128">        sslServerSocket.setUseClientMode(mode);</span>
+<span class="nc" id="L129">    }</span>
+
+    default void setEnableSessionCreation(SSLContext sslContext, SSLSocket sslSocket, boolean flag) {
+<span class="nc" id="L132">        sslSocket.setEnableSessionCreation(flag);</span>
+<span class="nc" id="L133">    }</span>
+
+    default void setEnableSessionCreation(SSLContext sslContext, SSLEngine sslEngine, boolean flag) {
+<span class="nc" id="L136">        sslEngine.setEnableSessionCreation(flag);</span>
+<span class="nc" id="L137">    }</span>
+
+    default void setEnableSessionCreation(SSLContext sslContext, SSLServerSocket sslServerSocket, boolean flag) {
+<span class="nc" id="L140">        sslServerSocket.setEnableSessionCreation(flag);</span>
+<span class="nc" id="L141">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

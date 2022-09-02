@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SSLContextSelector.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-ssl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.ssl</a> &gt; <span class="el_source">SSLContextSelector.java</span></div><h1>SSLContextSelector.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.ssl;
+
+import javax.net.ssl.SNIHostName;
+import javax.net.ssl.SNIMatcher;
+import javax.net.ssl.SNIServerName;
+import javax.net.ssl.SSLContext;
+
+import org.wildfly.common.Assert;
+import org.wildfly.common.array.Arrays2;
+
+/**
+ * A selector which chooses an SSL context based on connection information.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+@FunctionalInterface
+public interface SSLContextSelector {
+
+    /**
+     * Select the SSL context which corresponds to the given connection information.  The selector returns the SSL context
+     * that should be used for this connection, or {@code null} if no SSL contexts match, in which case a fallback
+     * selector may be used, or a default SSL context selected.  If no selectors match an SSL context, the connection
+     * is refused.
+     *
+     * @param connectionInformation information about the in-progress connection
+     * @return the SSL context to use, or {@code null} if the connection is not acceptable to this selector
+     */
+    SSLContext selectContext(SSLConnectionInformation connectionInformation);
+
+    /**
+     * Create an aggregate selector which executes each given selector in order until a match is found.
+     *
+     * @param selector1 the first selector to test
+     * @param selector2 the second selector to test
+     * @return the matched selector
+     */
+    static SSLContextSelector aggregate(SSLContextSelector selector1, SSLContextSelector selector2) {
+<span class="nc" id="L56">        return information -&gt; {</span>
+<span class="nc" id="L57">            SSLContext sslContext = null;</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">            if (selector1 != null) sslContext = selector1.selectContext(information);</span>
+<span class="nc bnc" id="L59" title="All 4 branches missed.">            if (sslContext == null &amp;&amp; selector2 != null) sslContext = selector2.selectContext(information);</span>
+<span class="nc" id="L60">            return sslContext;</span>
+        };
+    }
+
+    /**
+     * Create an aggregate selector which executes each given selector in order until a match is found.
+     *
+     * @param selectors the selectors to test
+     * @return the matched selector
+     */
+    static SSLContextSelector aggregate(SSLContextSelector... selectors) {
+<span class="nc" id="L71">        Assert.checkNotNullParam(&quot;selectors&quot;, selectors);</span>
+<span class="nc" id="L72">        final SSLContextSelector[] clone = Arrays2.compactNulls(selectors.clone());</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        if (clone.length == 0) {</span>
+<span class="nc" id="L74">            return NULL_SELECTOR;</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        } else if (clone.length == 1) {</span>
+<span class="nc" id="L76">            return clone[0];</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        } else if (clone.length == 2) {</span>
+<span class="nc" id="L78">            return aggregate(clone[0], clone[1]);</span>
+        } else {
+<span class="nc" id="L80">            return name -&gt; {</span>
+                SSLContext sslContext;
+<span class="nc bnc" id="L82" title="All 2 branches missed.">                for (SSLContextSelector selector : clone) {</span>
+<span class="nc" id="L83">                    sslContext = selector.selectContext(name);</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">                    if (sslContext != null) {</span>
+<span class="nc" id="L85">                        return sslContext;</span>
+                    }
+                }
+<span class="nc" id="L88">                return null;</span>
+            };
+        }
+    }
+
+    /**
+     * Create a selector which returns the given SSL context if the given SNI matcher matches.
+     *
+     * @param matcher the SNI matcher (must not be {@code null})
+     * @param context the SSL context to select (must not be {@code null})
+     * @return the context if the name matches, otherwise {@code null}
+     * @see SNIHostName#createSNIMatcher(String)
+     * @see SSLUtils#createHostNameStringPredicateSNIMatcher(java.util.function.Predicate)
+     * @see SSLUtils#createHostNamePredicateSNIMatcher(java.util.function.Predicate)
+     * @see SSLUtils#createHostNameStringSNIMatcher(String)
+     * @see SSLUtils#createHostNameSuffixSNIMatcher(String)
+     */
+    static SSLContextSelector sniMatcherSelector(SNIMatcher matcher, SSLContext context) {
+<span class="nc" id="L106">        Assert.checkNotNullParam(&quot;matcher&quot;, matcher);</span>
+<span class="nc" id="L107">        Assert.checkNotNullParam(&quot;context&quot;, context);</span>
+<span class="nc" id="L108">        return information -&gt; {</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">            for (SNIServerName serverName : information.getSNIServerNames()) {</span>
+<span class="nc bnc" id="L110" title="All 6 branches missed.">                if (serverName != null &amp;&amp; serverName.getType() == matcher.getType() &amp;&amp; matcher.matches(serverName)) {</span>
+<span class="nc" id="L111">                    return context;</span>
+                }
+<span class="nc" id="L113">            }</span>
+<span class="nc" id="L114">            return null;</span>
+        };
+    }
+
+    /**
+     * Create a selector which always returns the same context.
+     *
+     * @param context the context to return
+     * @return the selector which always returns {@code context}
+     */
+    static SSLContextSelector constantSelector(SSLContext context) {
+<span class="nc" id="L125">        return name -&gt; context;</span>
+    }
+
+    /**
+     * A selector which always returns {@code null} (no match).
+     */
+<span class="nc" id="L131">    SSLContextSelector NULL_SELECTOR = constantSelector(null);</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

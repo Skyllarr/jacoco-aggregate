@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages_$logger.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-encryption</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.encryption</a> &gt; <span class="el_source">ElytronMessages_$logger.java</span></div><h1>ElytronMessages_$logger.java</h1><pre class="source lang-java linenums">package org.wildfly.security.encryption;
+
+import java.util.Locale;
+import java.io.Serializable;
+import javax.annotation.Generated;
+import org.jboss.logging.DelegatingBasicLogger;
+import org.jboss.logging.BasicLogger;
+import java.security.GeneralSecurityException;
+import java.lang.Throwable;
+import java.lang.String;
+import org.jboss.logging.Logger;
+import java.util.Arrays;
+
+/**
+ * Warning this class consists of generated code.
+ */
+@Generated(value = &quot;org.jboss.logging.processor.generator.model.MessageLoggerImplementor&quot;, date = &quot;2022-09-02T20:20:37+0200&quot;)
+public class ElytronMessages_$logger extends DelegatingBasicLogger implements ElytronMessages, BasicLogger, Serializable {
+    private static final long serialVersionUID = 1L;
+<span class="fc" id="L20">    private static final String FQCN = ElytronMessages_$logger.class.getName();</span>
+    public ElytronMessages_$logger(final Logger log) {
+<span class="fc" id="L22">        super(log);</span>
+<span class="fc" id="L23">    }</span>
+<span class="fc" id="L24">    private static final Locale LOCALE = Locale.ROOT;</span>
+    protected Locale getLoggingLocale() {
+<span class="fc" id="L26">        return LOCALE;</span>
+    }
+    protected String badKeySize$str() {
+<span class="fc" id="L29">        return &quot;ELY19000: Invalid size value. Must be one of 128, 192, or 256&quot;;</span>
+    }
+    @Override
+    public final GeneralSecurityException badKeySize() {
+<span class="fc" id="L33">        final GeneralSecurityException result = new GeneralSecurityException(String.format(getLoggingLocale(), badKeySize$str()));</span>
+<span class="fc" id="L34">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L35">        return result;</span>
+    }
+    private static void _copyStackTraceMinusOne(final Throwable e) {
+<span class="fc" id="L38">        final StackTraceElement[] st = e.getStackTrace();</span>
+<span class="fc" id="L39">        e.setStackTrace(Arrays.copyOfRange(st, 1, st.length));</span>
+<span class="fc" id="L40">    }</span>
+    protected String badKeyPrefix$str() {
+<span class="fc" id="L42">        return &quot;ELY19001: Invalid prefix importing SecretKey&quot;;</span>
+    }
+    @Override
+    public final GeneralSecurityException badKeyPrefix() {
+<span class="fc" id="L46">        final GeneralSecurityException result = new GeneralSecurityException(String.format(getLoggingLocale(), badKeyPrefix$str()));</span>
+<span class="fc" id="L47">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L48">        return result;</span>
+    }
+    protected String unsupportedVersion$str() {
+<span class="fc" id="L51">        return &quot;ELY19002: Unsupported version '%d' the maximum supported version is '%d'&quot;;</span>
+    }
+    @Override
+    public final GeneralSecurityException unsupportedVersion(final int discovered, final int maxSupported) {
+<span class="fc" id="L55">        final GeneralSecurityException result = new GeneralSecurityException(String.format(getLoggingLocale(), unsupportedVersion$str(), discovered, maxSupported));</span>
+<span class="fc" id="L56">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L57">        return result;</span>
+    }
+    protected String unexpectedTokenType$str() {
+<span class="fc" id="L60">        return &quot;ELY19003: Unexpected token type '%s', expected '%s'&quot;;</span>
+    }
+    @Override
+    public final GeneralSecurityException unexpectedTokenType(final String actual, final String expected) {
+<span class="fc" id="L64">        final GeneralSecurityException result = new GeneralSecurityException(String.format(getLoggingLocale(), unexpectedTokenType$str(), actual, expected));</span>
+<span class="fc" id="L65">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L66">        return result;</span>
+    }
+    protected String unableToDecodeBase64Token$str() {
+<span class="fc" id="L69">        return &quot;ELY19004: Unable to decode Base64 token.&quot;;</span>
+    }
+    @Override
+    public final GeneralSecurityException unableToDecodeBase64Token(final Throwable cause) {
+<span class="fc" id="L73">        final GeneralSecurityException result = new GeneralSecurityException(String.format(getLoggingLocale(), unableToDecodeBase64Token$str()), cause);</span>
+<span class="fc" id="L74">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L75">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ScramInitialClientMessage.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-mechanism-scram</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.mechanism.scram</a> &gt; <span class="el_source">ScramInitialClientMessage.java</span></div><h1>ScramInitialClientMessage.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.mechanism.scram;
+
+import java.util.Arrays;
+
+/**
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class ScramInitialClientMessage {
+    private final ScramMechanism mechanism;
+    private final String authorizationId;
+    private final String authenticationName;
+    private final boolean binding;
+    private final String bindingType;
+    private final byte[] bindingData;
+    private final byte[] nonce;
+    private final int initialPartIndex;
+    private final byte[] messageBytes;
+
+<span class="nc" id="L37">    ScramInitialClientMessage(final ScramClient scramClient, final String authenticationName, final boolean binding, final byte[] nonce, final int initialPartIndex, final byte[] messageBytes) {</span>
+<span class="nc" id="L38">        this.binding = binding;</span>
+<span class="nc" id="L39">        this.initialPartIndex = initialPartIndex;</span>
+<span class="nc" id="L40">        bindingType = scramClient.getBindingType();</span>
+<span class="nc" id="L41">        bindingData = scramClient.getRawBindingData();</span>
+<span class="nc" id="L42">        mechanism = scramClient.getMechanism();</span>
+<span class="nc" id="L43">        authorizationId = scramClient.getAuthorizationId();</span>
+<span class="nc" id="L44">        this.authenticationName = authenticationName;</span>
+<span class="nc" id="L45">        this.nonce = nonce;</span>
+<span class="nc" id="L46">        this.messageBytes = messageBytes;</span>
+<span class="nc" id="L47">    }</span>
+
+<span class="nc" id="L49">    ScramInitialClientMessage(final ScramMechanism mechanism, final String authorizationId, final String authenticationName, final boolean binding, final String bindingType, final byte[] bindingData, final byte[] nonce, final int initialPartIndex, final byte[] messageBytes) {</span>
+<span class="nc" id="L50">        this.mechanism = mechanism;</span>
+<span class="nc" id="L51">        this.authorizationId = authorizationId;</span>
+<span class="nc" id="L52">        this.authenticationName = authenticationName;</span>
+<span class="nc" id="L53">        this.binding = binding;</span>
+<span class="nc" id="L54">        this.bindingType = bindingType;</span>
+<span class="nc" id="L55">        this.bindingData = bindingData;</span>
+<span class="nc" id="L56">        this.nonce = nonce;</span>
+<span class="nc" id="L57">        this.initialPartIndex = initialPartIndex;</span>
+<span class="nc" id="L58">        this.messageBytes = messageBytes;</span>
+<span class="nc" id="L59">    }</span>
+
+    public ScramMechanism getMechanism() {
+<span class="nc" id="L62">        return mechanism;</span>
+    }
+
+    public String getAuthenticationName() {
+<span class="nc" id="L66">        return authenticationName;</span>
+    }
+
+    public byte[] getNonce() {
+<span class="nc" id="L70">        return nonce.clone();</span>
+    }
+
+    byte[] getRawNonce() {
+<span class="nc" id="L74">        return nonce;</span>
+    }
+
+    public byte[] getInitialPart() {
+<span class="nc" id="L78">        return Arrays.copyOfRange(messageBytes, 0, initialPartIndex);</span>
+    }
+
+    public byte[] getMessageBytes() {
+<span class="nc" id="L82">        return messageBytes.clone();</span>
+    }
+
+    public String getAuthorizationId() {
+<span class="nc" id="L86">        return authorizationId;</span>
+    }
+
+    public boolean isBinding() {
+<span class="nc" id="L90">        return binding;</span>
+    }
+
+    public String getBindingType() {
+<span class="nc" id="L94">        return bindingType;</span>
+    }
+
+    public byte[] getBindingData() {
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        return bindingData == null ? null : bindingData.clone();</span>
+    }
+
+    byte[] getRawBindingData() {
+<span class="nc" id="L102">        return bindingData;</span>
+    }
+
+    int getInitialPartIndex() {
+<span class="nc" id="L106">        return initialPartIndex;</span>
+    }
+
+    byte[] getRawMessageBytes() {
+<span class="nc" id="L110">        return messageBytes;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

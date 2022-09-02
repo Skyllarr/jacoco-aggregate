@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages_$logger.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.server._private</a> &gt; <span class="el_source">ElytronMessages_$logger.java</span></div><h1>ElytronMessages_$logger.java</h1><pre class="source lang-java linenums">package org.wildfly.security.auth.server._private;
+
+import java.util.Locale;
+import java.lang.IllegalStateException;
+import org.wildfly.security.authz.AuthorizationFailureException;
+import java.io.Serializable;
+import javax.annotation.Generated;
+import org.jboss.logging.DelegatingBasicLogger;
+import java.security.GeneralSecurityException;
+import org.wildfly.security.auth.server.RealmUnavailableException;
+import java.lang.SecurityException;
+import java.lang.String;
+import java.io.IOException;
+import org.jboss.logging.Logger;
+import org.jboss.logging.BasicLogger;
+import java.lang.Throwable;
+import java.util.Arrays;
+import java.lang.IllegalArgumentException;
+import java.security.Principal;
+import java.lang.UnsupportedOperationException;
+
+
+import static org.jboss.logging.Logger.Level.ERROR;
+
+/**
+ * Warning this class consists of generated code.
+ */
+@Generated(value = &quot;org.jboss.logging.processor.generator.model.MessageLoggerImplementor&quot;, date = &quot;2022-09-02T20:20:30+0200&quot;)
+public class ElytronMessages_$logger extends DelegatingBasicLogger implements ElytronMessages, BasicLogger, Serializable {
+    private static final long serialVersionUID = 1L;
+<span class="fc" id="L31">    private static final String FQCN = ElytronMessages_$logger.class.getName();</span>
+    public ElytronMessages_$logger(final Logger log) {
+<span class="fc" id="L33">        super(log);</span>
+<span class="fc" id="L34">    }</span>
+<span class="fc" id="L35">    private static final Locale LOCALE = Locale.ROOT;</span>
+    protected Locale getLoggingLocale() {
+<span class="fc" id="L37">        return LOCALE;</span>
+    }
+    protected String builderAlreadyBuilt$str() {
+<span class="nc" id="L40">        return &quot;ELY00003: This builder has already been built&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException builderAlreadyBuilt() {
+<span class="nc" id="L44">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), builderAlreadyBuilt$str()));</span>
+<span class="nc" id="L45">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L46">        return result;</span>
+    }
+    private static void _copyStackTraceMinusOne(final Throwable e) {
+<span class="fc" id="L49">        final StackTraceElement[] st = e.getStackTrace();</span>
+<span class="fc" id="L50">        e.setStackTrace(Arrays.copyOfRange(st, 1, st.length));</span>
+<span class="fc" id="L51">    }</span>
+    protected String credentialNotSupported$str() {
+<span class="nc" id="L53">        return &quot;ELY00008: The given credential is not supported here&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException credentialNotSupported() {
+<span class="nc" id="L57">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), credentialNotSupported$str()));</span>
+<span class="nc" id="L58">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L59">        return result;</span>
+    }
+    protected String nameAlreadySet$str() {
+<span class="nc" id="L62">        return &quot;ELY01000: Authentication name was already set on this context&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException nameAlreadySet() {
+<span class="nc" id="L66">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), nameAlreadySet$str()));</span>
+<span class="nc" id="L67">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L68">        return result;</span>
+    }
+    protected String noAuthenticationInProgress$str() {
+<span class="nc" id="L71">        return &quot;ELY01003: No authentication is in progress&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException noAuthenticationInProgress() {
+<span class="nc" id="L75">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), noAuthenticationInProgress$str()));</span>
+<span class="nc" id="L76">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L77">        return result;</span>
+    }
+    protected String realmMapDoesNotContainDefault$str() {
+<span class="nc" id="L80">        return &quot;ELY01005: Realm map does not contain mapping for default realm '%s'&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException realmMapDoesNotContainDefault(final String defaultRealm) {
+<span class="nc" id="L84">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), realmMapDoesNotContainDefault$str(), defaultRealm));</span>
+<span class="nc" id="L85">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L86">        return result;</span>
+    }
+    protected String unableToObtainExclusiveAccess$str() {
+<span class="nc" id="L89">        return &quot;ELY01019: Unable to obtain exclusive access to backing identity&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException unableToObtainExclusiveAccess() {
+<span class="nc" id="L93">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), unableToObtainExclusiveAccess$str()));</span>
+<span class="nc" id="L94">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L95">        return result;</span>
+    }
+    protected String userDoesNotExist$str() {
+<span class="nc" id="L98">        return &quot;ELY01033: User does not exist&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException userDoesNotExist() {
+<span class="nc" id="L102">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), userDoesNotExist$str()));</span>
+<span class="nc" id="L103">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L104">        return result;</span>
+    }
+    protected String invalidCredentialTypeSpecified$str() {
+<span class="nc" id="L107">        return &quot;ELY01034: Invalid credential type specified&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException invalidCredentialTypeSpecified() {
+<span class="nc" id="L111">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), invalidCredentialTypeSpecified$str()));</span>
+<span class="nc" id="L112">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L113">        return result;</span>
+    }
+    protected String invalidName$str() {
+<span class="nc" id="L116">        return &quot;ELY01064: Invalid identity name&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidName() {
+<span class="nc" id="L120">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidName$str()));</span>
+<span class="nc" id="L121">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L122">        return result;</span>
+    }
+    protected String runAsAuthorizationFailed$str() {
+<span class="nc" id="L125">        return &quot;ELY01088: Attempting to run as \&quot;%s\&quot; authorization operation failed&quot;;</span>
+    }
+    @Override
+    public final AuthorizationFailureException runAsAuthorizationFailed(final Principal principal, final Principal targetPrincipal, final Throwable cause) {
+<span class="nc" id="L129">        final AuthorizationFailureException result = new AuthorizationFailureException(String.format(getLoggingLocale(), runAsAuthorizationFailed$str(), targetPrincipal), cause, principal);</span>
+<span class="nc" id="L130">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L131">        return result;</span>
+    }
+    protected String invalidMechRealmSelection$str() {
+<span class="nc" id="L134">        return &quot;ELY01092: Invalid mechanism realm selection \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidMechRealmSelection(final String realmName) {
+<span class="nc" id="L138">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidMechRealmSelection$str(), realmName));</span>
+<span class="nc" id="L139">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L140">        return result;</span>
+    }
+    protected String mechRealmAlreadySelected$str() {
+<span class="nc" id="L143">        return &quot;ELY01093: Mechanism realm was already selected&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException mechRealmAlreadySelected() {
+<span class="nc" id="L147">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), mechRealmAlreadySelected$str()));</span>
+<span class="nc" id="L148">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L149">        return result;</span>
+    }
+    protected String unableToCreateIdentity$str() {
+<span class="nc" id="L152">        return &quot;ELY01095: Unable to create identity&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException unableToCreateIdentity() {
+<span class="nc" id="L156">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), unableToCreateIdentity$str()));</span>
+<span class="nc" id="L157">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L158">        return result;</span>
+    }
+    protected String noSuchIdentity$str() {
+<span class="nc" id="L161">        return &quot;ELY01096: No such identity&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException noSuchIdentity() {
+<span class="nc" id="L165">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), noSuchIdentity$str()));</span>
+<span class="nc" id="L166">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L167">        return result;</span>
+    }
+    protected String cannotSucceedNotAuthorized$str() {
+<span class="nc" id="L170">        return &quot;ELY01112: Authentication cannot succeed; not authorized&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException cannotSucceedNotAuthorized() {
+<span class="nc" id="L174">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), cannotSucceedNotAuthorized$str()));</span>
+<span class="nc" id="L175">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L176">        return result;</span>
+    }
+    protected String unableToSelectMechanismConfiguration$str() {
+<span class="nc" id="L179">        return &quot;ELY01119: Unable to resolve MechanismConfiguration for mechanismType='%s', mechanismName='%s', hostName='%s', protocol='%s'.&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException unableToSelectMechanismConfiguration(final String mechanismType, final String mechanismName, final String hostName, final String protocol) {
+<span class="nc" id="L183">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), unableToSelectMechanismConfiguration$str(), mechanismType, mechanismName, hostName, protocol));</span>
+<span class="nc" id="L184">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L185">        return result;</span>
+    }
+    protected String tooLateToSetMechanismInformation$str() {
+<span class="nc" id="L188">        return &quot;ELY01120: Too late to set mechanism information as authentication has already begun.&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException tooLateToSetMechanismInformation() {
+<span class="nc" id="L192">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), tooLateToSetMechanismInformation$str()));</span>
+<span class="nc" id="L193">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L194">        return result;</span>
+    }
+    protected String credentialUpdateNotSupportedByRealm$str() {
+<span class="nc" id="L197">        return &quot;ELY01124: The security realm does not support updating a credential&quot;;</span>
+    }
+    @Override
+    public final UnsupportedOperationException credentialUpdateNotSupportedByRealm() {
+<span class="nc" id="L201">        final UnsupportedOperationException result = new UnsupportedOperationException(String.format(getLoggingLocale(), credentialUpdateNotSupportedByRealm$str()));</span>
+<span class="nc" id="L202">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L203">        return result;</span>
+    }
+    protected String classLoaderSecurityDomainExists$str() {
+<span class="nc" id="L206">        return &quot;ELY01148: A SecurityDomain has already been associated with the specified ClassLoader&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException classLoaderSecurityDomainExists() {
+<span class="nc" id="L210">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), classLoaderSecurityDomainExists$str()));</span>
+<span class="nc" id="L211">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L212">        return result;</span>
+    }
+    protected String cantWithSameSecurityDomainDomain$str() {
+<span class="nc" id="L215">        return &quot;ELY01149: Can not use SecurityIdentity with SecurityIdentity from same SecurityDomain&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException cantWithSameSecurityDomainDomain() {
+<span class="nc" id="L219">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), cantWithSameSecurityDomainDomain$str()));</span>
+<span class="nc" id="L220">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L221">        return result;</span>
+    }
+    protected String authenticationFailedEvidenceVerification$str() {
+<span class="fc" id="L224">        return &quot;ELY01151: Evidence Verification Failed.&quot;;</span>
+    }
+    @Override
+    public final SecurityException authenticationFailedEvidenceVerification() {
+<span class="fc" id="L228">        final SecurityException result = new SecurityException(String.format(getLoggingLocale(), authenticationFailedEvidenceVerification$str()));</span>
+<span class="fc" id="L229">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L230">        return result;</span>
+    }
+    protected String authenticationFailedAuthorization$str() {
+<span class="nc" id="L233">        return &quot;ELY01152: Authorization Check Failed.&quot;;</span>
+    }
+    @Override
+    public final SecurityException authenticationFailedAuthorization() {
+<span class="nc" id="L237">        final SecurityException result = new SecurityException(String.format(getLoggingLocale(), authenticationFailedAuthorization$str()));</span>
+<span class="nc" id="L238">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L239">        return result;</span>
+    }
+    protected String securityDomainMismatch$str() {
+<span class="nc" id="L242">        return &quot;ELY01155: Security domain mismatch&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException securityDomainMismatch() {
+<span class="nc" id="L246">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), securityDomainMismatch$str()));</span>
+<span class="nc" id="L247">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L248">        return result;</span>
+    }
+    protected String cannotObtainCredentialFromFactory$str() {
+<span class="nc" id="L251">        return &quot;ELY01156: Cannot obtain a credential from a security factory&quot;;</span>
+    }
+    @Override
+    public final IOException cannotObtainCredentialFromFactory(final GeneralSecurityException e) {
+<span class="nc" id="L255">        final IOException result = new IOException(String.format(getLoggingLocale(), cannotObtainCredentialFromFactory$str()), e);</span>
+<span class="nc" id="L256">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L257">        return result;</span>
+    }
+    @Override
+    public final void eventHandlerFailed(final Throwable cause) {
+<span class="nc" id="L261">        super.log.logf(FQCN, ERROR, cause, eventHandlerFailed$str());</span>
+<span class="nc" id="L262">    }</span>
+    protected String eventHandlerFailed$str() {
+<span class="nc" id="L264">        return &quot;ELY01094: An event handler threw an exception&quot;;</span>
+    }
+    protected String roleMappedAlreadyInitialized$str() {
+<span class="nc" id="L267">        return &quot;ELY08510: Role mapper has already been initialized.&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException roleMappedAlreadyInitialized() {
+<span class="nc" id="L271">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), roleMappedAlreadyInitialized$str()));</span>
+<span class="nc" id="L272">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L273">        return result;</span>
+    }
+    protected String roleMappedNotInitialized$str() {
+<span class="nc" id="L276">        return &quot;ELY08511: Role mapper hasn't been initialized yet.&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException roleMappedNotInitialized() {
+<span class="nc" id="L280">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), roleMappedNotInitialized$str()));</span>
+<span class="nc" id="L281">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L282">        return result;</span>
+    }
+    protected String invalidReplacementInRegexRoleMapper$str() {
+<span class="fc" id="L285">        return &quot;ELY16000: Invalid replacement in regex role mapper.&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidReplacementInRegexRoleMapper() {
+<span class="fc" id="L289">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidReplacementInRegexRoleMapper$str()));</span>
+<span class="fc" id="L290">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L291">        return result;</span>
+    }
+    protected String invalidPatternInRegexRoleMapper$str() {
+<span class="fc" id="L294">        return &quot;ELY16001: Invalid pattern in regex role mapper.&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidPatternInRegexRoleMapper() {
+<span class="fc" id="L298">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidPatternInRegexRoleMapper$str()));</span>
+<span class="fc" id="L299">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L300">        return result;</span>
+    }
+    protected String securityEventIdentityWrongDomain$str() {
+<span class="nc" id="L303">        return &quot;ELY16002: Can not handle SecurityEvent with SecurityIdentity from other SecurityDomain&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException securityEventIdentityWrongDomain() {
+<span class="nc" id="L307">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), securityEventIdentityWrongDomain$str()));</span>
+<span class="nc" id="L308">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L309">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

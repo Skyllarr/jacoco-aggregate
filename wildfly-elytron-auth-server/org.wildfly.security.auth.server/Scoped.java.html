@@ -1,0 +1,377 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Scoped.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.server</a> &gt; <span class="el_source">Scoped.java</span></div><h1>Scoped.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2017 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.server;
+
+import java.security.PrivilegedAction;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
+import java.util.concurrent.Callable;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.IntFunction;
+import java.util.function.LongFunction;
+import java.util.function.ObjIntConsumer;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+
+import org.wildfly.common.function.ExceptionBiConsumer;
+import org.wildfly.common.function.ExceptionBiFunction;
+import org.wildfly.common.function.ExceptionBiPredicate;
+import org.wildfly.common.function.ExceptionConsumer;
+import org.wildfly.common.function.ExceptionFunction;
+import org.wildfly.common.function.ExceptionIntFunction;
+import org.wildfly.common.function.ExceptionLongFunction;
+import org.wildfly.common.function.ExceptionObjIntConsumer;
+import org.wildfly.common.function.ExceptionPredicate;
+import org.wildfly.common.function.ExceptionSupplier;
+
+/**
+ * An identity configuration which can be applied on a scoped basis.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public interface Scoped {
+    /**
+     * Run an action under this identity.
+     *
+     * @param action the action to run
+     */
+    default void runAs(Runnable action) {
+<span class="nc bnc" id="L59" title="All 2 branches missed.">        if (action == null) return;</span>
+<span class="nc" id="L60">        runAsConsumer(Runnable::run, action);</span>
+<span class="nc" id="L61">    }</span>
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param action the action to run
+     * @param &lt;T&gt; the action return type
+     * @return the action result (may be {@code null})
+     * @throws Exception if the action fails
+     */
+    default &lt;T&gt; T runAs(Callable&lt;T&gt; action) throws Exception {
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        if (action == null) return null;</span>
+<span class="nc" id="L73">        return runAsFunctionEx(Callable::call, action);</span>
+    }
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param parameter the parameter to pass to the action
+     * @param action the action to run
+     * @param &lt;R&gt; the action return type
+     * @param &lt;T&gt; the action parameter type
+     * @return the action result (may be {@code null})
+     */
+    default &lt;T, R&gt; R runAsFunction(Function&lt;T, R&gt; action, T parameter) {
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        if (action == null) return null;</span>
+<span class="nc" id="L87">        return runAsFunction(Function::apply, action, parameter);</span>
+    }
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param parameter1 the first parameter to pass to the action
+     * @param parameter2 the second parameter to pass to the action
+     * @param action the action to run
+     * @param &lt;R&gt; the action return type
+     * @param &lt;T&gt; the action first parameter type
+     * @param &lt;U&gt; the action second parameter type
+     * @return the action result (may be {@code null})
+     */
+    &lt;T, U, R&gt; R runAsFunction(BiFunction&lt;T, U, R&gt; action, T parameter1, U parameter2);
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param parameter the parameter to pass to the action
+     * @param action the action to run
+     * @param &lt;T&gt; the action parameter type
+     */
+    default &lt;T&gt; void runAsConsumer(Consumer&lt;T&gt; action, T parameter) {
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        if (action == null) return;</span>
+<span class="nc" id="L112">        runAsConsumer(Consumer::accept, action, parameter);</span>
+<span class="nc" id="L113">    }</span>
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param parameter1 the first parameter to pass to the action
+     * @param parameter2 the second parameter to pass to the action
+     * @param action the action to run
+     * @param &lt;T&gt; the action first parameter type
+     * @param &lt;U&gt; the action second parameter type
+     */
+    &lt;T, U&gt; void runAsConsumer(BiConsumer&lt;T, U&gt; action, T parameter1, U parameter2);
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param parameter1 the first parameter to pass to the action
+     * @param parameter2 the second parameter to pass to the action
+     * @param action the action to run
+     * @param &lt;T&gt; the action first parameter type
+     */
+    &lt;T&gt; void runAsObjIntConsumer(ObjIntConsumer&lt;T&gt; action, T parameter1, int parameter2);
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param action the action to run
+     * @param &lt;T&gt; the action return type
+     * @return the action result (may be {@code null})
+     */
+    default &lt;T&gt; T runAsSupplier(Supplier&lt;T&gt; action) {
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        if (action == null) return null;</span>
+<span class="nc" id="L145">        return runAsFunction(Supplier::get, action);</span>
+    }
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param parameter the parameter to pass to the action
+     * @param action the action to run
+     * @param &lt;R&gt; the action return type
+     * @param &lt;T&gt; the action parameter type
+     * @param &lt;E&gt; the action exception type
+     * @return the action result (may be {@code null})
+     * @throws E if the action throws this exception
+     */
+    default &lt;T, R, E extends Exception&gt; R runAsFunctionEx(ExceptionFunction&lt;T, R, E&gt; action, T parameter) throws E {
+<span class="nc bnc" id="L160" title="All 2 branches missed.">        if (action == null) return null;</span>
+<span class="nc" id="L161">        return runAsFunctionEx(ExceptionFunction::apply, action, parameter);</span>
+    }
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param parameter1 the first parameter to pass to the action
+     * @param parameter2 the second parameter to pass to the action
+     * @param action the action to run
+     * @param &lt;R&gt; the action return type
+     * @param &lt;T&gt; the action first parameter type
+     * @param &lt;U&gt; the action second parameter type
+     * @param &lt;E&gt; the action exception type
+     * @return the action result (may be {@code null})
+     * @throws E if the action throws this exception
+     */
+    &lt;T, U, R, E extends Exception&gt; R runAsFunctionEx(ExceptionBiFunction&lt;T, U, R, E&gt; action, T parameter1, U parameter2) throws E;
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param parameter the parameter to pass to the action
+     * @param action the action to run
+     * @param &lt;T&gt; the action parameter type
+     * @param &lt;E&gt; the action exception type
+     * @throws E if the action throws this exception
+     */
+    default &lt;T, E extends Exception&gt; void runAsConsumerEx(ExceptionConsumer&lt;T, E&gt; action, T parameter) throws E {
+<span class="nc bnc" id="L189" title="All 2 branches missed.">        if (action == null) return;</span>
+<span class="nc" id="L190">        runAsConsumerEx(ExceptionConsumer::accept, action, parameter);</span>
+<span class="nc" id="L191">    }</span>
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param parameter1 the first parameter to pass to the action
+     * @param parameter2 the second parameter to pass to the action
+     * @param action the action to run
+     * @param &lt;T&gt; the action first parameter type
+     * @param &lt;U&gt; the action second parameter type
+     * @param &lt;E&gt; the action exception type
+     * @throws E if the action throws this exception
+     */
+    &lt;T, U, E extends Exception&gt; void runAsConsumerEx(ExceptionBiConsumer&lt;T, U, E&gt; action, T parameter1, U parameter2) throws E;
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param parameter1 the first parameter to pass to the action
+     * @param parameter2 the second parameter to pass to the action
+     * @param action the action to run
+     * @param &lt;T&gt; the action first parameter type
+     * @param &lt;E&gt; the action exception type
+     * @throws E if the action throws this exception
+     */
+    &lt;T, E extends Exception&gt; void runAsObjIntConsumerEx(ExceptionObjIntConsumer&lt;T, E&gt; action, T parameter1, int parameter2) throws E;
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param action the action to run
+     * @param &lt;T&gt; the action return type
+     * @param &lt;E&gt; the action exception type
+     * @return the action result (may be {@code null})
+     * @throws E if the action throws this exception
+     */
+    default &lt;T, E extends Exception&gt; T runAsSupplierEx(ExceptionSupplier&lt;T, E&gt; action) throws E {
+<span class="nc bnc" id="L228" title="All 2 branches missed.">        if (action == null) return null;</span>
+<span class="nc" id="L229">        return runAsFunctionEx(ExceptionSupplier::get, action);</span>
+    }
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param action the task to run (must not be {@code null})
+     * @param &lt;R&gt; the return value type
+     * @return the action return value
+     */
+    default &lt;R&gt; R runAsAction(PrivilegedAction&lt;R&gt; action) {
+<span class="nc bnc" id="L240" title="All 2 branches missed.">        if (action == null) return null;</span>
+<span class="nc" id="L241">        return runAsFunction(PrivilegedAction::run, action);</span>
+    }
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param action the task to run (must not be {@code null})
+     * @param &lt;R&gt; the return value type
+     * @return the action return value
+     * @throws PrivilegedActionException if the action fails with an exception
+     */
+    default &lt;R&gt; R runAsExceptionAction(PrivilegedExceptionAction&lt;R&gt; action) throws PrivilegedActionException {
+<span class="nc bnc" id="L253" title="All 2 branches missed.">        if (action == null) return null;</span>
+        try {
+<span class="nc" id="L255">            return runAsFunctionEx(PrivilegedExceptionAction::run, action);</span>
+<span class="nc" id="L256">        } catch (Exception e) {</span>
+<span class="nc" id="L257">            throw new PrivilegedActionException(e);</span>
+        }
+    }
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param predicate the task to run (must not be {@code null})
+     * @param param1 the first parameter to pass to the task
+     * @param param2 the second parameter to pass to the task
+     * @param &lt;T&gt; the first parameter type
+     * @param &lt;U&gt; the second parameter type
+     * @return the action return value
+     * @throws UnsupportedOperationException if this operation is not implemented
+     */
+    default &lt;T, U&gt; boolean runAsBiPredicate(BiPredicate&lt;T, U&gt; predicate, T param1, U param2) {
+<span class="nc" id="L273">        throw new UnsupportedOperationException();</span>
+    }
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param predicate the task to run (must not be {@code null})
+     * @param param1 the first parameter to pass to the task
+     * @param param2 the second parameter to pass to the task
+     * @param &lt;T&gt; the first parameter type
+     * @param &lt;U&gt; the second parameter type
+     * @param &lt;E&gt; the exception type
+     * @return the action return value
+     * @throws E if an exception occurs in the task
+     * @throws UnsupportedOperationException if this operation is not implemented
+     */
+    default &lt;T, U, E extends Exception&gt; boolean runAsExBiPredicate(ExceptionBiPredicate&lt;T, U, E&gt; predicate, T param1, U param2) throws E {
+<span class="nc" id="L290">        throw new UnsupportedOperationException();</span>
+    }
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param predicate the task to run (must not be {@code null})
+     * @param param the parameter to pass to the task
+     * @param &lt;T&gt; the first parameter type
+     * @return the action return value
+     */
+    default &lt;T&gt; boolean runAsPredicate(Predicate&lt;T&gt; predicate, T param) {
+<span class="nc bnc" id="L302" title="All 2 branches missed.">        if (predicate == null) return false;</span>
+<span class="nc" id="L303">        return runAsBiPredicate(Predicate::test, predicate, param);</span>
+    }
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param predicate the task to run (must not be {@code null})
+     * @param param the parameter to pass to the task
+     * @param &lt;T&gt; the first parameter type
+     * @param &lt;E&gt; the exception type
+     * @return the action return value
+     * @throws E if an exception occurs in the task
+     */
+    default &lt;T, E extends Exception&gt; boolean runAsExPredicate(ExceptionPredicate&lt;T, E&gt; predicate, T param) throws E {
+<span class="nc bnc" id="L317" title="All 2 branches missed.">        if (predicate == null) return false;</span>
+<span class="nc" id="L318">        return runAsExBiPredicate(ExceptionPredicate::test, predicate, param);</span>
+    }
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param action the task to run (must not be {@code null})
+     * @param value the parameter to pass to the task
+     * @param &lt;T&gt; the return value type
+     * @return the action return value
+     */
+    default &lt;T&gt; T runAsIntFunction(IntFunction&lt;T&gt; action, int value) {
+<span class="nc bnc" id="L330" title="All 2 branches missed.">        if (action == null) return null;</span>
+<span class="nc" id="L331">        return runAsFunction(IntFunction::apply, action, value);</span>
+    }
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param action the task to run (must not be {@code null})
+     * @param value the parameter to pass to the task
+     * @param &lt;T&gt; the return value type
+     * @param &lt;E&gt; the exception type
+     * @return the action return value
+     * @throws E if an exception occurs in the task
+     */
+    default &lt;T, E extends Exception&gt; T runAsExIntFunction(ExceptionIntFunction&lt;T, E&gt; action, int value) throws E {
+<span class="nc bnc" id="L345" title="All 2 branches missed.">        if (action == null) return null;</span>
+<span class="nc" id="L346">        return runAsFunctionEx(ExceptionIntFunction::apply, action, value);</span>
+    }
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param action the task to run (must not be {@code null})
+     * @param value the parameter to pass to the task
+     * @param &lt;T&gt; the return value type
+     * @return the action return value
+     */
+    default &lt;T&gt; T runAsLongFunction(LongFunction&lt;T&gt; action, long value) {
+<span class="nc bnc" id="L358" title="All 2 branches missed.">        if (action == null) return null;</span>
+<span class="nc" id="L359">        return runAsFunction(LongFunction::apply, action, value);</span>
+    }
+
+    /**
+     * Run an action under this identity.
+     *
+     * @param action the task to run (must not be {@code null})
+     * @param value the parameter to pass to the task
+     * @param &lt;T&gt; the return value type
+     * @param &lt;E&gt; the exception type
+     * @return the action return value
+     * @throws E if an exception occurs in the task
+     */
+    default &lt;T, E extends Exception&gt; T runAsExLongFunction(ExceptionLongFunction&lt;T, E&gt; action, long value) throws E {
+<span class="nc bnc" id="L373" title="All 2 branches missed.">        if (action == null) return null;</span>
+<span class="nc" id="L374">        return runAsFunctionEx(ExceptionLongFunction::apply, action, value);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages_$logger.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-realm-token</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.realm.token._private</a> &gt; <span class="el_source">ElytronMessages_$logger.java</span></div><h1>ElytronMessages_$logger.java</h1><pre class="source lang-java linenums">package org.wildfly.security.auth.realm.token._private;
+
+import java.util.Locale;
+import java.lang.IllegalStateException;
+import java.io.Serializable;
+import javax.annotation.Generated;
+import org.jboss.logging.DelegatingBasicLogger;
+import org.wildfly.security.auth.server.RealmUnavailableException;
+import java.lang.String;
+import org.jboss.logging.Logger;
+import java.net.URL;
+import java.lang.RuntimeException;
+import org.jboss.logging.BasicLogger;
+import java.lang.Throwable;
+import java.util.Arrays;
+import java.lang.IllegalArgumentException;
+
+
+import static org.jboss.logging.Logger.Level.INFO;
+import static org.jboss.logging.Logger.Level.WARN;
+
+/**
+ * Warning this class consists of generated code.
+ */
+@Generated(value = &quot;org.jboss.logging.processor.generator.model.MessageLoggerImplementor&quot;, date = &quot;2022-09-02T20:22:23+0200&quot;)
+public class ElytronMessages_$logger extends DelegatingBasicLogger implements ElytronMessages, BasicLogger, Serializable {
+    private static final long serialVersionUID = 1L;
+<span class="fc" id="L28">    private static final String FQCN = ElytronMessages_$logger.class.getName();</span>
+    public ElytronMessages_$logger(final Logger log) {
+<span class="fc" id="L30">        super(log);</span>
+<span class="fc" id="L31">    }</span>
+<span class="fc" id="L32">    private static final Locale LOCALE = Locale.ROOT;</span>
+    protected Locale getLoggingLocale() {
+<span class="fc" id="L34">        return LOCALE;</span>
+    }
+    protected String tokenRealmFailedToObtainPrincipal$str() {
+<span class="nc" id="L37">        return &quot;ELY01104: OAuth2-based realm failed to obtain principal&quot;;</span>
+    }
+    @Override
+    public final RuntimeException tokenRealmFailedToObtainPrincipal(final Throwable cause) {
+<span class="nc" id="L41">        final RuntimeException result = new RuntimeException(String.format(getLoggingLocale(), tokenRealmFailedToObtainPrincipal$str()), cause);</span>
+<span class="nc" id="L42">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L43">        return result;</span>
+    }
+    private static void _copyStackTraceMinusOne(final Throwable e) {
+<span class="fc" id="L46">        final StackTraceElement[] st = e.getStackTrace();</span>
+<span class="fc" id="L47">        e.setStackTrace(Arrays.copyOfRange(st, 1, st.length));</span>
+<span class="fc" id="L48">    }</span>
+    protected String tokenRealmOAuth2TokenIntrospectionFailed$str() {
+<span class="fc" id="L50">        return &quot;ELY01105: OAuth2-based realm failed to introspect token&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException tokenRealmOAuth2TokenIntrospectionFailed(final Throwable cause) {
+<span class="fc" id="L54">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), tokenRealmOAuth2TokenIntrospectionFailed$str()), cause);</span>
+<span class="fc" id="L55">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L56">        return result;</span>
+    }
+    protected String tokenRealmFailedToObtainPrincipalWithClaim$str() {
+<span class="nc" id="L59">        return &quot;ELY01113: Token-based realm failed to obtain principal from token using claim [%s]&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException tokenRealmFailedToObtainPrincipalWithClaim(final String claimName) {
+<span class="nc" id="L63">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), tokenRealmFailedToObtainPrincipalWithClaim$str(), claimName));</span>
+<span class="nc" id="L64">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L65">        return result;</span>
+    }
+    protected String tokenRealmJwtInvalidFormat$str() {
+<span class="nc" id="L68">        return &quot;ELY01114: Invalid token format. Tokens must have a signature part accordingly with JWS specification&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException tokenRealmJwtInvalidFormat() {
+<span class="nc" id="L72">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), tokenRealmJwtInvalidFormat$str()));</span>
+<span class="nc" id="L73">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L74">        return result;</span>
+    }
+    protected String tokenRealmJwtParseFailed$str() {
+<span class="nc" id="L77">        return &quot;ELY01115: Failed to parse token&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException tokenRealmJwtParseFailed(final Throwable cause) {
+<span class="nc" id="L81">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), tokenRealmJwtParseFailed$str()), cause);</span>
+<span class="nc" id="L82">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L83">        return result;</span>
+    }
+    protected String tokenRealmJwtSignatureCheckFailed$str() {
+<span class="nc" id="L86">        return &quot;ELY01116: Signature verification failed&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException tokenRealmJwtSignatureCheckFailed(final Throwable cause) {
+<span class="nc" id="L90">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), tokenRealmJwtSignatureCheckFailed$str()), cause);</span>
+<span class="nc" id="L91">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L92">        return result;</span>
+    }
+    protected String tokenRealmJwtSignatureInvalidAlgorithm$str() {
+<span class="nc" id="L95">        return &quot;ELY01117: Invalid signature algorithm [%s]&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException tokenRealmJwtSignatureInvalidAlgorithm(final String algorithm) {
+<span class="nc" id="L99">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), tokenRealmJwtSignatureInvalidAlgorithm$str(), algorithm));</span>
+<span class="nc" id="L100">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L101">        return result;</span>
+    }
+    protected String tokenRealmJwtInvalidPublicKeyPem$str() {
+<span class="nc" id="L104">        return &quot;ELY01118: Public key could not be obtained. Probably due to an invalid PEM format.&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException tokenRealmJwtInvalidPublicKeyPem() {
+<span class="nc" id="L108">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), tokenRealmJwtInvalidPublicKeyPem$str()));</span>
+<span class="nc" id="L109">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L110">        return result;</span>
+    }
+    @Override
+    public final void tokenRealmJwtWarnNoIssuerIgnoringIssuerCheck() {
+<span class="nc" id="L114">        super.log.logf(FQCN, WARN, null, tokenRealmJwtWarnNoIssuerIgnoringIssuerCheck$str());</span>
+<span class="nc" id="L115">    }</span>
+    protected String tokenRealmJwtWarnNoIssuerIgnoringIssuerCheck$str() {
+<span class="nc" id="L117">        return &quot;ELY01126: Jwt-based token realm not configured with a list of valid issuers. Ignoring issuer verification.&quot;;</span>
+    }
+    @Override
+    public final void tokenRealmJwtWarnNoAudienceIgnoringAudienceCheck() {
+<span class="nc" id="L121">        super.log.logf(FQCN, WARN, null, tokenRealmJwtWarnNoAudienceIgnoringAudienceCheck$str());</span>
+<span class="nc" id="L122">    }</span>
+    protected String tokenRealmJwtWarnNoAudienceIgnoringAudienceCheck$str() {
+<span class="nc" id="L124">        return &quot;ELY01127: Jwt-based token not configured with a list of valid audiences. Ignoring audience verification.&quot;;</span>
+    }
+    @Override
+    public final void tokenRealmJwtWarnNoPublicKeyIgnoringSignatureCheck() {
+<span class="nc" id="L128">        super.log.logf(FQCN, WARN, null, tokenRealmJwtWarnNoPublicKeyIgnoringSignatureCheck$str());</span>
+<span class="nc" id="L129">    }</span>
+    protected String tokenRealmJwtWarnNoPublicKeyIgnoringSignatureCheck$str() {
+<span class="nc" id="L131">        return &quot;ELY01128: Jwt-based token not configured with a public key. Ignoring signature verification.&quot;;</span>
+    }
+    @Override
+    public final void unableToFetchJwks(final String url) {
+<span class="nc" id="L135">        super.log.logf(FQCN, WARN, null, unableToFetchJwks$str(), url);</span>
+<span class="nc" id="L136">    }</span>
+    protected String unableToFetchJwks$str() {
+<span class="nc" id="L138">        return &quot;ELY01178: Unable to update jwk set from \&quot;%1$s\&quot;.&quot;;</span>
+    }
+    @Override
+    public final void tokenRealmJwtNoSSLIgnoringJku() {
+<span class="nc" id="L142">        super.log.logf(FQCN, WARN, null, tokenRealmJwtNoSSLIgnoringJku$str());</span>
+<span class="nc" id="L143">    }</span>
+    protected String tokenRealmJwtNoSSLIgnoringJku$str() {
+<span class="nc" id="L145">        return &quot;ELY01179: SSL not configured. jku claim will not be supported.&quot;;</span>
+    }
+    @Override
+    public final void tokenRealmJwkMissingClaim(final String claim) {
+<span class="nc" id="L149">        super.log.logf(FQCN, INFO, null, tokenRealmJwkMissingClaim$str(), claim);</span>
+<span class="nc" id="L150">    }</span>
+    protected String tokenRealmJwkMissingClaim$str() {
+<span class="nc" id="L152">        return &quot;ELY01180: Fetched jwk does not contain \&quot;%1$s\&quot; claim, ignoring...&quot;;</span>
+    }
+    @Override
+    public final void avoidingFetchJwks(final URL url, final long timestamp) {
+<span class="nc" id="L156">        super.log.logf(FQCN, WARN, null, avoidingFetchJwks$str(), url, timestamp);</span>
+<span class="nc" id="L157">    }</span>
+    protected String avoidingFetchJwks$str() {
+<span class="nc" id="L159">        return &quot;ELY01181: Not sending new request to jwks url \&quot;%s\&quot;. Last request time was %d.&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

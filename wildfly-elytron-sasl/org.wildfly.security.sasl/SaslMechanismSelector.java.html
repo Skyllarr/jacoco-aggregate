@@ -1,0 +1,940 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SaslMechanismSelector.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl</a> &gt; <span class="el_source">SaslMechanismSelector.java</span></div><h1>SaslMechanismSelector.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2017 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl;
+
+import static org.wildfly.security.sasl._private.ElytronMessages.sasl;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Set;
+import java.util.function.Supplier;
+
+import javax.net.ssl.SSLSession;
+
+import org.wildfly.common.Assert;
+import org.wildfly.common.iteration.CodePointIterator;
+
+/**
+ * A selection specification for SASL client or server mechanisms.  The specification can be used to define the types,
+ * behavior, and order of SASL mechanisms.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public abstract class SaslMechanismSelector {
+
+<span class="nc" id="L46">    private static final SaslMechanismPredicate[] NO_PREDICATES = new SaslMechanismPredicate[0];</span>
+    final SaslMechanismSelector prev;
+
+    private int hashCode;
+
+<span class="nc" id="L51">    SaslMechanismSelector(final SaslMechanismSelector prev) {</span>
+<span class="nc" id="L52">        this.prev = prev;</span>
+<span class="nc" id="L53">    }</span>
+
+    /**
+     * Create a supplier of mechanism names that provides the names of the mechanisms which are matched by
+     * this selector in the preferential order that the selector specifies.  When no preference between two mechanisms
+     * is specified, the original order is used.
+     *
+     * @param mechNames the mechanism names (must not be {@code null})
+     * @return the supplier of mechanisms (not {@code null})
+     */
+    public Supplier&lt;String&gt; createMechanismSupplier(String[] mechNames) {
+<span class="nc" id="L64">        return createMechanismSupplier(mechNames, null);</span>
+    }
+
+    /**
+     * Create a supplier of mechanism names that provides the names of the mechanisms which are matched by
+     * this selector in the preferential order that the selector specifies.  When no preference between two mechanisms
+     * is specified, the original order is used.
+     *
+     * @param mechNames the mechanism names (must not be {@code null})
+     * @param sslSession the SSL session, if any is active, or {@code null} if SSL is not active
+     * @return the supplier of mechanisms (not {@code null})
+     */
+    public Supplier&lt;String&gt; createMechanismSupplier(String[] mechNames, SSLSession sslSession) {
+<span class="nc" id="L77">        Assert.checkNotNullParam(&quot;mechNames&quot;, mechNames);</span>
+<span class="nc" id="L78">        final LinkedHashSet&lt;String&gt; set = new LinkedHashSet&lt;&gt;(mechNames.length);</span>
+<span class="nc" id="L79">        Collections.addAll(set, mechNames);</span>
+<span class="nc" id="L80">        preprocess(set, sslSession);</span>
+<span class="nc" id="L81">        return doCreateSupplier(set, sslSession);</span>
+    }
+
+    /**
+     * Create a supplier of mechanism names that provides the names of the mechanisms which are matched by
+     * this selector in the preferential order that the selector specifies.  When no preference between two mechanisms
+     * is specified, the original order is used.
+     *
+     * @param mechNames the mechanism names (must not be {@code null})
+     * @return the supplier of mechanisms (not {@code null})
+     */
+    public Supplier&lt;String&gt; createMechanismSupplier(Collection&lt;String&gt; mechNames) {
+<span class="nc" id="L93">        Assert.checkNotNullParam(&quot;mechNames&quot;, mechNames);</span>
+<span class="nc" id="L94">        return createMechanismSupplier(mechNames, null);</span>
+    }
+
+    /**
+     * Create a supplier of mechanism names that provides the names of the mechanisms which are matched by
+     * this selector in the preferential order that the selector specifies.  When no preference between two mechanisms
+     * is specified, the original order is used.
+     *
+     * @param mechNames the mechanism names (must not be {@code null})
+     * @param sslSession the SSL session, if any is active, or {@code null} if SSL is not active
+     * @return the supplier of mechanisms (not {@code null})
+     */
+    public Supplier&lt;String&gt; createMechanismSupplier(Collection&lt;String&gt; mechNames, SSLSession sslSession) {
+<span class="nc" id="L107">        Assert.checkNotNullParam(&quot;mechNames&quot;, mechNames);</span>
+<span class="nc" id="L108">        final LinkedHashSet&lt;String&gt; set = new LinkedHashSet&lt;&gt;(mechNames);</span>
+<span class="nc" id="L109">        preprocess(set, sslSession);</span>
+<span class="nc" id="L110">        return doCreateSupplier(set, sslSession);</span>
+    }
+
+    /**
+     * Get a list of mechanism names which are matched by this selector in the preferential order that the selector
+     * specifies.  When no preference between two mechanisms is specified, the original order is used.
+     *
+     * @param mechNames the mechanism names (must not be {@code null})
+     * @param sslSession the SSL session, if any is active, or {@code null} if SSL is not active
+     * @return the list of mechanisms (not {@code null})
+     */
+    public List&lt;String&gt; apply(Collection&lt;String&gt; mechNames, SSLSession sslSession) {
+<span class="nc" id="L122">        Assert.checkNotNullParam(&quot;mechNames&quot;, mechNames);</span>
+<span class="nc" id="L123">        final Supplier&lt;String&gt; supplier = createMechanismSupplier(mechNames, sslSession);</span>
+<span class="nc" id="L124">        final String first = supplier.get();</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">        if (first == null) {</span>
+<span class="nc" id="L126">            return Collections.emptyList();</span>
+        }
+<span class="nc" id="L128">        final String second = supplier.get();</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        if (second == null) {</span>
+<span class="nc" id="L130">            return Collections.singletonList(first);</span>
+        }
+<span class="nc" id="L132">        ArrayList&lt;String&gt; list = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L133">        list.add(first);</span>
+<span class="nc" id="L134">        list.add(second);</span>
+        for (;;) {
+<span class="nc" id="L136">            final String name = supplier.get();</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">            if (name == null) {</span>
+<span class="nc" id="L138">                return list;</span>
+            }
+<span class="nc" id="L140">            list.add(name);</span>
+<span class="nc" id="L141">        }</span>
+    }
+
+    abstract Supplier&lt;String&gt; doCreateSupplier(LinkedHashSet&lt;String&gt; set, SSLSession sslSession);
+
+    void preprocess(Set&lt;String&gt; mechNames, SSLSession sslSession) {
+<span class="nc bnc" id="L147" title="All 2 branches missed.">        if (prev != null) {</span>
+<span class="nc" id="L148">            prev.preprocess(mechNames, sslSession);</span>
+        }
+<span class="nc" id="L150">    }</span>
+
+    public SaslMechanismSelector addMechanism(String mechName) {
+<span class="nc" id="L153">        Assert.checkNotNullParam(&quot;mechName&quot;, mechName);</span>
+<span class="nc" id="L154">        return new AddSelector(this, mechName);</span>
+    }
+
+    public SaslMechanismSelector addMechanisms(String... mechNames) {
+<span class="nc" id="L158">        Assert.checkNotNullParam(&quot;mechNames&quot;, mechNames);</span>
+<span class="nc" id="L159">        SaslMechanismSelector selector = this;</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">        for (String mechName : mechNames) {</span>
+<span class="nc" id="L161">            selector = new AddSelector(selector, mechName);</span>
+        }
+<span class="nc" id="L163">        return selector;</span>
+    }
+
+    public SaslMechanismSelector forbidMechanism(String mechName) {
+<span class="nc" id="L167">        Assert.checkNotNullParam(&quot;mechName&quot;, mechName);</span>
+<span class="nc" id="L168">        return new ForbidSelector(this, mechName);</span>
+    }
+
+    public SaslMechanismSelector forbidMechanisms(String... mechNames) {
+<span class="nc" id="L172">        Assert.checkNotNullParam(&quot;mechNames&quot;, mechNames);</span>
+<span class="nc" id="L173">        SaslMechanismSelector selector = this;</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">        for (String mechName : mechNames) {</span>
+<span class="nc" id="L175">            selector = new ForbidSelector(selector, mechName);</span>
+        }
+<span class="nc" id="L177">        return selector;</span>
+    }
+
+    public SaslMechanismSelector addMatching(SaslMechanismPredicate predicate) {
+<span class="nc" id="L181">        Assert.checkNotNullParam(&quot;predicate&quot;, predicate);</span>
+<span class="nc" id="L182">        return new AddMatchingSelector(this, predicate);</span>
+    }
+
+    public SaslMechanismSelector forbidMatching(SaslMechanismPredicate predicate) {
+<span class="nc" id="L186">        Assert.checkNotNullParam(&quot;predicate&quot;, predicate);</span>
+<span class="nc" id="L187">        return new ForbidMatchingSelector(this, predicate);</span>
+    }
+
+    public SaslMechanismSelector addAllRemaining() {
+<span class="nc" id="L191">        return addMatching(SaslMechanismPredicate.matchTrue());</span>
+    }
+
+    public final String toString() {
+<span class="nc" id="L195">        final StringBuilder b = new StringBuilder();</span>
+<span class="nc" id="L196">        toString(b);</span>
+<span class="nc" id="L197">        return b.toString();</span>
+    }
+
+    public int hashCode() {
+<span class="nc" id="L201">        int hashCode = this.hashCode;</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">        if (hashCode == 0) {</span>
+<span class="nc" id="L203">            hashCode = forbidHashCode() * 19 + addHashCode();</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">            return this.hashCode = hashCode == 0 ? 1 : hashCode;</span>
+        }
+<span class="nc" id="L206">        return hashCode;</span>
+    }
+
+    public final boolean equals(final Object obj) {
+<span class="nc bnc" id="L210" title="All 4 branches missed.">        return obj instanceof SaslMechanismSelector &amp;&amp; equals((SaslMechanismSelector) obj);</span>
+    }
+
+    public final boolean equals(final SaslMechanismSelector selector) {
+<span class="nc bnc" id="L214" title="All 14 branches missed.">        return this == selector || selector != null &amp;&amp; hashCode() == selector.hashCode() &amp;&amp; forbidHalfEquals(selector) &amp;&amp; selector.forbidHalfEquals(this) &amp;&amp; addHalfEquals(selector) &amp;&amp; selector.addHalfEquals(this);</span>
+    }
+
+<span class="nc" id="L217">    public static final SaslMechanismSelector NONE = new EmptySelector();</span>
+
+<span class="nc" id="L219">    public static final SaslMechanismSelector ALL = NONE.addAllRemaining();</span>
+
+<span class="nc" id="L221">    public static final SaslMechanismSelector DEFAULT = ALL.forbidMatching(</span>
+<span class="nc" id="L222">        SaslMechanismPredicate.matchAny(</span>
+<span class="nc" id="L223">            SaslMechanismPredicate.matchFamily(&quot;IEC-ISO-9798&quot;),</span>
+<span class="nc" id="L224">            SaslMechanismPredicate.matchExact(&quot;OTP&quot;),</span>
+<span class="nc" id="L225">            SaslMechanismPredicate.matchExact(&quot;NTLM&quot;),</span>
+<span class="nc" id="L226">            SaslMechanismPredicate.matchExact(&quot;CRAM-MD5&quot;)</span>
+        )
+    );
+
+    private static final int TOK_INVALID = 0;
+    private static final int TOK_FAMILY = 1;
+    private static final int TOK_TLS = 2;
+    private static final int TOK_PLUS = 3;
+    private static final int TOK_MUTUAL = 4;
+    private static final int TOK_HASH = 5;
+    private static final int TOK_MINUS = 6;
+    private static final int TOK_ALL = 7;
+    private static final int TOK_LPAREN = 8;
+    private static final int TOK_RPAREN = 9;
+    private static final int TOK_OR = 10;
+    private static final int TOK_AND = 11;
+    private static final int TOK_EQ = 12;
+    private static final int TOK_Q = 13;
+    private static final int TOK_COLON = 14;
+    private static final int TOK_NOT = 15;
+    private static final int TOK_NAME = 16;
+    private static final int TOK_END = -1;
+
+    static final class Tokenizer {
+        private final String string;
+        private final CodePointIterator i;
+<span class="nc" id="L252">        private int current = TOK_INVALID;</span>
+        private int next;
+        private long offs;
+        private String stringVal;
+        private String nextStringVal;
+
+<span class="nc" id="L258">        Tokenizer(final String string) {</span>
+<span class="nc" id="L259">            this.string = string;</span>
+<span class="nc" id="L260">            this.i = CodePointIterator.ofString(string);</span>
+<span class="nc" id="L261">        }</span>
+
+        private static boolean isNameChar(int cp) {
+<span class="nc bnc" id="L264" title="All 6 branches missed.">            return Character.isLetterOrDigit(cp) || cp == '-' || cp == '_';</span>
+        }
+
+        @SuppressWarnings(&quot;SpellCheckingInspection&quot;)
+        boolean hasNext() {
+<span class="nc bnc" id="L269" title="All 2 branches missed.">            if (next == TOK_INVALID) {</span>
+                int cp;
+<span class="nc bnc" id="L271" title="All 2 branches missed.">                while (i.hasNext()) {</span>
+<span class="nc" id="L272">                    long offs = i.getIndex();</span>
+<span class="nc" id="L273">                    cp = i.next();</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">                    if (! Character.isWhitespace(cp)) {</span>
+                        // determine the token type, if valid
+<span class="nc bnc" id="L276" title="All 11 branches missed.">                        switch (cp) {</span>
+                            case '#': {
+                                // special of some sort
+<span class="nc bnc" id="L279" title="All 2 branches missed.">                                if (! i.hasNext()) {</span>
+<span class="nc" id="L280">                                    throw sasl.mechSelectorUnexpectedChar(cp, i.getIndex(), string);</span>
+                                }
+<span class="nc" id="L282">                                offs = i.getIndex();</span>
+<span class="nc" id="L283">                                cp = i.next();</span>
+<span class="nc bnc" id="L284" title="All 7 branches missed.">                                switch (cp) {</span>
+                                    case 'F': {
+                                        // FAMILY or nothing
+<span class="nc bnc" id="L287" title="All 2 branches missed.">                                        if (! i.limitedTo(5).contentEquals(&quot;AMILY&quot;)) {</span>
+<span class="nc" id="L288">                                            throw sasl.mechSelectorUnexpectedChar(cp, i.getIndex(), string);</span>
+                                        }
+<span class="nc bnc" id="L290" title="All 4 branches missed.">                                        if (i.hasNext() &amp;&amp; isNameChar(i.peekNext())) {</span>
+<span class="nc" id="L291">                                            throw sasl.mechSelectorUnexpectedChar(cp, i.getIndex(), string);</span>
+                                        }
+<span class="nc" id="L293">                                        this.offs = offs;</span>
+<span class="nc" id="L294">                                        this.next = TOK_FAMILY;</span>
+<span class="nc" id="L295">                                        return true;</span>
+                                    }
+                                    case 'T': {
+                                        // TLS
+<span class="nc bnc" id="L299" title="All 2 branches missed.">                                        if (! i.limitedTo(2).contentEquals(&quot;LS&quot;)) {</span>
+<span class="nc" id="L300">                                            throw sasl.mechSelectorUnexpectedChar(cp, i.getIndex(), string);</span>
+                                        }
+<span class="nc bnc" id="L302" title="All 4 branches missed.">                                        if (i.hasNext() &amp;&amp; isNameChar(i.peekNext())) {</span>
+<span class="nc" id="L303">                                            throw sasl.mechSelectorUnexpectedChar(cp, i.getIndex(), string);</span>
+                                        }
+<span class="nc" id="L305">                                        this.offs = offs;</span>
+<span class="nc" id="L306">                                        this.next = TOK_TLS;</span>
+<span class="nc" id="L307">                                        return true;</span>
+                                    }
+                                    case 'P': {
+                                        // PLUS
+<span class="nc bnc" id="L311" title="All 2 branches missed.">                                        if (! i.limitedTo(3).contentEquals(&quot;LUS&quot;)) {</span>
+<span class="nc" id="L312">                                            throw sasl.mechSelectorUnexpectedChar(cp, i.getIndex(), string);</span>
+                                        }
+<span class="nc bnc" id="L314" title="All 4 branches missed.">                                        if (i.hasNext() &amp;&amp; isNameChar(i.peekNext())) {</span>
+<span class="nc" id="L315">                                            throw sasl.mechSelectorUnexpectedChar(cp, i.getIndex(), string);</span>
+                                        }
+<span class="nc" id="L317">                                        this.offs = offs;</span>
+<span class="nc" id="L318">                                        this.next = TOK_PLUS;</span>
+<span class="nc" id="L319">                                        return true;</span>
+                                    }
+                                    case 'M': {
+                                        // MUTUAL
+<span class="nc bnc" id="L323" title="All 2 branches missed.">                                        if (! i.limitedTo(5).contentEquals(&quot;UTUAL&quot;)) {</span>
+<span class="nc" id="L324">                                            throw sasl.mechSelectorUnexpectedChar(cp, i.getIndex(), string);</span>
+                                        }
+<span class="nc bnc" id="L326" title="All 4 branches missed.">                                        if (i.hasNext() &amp;&amp; isNameChar(i.peekNext())) {</span>
+<span class="nc" id="L327">                                            throw sasl.mechSelectorUnexpectedChar(cp, i.getIndex(), string);</span>
+                                        }
+<span class="nc" id="L329">                                        this.offs = offs;</span>
+<span class="nc" id="L330">                                        this.next = TOK_MUTUAL;</span>
+<span class="nc" id="L331">                                        return true;</span>
+                                    }
+                                    case 'H': {
+                                        // HASH
+<span class="nc bnc" id="L335" title="All 2 branches missed.">                                        if (! i.limitedTo(3).contentEquals(&quot;ASH&quot;)) {</span>
+<span class="nc" id="L336">                                            throw sasl.mechSelectorUnexpectedChar(cp, i.getIndex(), string);</span>
+                                        }
+<span class="nc bnc" id="L338" title="All 4 branches missed.">                                        if (i.hasNext() &amp;&amp; isNameChar(i.peekNext())) {</span>
+<span class="nc" id="L339">                                            throw sasl.mechSelectorUnexpectedChar(cp, i.getIndex(), string);</span>
+                                        }
+<span class="nc" id="L341">                                        this.offs = offs;</span>
+<span class="nc" id="L342">                                        this.next = TOK_HASH;</span>
+<span class="nc" id="L343">                                        return true;</span>
+                                    }
+                                    case 'A': {
+                                        // ALL
+<span class="nc bnc" id="L347" title="All 2 branches missed.">                                        if (! i.limitedTo(2).contentEquals(&quot;LL&quot;)) {</span>
+<span class="nc" id="L348">                                            throw sasl.mechSelectorUnexpectedChar(cp, i.getIndex(), string);</span>
+                                        }
+<span class="nc bnc" id="L350" title="All 4 branches missed.">                                        if (i.hasNext() &amp;&amp; isNameChar(i.peekNext())) {</span>
+<span class="nc" id="L351">                                            throw sasl.mechSelectorUnexpectedChar(cp, i.getIndex(), string);</span>
+                                        }
+<span class="nc" id="L353">                                        this.offs = offs;</span>
+<span class="nc" id="L354">                                        this.next = TOK_ALL;</span>
+<span class="nc" id="L355">                                        return true;</span>
+                                    }
+                                    default: {
+<span class="nc" id="L358">                                        throw sasl.mechSelectorUnexpectedChar(cp, i.getIndex(), string);</span>
+                                    }
+                                }
+                            }
+                            case '-': {
+<span class="nc" id="L363">                                this.offs = offs;</span>
+<span class="nc" id="L364">                                this.next = TOK_MINUS;</span>
+<span class="nc" id="L365">                                return true;</span>
+                            }
+                            case '(': {
+<span class="nc" id="L368">                                this.offs = offs;</span>
+<span class="nc" id="L369">                                this.next = TOK_LPAREN;</span>
+<span class="nc" id="L370">                                return true;</span>
+                            }
+                            case ')': {
+<span class="nc" id="L373">                                this.offs = offs;</span>
+<span class="nc" id="L374">                                this.next = TOK_RPAREN;</span>
+<span class="nc" id="L375">                                return true;</span>
+                            }
+                            case '?': {
+<span class="nc" id="L378">                                this.offs = offs;</span>
+<span class="nc" id="L379">                                this.next = TOK_Q;</span>
+<span class="nc" id="L380">                                return true;</span>
+                            }
+                            case ':': {
+<span class="nc" id="L383">                                this.offs = offs;</span>
+<span class="nc" id="L384">                                this.next = TOK_COLON;</span>
+<span class="nc" id="L385">                                return true;</span>
+                            }
+                            case '!': {
+<span class="nc" id="L388">                                this.offs = offs;</span>
+<span class="nc" id="L389">                                this.next = TOK_NOT;</span>
+<span class="nc" id="L390">                                return true;</span>
+                            }
+                            case '|': {
+<span class="nc" id="L393">                                cp = i.next();</span>
+<span class="nc bnc" id="L394" title="All 2 branches missed.">                                if (cp != '|') {</span>
+<span class="nc" id="L395">                                    throw sasl.mechSelectorUnexpectedChar(cp, i.getIndex(), string);</span>
+                                }
+<span class="nc" id="L397">                                this.offs = offs;</span>
+<span class="nc" id="L398">                                this.next = TOK_OR;</span>
+<span class="nc" id="L399">                                return true;</span>
+                            }
+                            case '&amp;': {
+<span class="nc" id="L402">                                cp = i.next();</span>
+<span class="nc bnc" id="L403" title="All 2 branches missed.">                                if (cp != '&amp;') {</span>
+<span class="nc" id="L404">                                    throw sasl.mechSelectorUnexpectedChar(cp, i.getIndex(), string);</span>
+                                }
+<span class="nc" id="L406">                                this.offs = offs;</span>
+<span class="nc" id="L407">                                this.next = TOK_AND;</span>
+<span class="nc" id="L408">                                return true;</span>
+                            }
+                            case '=': {
+<span class="nc" id="L411">                                cp = i.next();</span>
+<span class="nc bnc" id="L412" title="All 2 branches missed.">                                if (cp != '=') {</span>
+<span class="nc" id="L413">                                    throw sasl.mechSelectorUnexpectedChar(cp, i.getIndex(), string);</span>
+                                }
+<span class="nc" id="L415">                                this.offs = offs;</span>
+<span class="nc" id="L416">                                this.next = TOK_EQ;</span>
+<span class="nc" id="L417">                                return true;</span>
+                            }
+                            default: {
+<span class="nc bnc" id="L420" title="All 4 branches missed.">                                if (Character.isLetterOrDigit(cp) || cp == '_') {</span>
+                                    // name, probably
+<span class="nc" id="L422">                                    final long start = i.getIndex() - 1;</span>
+                                    for (;;) {
+<span class="nc bnc" id="L424" title="All 2 branches missed.">                                        if (! i.hasNext()) {</span>
+<span class="nc" id="L425">                                            nextStringVal = string.substring((int) start);</span>
+<span class="nc" id="L426">                                            this.offs = offs;</span>
+<span class="nc" id="L427">                                            next = TOK_NAME;</span>
+<span class="nc" id="L428">                                            return true;</span>
+                                        }
+<span class="nc" id="L430">                                        cp = i.next();</span>
+<span class="nc bnc" id="L431" title="All 2 branches missed.">                                        if (! isNameChar(cp)) {</span>
+<span class="nc" id="L432">                                            switch (nextStringVal = string.substring((int) start, (int) i.getIndex() - 1)) {}</span>
+<span class="nc" id="L433">                                            i.previous();</span>
+<span class="nc" id="L434">                                            this.offs = offs;</span>
+<span class="nc" id="L435">                                            next = TOK_NAME;</span>
+<span class="nc" id="L436">                                            return true;</span>
+                                        }
+                                    }
+                                } else {
+<span class="nc" id="L440">                                    throw sasl.mechSelectorUnexpectedChar(cp, i.getIndex(), string);</span>
+                                }
+                            }
+                        }
+                    }
+<span class="nc" id="L445">                }</span>
+<span class="nc" id="L446">                this.next = TOK_END;</span>
+<span class="nc" id="L447">                return false;</span>
+            }
+<span class="nc bnc" id="L449" title="All 2 branches missed.">            return next != TOK_END;</span>
+        }
+
+        int peekNext() {
+<span class="nc bnc" id="L453" title="All 2 branches missed.">            if (! hasNext()) {</span>
+<span class="nc" id="L454">                throw new NoSuchElementException();</span>
+            }
+<span class="nc" id="L456">            return next;</span>
+        }
+
+        int next() {
+<span class="nc bnc" id="L460" title="All 2 branches missed.">            if (! hasNext()) {</span>
+<span class="nc" id="L461">                throw new NoSuchElementException();</span>
+            }
+            try {
+<span class="nc" id="L464">                return next;</span>
+            } finally {
+<span class="nc" id="L466">                current = next;</span>
+<span class="nc" id="L467">                stringVal = nextStringVal;</span>
+<span class="nc" id="L468">                next = TOK_INVALID;</span>
+<span class="nc" id="L469">                nextStringVal = null;</span>
+            }
+        }
+
+        int current() {
+<span class="nc" id="L474">            return current;</span>
+        }
+
+        int offset() {
+<span class="nc" id="L478">            return (int) offs;</span>
+        }
+
+        String getStringVal() {
+<span class="nc" id="L482">            return stringVal;</span>
+        }
+    }
+
+    static String tokToString(Tokenizer t) {
+<span class="nc bnc" id="L487" title="All 19 branches missed.">        switch (t.current()) {</span>
+<span class="nc" id="L488">            case TOK_INVALID: return &quot;&lt;&lt;invalid&gt;&gt;&quot;;</span>
+<span class="nc" id="L489">            case TOK_FAMILY: return &quot;#FAMILY&quot;;</span>
+<span class="nc" id="L490">            case TOK_TLS: return &quot;#TLS&quot;;</span>
+<span class="nc" id="L491">            case TOK_PLUS: return &quot;#PLUS&quot;;</span>
+<span class="nc" id="L492">            case TOK_MUTUAL: return &quot;#MUTUAL&quot;;</span>
+<span class="nc" id="L493">            case TOK_HASH: return &quot;#HASH&quot;;</span>
+<span class="nc" id="L494">            case TOK_MINUS: return &quot;-&quot;;</span>
+<span class="nc" id="L495">            case TOK_ALL: return &quot;#ALL&quot;;</span>
+<span class="nc" id="L496">            case TOK_LPAREN: return &quot;(&quot;;</span>
+<span class="nc" id="L497">            case TOK_RPAREN: return &quot;)&quot;;</span>
+<span class="nc" id="L498">            case TOK_OR: return &quot;||&quot;;</span>
+<span class="nc" id="L499">            case TOK_AND: return &quot;&amp;&amp;&quot;;</span>
+<span class="nc" id="L500">            case TOK_EQ: return &quot;==&quot;;</span>
+<span class="nc" id="L501">            case TOK_Q: return &quot;?&quot;;</span>
+<span class="nc" id="L502">            case TOK_COLON: return &quot;:&quot;;</span>
+<span class="nc" id="L503">            case TOK_NOT: return &quot;!&quot;;</span>
+<span class="nc" id="L504">            case TOK_NAME: return &quot;&lt;name&gt;&quot;;</span>
+<span class="nc" id="L505">            case TOK_END: return &quot;&lt;&lt;end&gt;&gt;&quot;;</span>
+<span class="nc" id="L506">            default: return &quot;&lt;&lt;unknown&gt;&gt;&quot;;</span>
+        }
+    }
+
+    /*
+     * Pure grammar (right-recursive, left-to-right, top-down (LL(1)) rec-descent):
+     *
+     *     selector ::= ( name | top-level-predicate | '-' name | '-' top-level-predicate \ '#ALL' )*
+     *
+     *     name ::= [A-Za-z0-9_][-A-Za-z0-9_]*
+     *
+     *     special ::= '#FAMILY' '(' name ')' |
+     *              '#TLS' |
+     *              '#PLUS' |
+     *              '#MUTUAL' |
+     *              '#HASH' '(' name ')'
+     *
+     *     top-level-predicate ::= '(' if-predicate ')' |
+     *                   special |
+     *                   name |
+     *                   '!' top-level-predicate
+     *
+     *     and-predicate ::= top-level-predicate '&amp;&amp;' and-predicate |
+     *                       top-level-predicate
+     *
+     *     or-predicate ::= and-predicate '||' or-predicate |
+     *                      and-predicate
+     *
+     *     eq-predicate ::= or-predicate '==' eq-predicate |
+     *                      or-predicate
+     *
+     *     if-predicate ::= eq-predicate '?' if-predicate ':' if-predicate |
+     *                      eq-predicate
+     *
+     * Note that the or-, eq-, and if-predicates rules are really implemented as a repeating loop for efficiency.
+     */
+    public static SaslMechanismSelector fromString(String string) {
+<span class="nc" id="L543">        Assert.checkNotNullParam(&quot;string&quot;, string);</span>
+<span class="nc" id="L544">        final Tokenizer t = new Tokenizer(string);</span>
+<span class="nc" id="L545">        SaslMechanismSelector current = NONE;</span>
+        int tok;
+<span class="nc bnc" id="L547" title="All 2 branches missed.">        while (t.hasNext()) {</span>
+<span class="nc" id="L548">            tok = t.next();</span>
+<span class="nc bnc" id="L549" title="All 4 branches missed.">            switch (tok) {</span>
+                case TOK_NAME: {
+<span class="nc" id="L551">                    current = current.addMechanism(t.getStringVal());</span>
+<span class="nc" id="L552">                    break;</span>
+                }
+                case TOK_ALL: {
+<span class="nc" id="L555">                    current = current.addAllRemaining();</span>
+<span class="nc" id="L556">                    break;</span>
+                }
+                case TOK_MINUS: {
+<span class="nc bnc" id="L559" title="All 2 branches missed.">                    if (! t.hasNext()) {</span>
+<span class="nc" id="L560">                        throw sasl.mechSelectorTokenNotAllowed(tokToString(t), t.offset(), string);</span>
+                    }
+<span class="nc" id="L562">                    tok = t.next();</span>
+<span class="nc bnc" id="L563" title="All 2 branches missed.">                    switch (tok) {</span>
+                        case TOK_NAME: {
+<span class="nc" id="L565">                            current = current.forbidMechanism(t.getStringVal());</span>
+<span class="nc" id="L566">                            break;</span>
+                        }
+                        default: {
+                            // try a predicate
+<span class="nc" id="L570">                            current = current.forbidMatching(parseTopLevelPredicate(t, string, tok));</span>
+<span class="nc" id="L571">                            break;</span>
+                        }
+                    }
+                    break;
+                }
+                default: {
+                    // try a predicate
+<span class="nc" id="L578">                    current = current.addMatching(parseTopLevelPredicate(t, string, tok));</span>
+<span class="nc" id="L579">                    break;</span>
+                }
+            }
+        }
+<span class="nc" id="L583">        return current;</span>
+    }
+
+    private static SaslMechanismPredicate parseTopLevelPredicate(final Tokenizer t, final String string, final int tok) {
+<span class="nc bnc" id="L587" title="All 9 branches missed.">        switch (tok) {</span>
+            case TOK_LPAREN: {
+<span class="nc bnc" id="L589" title="All 2 branches missed.">                if (! t.hasNext()) {</span>
+<span class="nc" id="L590">                    throw sasl.mechSelectorUnexpectedEnd(string);</span>
+                }
+<span class="nc" id="L592">                final SaslMechanismPredicate result = parseIfPredicate(t, string);</span>
+<span class="nc bnc" id="L593" title="All 2 branches missed.">                if (! t.hasNext()) {</span>
+<span class="nc" id="L594">                    throw sasl.mechSelectorUnexpectedEnd(string);</span>
+                }
+<span class="nc bnc" id="L596" title="All 2 branches missed.">                if (t.next() != TOK_RPAREN) {</span>
+<span class="nc" id="L597">                    throw sasl.mechSelectorTokenNotAllowed(tokToString(t), t.offset(), string);</span>
+                }
+<span class="nc" id="L599">                return result;</span>
+            }
+            case TOK_FAMILY: {
+<span class="nc" id="L602">                return SaslMechanismPredicate.matchFamily(parseSpecialWithName(string, t));</span>
+            }
+            case TOK_HASH: {
+<span class="nc" id="L605">                return SaslMechanismPredicate.matchHashFunction(parseSpecialWithName(string, t));</span>
+            }
+            case TOK_PLUS: {
+<span class="nc" id="L608">                return SaslMechanismPredicate.matchPlus();</span>
+            }
+            case TOK_TLS: {
+<span class="nc" id="L611">                return SaslMechanismPredicate.matchTLSActive();</span>
+            }
+            case TOK_MUTUAL: {
+<span class="nc" id="L614">                return SaslMechanismPredicate.matchMutual();</span>
+            }
+            case TOK_NAME: {
+<span class="nc" id="L617">                return SaslMechanismPredicate.matchExact(t.getStringVal());</span>
+            }
+            case TOK_NOT: {
+<span class="nc" id="L620">                return parseTopLevelPredicate(t, string).not();</span>
+            }
+            default: {
+<span class="nc" id="L623">                throw sasl.mechSelectorTokenNotAllowed(tokToString(t), t.offset(), string);</span>
+            }
+        }
+    }
+
+    private static SaslMechanismPredicate parseIfPredicate(final Tokenizer t, final String string) {
+<span class="nc" id="L629">        SaslMechanismPredicate query = parseEqPredicate(t, string);</span>
+<span class="nc bnc" id="L630" title="All 4 branches missed.">        if (! t.hasNext() || t.peekNext() != TOK_Q) {</span>
+<span class="nc" id="L631">            return query;</span>
+        }
+<span class="nc" id="L633">        t.next(); // consume</span>
+<span class="nc" id="L634">        SaslMechanismPredicate ifTrue = parseIfPredicate(t, string);</span>
+<span class="nc bnc" id="L635" title="All 2 branches missed.">        if (! t.hasNext()) {</span>
+<span class="nc" id="L636">            throw sasl.mechSelectorUnexpectedEnd(string);</span>
+        }
+<span class="nc bnc" id="L638" title="All 2 branches missed.">        if (t.next() != TOK_COLON) {</span>
+<span class="nc" id="L639">            throw sasl.mechSelectorTokenNotAllowed(tokToString(t), t.offset(), string);</span>
+        }
+<span class="nc" id="L641">        SaslMechanismPredicate ifFalse = parseIfPredicate(t, string);</span>
+<span class="nc" id="L642">        return SaslMechanismPredicate.matchIf(query, ifTrue, ifFalse);</span>
+    }
+
+    private static SaslMechanismPredicate parseEqPredicate(final Tokenizer t, final String string) {
+<span class="nc" id="L646">        SaslMechanismPredicate first = parseOrPredicate(t, string);</span>
+<span class="nc bnc" id="L647" title="All 4 branches missed.">        if (! t.hasNext() || t.peekNext() != TOK_EQ) {</span>
+<span class="nc" id="L648">            return first;</span>
+        }
+<span class="nc" id="L650">        ArrayList&lt;SaslMechanismPredicate&gt; list = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L651">        list.add(first);</span>
+<span class="nc" id="L652">        t.next(); // consume</span>
+        for (;;) {
+<span class="nc" id="L654">            list.add(parseOrPredicate(t, string));</span>
+<span class="nc bnc" id="L655" title="All 4 branches missed.">            if (! t.hasNext() || t.peekNext() != TOK_EQ) {</span>
+<span class="nc" id="L656">                return SaslMechanismPredicate.matchAllOrNone(list.toArray(NO_PREDICATES));</span>
+            }
+        }
+    }
+
+    private static SaslMechanismPredicate parseOrPredicate(final Tokenizer t, final String string) {
+<span class="nc" id="L662">        SaslMechanismPredicate first = parseAndPredicate(t, string);</span>
+<span class="nc bnc" id="L663" title="All 4 branches missed.">        if (! t.hasNext() || t.peekNext() != TOK_OR) {</span>
+<span class="nc" id="L664">            return first;</span>
+        }
+<span class="nc" id="L666">        ArrayList&lt;SaslMechanismPredicate&gt; list = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L667">        list.add(first);</span>
+<span class="nc" id="L668">        t.next(); // consume</span>
+        for (;;) {
+<span class="nc" id="L670">            list.add(parseAndPredicate(t, string));</span>
+<span class="nc bnc" id="L671" title="All 4 branches missed.">            if (! t.hasNext() || t.peekNext() != TOK_OR) {</span>
+<span class="nc" id="L672">                return SaslMechanismPredicate.matchAny(list.toArray(NO_PREDICATES));</span>
+            }
+        }
+    }
+
+    private static SaslMechanismPredicate parseAndPredicate(final Tokenizer t, final String string) {
+<span class="nc" id="L678">        SaslMechanismPredicate first = parseTopLevelPredicate(t, string);</span>
+<span class="nc bnc" id="L679" title="All 4 branches missed.">        if (! t.hasNext() || t.peekNext() != TOK_AND) {</span>
+<span class="nc" id="L680">            return first;</span>
+        }
+<span class="nc" id="L682">        ArrayList&lt;SaslMechanismPredicate&gt; list = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L683">        list.add(first);</span>
+<span class="nc" id="L684">        t.next(); // consume</span>
+        for (;;) {
+<span class="nc" id="L686">            list.add(parseTopLevelPredicate(t, string));</span>
+<span class="nc bnc" id="L687" title="All 4 branches missed.">            if (! t.hasNext() || t.peekNext() != TOK_OR) {</span>
+<span class="nc" id="L688">                return SaslMechanismPredicate.matchAll(list.toArray(NO_PREDICATES));</span>
+            }
+        }
+    }
+
+    private static SaslMechanismPredicate parseTopLevelPredicate(final Tokenizer t, final String string) {
+<span class="nc bnc" id="L694" title="All 2 branches missed.">        if (! t.hasNext()) {</span>
+<span class="nc" id="L695">            throw sasl.mechSelectorUnexpectedEnd(string);</span>
+        }
+<span class="nc" id="L697">        return parseTopLevelPredicate(t, string, t.next());</span>
+    }
+
+    private static String parseSpecialWithName(final String string, final Tokenizer t) {
+<span class="nc bnc" id="L701" title="All 2 branches missed.">        if (! t.hasNext()) {</span>
+<span class="nc" id="L702">            throw sasl.mechSelectorTokenNotAllowed(tokToString(t), t.offset(), string);</span>
+        }
+<span class="nc bnc" id="L704" title="All 2 branches missed.">        if (t.next() != TOK_LPAREN) {</span>
+<span class="nc" id="L705">            throw sasl.mechSelectorTokenNotAllowed(tokToString(t), t.offset(), string);</span>
+        }
+<span class="nc bnc" id="L707" title="All 2 branches missed.">        if (! t.hasNext()) {</span>
+<span class="nc" id="L708">            throw sasl.mechSelectorTokenNotAllowed(tokToString(t), t.offset(), string);</span>
+        }
+<span class="nc bnc" id="L710" title="All 2 branches missed.">        if (t.next() != TOK_NAME) {</span>
+<span class="nc" id="L711">            throw sasl.mechSelectorTokenNotAllowed(tokToString(t), t.offset(), string);</span>
+        }
+<span class="nc" id="L713">        String familyName = t.getStringVal();</span>
+<span class="nc bnc" id="L714" title="All 2 branches missed.">        if (! t.hasNext()) {</span>
+<span class="nc" id="L715">            throw sasl.mechSelectorTokenNotAllowed(tokToString(t), t.offset(), string);</span>
+        }
+<span class="nc bnc" id="L717" title="All 2 branches missed.">        if (t.next() != TOK_RPAREN) {</span>
+<span class="nc" id="L718">            throw sasl.mechSelectorTokenNotAllowed(tokToString(t), t.offset(), string);</span>
+        }
+<span class="nc" id="L720">        return familyName;</span>
+    }
+
+    // ============= private =============
+
+    int addHashCode() {
+<span class="nc bnc" id="L726" title="All 2 branches missed.">        return prev == null ? 0 : prev.addHashCode();</span>
+    }
+
+    int forbidHashCode() {
+<span class="nc bnc" id="L730" title="All 2 branches missed.">        return prev == null ? 0 : prev.forbidHashCode();</span>
+    }
+
+    boolean forbidHalfEquals(final SaslMechanismSelector selector) {
+<span class="nc" id="L734">        final SaslMechanismSelector prev = this.prev;</span>
+<span class="nc bnc" id="L735" title="All 4 branches missed.">        return prev == null || prev.forbidHalfEquals(selector);</span>
+    }
+
+    boolean addHalfEquals(final SaslMechanismSelector selector) {
+<span class="nc" id="L739">        final SaslMechanismSelector prev = this.prev;</span>
+<span class="nc bnc" id="L740" title="All 4 branches missed.">        return prev == null || prev.addHalfEquals(selector);</span>
+    }
+
+    abstract void toString(StringBuilder b);
+
+    boolean adds(final String mechName) {
+<span class="nc" id="L746">        final SaslMechanismSelector prev = this.prev;</span>
+<span class="nc bnc" id="L747" title="All 4 branches missed.">        return prev != null &amp;&amp; prev.adds(mechName);</span>
+    }
+
+    boolean adds(final SaslMechanismPredicate predicate) {
+<span class="nc" id="L751">        final SaslMechanismSelector prev = this.prev;</span>
+<span class="nc bnc" id="L752" title="All 4 branches missed.">        return prev != null &amp;&amp; prev.adds(predicate);</span>
+    }
+
+    boolean forbids(final String mechName) {
+<span class="nc" id="L756">        final SaslMechanismSelector prev = this.prev;</span>
+<span class="nc bnc" id="L757" title="All 4 branches missed.">        return prev != null &amp;&amp; prev.forbids(mechName);</span>
+    }
+
+    boolean forbids(final SaslMechanismPredicate predicate) {
+<span class="nc" id="L761">        final SaslMechanismSelector prev = this.prev;</span>
+<span class="nc bnc" id="L762" title="All 4 branches missed.">        return prev != null &amp;&amp; prev.forbids(predicate);</span>
+    }
+
+    static class EmptySelector extends SaslMechanismSelector {
+<span class="nc" id="L766">        private static final Supplier&lt;String&gt; empty = () -&gt; null;</span>
+
+        EmptySelector() {
+<span class="nc" id="L769">            super(null);</span>
+<span class="nc" id="L770">        }</span>
+
+        protected Supplier&lt;String&gt; doCreateSupplier(final LinkedHashSet&lt;String&gt; set, final SSLSession sslSession) {
+<span class="nc" id="L773">            return empty;</span>
+        }
+
+        void toString(final StringBuilder b) {
+<span class="nc" id="L777">        }</span>
+    }
+
+    static class AddSelector extends SaslMechanismSelector {
+        private final String mechName;
+
+        AddSelector(final SaslMechanismSelector prev, final String mechName) {
+<span class="nc" id="L784">            super(prev);</span>
+<span class="nc" id="L785">            this.mechName = mechName;</span>
+<span class="nc" id="L786">        }</span>
+
+        Supplier&lt;String&gt; doCreateSupplier(final LinkedHashSet&lt;String&gt; set, final SSLSession sslSession) {
+<span class="nc" id="L789">            final Supplier&lt;String&gt; prevSupplier = prev.doCreateSupplier(set, sslSession);</span>
+<span class="nc" id="L790">            return () -&gt; {</span>
+<span class="nc" id="L791">                final String name = prevSupplier.get();</span>
+<span class="nc bnc" id="L792" title="All 2 branches missed.">                if (name != null) {</span>
+<span class="nc" id="L793">                    return name;</span>
+                }
+<span class="nc bnc" id="L795" title="All 2 branches missed.">                if (set.remove(mechName)) {</span>
+<span class="nc" id="L796">                    return mechName;</span>
+                }
+<span class="nc" id="L798">                return null;</span>
+            };
+        }
+
+        int addHashCode() {
+<span class="nc" id="L803">            return super.addHashCode() * 19 + mechName.hashCode();</span>
+        }
+
+        boolean addHalfEquals(final SaslMechanismSelector selector) {
+<span class="nc bnc" id="L807" title="All 4 branches missed.">            return super.addHalfEquals(selector) &amp;&amp; selector.adds(mechName);</span>
+        }
+
+        boolean adds(final String mechName) {
+<span class="nc bnc" id="L811" title="All 4 branches missed.">            return this.mechName.equals(mechName) || super.adds(mechName);</span>
+        }
+
+        void toString(final StringBuilder b) {
+<span class="nc" id="L815">            prev.toString(b);</span>
+<span class="nc bnc" id="L816" title="All 2 branches missed.">            if (b.length() &gt; 0) b.append(' ');</span>
+<span class="nc" id="L817">            b.append(mechName);</span>
+<span class="nc" id="L818">        }</span>
+    }
+
+    static class ForbidSelector extends SaslMechanismSelector {
+        private final String mechName;
+
+        ForbidSelector(final SaslMechanismSelector prev, final String mechName) {
+<span class="nc" id="L825">            super(prev);</span>
+<span class="nc" id="L826">            this.mechName = mechName;</span>
+<span class="nc" id="L827">        }</span>
+
+        void preprocess(final Set&lt;String&gt; mechNames, final SSLSession sslSession) {
+<span class="nc" id="L830">            prev.preprocess(mechNames, sslSession);</span>
+<span class="nc" id="L831">            mechNames.remove(mechName);</span>
+<span class="nc" id="L832">        }</span>
+
+        Supplier&lt;String&gt; doCreateSupplier(final LinkedHashSet&lt;String&gt; set, final SSLSession sslSession) {
+<span class="nc" id="L835">            return prev.doCreateSupplier(set, sslSession);</span>
+        }
+
+        int forbidHashCode() {
+<span class="nc" id="L839">            return super.forbidHashCode() * 19 + mechName.hashCode();</span>
+        }
+
+        boolean forbidHalfEquals(final SaslMechanismSelector selector) {
+<span class="nc bnc" id="L843" title="All 4 branches missed.">            return super.forbidHalfEquals(selector) &amp;&amp; selector.forbids(mechName);</span>
+        }
+
+        boolean forbids(final String mechName) {
+<span class="nc bnc" id="L847" title="All 4 branches missed.">            return this.mechName.equals(mechName) || super.forbids(mechName);</span>
+        }
+
+        void toString(final StringBuilder b) {
+<span class="nc" id="L851">            prev.toString(b);</span>
+<span class="nc bnc" id="L852" title="All 2 branches missed.">            if (b.length() &gt; 0) b.append(' ');</span>
+<span class="nc" id="L853">            b.append('-').append(mechName);</span>
+<span class="nc" id="L854">        }</span>
+    }
+
+    static class AddMatchingSelector extends SaslMechanismSelector {
+        private final SaslMechanismPredicate predicate;
+
+        AddMatchingSelector(final SaslMechanismSelector prev, final SaslMechanismPredicate predicate) {
+<span class="nc" id="L861">            super(prev);</span>
+<span class="nc" id="L862">            this.predicate = predicate;</span>
+<span class="nc" id="L863">        }</span>
+
+        Supplier&lt;String&gt; doCreateSupplier(final LinkedHashSet&lt;String&gt; set, final SSLSession sslSession) {
+<span class="nc" id="L866">            final Supplier&lt;String&gt; prevSupplier = prev.doCreateSupplier(set, sslSession);</span>
+<span class="nc" id="L867">            final Iterator&lt;String&gt; iterator = set.iterator();</span>
+<span class="nc" id="L868">            return () -&gt; {</span>
+<span class="nc" id="L869">                String name = prevSupplier.get();</span>
+<span class="nc bnc" id="L870" title="All 2 branches missed.">                if (name != null) {</span>
+<span class="nc" id="L871">                    return name;</span>
+                }
+<span class="nc bnc" id="L873" title="All 2 branches missed.">                while (iterator.hasNext()) {</span>
+<span class="nc" id="L874">                    name = iterator.next();</span>
+<span class="nc bnc" id="L875" title="All 2 branches missed.">                    if (predicate.test(name, sslSession)) try {</span>
+<span class="nc" id="L876">                        return name;</span>
+                    } finally {
+<span class="nc" id="L878">                        iterator.remove();</span>
+                    }
+                }
+<span class="nc" id="L881">                return null;</span>
+            };
+        }
+
+        int addHashCode() {
+<span class="nc" id="L886">            return super.addHashCode() * 19 + predicate.calcHashCode();</span>
+        }
+
+        boolean addHalfEquals(final SaslMechanismSelector selector) {
+<span class="nc bnc" id="L890" title="All 4 branches missed.">            return super.addHalfEquals(selector) &amp;&amp; selector.adds(predicate);</span>
+        }
+
+        boolean adds(final SaslMechanismPredicate predicate) {
+<span class="nc bnc" id="L894" title="All 4 branches missed.">            return this.predicate.equals(predicate) || super.adds(predicate);</span>
+        }
+
+        void toString(final StringBuilder b) {
+<span class="nc" id="L898">            prev.toString(b);</span>
+<span class="nc bnc" id="L899" title="All 2 branches missed.">            if (b.length() &gt; 0) b.append(' ');</span>
+<span class="nc" id="L900">            b.append('(').append(predicate).append(')');</span>
+<span class="nc" id="L901">        }</span>
+    }
+
+    static class ForbidMatchingSelector extends SaslMechanismSelector {
+        private final SaslMechanismPredicate predicate;
+
+        ForbidMatchingSelector(final SaslMechanismSelector prev, final SaslMechanismPredicate predicate) {
+<span class="nc" id="L908">            super(prev);</span>
+<span class="nc" id="L909">            this.predicate = predicate;</span>
+<span class="nc" id="L910">        }</span>
+
+        void preprocess(final Set&lt;String&gt; mechNames, final SSLSession sslSession) {
+<span class="nc" id="L913">            prev.preprocess(mechNames, sslSession);</span>
+<span class="nc" id="L914">            mechNames.removeIf(mechName -&gt; predicate.test(mechName, sslSession));</span>
+<span class="nc" id="L915">        }</span>
+
+        Supplier&lt;String&gt; doCreateSupplier(final LinkedHashSet&lt;String&gt; set, final SSLSession sslSession) {
+<span class="nc" id="L918">            return prev.doCreateSupplier(set, sslSession);</span>
+        }
+
+        int forbidHashCode() {
+<span class="nc" id="L922">            return super.forbidHashCode() * 19 + predicate.calcHashCode();</span>
+        }
+
+        boolean forbidHalfEquals(final SaslMechanismSelector selector) {
+<span class="nc bnc" id="L926" title="All 4 branches missed.">            return super.forbidHalfEquals(selector) &amp;&amp; selector.forbids(predicate);</span>
+        }
+
+        boolean forbids(final SaslMechanismPredicate predicate) {
+<span class="nc bnc" id="L930" title="All 4 branches missed.">            return this.predicate.equals(predicate) || super.forbids(predicate);</span>
+        }
+
+        void toString(final StringBuilder b) {
+<span class="nc" id="L934">            prev.toString(b);</span>
+<span class="nc bnc" id="L935" title="All 2 branches missed.">            if (b.length() &gt; 0) b.append(' ');</span>
+<span class="nc" id="L936">            b.append('-').append('(').append(predicate).append(')');</span>
+<span class="nc" id="L937">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PrivilegedServerMechanismFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-util</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.util</a> &gt; <span class="el_source">PrivilegedServerMechanismFactory.java</span></div><h1>PrivilegedServerMechanismFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.http.util;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+
+import java.security.AccessControlContext;
+import java.security.AccessController;
+import java.util.Map;
+
+import javax.security.auth.callback.CallbackHandler;
+
+import org.wildfly.security.http.HttpAuthenticationException;
+import org.wildfly.security.http.HttpServerAuthenticationMechanism;
+import org.wildfly.security.http.HttpServerAuthenticationMechanismFactory;
+
+/**
+ * A {@link HttpServerAuthenticationMechanismFactory} that wraps a delegate so that any returned
+ * {@link HttpServerAuthenticationMechanism} is wrapped by a wrapper that ensures all calls are using the provided
+ * {@link AccessControlContext}, if no AccessControlContext is provided then the one in place at the time this factory is
+ * instantiated is used instead.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public final class PrivilegedServerMechanismFactory implements HttpServerAuthenticationMechanismFactory {
+
+    private final HttpServerAuthenticationMechanismFactory delegate;
+    private final AccessControlContext accessControlContext;
+
+    /**
+     * Construct a new instance of {@code PrivilegedServerMechanismFactory}.
+     *
+     * @param delegate the {@link HttpServerAuthenticationMechanismFactory} to delegate to.
+     * @param accessControlContext the {@link AccessControlContext} to use for calls to the wrapped factory and subsequently any
+     *        mechanism created by that factory.
+     */
+    public PrivilegedServerMechanismFactory(final HttpServerAuthenticationMechanismFactory delegate,
+<span class="nc" id="L53">            final AccessControlContext accessControlContext) {</span>
+<span class="nc" id="L54">        this.delegate = checkNotNullParam(&quot;delegate&quot;, delegate);</span>
+<span class="nc" id="L55">        this.accessControlContext = checkNotNullParam(&quot;accessControlContext&quot;, accessControlContext);</span>
+<span class="nc" id="L56">    }</span>
+
+    /**
+     * Construct a new instance of {@code PrivilegedServerMechanismFactory} using the current {@link AccessControlContext} for
+     * calls to the wrapped factory
+     *
+     * @param delegate the {@link HttpServerAuthenticationMechanismFactory} to delegate to.
+     */
+    public PrivilegedServerMechanismFactory(final HttpServerAuthenticationMechanismFactory delegate) {
+<span class="nc" id="L65">        this(delegate, AccessController.getContext());</span>
+<span class="nc" id="L66">    }</span>
+
+    /**
+     * @see org.wildfly.security.http.HttpServerAuthenticationMechanismFactory#getMechanismNames(java.util.Map)
+     */
+    @Override
+    public String[] getMechanismNames(Map&lt;String, ?&gt; properties) {
+<span class="nc" id="L73">        return delegate.getMechanismNames(properties);</span>
+    }
+
+    /**
+     * @see org.wildfly.security.http.HttpServerAuthenticationMechanismFactory#createAuthenticationMechanism(java.lang.String, java.util.Map, javax.security.auth.callback.CallbackHandler)
+     */
+    @Override
+    public HttpServerAuthenticationMechanism createAuthenticationMechanism(String mechanismName, Map&lt;String, ?&gt; properties,
+            CallbackHandler callbackHandler) throws HttpAuthenticationException {
+<span class="nc" id="L82">        HttpServerAuthenticationMechanism serverMechanism = delegate.createAuthenticationMechanism(mechanismName, properties,</span>
+                callbackHandler);
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        return serverMechanism != null ? new PrivilegedServerMechanism(serverMechanism, accessControlContext) : null;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

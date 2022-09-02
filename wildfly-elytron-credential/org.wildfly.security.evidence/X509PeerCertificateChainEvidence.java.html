@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>X509PeerCertificateChainEvidence.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-credential</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.evidence</a> &gt; <span class="el_source">X509PeerCertificateChainEvidence.java</span></div><h1>X509PeerCertificateChainEvidence.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.evidence;
+
+import java.security.Principal;
+import java.security.cert.X509Certificate;
+
+import javax.security.auth.x500.X500Principal;
+
+import org.wildfly.common.Assert;
+
+/**
+ * A piece of evidence that is comprised of a verified peer certificate chain.
+ */
+public final class X509PeerCertificateChainEvidence implements AlgorithmEvidence {
+
+    private final X509Certificate[] peerCertificateChain;
+    private Principal decodedPrincipal;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param peerCertificateChain the peer certificate chain to use (must not be {@code null})
+     */
+<span class="fc" id="L41">    public X509PeerCertificateChainEvidence(final X509Certificate... peerCertificateChain) {</span>
+<span class="fc" id="L42">        Assert.checkNotNullParam(&quot;peerCertificateChain&quot;, peerCertificateChain);</span>
+<span class="fc" id="L43">        this.peerCertificateChain = peerCertificateChain;</span>
+<span class="fc" id="L44">    }</span>
+
+    /**
+     * Get the {@link Principal} represented by the first certificate in the chain.
+     *
+     * @return the {@link Principal} represented by the first certificate in the chain.
+     * @deprecated Use {@link #getDefaultPrincipal()} or {@link #getDecodedPrincipal()} instead.
+     */
+    @Deprecated
+    @Override
+    public X500Principal getPrincipal() {
+<span class="fc" id="L55">        return getFirstCertificate().getSubjectX500Principal();</span>
+    }
+
+    public X500Principal getDefaultPrincipal() {
+<span class="nc" id="L59">        return getFirstCertificate().getSubjectX500Principal();</span>
+    }
+
+    public Principal getDecodedPrincipal() {
+<span class="fc" id="L63">        return decodedPrincipal;</span>
+    }
+
+    public void setDecodedPrincipal(Principal decodedPrincipal) {
+<span class="fc" id="L67">        this.decodedPrincipal = decodedPrincipal;</span>
+<span class="fc" id="L68">    }</span>
+
+    /**
+     * Get the peer certificate chain.
+     *
+     * @return the peer certificate chain (not {@code null})
+     */
+    public X509Certificate[] getPeerCertificateChain() {
+<span class="nc" id="L76">        return peerCertificateChain;</span>
+    }
+
+    /**
+     * Get the certificate public key algorithm.
+     *
+     * @return the certificate public key algorithm (not {@code null})
+     */
+    public String getAlgorithm() {
+<span class="nc" id="L85">        return getFirstCertificate().getPublicKey().getAlgorithm();</span>
+    }
+
+    /**
+     * Get the first certificate in the peer certificate chain.
+     *
+     * @return the first certificate in the peer certificate chain
+     */
+    public X509Certificate getFirstCertificate() {
+<span class="fc" id="L94">        return peerCertificateChain[0];</span>
+    }
+
+    /**
+     * Get the last certificate in the peer certificate chain.
+     *
+     * @return the last certificate in the peer certificate chain
+     */
+    public X509Certificate getLastCertificate() {
+<span class="nc" id="L103">        return peerCertificateChain[peerCertificateChain.length - 1];</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Evidence.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-credential</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.evidence</a> &gt; <span class="el_source">Evidence.java</span></div><h1>Evidence.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.evidence;
+
+import java.security.Principal;
+import java.util.function.Function;
+
+/**
+ * A piece of evidence which may be used for credential verification.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public interface Evidence {
+
+    /**
+     * Get the {@link Principal} which can be derived from this evidence, this can be {@code null} if there is no derived Principal.
+     *
+     * @return the {@link Principal} which can be derived from this evidence, this can be {@code null} if there is no derived Principal.
+     * @deprecated Use {@link #getDefaultPrincipal()} or {@link #getDecodedPrincipal()} instead.
+     */
+    @Deprecated
+    default Principal getPrincipal() {
+<span class="fc" id="L40">        return null;</span>
+    }
+
+    /**
+     * Get the default {@link Principal} associated with this evidence (may be {@code null}).
+     *
+     * @return the default {@link Principal} associated with this evidence (may be{@code null})
+     * @since 1.10.0
+     */
+    default Principal getDefaultPrincipal() {
+<span class="fc" id="L50">        return getPrincipal();</span>
+    }
+
+    /**
+     * Get the {@link Principal} derived from this evidence using an evidence decoder (may be {@code null}).
+     *
+     * @return the {@link Principal} derived from this evidence using an evidence decoder (may be {@code null})
+     * @since 1.10.0
+     */
+    default Principal getDecodedPrincipal() {
+<span class="fc" id="L60">        return getDefaultPrincipal();</span>
+    }
+
+    /**
+     * Set the {@link Principal} derived from this evidence using an evidence decoder (may be {@code null}).
+     * This method is a no-op by default. It is intended to be implemented by evidence types that can be
+     * associated with a principal derived from an evidence decoder.
+     *
+     * @param principal the principal derived from this evidence using an evidence decoder (may be {@code null})
+     * @since 1.10.0
+     */
+    default void setDecodedPrincipal(Principal principal) {
+        // no-op
+<span class="nc" id="L73">    }</span>
+
+    /**
+     * Cast this evidence type if the type and algorithm matches.
+     *
+     * @param evidenceType the evidence type class to check
+     * @param algorithmName the name of the algorithm or {@code null} if any algorithm is acceptable
+     * @param &lt;E&gt; the evidence type
+     * @return the evidence cast as the target type, or {@code null} if the evidence does not match the criteria
+     */
+    default &lt;E extends Evidence&gt; E castAs(Class&lt;E&gt; evidenceType, String algorithmName) {
+<span class="nc" id="L84">        return castAndApply(evidenceType, algorithmName, Function.identity());</span>
+    }
+
+    /**
+     * Cast this evidence type if the type matches.
+     *
+     * @param evidenceType the evidence type class to check
+     * @param &lt;E&gt; the evidence type
+     * @return the evidence cast as the target type, or {@code null} if the evidence does not match the criteria
+     */
+    default &lt;E extends Evidence&gt; E castAs(Class&lt;E&gt; evidenceType) {
+<span class="nc" id="L95">        return castAndApply(evidenceType, Function.identity());</span>
+    }
+
+    /**
+     * Cast this evidence type and apply a function if the type matches.
+     *
+     * @param evidenceType the evidence type class to check
+     * @param algorithmName the name of the algorithm or {@code null} if any algorithm is acceptable
+     * @param function the function to apply
+     * @param &lt;E&gt; the evidence type
+     * @param &lt;R&gt; the return type
+     * @return the result of the function, or {@code null} if the evidence is not of the given type
+     */
+    default &lt;E extends Evidence, R&gt; R castAndApply(Class&lt;E&gt; evidenceType, String algorithmName, Function&lt;E, R&gt; function) {
+<span class="nc bnc" id="L109" title="All 4 branches missed.">        return evidenceType.isInstance(this) &amp;&amp; algorithmName == null ? function.apply(evidenceType.cast(this)) : null;</span>
+    }
+
+    /**
+     * Cast this evidence type and apply a function if the type matches.
+     *
+     * @param evidenceType the evidence type class to check
+     * @param function the function to apply
+     * @param &lt;E&gt; the evidence type
+     * @param &lt;R&gt; the return type
+     * @return the result of the function, or {@code null} if the evidence is not of the given type
+     */
+    default &lt;E extends Evidence, R&gt; R castAndApply(Class&lt;E&gt; evidenceType, Function&lt;E, R&gt; function) {
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        return evidenceType.isInstance(this) ? function.apply(evidenceType.cast(this)) : null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

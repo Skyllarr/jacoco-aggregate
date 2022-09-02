@@ -1,0 +1,424 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OidcProviderMetadata.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-oidc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.oidc</a> &gt; <span class="el_source">OidcProviderMetadata.java</span></div><h1>OidcProviderMetadata.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2020 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.http.oidc;
+
+import com.fasterxml.jackson.annotation.JsonAnyGetter;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * OpenID provider metadata values used by the OpenID Connect (OIDC) HTTP mechanism,
+ * as defined in &lt;a href=&quot;https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata&quot;&gt;OpenID Connect Discovery 1.0&lt;/a&gt;.
+ *
+ * @author &lt;a href=&quot;mailto:sthorger@redhat.com&quot;&gt;Stian Thorgersen&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+
+<span class="nc" id="L37">public class OidcProviderMetadata {</span>
+
+    @JsonProperty(&quot;issuer&quot;)
+    private String issuer;
+
+    @JsonProperty(&quot;authorization_endpoint&quot;)
+    private String authorizationEndpoint;
+
+    @JsonProperty(&quot;token_endpoint&quot;)
+    private String tokenEndpoint;
+
+    @JsonProperty(&quot;introspection_endpoint&quot;)
+    private String introspectionEndpoint;
+
+    @JsonProperty(&quot;userinfo_endpoint&quot;)
+    private String userinfoEndpoint;
+
+    @JsonProperty(&quot;end_session_endpoint&quot;)
+    private String logoutEndpoint;
+
+    @JsonProperty(&quot;jwks_uri&quot;)
+    private String jwksUri;
+
+    @JsonProperty(&quot;check_session_iframe&quot;)
+    private String checkSessionIframe;
+
+    @JsonProperty(&quot;grant_types_supported&quot;)
+    private List&lt;String&gt; grantTypesSupported;
+
+    @JsonProperty(&quot;response_types_supported&quot;)
+    private List&lt;String&gt; responseTypesSupported;
+
+    @JsonProperty(&quot;subject_types_supported&quot;)
+    private List&lt;String&gt; subjectTypesSupported;
+
+    @JsonProperty(&quot;id_token_signing_alg_values_supported&quot;)
+    private List&lt;String&gt; idTokenSigningAlgValuesSupported;
+
+    @JsonProperty(&quot;id_token_encryption_alg_values_supported&quot;)
+    private List&lt;String&gt; idTokenEncryptionAlgValuesSupported;
+
+    @JsonProperty(&quot;id_token_encryption_enc_values_supported&quot;)
+    private List&lt;String&gt; idTokenEncryptionEncValuesSupported;
+
+    @JsonProperty(&quot;userinfo_signing_alg_values_supported&quot;)
+    private List&lt;String&gt; userInfoSigningAlgValuesSupported;
+
+    @JsonProperty(&quot;request_object_signing_alg_values_supported&quot;)
+    private List&lt;String&gt; requestObjectSigningAlgValuesSupported;
+
+    @JsonProperty(&quot;response_modes_supported&quot;)
+    private List&lt;String&gt; responseModesSupported;
+
+    @JsonProperty(&quot;registration_endpoint&quot;)
+    private String registrationEndpoint;
+
+    @JsonProperty(&quot;token_endpoint_auth_methods_supported&quot;)
+    private List&lt;String&gt; tokenEndpointAuthMethodsSupported;
+
+    @JsonProperty(&quot;token_endpoint_auth_signing_alg_values_supported&quot;)
+    private List&lt;String&gt; tokenEndpointAuthSigningAlgValuesSupported;
+
+    @JsonProperty(&quot;claims_supported&quot;)
+    private List&lt;String&gt; claimsSupported;
+
+    @JsonProperty(&quot;claim_types_supported&quot;)
+    private List&lt;String&gt; claimTypesSupported;
+
+    @JsonProperty(&quot;claims_parameter_supported&quot;)
+    private Boolean claimsParameterSupported;
+
+    @JsonProperty(&quot;scopes_supported&quot;)
+    private List&lt;String&gt; scopesSupported;
+
+    @JsonProperty(&quot;request_parameter_supported&quot;)
+    private Boolean requestParameterSupported;
+
+    @JsonProperty(&quot;request_uri_parameter_supported&quot;)
+    private Boolean requestUriParameterSupported;
+
+    @JsonProperty(&quot;revocation_endpoint&quot;)
+    private String revocationEndpoint;
+
+    @JsonProperty(&quot;revocation_endpoint_auth_methods_supported&quot;)
+    private List&lt;String&gt; revocationEndpointAuthMethodsSupported;
+
+    @JsonProperty(&quot;revocation_endpoint_auth_signing_alg_values_supported&quot;)
+    private List&lt;String&gt; revocationEndpointAuthSigningAlgValuesSupported;
+
+    @JsonProperty(&quot;backchannel_logout_supported&quot;)
+    private Boolean backchannelLogoutSupported;
+
+    @JsonProperty(&quot;backchannel_logout_session_supported&quot;)
+    private Boolean backchannelLogoutSessionSupported;
+
+    /*
+     * Additional metadata values specific to Keycloak.
+     */
+
+    // KEYCLOAK-7451 OAuth Authorization Server Metadata for Proof Key for Code Exchange
+    @JsonProperty(&quot;code_challenge_methods_supported&quot;)
+    private List&lt;String&gt; codeChallengeMethodsSupported;
+
+    // KEYCLOAK-6771 Certificate Bound Token
+    // https://tools.ietf.org/html/draft-ietf-oauth-mtls-08#section-6.2
+    @JsonProperty(&quot;tls_client_certificate_bound_access_tokens&quot;)
+    private Boolean tlsClientCertificateBoundAccessTokens;
+
+<span class="nc" id="L145">    protected Map&lt;String, Object&gt; otherClaims = new HashMap&lt;String, Object&gt;();</span>
+
+    public String getIssuer() {
+<span class="nc" id="L148">        return issuer;</span>
+    }
+
+    public void setIssuer(String issuer) {
+<span class="nc" id="L152">        this.issuer = issuer;</span>
+<span class="nc" id="L153">    }</span>
+
+    public String getAuthorizationEndpoint() {
+<span class="nc" id="L156">        return authorizationEndpoint;</span>
+    }
+
+    public void setAuthorizationEndpoint(String authorizationEndpoint) {
+<span class="nc" id="L160">        this.authorizationEndpoint = authorizationEndpoint;</span>
+<span class="nc" id="L161">    }</span>
+
+    public String getTokenEndpoint() {
+<span class="nc" id="L164">        return tokenEndpoint;</span>
+    }
+
+    public void setTokenEndpoint(String tokenEndpoint) {
+<span class="nc" id="L168">        this.tokenEndpoint = tokenEndpoint;</span>
+<span class="nc" id="L169">    }</span>
+
+    public String getIntrospectionEndpoint() {
+<span class="nc" id="L172">        return this.introspectionEndpoint;</span>
+    }
+
+    public void setIntrospectionEndpoint(String introspectionEndpoint) {
+<span class="nc" id="L176">        this.introspectionEndpoint = introspectionEndpoint;</span>
+<span class="nc" id="L177">    }</span>
+
+    public String getUserinfoEndpoint() {
+<span class="nc" id="L180">        return userinfoEndpoint;</span>
+    }
+
+    public void setUserinfoEndpoint(String userinfoEndpoint) {
+<span class="nc" id="L184">        this.userinfoEndpoint = userinfoEndpoint;</span>
+<span class="nc" id="L185">    }</span>
+
+    public String getJwksUri() {
+<span class="nc" id="L188">        return jwksUri;</span>
+    }
+
+    public void setJwksUri(String jwksUri) {
+<span class="nc" id="L192">        this.jwksUri = jwksUri;</span>
+<span class="nc" id="L193">    }</span>
+
+    public String getCheckSessionIframe() {
+<span class="nc" id="L196">        return checkSessionIframe;</span>
+    }
+
+    public void setCheckSessionIframe(String checkSessionIframe) {
+<span class="nc" id="L200">        this.checkSessionIframe = checkSessionIframe;</span>
+<span class="nc" id="L201">    }</span>
+
+    public String getLogoutEndpoint() {
+<span class="nc" id="L204">        return logoutEndpoint;</span>
+    }
+
+    public void setLogoutEndpoint(String logoutEndpoint) {
+<span class="nc" id="L208">        this.logoutEndpoint = logoutEndpoint;</span>
+<span class="nc" id="L209">    }</span>
+
+    public List&lt;String&gt; getGrantTypesSupported() {
+<span class="nc" id="L212">        return grantTypesSupported;</span>
+    }
+
+    public void setGrantTypesSupported(List&lt;String&gt; grantTypesSupported) {
+<span class="nc" id="L216">        this.grantTypesSupported = grantTypesSupported;</span>
+<span class="nc" id="L217">    }</span>
+
+    public List&lt;String&gt; getResponseTypesSupported() {
+<span class="nc" id="L220">        return responseTypesSupported;</span>
+    }
+
+    public void setResponseTypesSupported(List&lt;String&gt; responseTypesSupported) {
+<span class="nc" id="L224">        this.responseTypesSupported = responseTypesSupported;</span>
+<span class="nc" id="L225">    }</span>
+
+    public List&lt;String&gt; getSubjectTypesSupported() {
+<span class="nc" id="L228">        return subjectTypesSupported;</span>
+    }
+
+    public void setSubjectTypesSupported(List&lt;String&gt; subjectTypesSupported) {
+<span class="nc" id="L232">        this.subjectTypesSupported = subjectTypesSupported;</span>
+<span class="nc" id="L233">    }</span>
+
+    public List&lt;String&gt; getIdTokenSigningAlgValuesSupported() {
+<span class="nc" id="L236">        return idTokenSigningAlgValuesSupported;</span>
+    }
+
+    public void setIdTokenSigningAlgValuesSupported(List&lt;String&gt; idTokenSigningAlgValuesSupported) {
+<span class="nc" id="L240">        this.idTokenSigningAlgValuesSupported = idTokenSigningAlgValuesSupported;</span>
+<span class="nc" id="L241">    }</span>
+
+    public List&lt;String&gt; getIdTokenEncryptionAlgValuesSupported() {
+<span class="nc" id="L244">        return idTokenEncryptionAlgValuesSupported;</span>
+    }
+
+    public void setIdTokenEncryptionAlgValuesSupported(List&lt;String&gt; idTokenEncryptionAlgValuesSupported) {
+<span class="nc" id="L248">        this.idTokenEncryptionAlgValuesSupported = idTokenEncryptionAlgValuesSupported;</span>
+<span class="nc" id="L249">    }</span>
+
+    public List&lt;String&gt; getIdTokenEncryptionEncValuesSupported() {
+<span class="nc" id="L252">        return idTokenEncryptionEncValuesSupported;</span>
+    }
+
+    public void setIdTokenEncryptionEncValuesSupported(List&lt;String&gt; idTokenEncryptionEncValuesSupported) {
+<span class="nc" id="L256">        this.idTokenEncryptionEncValuesSupported = idTokenEncryptionEncValuesSupported;</span>
+<span class="nc" id="L257">    }</span>
+
+    public List&lt;String&gt; getUserInfoSigningAlgValuesSupported() {
+<span class="nc" id="L260">        return userInfoSigningAlgValuesSupported;</span>
+    }
+
+    public void setUserInfoSigningAlgValuesSupported(List&lt;String&gt; userInfoSigningAlgValuesSupported) {
+<span class="nc" id="L264">        this.userInfoSigningAlgValuesSupported = userInfoSigningAlgValuesSupported;</span>
+<span class="nc" id="L265">    }</span>
+
+    public List&lt;String&gt; getRequestObjectSigningAlgValuesSupported() {
+<span class="nc" id="L268">        return requestObjectSigningAlgValuesSupported;</span>
+    }
+
+    public void setRequestObjectSigningAlgValuesSupported(List&lt;String&gt; requestObjectSigningAlgValuesSupported) {
+<span class="nc" id="L272">        this.requestObjectSigningAlgValuesSupported = requestObjectSigningAlgValuesSupported;</span>
+<span class="nc" id="L273">    }</span>
+
+    public List&lt;String&gt; getResponseModesSupported() {
+<span class="nc" id="L276">        return responseModesSupported;</span>
+    }
+
+    public void setResponseModesSupported(List&lt;String&gt; responseModesSupported) {
+<span class="nc" id="L280">        this.responseModesSupported = responseModesSupported;</span>
+<span class="nc" id="L281">    }</span>
+
+    public String getRegistrationEndpoint() {
+<span class="nc" id="L284">        return registrationEndpoint;</span>
+    }
+
+    public void setRegistrationEndpoint(String registrationEndpoint) {
+<span class="nc" id="L288">        this.registrationEndpoint = registrationEndpoint;</span>
+<span class="nc" id="L289">    }</span>
+
+    public List&lt;String&gt; getTokenEndpointAuthMethodsSupported() {
+<span class="nc" id="L292">        return tokenEndpointAuthMethodsSupported;</span>
+    }
+
+    public void setTokenEndpointAuthMethodsSupported(List&lt;String&gt; tokenEndpointAuthMethodsSupported) {
+<span class="nc" id="L296">        this.tokenEndpointAuthMethodsSupported = tokenEndpointAuthMethodsSupported;</span>
+<span class="nc" id="L297">    }</span>
+
+    public List&lt;String&gt; getTokenEndpointAuthSigningAlgValuesSupported() {
+<span class="nc" id="L300">        return tokenEndpointAuthSigningAlgValuesSupported;</span>
+    }
+
+    public void setTokenEndpointAuthSigningAlgValuesSupported(List&lt;String&gt; tokenEndpointAuthSigningAlgValuesSupported) {
+<span class="nc" id="L304">        this.tokenEndpointAuthSigningAlgValuesSupported = tokenEndpointAuthSigningAlgValuesSupported;</span>
+<span class="nc" id="L305">    }</span>
+
+    public List&lt;String&gt; getClaimsSupported() {
+<span class="nc" id="L308">        return claimsSupported;</span>
+    }
+
+    public void setClaimsSupported(List&lt;String&gt; claimsSupported) {
+<span class="nc" id="L312">        this.claimsSupported = claimsSupported;</span>
+<span class="nc" id="L313">    }</span>
+
+    public List&lt;String&gt; getClaimTypesSupported() {
+<span class="nc" id="L316">        return claimTypesSupported;</span>
+    }
+
+    public void setClaimTypesSupported(List&lt;String&gt; claimTypesSupported) {
+<span class="nc" id="L320">        this.claimTypesSupported = claimTypesSupported;</span>
+<span class="nc" id="L321">    }</span>
+
+    public Boolean getClaimsParameterSupported() {
+<span class="nc" id="L324">        return claimsParameterSupported;</span>
+    }
+
+    public void setClaimsParameterSupported(Boolean claimsParameterSupported) {
+<span class="nc" id="L328">        this.claimsParameterSupported = claimsParameterSupported;</span>
+<span class="nc" id="L329">    }</span>
+
+    public List&lt;String&gt; getScopesSupported() {
+<span class="nc" id="L332">        return scopesSupported;</span>
+    }
+
+    public void setScopesSupported(List&lt;String&gt; scopesSupported) {
+<span class="nc" id="L336">        this.scopesSupported = scopesSupported;</span>
+<span class="nc" id="L337">    }</span>
+
+    public Boolean getRequestParameterSupported() {
+<span class="nc" id="L340">        return requestParameterSupported;</span>
+    }
+
+    public void setRequestParameterSupported(Boolean requestParameterSupported) {
+<span class="nc" id="L344">        this.requestParameterSupported = requestParameterSupported;</span>
+<span class="nc" id="L345">    }</span>
+
+    public Boolean getRequestUriParameterSupported() {
+<span class="nc" id="L348">        return requestUriParameterSupported;</span>
+    }
+
+    public void setRequestUriParameterSupported(Boolean requestUriParameterSupported) {
+<span class="nc" id="L352">        this.requestUriParameterSupported = requestUriParameterSupported;</span>
+<span class="nc" id="L353">    }</span>
+
+    public void setCodeChallengeMethodsSupported(List&lt;String&gt; codeChallengeMethodsSupported) {
+<span class="nc" id="L356">        this.codeChallengeMethodsSupported = codeChallengeMethodsSupported;</span>
+<span class="nc" id="L357">    }</span>
+
+    public void setTlsClientCertificateBoundAccessTokens(Boolean tlsClientCertificateBoundAccessTokens) {
+<span class="nc" id="L360">        this.tlsClientCertificateBoundAccessTokens = tlsClientCertificateBoundAccessTokens;</span>
+<span class="nc" id="L361">    }</span>
+
+    public String getRevocationEndpoint() {
+<span class="nc" id="L364">        return revocationEndpoint;</span>
+    }
+
+    public void setRevocationEndpoint(String revocationEndpoint) {
+<span class="nc" id="L368">        this.revocationEndpoint = revocationEndpoint;</span>
+<span class="nc" id="L369">    }</span>
+
+    public List&lt;String&gt; getRevocationEndpointAuthMethodsSupported() {
+<span class="nc" id="L372">        return revocationEndpointAuthMethodsSupported;</span>
+    }
+
+    public void setRevocationEndpointAuthMethodsSupported(List&lt;String&gt; revocationEndpointAuthMethodsSupported) {
+<span class="nc" id="L376">        this.revocationEndpointAuthMethodsSupported = revocationEndpointAuthMethodsSupported;</span>
+<span class="nc" id="L377">    }</span>
+
+    public List&lt;String&gt; getRevocationEndpointAuthSigningAlgValuesSupported() {
+<span class="nc" id="L380">        return revocationEndpointAuthSigningAlgValuesSupported;</span>
+    }
+
+    public void setRevocationEndpointAuthSigningAlgValuesSupported(List&lt;String&gt; revocationEndpointAuthSigningAlgValuesSupported) {
+<span class="nc" id="L384">        this.revocationEndpointAuthSigningAlgValuesSupported = revocationEndpointAuthSigningAlgValuesSupported;</span>
+<span class="nc" id="L385">    }</span>
+
+    public Boolean getBackchannelLogoutSupported() {
+<span class="nc" id="L388">        return backchannelLogoutSupported;</span>
+    }
+
+    public Boolean getBackchannelLogoutSessionSupported() {
+<span class="nc" id="L392">        return backchannelLogoutSessionSupported;</span>
+    }
+
+    public void setBackchannelLogoutSessionSupported(Boolean backchannelLogoutSessionSupported) {
+<span class="nc" id="L396">        this.backchannelLogoutSessionSupported = backchannelLogoutSessionSupported;</span>
+<span class="nc" id="L397">    }</span>
+
+    public void setBackchannelLogoutSupported(Boolean backchannelLogoutSupported) {
+<span class="nc" id="L400">        this.backchannelLogoutSupported = backchannelLogoutSupported;</span>
+<span class="nc" id="L401">    }</span>
+
+    // KEYCLOAK-7451 OAuth Authorization Server Metadata for Proof Key for Code Exchange
+    public List&lt;String&gt; getCodeChallengeMethodsSupported() {
+<span class="nc" id="L405">        return codeChallengeMethodsSupported;</span>
+    }
+
+    // KEYCLOAK-6771 Certificate Bound Token
+    // https://tools.ietf.org/html/draft-ietf-oauth-mtls-08#section-6.2
+    public Boolean getTlsClientCertificateBoundAccessTokens() {
+<span class="nc" id="L411">        return tlsClientCertificateBoundAccessTokens;</span>
+    }
+
+    @JsonAnyGetter
+    public Map&lt;String, Object&gt; getOtherClaims() {
+<span class="nc" id="L416">        return otherClaims;</span>
+    }
+
+    @JsonAnySetter
+    public void setOtherClaims(String name, Object value) {
+<span class="nc" id="L421">        otherClaims.put(name, value);</span>
+<span class="nc" id="L422">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

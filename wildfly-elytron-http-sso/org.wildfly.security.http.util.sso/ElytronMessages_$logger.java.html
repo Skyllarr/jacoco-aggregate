@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages_$logger.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-sso</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.util.sso</a> &gt; <span class="el_source">ElytronMessages_$logger.java</span></div><h1>ElytronMessages_$logger.java</h1><pre class="source lang-java linenums">package org.wildfly.security.http.util.sso;
+
+import java.util.Locale;
+import java.lang.IllegalStateException;
+import java.io.Serializable;
+import javax.annotation.Generated;
+import org.jboss.logging.DelegatingBasicLogger;
+import org.wildfly.security.http.HttpAuthenticationException;
+import org.jboss.logging.BasicLogger;
+import java.lang.Throwable;
+import java.lang.String;
+import org.jboss.logging.Logger;
+import java.util.Arrays;
+
+
+import static org.jboss.logging.Logger.Level.ERROR;
+import static org.jboss.logging.Logger.Level.WARN;
+
+/**
+ * Warning this class consists of generated code.
+ */
+@Generated(value = &quot;org.jboss.logging.processor.generator.model.MessageLoggerImplementor&quot;, date = &quot;2022-09-02T20:27:27+0200&quot;)
+public class ElytronMessages_$logger extends DelegatingBasicLogger implements ElytronMessages, BasicLogger, Serializable {
+    private static final long serialVersionUID = 1L;
+<span class="nc" id="L25">    private static final String FQCN = ElytronMessages_$logger.class.getName();</span>
+    public ElytronMessages_$logger(final Logger log) {
+<span class="nc" id="L27">        super(log);</span>
+<span class="nc" id="L28">    }</span>
+<span class="nc" id="L29">    private static final Locale LOCALE = Locale.ROOT;</span>
+    protected Locale getLoggingLocale() {
+<span class="nc" id="L31">        return LOCALE;</span>
+    }
+    @Override
+    public final void warnHttpMechSsoFailedLogoutParticipant(final String url, final Throwable cause) {
+<span class="nc" id="L35">        super.log.logf(FQCN, WARN, cause, warnHttpMechSsoFailedLogoutParticipant$str(), url);</span>
+<span class="nc" id="L36">    }</span>
+    protected String warnHttpMechSsoFailedLogoutParticipant$str() {
+<span class="nc" id="L38">        return &quot;ELY06008: Failed to logout participant [%s]. Participant will be removed from list of participants but its local session may still be active.&quot;;</span>
+    }
+    protected String httpMechSsoInvalidLogoutMessage$str() {
+<span class="nc" id="L41">        return &quot;ELY06012: Invalid logout message received for local session [%s]&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException httpMechSsoInvalidLogoutMessage(final String localSessionId) {
+<span class="nc" id="L45">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), httpMechSsoInvalidLogoutMessage$str(), localSessionId));</span>
+<span class="nc" id="L46">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L47">        return result;</span>
+    }
+    private static void _copyStackTraceMinusOne(final Throwable e) {
+<span class="nc" id="L50">        final StackTraceElement[] st = e.getStackTrace();</span>
+<span class="nc" id="L51">        e.setStackTrace(Arrays.copyOfRange(st, 1, st.length));</span>
+<span class="nc" id="L52">    }</span>
+    @Override
+    public final void errorHttpMechSsoFailedInvalidateLocalSession(final Throwable cause) {
+<span class="nc" id="L55">        super.log.logf(FQCN, ERROR, cause, errorHttpMechSsoFailedInvalidateLocalSession$str());</span>
+<span class="nc" id="L56">    }</span>
+    protected String errorHttpMechSsoFailedInvalidateLocalSession$str() {
+<span class="nc" id="L58">        return &quot;ELY06013: Failed to invalidate local session&quot;;</span>
+    }
+    protected String httpServerAuthenticationMechanismNotFound$str() {
+<span class="nc" id="L61">        return &quot;ELY06014: Authentication mechanism '%s' cannot be found&quot;;</span>
+    }
+    @Override
+    public final HttpAuthenticationException httpServerAuthenticationMechanismNotFound(final String mechanismName) {
+<span class="nc" id="L65">        final HttpAuthenticationException result = new HttpAuthenticationException(String.format(getLoggingLocale(), httpServerAuthenticationMechanismNotFound$str(), mechanismName));</span>
+<span class="nc" id="L66">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L67">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

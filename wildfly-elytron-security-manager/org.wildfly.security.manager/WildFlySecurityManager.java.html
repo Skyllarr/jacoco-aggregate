@@ -1,0 +1,1642 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>WildFlySecurityManager.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-security-manager</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.manager</a> &gt; <span class="el_source">WildFlySecurityManager.java</span></div><h1>WildFlySecurityManager.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.manager;
+
+import java.io.FileDescriptor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Member;
+import java.net.InetAddress;
+import java.security.AccessControlContext;
+import java.security.CodeSource;
+import java.security.Permission;
+import java.security.Principal;
+import java.security.PrivilegedAction;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
+import java.security.ProtectionDomain;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.Properties;
+import java.util.PropertyPermission;
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
+import java.util.concurrent.atomic.AtomicLongFieldUpdater;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
+
+import org.kohsuke.MetaInfServices;
+import org.wildfly.common.Assert;
+import org.wildfly.security.ParametricPrivilegedAction;
+import org.wildfly.security.ParametricPrivilegedExceptionAction;
+import org.wildfly.security.manager.action.ClearPropertyAction;
+import org.wildfly.security.manager.action.GetClassLoaderAction;
+import org.wildfly.security.manager.action.GetContextClassLoaderAction;
+import org.wildfly.security.manager.action.GetEnvironmentAction;
+import org.wildfly.security.manager.action.GetProtectionDomainAction;
+import org.wildfly.security.manager.action.GetSystemPropertiesAction;
+import org.wildfly.security.manager.action.ReadEnvironmentPropertyAction;
+import org.wildfly.security.manager.action.ReadPropertyAction;
+import org.wildfly.security.manager.action.SetContextClassLoaderAction;
+import org.wildfly.security.manager.action.WritePropertyAction;
+import org.wildfly.security.permission.PermissionVerifier;
+import sun.misc.Unsafe;
+
+import static java.lang.System.clearProperty;
+import static java.lang.System.getProperties;
+import static java.lang.System.getProperty;
+import static java.lang.System.getSecurityManager;
+import static java.lang.System.getenv;
+import static java.lang.System.setProperty;
+import static java.lang.Thread.currentThread;
+import static java.security.AccessController.doPrivileged;
+import static java.security.AccessController.getContext;
+import static org.wildfly.security.manager.WildFlySecurityManagerPermission.doUncheckedPermission;
+import static org.wildfly.security.manager._private.SecurityMessages.access;
+
+/**
+ * The security manager.  This security manager implementation can be switched on and off on a per-thread basis,
+ * and additionally logs access violations in a way that should be substantially clearer than most JDK implementations.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+@MetaInfServices(SecurityManager.class)
+public final class WildFlySecurityManager extends SecurityManager implements PermissionVerifier {
+
+<span class="fc" id="L79">    private static final Permission SECURITY_MANAGER_PERMISSION = new RuntimePermission(&quot;setSecurityManager&quot;);</span>
+<span class="fc" id="L80">    private static final Permission PROPERTIES_PERMISSION = new PropertyPermission(&quot;*&quot;, &quot;read,write&quot;);</span>
+<span class="fc" id="L81">    private static final Permission ENVIRONMENT_PERMISSION = new RuntimePermission(&quot;getenv.*&quot;);</span>
+<span class="fc" id="L82">    private static final Permission GET_CLASS_LOADER_PERMISSION = new RuntimePermission(&quot;getClassLoader&quot;);</span>
+<span class="fc" id="L83">    private static final Permission SET_CLASS_LOADER_PERMISSION = new RuntimePermission(&quot;setClassLoader&quot;);</span>
+<span class="fc" id="L84">    private static final Permission ACCESS_DECLARED_MEMBERS_PERMISSION = new RuntimePermission(&quot;accessDeclaredMembers&quot;);</span>
+
+    private static final boolean LOG_ONLY;
+
+<span class="fc" id="L88">    static class Context {</span>
+<span class="fc" id="L89">        boolean checking = true;</span>
+<span class="fc" id="L90">        boolean entered = false;</span>
+        ParametricPrivilegedAction&lt;Object, Object&gt; action1;
+        ParametricPrivilegedExceptionAction&lt;Object, Object&gt; action2;
+        Object parameter;
+    }
+
+<span class="fc" id="L96">    private static final ThreadLocal&lt;Context&gt; CTX = new ThreadLocal&lt;Context&gt;() {</span>
+        protected Context initialValue() {
+<span class="fc" id="L98">            return new Context();</span>
+        }
+    };
+
+    private static final Unsafe unsafe;
+    private static final long pdStackOffset;
+    private static final WildFlySecurityManager INSTANCE;
+    private static final boolean hasGetCallerClass;
+    private static final boolean usingStackWalker;
+
+    static {
+        final Field pdField;
+        try {
+            // does not need to be accessible
+<span class="fc" id="L112">            pdField = AccessControlContext.class.getDeclaredField(&quot;context&quot;);</span>
+<span class="nc" id="L113">        } catch (NoSuchFieldException e) {</span>
+<span class="nc" id="L114">            throw new NoSuchFieldError(e.getMessage());</span>
+<span class="fc" id="L115">        }</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (pdField.getType() != ProtectionDomain[].class) {</span>
+<span class="nc" id="L117">            throw new Error();</span>
+        }
+        try {
+<span class="fc" id="L120">            unsafe = (Unsafe) doPrivileged(new GetAccessibleDeclaredFieldAction(Unsafe.class, &quot;theUnsafe&quot;)).get(null);</span>
+<span class="nc" id="L121">        } catch (IllegalAccessException e) {</span>
+<span class="nc" id="L122">            throw new IllegalAccessError(e.getMessage());</span>
+<span class="fc" id="L123">        }</span>
+<span class="fc" id="L124">        pdStackOffset = unsafe.objectFieldOffset(pdField);</span>
+        // Cannot be lambda due to JDK race conditions
+        //noinspection Convert2Lambda,Anonymous2MethodRef
+<span class="fc" id="L127">        INSTANCE = doPrivileged(new PrivilegedAction&lt;WildFlySecurityManager&gt;() {</span>
+            public WildFlySecurityManager run() {
+<span class="fc" id="L129">                return new WildFlySecurityManager();</span>
+            }
+        });
+<span class="fc" id="L132">        boolean result = false;</span>
+        try {
+            /*
+             * If JDKSpecific.getCallerClass(0) does not return this class assume a fault and fall back to using
+             * SecurityManager.getClassContext().
+             */
+<span class="nc bnc" id="L138" title="All 2 branches missed.">            result = JDKSpecific.getCallerClass(0) == WildFlySecurityManager.class;</span>
+<span class="pc" id="L139">        } catch (Throwable ignored) {}</span>
+<span class="fc" id="L140">        hasGetCallerClass = result;</span>
+<span class="pc bpc" id="L141" title="3 of 4 branches missed.">        usingStackWalker = hasGetCallerClass &amp;&amp; JDKSpecific.usingStackWalker();</span>
+<span class="fc" id="L142">        LOG_ONLY = Boolean.parseBoolean(doPrivileged(new ReadPropertyAction(&quot;org.wildfly.security.manager.log-only&quot;, &quot;false&quot;)));</span>
+    }
+
+    /**
+     * Construct a new instance.  If the caller does not have permission to do so, this method will throw an exception.
+     *
+     * @throws SecurityException if the caller does not have permission to create a security manager instance
+     */
+<span class="fc" id="L150">    public WildFlySecurityManager() throws SecurityException {</span>
+<span class="fc" id="L151">    }</span>
+
+    @Deprecated
+    public static void install() throws SecurityException {
+<span class="nc bnc" id="L155" title="All 2 branches missed.">        if (System.getSecurityManager() instanceof WildFlySecurityManager) return;</span>
+<span class="nc" id="L156">        System.setSecurityManager(new WildFlySecurityManager());</span>
+<span class="nc" id="L157">    }</span>
+
+    @SuppressWarnings(&quot;deprecation&quot;)
+    static Class&lt;?&gt; getCallerClass(int n) {
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">        if (hasGetCallerClass) {</span>
+            /*
+             * An additional 1 is added to take into account the call to.
+             *   WildFlySecurityManager.getCallerClass(int);
+             *
+             * The individual JDKSpecific.getCallerClass(int) implementations take care
+             * of any offset they require.
+             */
+<span class="nc" id="L169">            return JDKSpecific.getCallerClass(n + 1);</span>
+        } else {
+            /*
+             * Fixed offset of 2 to take into account the following calls on the call stack: -
+             *   WildFlySecurityManager.getCallStack();
+             *   WildFlySecurityManager.getCallerClass(int);
+             */
+<span class="fc" id="L176">            return getCallStack()[n + 2];</span>
+        }
+    }
+
+    static Class&lt;?&gt;[] getCallStack() {
+<span class="fc" id="L181">        return INSTANCE.getClassContext();</span>
+    }
+
+    /**
+     * Determine whether the security manager is currently checking permissions.
+     *
+     * @return {@code true} if the security manager is currently checking permissions
+     */
+    public static boolean isChecking() {
+<span class="nc" id="L190">        final SecurityManager sm = getSecurityManager();</span>
+<span class="nc bnc" id="L191" title="All 4 branches missed.">        return sm instanceof WildFlySecurityManager ? doCheck() : sm != null;</span>
+    }
+
+    /**
+     * Perform a permission check.
+     *
+     * @param perm the permission to check
+     * @throws SecurityException if the check fails
+     */
+    public void checkPermission(final Permission perm) throws SecurityException {
+<span class="nc" id="L201">        checkPermission(perm, getContext());</span>
+<span class="nc" id="L202">    }</span>
+
+    /**
+     * Perform a permission check.
+     *
+     * @param perm the permission to check
+     * @param context the security context to use for the check (must be an {@link AccessControlContext} instance)
+     * @throws SecurityException if the check fails
+     */
+    public void checkPermission(final Permission perm, final Object context) throws SecurityException {
+<span class="nc bnc" id="L212" title="All 2 branches missed.">        if (context instanceof AccessControlContext) {</span>
+<span class="nc" id="L213">            checkPermission(perm, (AccessControlContext) context);</span>
+        } else {
+<span class="nc" id="L215">            throw access.unknownContext();</span>
+        }
+<span class="nc" id="L217">    }</span>
+
+    /**
+     * Find the protection domain in the given list which denies a permission, or {@code null} if the permission
+     * check would pass.
+     *
+     * @param permission the permission to test
+     * @param domains the protection domains to try
+     * @return the first denying protection domain, or {@code null} if there is none
+     */
+    public static ProtectionDomain findAccessDenial(final Permission permission, final ProtectionDomain... domains) {
+<span class="nc" id="L228">        ProtectionDomain deniedDomain = null;</span>
+<span class="nc bnc" id="L229" title="All 4 branches missed.">        if (domains != null) for (ProtectionDomain domain : domains) {</span>
+<span class="nc bnc" id="L230" title="All 2 branches missed.">            if (! domain.implies(permission)) {</span>
+<span class="nc" id="L231">                final CodeSource codeSource = domain.getCodeSource();</span>
+<span class="nc" id="L232">                final ClassLoader classLoader = domain.getClassLoader();</span>
+<span class="nc" id="L233">                final Principal[] principals = domain.getPrincipals();</span>
+<span class="nc bnc" id="L234" title="All 4 branches missed.">                if (principals == null || principals.length == 0) {</span>
+<span class="nc" id="L235">                    access.accessCheckFailed(permission, codeSource, classLoader);</span>
+                } else {
+<span class="nc" id="L237">                    access.accessCheckFailed(permission, codeSource, classLoader, Arrays.toString(principals));</span>
+                }
+<span class="nc bnc" id="L239" title="All 2 branches missed.">                if (access.isTraceEnabled()) {</span>
+<span class="nc" id="L240">                    access.trace(</span>
+                            &quot;Permission check failed (permission \&quot;&quot; + permission + &quot;\&quot; in protection domain &quot; + domain + &quot; )&quot;,
+                            new RuntimeException(&quot;Exception not thrown, analysis only.&quot;));
+                }
+<span class="nc bnc" id="L244" title="All 4 branches missed.">                if (deniedDomain == null &amp;&amp; ! LOG_ONLY) {</span>
+<span class="nc" id="L245">                    deniedDomain = domain;</span>
+                }
+            }
+        }
+<span class="nc" id="L249">        return deniedDomain;</span>
+    }
+
+    /**
+     * Try a permission check.  Any violations will be logged to the {@code org.wildfly.security.access} category
+     * at a {@code DEBUG} level.
+     *
+     * @param permission the permission to check
+     * @param domains the protection domains to try
+     * @return {@code true} if the access check succeeded, {@code false} otherwise
+     */
+    public static boolean tryCheckPermission(final Permission permission, final ProtectionDomain... domains) {
+<span class="nc bnc" id="L261" title="All 2 branches missed.">        if (permission.implies(SECURITY_MANAGER_PERMISSION)) {</span>
+<span class="nc" id="L262">            return false;</span>
+        }
+<span class="nc" id="L264">        final Context ctx = CTX.get();</span>
+<span class="nc bnc" id="L265" title="All 2 branches missed.">        if (ctx.checking) {</span>
+<span class="nc bnc" id="L266" title="All 2 branches missed.">            if (ctx.entered) {</span>
+<span class="nc" id="L267">                return true;</span>
+            }
+<span class="nc" id="L269">            ctx.entered = true;</span>
+            try {
+<span class="nc" id="L271">                final ProtectionDomain deniedDomain = findAccessDenial(permission, domains);</span>
+<span class="nc bnc" id="L272" title="All 2 branches missed.">                if (deniedDomain != null) {</span>
+<span class="nc" id="L273">                    return false;</span>
+                }
+            } finally {
+<span class="nc" id="L276">                ctx.entered = false;</span>
+            }
+        }
+<span class="nc" id="L279">        return true;</span>
+    }
+
+    public boolean implies(final Permission permission) {
+<span class="nc" id="L283">        return tryCheckPermission(permission, getProtectionDomainStack(getContext()));</span>
+    }
+
+    /**
+     * Perform a permission check.
+     *
+     * @param perm the permission to check
+     * @param context the security context to use for the check
+     * @throws SecurityException if the check fails
+     */
+    public void checkPermission(final Permission perm, final AccessControlContext context) throws SecurityException {
+<span class="nc bnc" id="L294" title="All 2 branches missed.">        if (perm.implies(SECURITY_MANAGER_PERMISSION)) {</span>
+<span class="nc" id="L295">            throw access.secMgrChange();</span>
+        }
+<span class="nc" id="L297">        final Context ctx = CTX.get();</span>
+<span class="nc bnc" id="L298" title="All 2 branches missed.">        if (ctx.checking) {</span>
+<span class="nc bnc" id="L299" title="All 2 branches missed.">            if (ctx.entered) {</span>
+<span class="nc" id="L300">                return;</span>
+            }
+            final ProtectionDomain[] stack;
+<span class="nc" id="L303">            ctx.entered = true;</span>
+            try {
+<span class="nc" id="L305">                stack = getProtectionDomainStack(context);</span>
+<span class="nc bnc" id="L306" title="All 2 branches missed.">                if (stack != null) {</span>
+<span class="nc" id="L307">                    final ProtectionDomain deniedDomain = findAccessDenial(perm, stack);</span>
+<span class="nc bnc" id="L308" title="All 2 branches missed.">                    if (deniedDomain != null) {</span>
+<span class="nc" id="L309">                        throw access.accessControlException(perm, perm, deniedDomain.getCodeSource(), deniedDomain.getClassLoader());</span>
+                    }
+                }
+            } finally {
+<span class="nc" id="L313">                ctx.entered = false;</span>
+            }
+        }
+<span class="nc" id="L316">    }</span>
+
+    private static ProtectionDomain[] getProtectionDomainStack(final AccessControlContext context) {
+<span class="fc" id="L319">        return (ProtectionDomain[]) unsafe.getObject(context, pdStackOffset);</span>
+    }
+
+    private static boolean doCheck() {
+<span class="nc" id="L323">        return doCheck(CTX.get());</span>
+    }
+
+    private static boolean doCheck(final WildFlySecurityManager.Context ctx) {
+<span class="nc bnc" id="L327" title="All 4 branches missed.">        return ctx.checking &amp;&amp; ! ctx.entered;</span>
+    }
+
+    public void checkCreateClassLoader() {
+<span class="nc bnc" id="L331" title="All 2 branches missed.">        if (doCheck()) {</span>
+<span class="nc" id="L332">            super.checkCreateClassLoader();</span>
+        }
+<span class="nc" id="L334">    }</span>
+
+    public void checkAccess(final Thread t) {
+<span class="nc bnc" id="L337" title="All 2 branches missed.">        if (doCheck()) {</span>
+<span class="nc" id="L338">            super.checkAccess(t);</span>
+        }
+<span class="nc" id="L340">    }</span>
+
+    public void checkAccess(final ThreadGroup g) {
+<span class="nc bnc" id="L343" title="All 2 branches missed.">        if (doCheck()) {</span>
+<span class="nc" id="L344">            super.checkAccess(g);</span>
+        }
+<span class="nc" id="L346">    }</span>
+
+    public void checkExit(final int status) {
+<span class="nc bnc" id="L349" title="All 2 branches missed.">        if (doCheck()) {</span>
+<span class="nc" id="L350">            super.checkExit(status);</span>
+        }
+<span class="nc" id="L352">    }</span>
+
+    public void checkExec(final String cmd) {
+<span class="nc bnc" id="L355" title="All 2 branches missed.">        if (doCheck()) {</span>
+<span class="nc" id="L356">            super.checkExec(cmd);</span>
+        }
+<span class="nc" id="L358">    }</span>
+
+    public void checkLink(final String lib) {
+<span class="nc bnc" id="L361" title="All 2 branches missed.">        if (doCheck()) {</span>
+<span class="nc" id="L362">            super.checkLink(lib);</span>
+        }
+<span class="nc" id="L364">    }</span>
+
+    public void checkRead(final FileDescriptor fd) {
+<span class="nc bnc" id="L367" title="All 2 branches missed.">        if (doCheck()) {</span>
+<span class="nc" id="L368">            super.checkRead(fd);</span>
+        }
+<span class="nc" id="L370">    }</span>
+
+    public void checkRead(final String file) {
+<span class="nc bnc" id="L373" title="All 2 branches missed.">        if (doCheck()) {</span>
+<span class="nc" id="L374">            super.checkRead(file);</span>
+        }
+<span class="nc" id="L376">    }</span>
+
+    public void checkRead(final String file, final Object context) {
+<span class="nc bnc" id="L379" title="All 2 branches missed.">        if (doCheck()) {</span>
+<span class="nc" id="L380">            super.checkRead(file, context);</span>
+        }
+<span class="nc" id="L382">    }</span>
+
+    public void checkWrite(final FileDescriptor fd) {
+<span class="nc bnc" id="L385" title="All 2 branches missed.">        if (doCheck()) {</span>
+<span class="nc" id="L386">            super.checkWrite(fd);</span>
+        }
+<span class="nc" id="L388">    }</span>
+
+    public void checkWrite(final String file) {
+<span class="nc bnc" id="L391" title="All 2 branches missed.">        if (doCheck()) {</span>
+<span class="nc" id="L392">            super.checkWrite(file);</span>
+        }
+<span class="nc" id="L394">    }</span>
+
+    public void checkDelete(final String file) {
+<span class="nc bnc" id="L397" title="All 2 branches missed.">        if (doCheck()) {</span>
+<span class="nc" id="L398">            super.checkDelete(file);</span>
+        }
+<span class="nc" id="L400">    }</span>
+
+    public void checkConnect(final String host, final int port) {
+<span class="nc bnc" id="L403" title="All 2 branches missed.">        if (doCheck()) {</span>
+<span class="nc" id="L404">            super.checkConnect(host, port);</span>
+        }
+<span class="nc" id="L406">    }</span>
+
+    public void checkConnect(final String host, final int port, final Object context) {
+<span class="nc bnc" id="L409" title="All 2 branches missed.">        if (doCheck()) {</span>
+<span class="nc" id="L410">            super.checkConnect(host, port, context);</span>
+        }
+<span class="nc" id="L412">    }</span>
+
+    public void checkListen(final int port) {
+<span class="nc bnc" id="L415" title="All 2 branches missed.">        if (doCheck()) {</span>
+<span class="nc" id="L416">            super.checkListen(port);</span>
+        }
+<span class="nc" id="L418">    }</span>
+
+    public void checkAccept(final String host, final int port) {
+<span class="nc bnc" id="L421" title="All 2 branches missed.">        if (doCheck()) {</span>
+<span class="nc" id="L422">            super.checkAccept(host, port);</span>
+        }
+<span class="nc" id="L424">    }</span>
+
+    public void checkMulticast(final InetAddress maddr) {
+<span class="nc bnc" id="L427" title="All 2 branches missed.">        if (doCheck()) {</span>
+<span class="nc" id="L428">            super.checkMulticast(maddr);</span>
+        }
+<span class="nc" id="L430">    }</span>
+
+    @Deprecated @SuppressWarnings(&quot;deprecation&quot;)
+    public void checkMulticast(final InetAddress maddr, final byte ttl) {
+<span class="nc bnc" id="L434" title="All 2 branches missed.">        if (doCheck()) {</span>
+<span class="nc" id="L435">            super.checkMulticast(maddr, ttl);</span>
+        }
+<span class="nc" id="L437">    }</span>
+
+    public void checkPropertiesAccess() {
+<span class="nc bnc" id="L440" title="All 2 branches missed.">        if (doCheck()) {</span>
+<span class="nc" id="L441">            super.checkPropertiesAccess();</span>
+        }
+<span class="nc" id="L443">    }</span>
+
+    public void checkPropertyAccess(final String key) {
+<span class="nc" id="L446">        final Context ctx = CTX.get();</span>
+<span class="nc bnc" id="L447" title="All 2 branches missed.">        if (doCheck(ctx)) {</span>
+            /*
+             * Here is our expected stack:
+             *   0: this method
+             *   1: java.lang.System.getProperty() (may repeat)
+             *   2: user code   | java.lang.(Boolean|Integer|Long).getXxx()
+             *  3+: ???         | java.lang.(Boolean|Integer|Long).getXxx() (more)
+             *   n:             | user code
+             */
+<span class="nc" id="L456">            Class&lt;?&gt;[] context = getClassContext();</span>
+<span class="nc bnc" id="L457" title="All 2 branches missed.">            if (context.length &lt; 3) {</span>
+<span class="nc" id="L458">                super.checkPropertyAccess(key);</span>
+<span class="nc" id="L459">                return;</span>
+            }
+<span class="nc bnc" id="L461" title="All 2 branches missed.">            if (context[1] != System.class) {</span>
+<span class="nc" id="L462">                super.checkPropertyAccess(key);</span>
+<span class="nc" id="L463">                return;</span>
+            }
+<span class="nc" id="L465">            Class&lt;?&gt; testClass = context[2];</span>
+<span class="nc bnc" id="L466" title="All 4 branches missed.">            if (context.length &gt;= 4) for (int i = 2; i &lt; context.length; i ++) {</span>
+<span class="nc bnc" id="L467" title="All 8 branches missed.">                if (context[i] == Boolean.class || context[i] == Integer.class || context[i] == Long.class || context[i] == System.class) {</span>
+<span class="nc" id="L468">                    testClass = context[i + 1];</span>
+                } else {
+                    break;
+                }
+            }
+            final ProtectionDomain protectionDomain;
+            final ClassLoader classLoader;
+            final ClassLoader objectClassLoader;
+<span class="nc" id="L476">            ctx.entered = true;</span>
+            try {
+<span class="nc" id="L478">                protectionDomain = testClass.getProtectionDomain();</span>
+<span class="nc" id="L479">                classLoader = testClass.getClassLoader();</span>
+<span class="nc" id="L480">                objectClassLoader = Object.class.getClassLoader();</span>
+            } finally {
+<span class="nc" id="L482">                ctx.entered = false;</span>
+            }
+<span class="nc bnc" id="L484" title="All 2 branches missed.">            if (classLoader == objectClassLoader) {</span>
+                // can't trust it, it's gone through more JDK code
+<span class="nc" id="L486">                super.checkPropertyAccess(key);</span>
+<span class="nc" id="L487">                return;</span>
+            }
+<span class="nc" id="L489">            final PropertyPermission permission = new PropertyPermission(key, &quot;read&quot;);</span>
+<span class="nc bnc" id="L490" title="All 2 branches missed.">            if (protectionDomain.implies(permission)) {</span>
+<span class="nc" id="L491">                return;</span>
+            }
+<span class="nc" id="L493">            checkPermission(permission, getContext());</span>
+        }
+<span class="nc" id="L495">    }</span>
+
+    public void checkPrintJobAccess() {
+<span class="nc bnc" id="L498" title="All 2 branches missed.">        if (doCheck()) {</span>
+<span class="nc" id="L499">            super.checkPrintJobAccess();</span>
+        }
+<span class="nc" id="L501">    }</span>
+
+    public void checkPackageAccess(final String pkg) {
+<span class="nc bnc" id="L504" title="All 2 branches missed.">        if (doCheck()) {</span>
+<span class="nc" id="L505">            super.checkPackageAccess(pkg);</span>
+        }
+<span class="nc" id="L507">    }</span>
+
+    public void checkPackageDefinition(final String pkg) {
+<span class="nc bnc" id="L510" title="All 2 branches missed.">        if (doCheck()) {</span>
+<span class="nc" id="L511">            super.checkPackageDefinition(pkg);</span>
+        }
+<span class="nc" id="L513">    }</span>
+
+    public void checkSetFactory() {
+<span class="nc bnc" id="L516" title="All 2 branches missed.">        if (doCheck()) {</span>
+<span class="nc" id="L517">            super.checkSetFactory();</span>
+        }
+<span class="nc" id="L519">    }</span>
+
+<span class="fc" id="L521">    private static final Class&lt;?&gt;[] ATOMIC_FIELD_UPDATER_TYPES = new Class&lt;?&gt;[] {</span>
+        AtomicReferenceFieldUpdater.class, AtomicLongFieldUpdater.class, AtomicIntegerFieldUpdater.class
+    };
+
+    private static boolean isAssignableToOneOf(Class&lt;?&gt; test, Class&lt;?&gt;... expect) {
+<span class="nc bnc" id="L526" title="All 2 branches missed.">        for (Class&lt;?&gt; clazz : expect) {</span>
+<span class="nc bnc" id="L527" title="All 2 branches missed.">            if (clazz.isAssignableFrom(test)) return true;</span>
+        }
+<span class="nc" id="L529">        return false;</span>
+    }
+
+    @Deprecated @SuppressWarnings(&quot;deprecation&quot;)
+    public void checkMemberAccess(final Class&lt;?&gt; clazz, final int which) {
+<span class="nc" id="L534">        final Context ctx = CTX.get();</span>
+<span class="nc bnc" id="L535" title="All 2 branches missed.">        if (doCheck(ctx)) {</span>
+<span class="nc" id="L536">            Assert.checkNotNullParam(&quot;class&quot;, clazz);</span>
+<span class="nc bnc" id="L537" title="All 2 branches missed.">            if (which != Member.PUBLIC) {</span>
+                /* The default sec mgr implementation makes some ugly assumptions about call stack depth that we must
+                 * unfortunately replicate (and improve upon).  Here are the stack elements we expect to see:
+                 *
+                 *   0: this method
+                 *   1: java.lang.Class#checkMemberAccess()
+                 *   2: java.lang.Class#getDeclared*() or similar in Class
+                 *   3: user code | java.util.concurrent.Atomic*FieldUpdater (impl)
+                 *  4+: ???       | java.util.concurrent.Atomic*FieldUpdater (possibly more)
+                 *   n: ???       | user code
+                 *
+                 * The great irony is that Class is supposed to detect that this method is overridden and fall back to
+                 * a simple permission check, however that doesn't seem to be working in practice.
+                 */
+<span class="nc" id="L551">                Class&lt;?&gt;[] context = getClassContext();</span>
+<span class="nc" id="L552">                int depth = context.length;</span>
+<span class="nc bnc" id="L553" title="All 6 branches missed.">                if (depth &gt;= 4 &amp;&amp; context[1] == Class.class &amp;&amp; context[2] == Class.class) {</span>
+                    final ClassLoader objectClassLoader;
+                    final ClassLoader clazzClassLoader;
+                    ClassLoader classLoader;
+                    // get class loaders without permission check
+<span class="nc" id="L558">                    ctx.entered = true;</span>
+                    try {
+<span class="nc" id="L560">                        objectClassLoader = Object.class.getClassLoader();</span>
+<span class="nc" id="L561">                        clazzClassLoader = clazz.getClassLoader();</span>
+<span class="nc bnc" id="L562" title="All 2 branches missed.">                        for (int i = 3; i &lt; depth; i ++) {</span>
+<span class="nc" id="L563">                            classLoader = context[i].getClassLoader();</span>
+<span class="nc bnc" id="L564" title="All 2 branches missed.">                            if (classLoader == objectClassLoader) {</span>
+<span class="nc bnc" id="L565" title="All 2 branches missed.">                                if (isAssignableToOneOf(context[i], ATOMIC_FIELD_UPDATER_TYPES)) {</span>
+                                    // keep going
+                                } else {
+                                    // unknown JDK class, fall back
+<span class="nc" id="L569">                                    checkPermission(ACCESS_DECLARED_MEMBERS_PERMISSION);</span>
+<span class="nc" id="L570">                                    return;</span>
+                                }
+                            } else {
+<span class="nc bnc" id="L573" title="All 2 branches missed.">                                if (clazzClassLoader == classLoader) {</span>
+                                    // permission granted
+<span class="nc" id="L575">                                    return;</span>
+                                } else {
+                                    // class loaders differ
+<span class="nc" id="L578">                                    checkPermission(ACCESS_DECLARED_MEMBERS_PERMISSION);</span>
+<span class="nc" id="L579">                                    return;</span>
+                                }
+                            }
+                        }
+                    } finally {
+<span class="nc" id="L584">                        ctx.entered = false;</span>
+                    }
+                }
+                // fall back to paranoid check
+<span class="nc" id="L588">                checkPermission(ACCESS_DECLARED_MEMBERS_PERMISSION);</span>
+            }
+        }
+<span class="nc" id="L591">    }</span>
+
+    public void checkSecurityAccess(final String target) {
+<span class="nc bnc" id="L594" title="All 2 branches missed.">        if (doCheck()) {</span>
+<span class="nc" id="L595">            super.checkSecurityAccess(target);</span>
+        }
+<span class="nc" id="L597">    }</span>
+
+    /**
+     * Perform an action with permission checking enabled.  If permission checking is already enabled, the action is
+     * simply run.
+     *
+     * @param action the action to perform
+     * @param &lt;T&gt; the action return type
+     * @return the return value of the action
+     */
+    public static &lt;T&gt; T doChecked(PrivilegedAction&lt;T&gt; action) {
+<span class="fc" id="L608">        final Context ctx = CTX.get();</span>
+<span class="pc bpc" id="L609" title="1 of 2 branches missed.">        if (ctx.checking) {</span>
+<span class="fc" id="L610">            return action.run();</span>
+        }
+<span class="nc" id="L612">        ctx.checking = true;</span>
+        try {
+<span class="nc" id="L614">            return action.run();</span>
+        } finally {
+<span class="nc" id="L616">            ctx.checking = false;</span>
+        }
+    }
+
+    /**
+     * Perform an action with permission checking enabled.  If permission checking is already enabled, the action is
+     * simply run.
+     *
+     * @param action the action to perform
+     * @param &lt;T&gt; the action return type
+     * @return the return value of the action
+     * @throws PrivilegedActionException if the action threw an exception
+     */
+    public static &lt;T&gt; T doChecked(PrivilegedExceptionAction&lt;T&gt; action) throws PrivilegedActionException {
+<span class="nc" id="L630">        final Context ctx = CTX.get();</span>
+<span class="nc bnc" id="L631" title="All 2 branches missed.">        if (ctx.checking) {</span>
+            try {
+<span class="nc" id="L633">                return action.run();</span>
+<span class="nc" id="L634">            } catch (RuntimeException e) {</span>
+<span class="nc" id="L635">                throw e;</span>
+<span class="nc" id="L636">            } catch (Exception e) {</span>
+<span class="nc" id="L637">                throw new PrivilegedActionException(e);</span>
+            }
+        }
+<span class="nc" id="L640">        ctx.checking = true;</span>
+        try {
+<span class="nc" id="L642">            return action.run();</span>
+<span class="nc" id="L643">        } catch (RuntimeException e) {</span>
+<span class="nc" id="L644">            throw e;</span>
+<span class="nc" id="L645">        } catch (Exception e) {</span>
+<span class="nc" id="L646">            throw new PrivilegedActionException(e);</span>
+        } finally {
+<span class="nc" id="L648">            ctx.checking = false;</span>
+        }
+    }
+
+    /**
+     * Perform an action with permission checking enabled.  If permission checking is already enabled, the action is
+     * simply run.
+     *
+     * @param action the action to perform
+     * @param context the access control context to use
+     * @param &lt;T&gt; the action return type
+     * @return the return value of the action
+     */
+    public static &lt;T&gt; T doChecked(PrivilegedAction&lt;T&gt; action, AccessControlContext context) {
+<span class="fc" id="L662">        final Context ctx = CTX.get();</span>
+<span class="pc bpc" id="L663" title="1 of 2 branches missed.">        if (ctx.checking) {</span>
+<span class="fc" id="L664">            return doPrivileged(action, context);</span>
+        }
+<span class="nc" id="L666">        ctx.checking = true;</span>
+        try {
+<span class="nc" id="L668">            return doPrivileged(action, context);</span>
+        } finally {
+<span class="nc" id="L670">            ctx.checking = false;</span>
+        }
+    }
+
+    /**
+     * Perform an action with permission checking enabled.  If permission checking is already enabled, the action is
+     * simply run.
+     *
+     * @param action the action to perform
+     * @param context the access control context to use
+     * @param &lt;T&gt; the action return type
+     * @return the return value of the action
+     * @throws PrivilegedActionException if the action threw an exception
+     */
+    public static &lt;T&gt; T doChecked(PrivilegedExceptionAction&lt;T&gt; action, AccessControlContext context) throws PrivilegedActionException {
+<span class="nc" id="L685">        final Context ctx = CTX.get();</span>
+<span class="nc bnc" id="L686" title="All 2 branches missed.">        if (ctx.checking) {</span>
+            try {
+<span class="nc" id="L688">                return doPrivileged(action, context);</span>
+<span class="nc" id="L689">            } catch (RuntimeException e) {</span>
+<span class="nc" id="L690">                throw e;</span>
+<span class="nc" id="L691">            } catch (Exception e) {</span>
+<span class="nc" id="L692">                throw new PrivilegedActionException(e);</span>
+            }
+        }
+<span class="nc" id="L695">        ctx.checking = true;</span>
+        try {
+<span class="nc" id="L697">            return doPrivileged(action, context);</span>
+        } finally {
+<span class="nc" id="L699">            ctx.checking = false;</span>
+        }
+    }
+
+    /**
+     * Perform an action with permission checking enabled.  If permission checking is already enabled, the action is
+     * simply run.
+     *
+     * @param parameter the parameter to pass to the action
+     * @param action the action to perform
+     * @param &lt;T&gt; the action return type
+     * @param &lt;P&gt; the action parameter type
+     * @return the return value of the action
+     */
+    public static &lt;T, P&gt; T doChecked(P parameter, ParametricPrivilegedAction&lt;T, P&gt; action) {
+<span class="fc" id="L714">        final Context ctx = CTX.get();</span>
+<span class="pc bpc" id="L715" title="1 of 2 branches missed.">        if (ctx.checking) {</span>
+<span class="fc" id="L716">            return action.run(parameter);</span>
+        }
+<span class="nc" id="L718">        ctx.checking = true;</span>
+        try {
+<span class="nc" id="L720">            return action.run(parameter);</span>
+        } finally {
+<span class="nc" id="L722">            ctx.checking = false;</span>
+        }
+    }
+
+    /**
+     * Perform an action with permission checking enabled.  If permission checking is already enabled, the action is
+     * simply run.
+     *
+     * @param parameter the parameter to pass to the action
+     * @param action the action to perform
+     * @param &lt;T&gt; the action return type
+     * @param &lt;P&gt; the action parameter type
+     * @return the return value of the action
+     * @throws PrivilegedActionException if the action threw an exception
+     */
+    public static &lt;T, P&gt; T doChecked(P parameter, ParametricPrivilegedExceptionAction&lt;T, P&gt; action) throws PrivilegedActionException {
+<span class="nc" id="L738">        final Context ctx = CTX.get();</span>
+<span class="nc bnc" id="L739" title="All 2 branches missed.">        if (ctx.checking) {</span>
+            try {
+<span class="nc" id="L741">                return action.run(parameter);</span>
+<span class="nc" id="L742">            } catch (RuntimeException e) {</span>
+<span class="nc" id="L743">                throw e;</span>
+<span class="nc" id="L744">            } catch (Exception e) {</span>
+<span class="nc" id="L745">                throw new PrivilegedActionException(e);</span>
+            }
+        }
+<span class="nc" id="L748">        ctx.checking = true;</span>
+        try {
+<span class="nc" id="L750">            return action.run(parameter);</span>
+<span class="nc" id="L751">        } catch (RuntimeException e) {</span>
+<span class="nc" id="L752">            throw e;</span>
+<span class="nc" id="L753">        } catch (Exception e) {</span>
+<span class="nc" id="L754">            throw new PrivilegedActionException(e);</span>
+        } finally {
+<span class="nc" id="L756">            ctx.checking = false;</span>
+        }
+    }
+
+    /**
+     * Perform an action with permission checking enabled.  If permission checking is already enabled, the action is
+     * simply run.
+     *
+     * @param parameter the parameter to pass to the action
+     * @param action the action to perform
+     * @param context the access control context to use
+     * @param &lt;T&gt; the action return type
+     * @param &lt;P&gt; the action parameter type
+     * @return the return value of the action
+     */
+    public static &lt;T, P&gt; T doChecked(P parameter, ParametricPrivilegedAction&lt;T, P&gt; action, AccessControlContext context) {
+<span class="fc" id="L772">        final Context ctx = CTX.get();</span>
+<span class="pc bpc" id="L773" title="1 of 2 branches missed.">        if (ctx.checking) {</span>
+<span class="fc" id="L774">            return doPrivilegedWithParameter(parameter, action, context);</span>
+        }
+<span class="nc" id="L776">        ctx.checking = true;</span>
+        try {
+<span class="nc" id="L778">            return doPrivilegedWithParameter(parameter, action, context);</span>
+        } finally {
+<span class="nc" id="L780">            ctx.checking = false;</span>
+        }
+    }
+
+    /**
+     * Perform an action with permission checking enabled.  If permission checking is already enabled, the action is
+     * simply run.
+     *
+     * @param parameter the parameter to pass to the action
+     * @param action the action to perform
+     * @param context the access control context to use
+     * @param &lt;T&gt; the action return type
+     * @param &lt;P&gt; the action parameter type
+     * @return the return value of the action
+     * @throws PrivilegedActionException if the action threw an exception
+     */
+    public static &lt;T, P&gt; T doChecked(P parameter, ParametricPrivilegedExceptionAction&lt;T, P&gt; action, AccessControlContext context) throws PrivilegedActionException {
+<span class="nc" id="L797">        final Context ctx = CTX.get();</span>
+<span class="nc bnc" id="L798" title="All 2 branches missed.">        if (ctx.checking) {</span>
+<span class="nc" id="L799">            return doPrivilegedWithParameter(parameter, action, context);</span>
+        }
+<span class="nc" id="L801">        ctx.checking = true;</span>
+        try {
+<span class="nc" id="L803">            return doPrivilegedWithParameter(parameter, action, context);</span>
+        } finally {
+<span class="nc" id="L805">            ctx.checking = false;</span>
+        }
+    }
+
+    /**
+     * Perform an action with permission checking disabled.  If permission checking is already disabled, the action is
+     * simply run.  The immediate caller must have the {@code doUnchecked} runtime permission.
+     *
+     * @param action the action to perform
+     * @param &lt;T&gt; the action return type
+     * @return the return value of the action
+     */
+    public static &lt;T&gt; T doUnchecked(PrivilegedAction&lt;T&gt; action) {
+<span class="fc" id="L818">        final SecurityManager sm = getSecurityManager();</span>
+<span class="pc bpc" id="L819" title="1 of 2 branches missed.">        if (sm instanceof WildFlySecurityManager) {</span>
+<span class="nc" id="L820">            final Context ctx = CTX.get();</span>
+<span class="nc bnc" id="L821" title="All 2 branches missed.">            if (! ctx.checking) {</span>
+<span class="nc" id="L822">                return action.run();</span>
+            }
+<span class="nc" id="L824">            ctx.checking = false;</span>
+            try {
+<span class="nc bnc" id="L826" title="All 2 branches missed.">                if (sm != null) {</span>
+<span class="nc" id="L827">                    checkPDPermission(getCallerClass(1), doUncheckedPermission);</span>
+                }
+<span class="nc" id="L829">                return action.run();</span>
+            } finally {
+<span class="nc" id="L831">                ctx.checking = true;</span>
+            }
+<span class="pc bpc" id="L833" title="1 of 2 branches missed.">        } else if (sm != null) {</span>
+            // Just doPrivileged as the caller.
+<span class="fc" id="L835">            return doPrivileged(action, getCallerAccessControlContext());</span>
+        }
+
+<span class="nc" id="L838">        return action.run();</span>
+    }
+
+    /**
+     * Perform an action with permission checking disabled.  If permission checking is already disabled, the action is
+     * simply run.  The caller must have the {@code doUnchecked} runtime permission.
+     *
+     * @param action the action to perform
+     * @param &lt;T&gt; the action return type
+     * @return the return value of the action
+     * @throws PrivilegedActionException if the action threw an exception
+     */
+    public static &lt;T&gt; T doUnchecked(PrivilegedExceptionAction&lt;T&gt; action) throws PrivilegedActionException {
+<span class="nc" id="L851">        final SecurityManager sm = getSecurityManager();</span>
+<span class="nc bnc" id="L852" title="All 2 branches missed.">        if (sm instanceof WildFlySecurityManager) {</span>
+<span class="nc" id="L853">            final Context ctx = CTX.get();</span>
+<span class="nc bnc" id="L854" title="All 2 branches missed.">            if (! ctx.checking) {</span>
+                try {
+<span class="nc" id="L856">                    return action.run();</span>
+<span class="nc" id="L857">                } catch (Exception e) {</span>
+<span class="nc" id="L858">                    throw new PrivilegedActionException(e);</span>
+                }
+            }
+<span class="nc" id="L861">            ctx.checking = false;</span>
+            try {
+<span class="nc bnc" id="L863" title="All 2 branches missed.">                if (sm != null) {</span>
+<span class="nc" id="L864">                    checkPDPermission(getCallerClass(1), doUncheckedPermission);</span>
+                }
+<span class="nc" id="L866">                return action.run();</span>
+<span class="nc" id="L867">            } catch (Exception e) {</span>
+<span class="nc" id="L868">                throw new PrivilegedActionException(e);</span>
+            } finally {
+<span class="nc" id="L870">                ctx.checking = true;</span>
+            }
+<span class="nc bnc" id="L872" title="All 2 branches missed.">        } else if (sm != null) {</span>
+            // Just doPrivileged as the caller.
+<span class="nc" id="L874">            return doPrivileged(action, getCallerAccessControlContext());</span>
+        }
+
+        try {
+<span class="nc" id="L878">            return action.run();</span>
+<span class="nc" id="L879">        } catch (Exception e) {</span>
+<span class="nc" id="L880">            throw new PrivilegedActionException(e);</span>
+        }
+    }
+
+    /**
+     * Perform an action with permission checking disabled.  If permission checking is already disabled, the action is
+     * simply run.  The immediate caller must have the {@code doUnchecked} runtime permission.
+     *
+     * @param action the action to perform
+     * @param context the access control context to use
+     * @param &lt;T&gt; the action return type
+     * @return the return value of the action
+     */
+    public static &lt;T&gt; T doUnchecked(PrivilegedAction&lt;T&gt; action, AccessControlContext context) {
+<span class="fc" id="L894">        final SecurityManager sm = getSecurityManager();</span>
+<span class="pc bpc" id="L895" title="1 of 2 branches missed.">        if (sm instanceof WildFlySecurityManager) {</span>
+<span class="nc" id="L896">            final Context ctx = CTX.get();</span>
+<span class="nc bnc" id="L897" title="All 2 branches missed.">            if (! ctx.checking) {</span>
+<span class="nc" id="L898">                return doPrivileged(action, context);</span>
+            }
+<span class="nc" id="L900">            ctx.checking = false;</span>
+            try {
+<span class="nc bnc" id="L902" title="All 2 branches missed.">                if (sm != null) {</span>
+<span class="nc" id="L903">                    checkPDPermission(getCallerClass(1), doUncheckedPermission);</span>
+                }
+<span class="nc" id="L905">                return action.run();</span>
+            } finally {
+<span class="nc" id="L907">                ctx.checking = true;</span>
+            }
+<span class="pc bpc" id="L909" title="1 of 2 branches missed.">        } else if (sm != null) {</span>
+            // Just doPrivileged as the caller.
+<span class="fc" id="L911">            return doPrivileged(action, context);</span>
+        }
+
+<span class="nc" id="L914">        return doPrivileged(action, context);</span>
+    }
+
+    /**
+     * Perform an action with permission checking disabled.  If permission checking is already disabled, the action is
+     * simply run.  The caller must have the {@code doUnchecked} runtime permission.
+     *
+     * @param action the action to perform
+     * @param context the access control context to use
+     * @param &lt;T&gt; the action return type
+     * @return the return value of the action
+     * @throws PrivilegedActionException if the action threw an exception
+     */
+    public static &lt;T&gt; T doUnchecked(PrivilegedExceptionAction&lt;T&gt; action, AccessControlContext context) throws PrivilegedActionException {
+<span class="nc" id="L928">        final SecurityManager sm = getSecurityManager();</span>
+<span class="nc bnc" id="L929" title="All 2 branches missed.">        if (sm instanceof WildFlySecurityManager) {</span>
+<span class="nc" id="L930">            final Context ctx = CTX.get();</span>
+<span class="nc bnc" id="L931" title="All 2 branches missed.">            if (! ctx.checking) {</span>
+<span class="nc" id="L932">                return doPrivileged(action, context);</span>
+            }
+<span class="nc" id="L934">            ctx.checking = false;</span>
+            try {
+<span class="nc bnc" id="L936" title="All 2 branches missed.">                if (sm != null) {</span>
+<span class="nc" id="L937">                    checkPDPermission(getCallerClass(1), doUncheckedPermission);</span>
+                }
+<span class="nc" id="L939">                return doPrivileged(action, context);</span>
+            } finally {
+<span class="nc" id="L941">                ctx.checking = true;</span>
+            }
+<span class="nc bnc" id="L943" title="All 2 branches missed.">        } else if (sm != null) {</span>
+            // Just doPrivileged as the caller.
+<span class="nc" id="L945">            return doPrivileged(action, context);</span>
+        }
+
+<span class="nc" id="L948">        return doPrivileged(action, context);</span>
+    }
+
+    /**
+     * Perform an action with permission checking disabled.  If permission checking is already disabled, the action is
+     * simply run.  The immediate caller must have the {@code doUnchecked} runtime permission.
+     *
+     * @param parameter the parameter to pass to the action
+     * @param action the action to perform
+     * @param &lt;T&gt; the action return type
+     * @param &lt;P&gt; the action parameter type
+     * @return the return value of the action
+     */
+    public static &lt;T, P&gt; T doUnchecked(P parameter, ParametricPrivilegedAction&lt;T, P&gt; action) {
+<span class="nc" id="L962">        final SecurityManager sm = getSecurityManager();</span>
+<span class="nc bnc" id="L963" title="All 2 branches missed.">        if (sm instanceof WildFlySecurityManager) {</span>
+<span class="nc" id="L964">            final Context ctx = CTX.get();</span>
+<span class="nc bnc" id="L965" title="All 2 branches missed.">            if (! ctx.checking) {</span>
+<span class="nc" id="L966">                return action.run(parameter);</span>
+            }
+<span class="nc" id="L968">            ctx.checking = false;</span>
+            try {
+<span class="nc bnc" id="L970" title="All 2 branches missed.">                if (sm != null) {</span>
+<span class="nc" id="L971">                    checkPDPermission(getCallerClass(1), doUncheckedPermission);</span>
+                }
+<span class="nc" id="L973">                return action.run(parameter);</span>
+            } finally {
+<span class="nc" id="L975">                ctx.checking = true;</span>
+            }
+<span class="nc bnc" id="L977" title="All 2 branches missed.">        } else if (sm != null) {</span>
+            // Just doPrivileged as the caller.
+<span class="nc" id="L979">            return doPrivilegedWithParameter(parameter, action, null);</span>
+        }
+
+<span class="nc" id="L982">        return action.run(parameter);</span>
+    }
+
+    /**
+     * Perform an action with permission checking disabled.  If permission checking is already disabled, the action is
+     * simply run.  The caller must have the {@code doUnchecked} runtime permission.
+     *
+     * @param parameter the parameter to pass to the action
+     * @param action the action to perform
+     * @param &lt;T&gt; the action return type
+     * @param &lt;P&gt; the action parameter type
+     * @return the return value of the action
+     * @throws PrivilegedActionException if the action threw an exception
+     */
+    public static &lt;T, P&gt; T doUnchecked(P parameter, ParametricPrivilegedExceptionAction&lt;T, P&gt; action) throws PrivilegedActionException {
+<span class="nc" id="L997">        final SecurityManager sm = getSecurityManager();</span>
+<span class="nc bnc" id="L998" title="All 2 branches missed.">        if (sm instanceof WildFlySecurityManager) {</span>
+<span class="nc" id="L999">            final Context ctx = CTX.get();</span>
+<span class="nc bnc" id="L1000" title="All 2 branches missed.">            if (! ctx.checking) {</span>
+                try {
+<span class="nc" id="L1002">                    return action.run(parameter);</span>
+<span class="nc" id="L1003">                } catch (Exception e) {</span>
+<span class="nc" id="L1004">                    throw new PrivilegedActionException(e);</span>
+                }
+            }
+<span class="nc" id="L1007">            ctx.checking = false;</span>
+            try {
+<span class="nc bnc" id="L1009" title="All 2 branches missed.">                if (sm != null) {</span>
+<span class="nc" id="L1010">                    checkPDPermission(getCallerClass(1), doUncheckedPermission);</span>
+                }
+<span class="nc" id="L1012">                return action.run(parameter);</span>
+<span class="nc" id="L1013">            } catch (Exception e) {</span>
+<span class="nc" id="L1014">                throw new PrivilegedActionException(e);</span>
+            } finally {
+<span class="nc" id="L1016">                ctx.checking = true;</span>
+            }
+<span class="nc bnc" id="L1018" title="All 2 branches missed.">        } else if (sm != null) {</span>
+            // Just doPrivileged as the caller.
+<span class="nc" id="L1020">            return doPrivilegedWithParameter(parameter, action, null);</span>
+        }
+
+        try {
+<span class="nc" id="L1024">            return action.run(parameter);</span>
+<span class="nc" id="L1025">        } catch (Exception e) {</span>
+<span class="nc" id="L1026">            throw new PrivilegedActionException(e);</span>
+        }
+    }
+
+    /**
+     * Perform an action with permission checking disabled.  If permission checking is already disabled, the action is
+     * simply run.  The immediate caller must have the {@code doUnchecked} runtime permission.
+     *
+     * @param parameter the parameter to pass to the action
+     * @param action the action to perform
+     * @param context the access control context to use
+     * @param &lt;T&gt; the action return type
+     * @param &lt;P&gt; the action parameter type
+     * @return the return value of the action
+     */
+    public static &lt;T, P&gt; T doUnchecked(P parameter, ParametricPrivilegedAction&lt;T, P&gt; action, AccessControlContext context) {
+<span class="fc" id="L1042">        final SecurityManager sm = getSecurityManager();</span>
+<span class="pc bpc" id="L1043" title="1 of 2 branches missed.">        if (sm instanceof WildFlySecurityManager) {</span>
+<span class="nc" id="L1044">            final Context ctx = CTX.get();</span>
+<span class="nc bnc" id="L1045" title="All 2 branches missed.">            if (! ctx.checking) {</span>
+<span class="nc" id="L1046">                return doPrivilegedWithParameter(parameter, action, context);</span>
+            }
+<span class="nc" id="L1048">            ctx.checking = false;</span>
+            try {
+<span class="nc bnc" id="L1050" title="All 2 branches missed.">                if (sm != null) {</span>
+<span class="nc" id="L1051">                    checkPDPermission(getCallerClass(1), doUncheckedPermission);</span>
+                }
+<span class="nc" id="L1053">                return doPrivilegedWithParameter(parameter, action, context);</span>
+            } finally {
+<span class="nc" id="L1055">                ctx.checking = true;</span>
+            }
+        }
+
+<span class="fc" id="L1059">        return doPrivilegedWithParameter(parameter, action, context);</span>
+    }
+
+    /**
+     * Perform an action with permission checking disabled.  If permission checking is already disabled, the action is
+     * simply run.  The caller must have the {@code doUnchecked} runtime permission.
+     *
+     * @param parameter the parameter to pass to the action
+     * @param action the action to perform
+     * @param context the access control context to use
+     * @param &lt;T&gt; the action return type
+     * @param &lt;P&gt; the action parameter type
+     * @return the return value of the action
+     * @throws PrivilegedActionException if the action threw an exception
+     */
+    public static &lt;T, P&gt; T doUnchecked(P parameter, ParametricPrivilegedExceptionAction&lt;T, P&gt; action, AccessControlContext context) throws PrivilegedActionException {
+<span class="nc" id="L1075">        final SecurityManager sm = getSecurityManager();</span>
+<span class="nc bnc" id="L1076" title="All 2 branches missed.">        if (sm instanceof WildFlySecurityManager) {</span>
+<span class="nc" id="L1077">            final Context ctx = CTX.get();</span>
+<span class="nc bnc" id="L1078" title="All 2 branches missed.">            if (! ctx.checking) {</span>
+<span class="nc" id="L1079">                return doPrivilegedWithParameter(parameter, action, context);</span>
+            }
+<span class="nc" id="L1081">            ctx.checking = false;</span>
+            try {
+<span class="nc bnc" id="L1083" title="All 2 branches missed.">                if (sm != null) {</span>
+<span class="nc" id="L1084">                    checkPDPermission(getCallerClass(1), doUncheckedPermission);</span>
+                }
+<span class="nc" id="L1086">                return doPrivilegedWithParameter(parameter, action, context);</span>
+            } finally {
+<span class="nc" id="L1088">                ctx.checking = true;</span>
+            }
+        }
+
+<span class="nc" id="L1092">        return doPrivilegedWithParameter(parameter, action, context);</span>
+    }
+
+    private static void checkPropertyReadPermission(Class&lt;?&gt; clazz, String propertyName) {
+        final ProtectionDomain protectionDomain;
+        final ClassLoader classLoader;
+<span class="nc bnc" id="L1098" title="All 2 branches missed.">        if (getSecurityManager() instanceof WildFlySecurityManager) {</span>
+<span class="nc" id="L1099">            protectionDomain = clazz.getProtectionDomain();</span>
+<span class="nc" id="L1100">            classLoader = clazz.getClassLoader();</span>
+        } else {
+<span class="nc" id="L1102">            protectionDomain = doPrivileged(new GetProtectionDomainAction(clazz));</span>
+<span class="nc" id="L1103">            classLoader = doPrivileged(new GetClassLoaderAction(clazz));</span>
+        }
+<span class="nc bnc" id="L1105" title="All 2 branches missed.">        if (protectionDomain.implies(PROPERTIES_PERMISSION)) {</span>
+<span class="nc" id="L1106">            return;</span>
+        }
+<span class="nc" id="L1108">        final PropertyPermission permission = new PropertyPermission(propertyName, &quot;read&quot;);</span>
+<span class="nc bnc" id="L1109" title="All 2 branches missed.">        if (protectionDomain.implies(permission)) {</span>
+<span class="nc" id="L1110">            return;</span>
+        }
+<span class="nc" id="L1112">        access.accessCheckFailed(permission, protectionDomain.getCodeSource(), classLoader);</span>
+<span class="nc bnc" id="L1113" title="All 2 branches missed.">        if (! LOG_ONLY) {</span>
+<span class="nc" id="L1114">            throw access.accessControlException(permission, permission, protectionDomain.getCodeSource(), classLoader);</span>
+        }
+<span class="nc" id="L1116">    }</span>
+
+    private static void checkEnvPropertyReadPermission(Class&lt;?&gt; clazz, String propertyName) {
+        final ProtectionDomain protectionDomain;
+        final ClassLoader classLoader;
+<span class="nc bnc" id="L1121" title="All 2 branches missed.">        if (getSecurityManager() instanceof WildFlySecurityManager) {</span>
+<span class="nc" id="L1122">            protectionDomain = clazz.getProtectionDomain();</span>
+<span class="nc" id="L1123">            classLoader = clazz.getClassLoader();</span>
+        } else {
+<span class="nc" id="L1125">            protectionDomain = doPrivileged(new GetProtectionDomainAction(clazz));</span>
+<span class="nc" id="L1126">            classLoader = doPrivileged(new GetClassLoaderAction(clazz));</span>
+        }
+<span class="nc bnc" id="L1128" title="All 2 branches missed.">        if (protectionDomain.implies(ENVIRONMENT_PERMISSION)) {</span>
+<span class="nc" id="L1129">            return;</span>
+        }
+<span class="nc" id="L1131">        final RuntimePermission permission = new RuntimePermission(&quot;getenv.&quot; + propertyName);</span>
+<span class="nc bnc" id="L1132" title="All 2 branches missed.">        if (protectionDomain.implies(permission)) {</span>
+<span class="nc" id="L1133">            return;</span>
+        }
+<span class="nc" id="L1135">        access.accessCheckFailed(permission, protectionDomain.getCodeSource(), classLoader);</span>
+<span class="nc bnc" id="L1136" title="All 2 branches missed.">        if (! LOG_ONLY) {</span>
+<span class="nc" id="L1137">            throw access.accessControlException(permission, permission, protectionDomain.getCodeSource(), classLoader);</span>
+        }
+<span class="nc" id="L1139">    }</span>
+
+    private static void checkPropertyWritePermission(Class&lt;?&gt; clazz, String propertyName) {
+        final ProtectionDomain protectionDomain;
+        final ClassLoader classLoader;
+<span class="nc bnc" id="L1144" title="All 2 branches missed.">        if (getSecurityManager() instanceof WildFlySecurityManager) {</span>
+<span class="nc" id="L1145">            protectionDomain = clazz.getProtectionDomain();</span>
+<span class="nc" id="L1146">            classLoader = clazz.getClassLoader();</span>
+        } else {
+<span class="nc" id="L1148">            protectionDomain = doPrivileged(new GetProtectionDomainAction(clazz));</span>
+<span class="nc" id="L1149">            classLoader = doPrivileged(new GetClassLoaderAction(clazz));</span>
+        }
+<span class="nc bnc" id="L1151" title="All 2 branches missed.">        if (protectionDomain.implies(PROPERTIES_PERMISSION)) {</span>
+<span class="nc" id="L1152">            return;</span>
+        }
+<span class="nc" id="L1154">        final PropertyPermission permission = new PropertyPermission(propertyName, &quot;write&quot;);</span>
+<span class="nc bnc" id="L1155" title="All 2 branches missed.">        if (protectionDomain.implies(permission)) {</span>
+<span class="nc" id="L1156">            return;</span>
+        }
+<span class="nc" id="L1158">        access.accessCheckFailed(permission, protectionDomain.getCodeSource(), classLoader);</span>
+<span class="nc bnc" id="L1159" title="All 2 branches missed.">        if (! LOG_ONLY) {</span>
+<span class="nc" id="L1160">            throw access.accessControlException(permission, permission, protectionDomain.getCodeSource(), classLoader);</span>
+        }
+<span class="nc" id="L1162">    }</span>
+
+    private static void checkPDPermission(Class&lt;?&gt; clazz, Permission permission) {
+        final ProtectionDomain protectionDomain;
+        final ClassLoader classLoader;
+<span class="nc bnc" id="L1167" title="All 2 branches missed.">        if (getSecurityManager() instanceof WildFlySecurityManager) {</span>
+<span class="nc" id="L1168">            protectionDomain = clazz.getProtectionDomain();</span>
+<span class="nc" id="L1169">            classLoader = clazz.getClassLoader();</span>
+        } else {
+<span class="nc" id="L1171">            protectionDomain = doPrivileged(new GetProtectionDomainAction(clazz));</span>
+<span class="nc" id="L1172">            classLoader = doPrivileged(new GetClassLoaderAction(clazz));</span>
+        }
+<span class="nc bnc" id="L1174" title="All 2 branches missed.">        if (protectionDomain.implies(permission)) {</span>
+<span class="nc" id="L1175">            return;</span>
+        }
+<span class="nc" id="L1177">        access.accessCheckFailed(permission, protectionDomain.getCodeSource(), classLoader);</span>
+<span class="nc bnc" id="L1178" title="All 2 branches missed.">        if (! LOG_ONLY) {</span>
+<span class="nc" id="L1179">            throw access.accessControlException(permission, permission, protectionDomain.getCodeSource(), classLoader);</span>
+        }
+<span class="nc" id="L1181">    }</span>
+
+    /**
+     * Get a property, doing a faster permission check that skips having to execute a privileged action frame.
+     *
+     * @param name the property name
+     * @param def the default value if the property is not found
+     * @return the property value, or the default value
+     */
+    public static String getPropertyPrivileged(String name, String def) {
+<span class="fc" id="L1191">        final SecurityManager sm = getSecurityManager();</span>
+<span class="pc bpc" id="L1192" title="1 of 2 branches missed.">        if (sm instanceof WildFlySecurityManager) {</span>
+<span class="nc" id="L1193">            final Context ctx = CTX.get();</span>
+<span class="nc bnc" id="L1194" title="All 2 branches missed.">            if (! ctx.checking) {</span>
+<span class="nc" id="L1195">                return getProperty(name, def);</span>
+            }
+<span class="nc" id="L1197">            ctx.checking = false;</span>
+            try {
+<span class="nc" id="L1199">                checkPropertyReadPermission(getCallerClass(1), name);</span>
+<span class="nc" id="L1200">                return getProperty(name, def);</span>
+            } finally {
+<span class="nc" id="L1202">                ctx.checking = true;</span>
+            }
+<span class="pc bpc" id="L1204" title="1 of 2 branches missed.">        } else if (sm != null) {</span>
+<span class="fc" id="L1205">            AccessControlContext context = getCallerAccessControlContext();</span>
+<span class="fc" id="L1206">            return doPrivileged(new ReadPropertyAction(name, def), context);</span>
+        }
+
+<span class="nc" id="L1209">        return getProperty(name, def);</span>
+    }
+
+    private static &lt;T&gt; T def(T test, T def) {
+<span class="nc bnc" id="L1213" title="All 2 branches missed.">        return test == null ? def : test;</span>
+    }
+
+    /**
+     * Get an environmental property, doing a faster permission check that skips having to execute a privileged action frame.
+     *
+     * @param name the property name
+     * @param def the default value if the property is not found
+     * @return the property value, or the default value
+     */
+    public static String getEnvPropertyPrivileged(String name, String def) {
+<span class="nc" id="L1224">        final SecurityManager sm = getSecurityManager();</span>
+<span class="nc bnc" id="L1225" title="All 2 branches missed.">        if (sm instanceof WildFlySecurityManager) {</span>
+<span class="nc" id="L1226">            final Context ctx = CTX.get();</span>
+<span class="nc bnc" id="L1227" title="All 2 branches missed.">            if (! ctx.checking) {</span>
+<span class="nc" id="L1228">                return def(getenv(name), def);</span>
+            }
+<span class="nc" id="L1230">            ctx.checking = false;</span>
+            try {
+<span class="nc" id="L1232">                checkEnvPropertyReadPermission(getCallerClass(1), name);</span>
+<span class="nc" id="L1233">                return def(getenv(name), def);</span>
+            } finally {
+<span class="nc" id="L1235">                ctx.checking = true;</span>
+            }
+<span class="nc bnc" id="L1237" title="All 2 branches missed.">        } else if (sm != null) {</span>
+<span class="nc" id="L1238">            return doPrivileged(new ReadEnvironmentPropertyAction(name, def), getCallerAccessControlContext());</span>
+        }
+
+<span class="nc" id="L1241">        return getenv(name);</span>
+    }
+
+    /**
+     * Set a property, doing a faster permission check that skips having to execute a privileged action frame.
+     *
+     * @param name the property name
+     * @param value the value ot set
+     * @return the previous property value, or {@code null} if there was none
+     */
+    public static String setPropertyPrivileged(String name, String value) {
+<span class="nc" id="L1252">        final SecurityManager sm = getSecurityManager();</span>
+<span class="nc bnc" id="L1253" title="All 2 branches missed.">        if (sm instanceof WildFlySecurityManager) {</span>
+<span class="nc" id="L1254">            final Context ctx = CTX.get();</span>
+<span class="nc bnc" id="L1255" title="All 2 branches missed.">            if (! ctx.checking) {</span>
+<span class="nc" id="L1256">                return setProperty(name, value);</span>
+            }
+<span class="nc" id="L1258">            ctx.checking = false;</span>
+            try {
+<span class="nc" id="L1260">                checkPropertyWritePermission(getCallerClass(1), name);</span>
+<span class="nc" id="L1261">                return setProperty(name, value);</span>
+            } finally {
+<span class="nc" id="L1263">                ctx.checking = true;</span>
+            }
+<span class="nc bnc" id="L1265" title="All 2 branches missed.">        } else if (sm != null) {</span>
+<span class="nc" id="L1266">            return doPrivileged(new WritePropertyAction(name, value), getCallerAccessControlContext());</span>
+        }
+
+<span class="nc" id="L1269">        return setProperty(name, value);</span>
+    }
+
+    /**
+     * Clear a property, doing a faster permission check that skips having to execute a privileged action frame.
+     *
+     * @param name the property name
+     * @return the previous property value, or {@code null} if there was none
+     */
+    public static String clearPropertyPrivileged(String name) {
+<span class="nc" id="L1279">        final SecurityManager sm = getSecurityManager();</span>
+<span class="nc bnc" id="L1280" title="All 2 branches missed.">        if (sm instanceof WildFlySecurityManager) {</span>
+<span class="nc" id="L1281">            final Context ctx = CTX.get();</span>
+<span class="nc bnc" id="L1282" title="All 2 branches missed.">            if (! ctx.checking) {</span>
+<span class="nc" id="L1283">                return clearProperty(name);</span>
+            }
+<span class="nc" id="L1285">            ctx.checking = false;</span>
+            try {
+<span class="nc" id="L1287">                checkPropertyWritePermission(getCallerClass(1), name);</span>
+<span class="nc" id="L1288">                return clearProperty(name);</span>
+            } finally {
+<span class="nc" id="L1290">                ctx.checking = true;</span>
+            }
+<span class="nc bnc" id="L1292" title="All 2 branches missed.">        } else if (sm != null) {</span>
+<span class="nc" id="L1293">            return doPrivileged(new ClearPropertyAction(name), getCallerAccessControlContext());</span>
+        }
+
+<span class="nc" id="L1296">        return clearProperty(name);</span>
+    }
+
+    /**
+     * Get the current thread's context class loader, doing a faster permission check that skips having to execute a
+     * privileged action frame.
+     *
+     * @return the context class loader
+     */
+    public static ClassLoader getCurrentContextClassLoaderPrivileged() {
+<span class="nc" id="L1306">        final SecurityManager sm = System.getSecurityManager();</span>
+<span class="nc bnc" id="L1307" title="All 2 branches missed.">        if (sm instanceof WildFlySecurityManager) {</span>
+<span class="nc" id="L1308">            final Context ctx = CTX.get();</span>
+<span class="nc bnc" id="L1309" title="All 2 branches missed.">            if (! ctx.checking) {</span>
+<span class="nc" id="L1310">                return currentThread().getContextClassLoader();</span>
+            }
+<span class="nc" id="L1312">            ctx.checking = false;</span>
+            try {
+<span class="nc" id="L1314">                checkPDPermission(getCallerClass(1), GET_CLASS_LOADER_PERMISSION);</span>
+<span class="nc" id="L1315">                return currentThread().getContextClassLoader();</span>
+            } finally {
+<span class="nc" id="L1317">                ctx.checking = true;</span>
+            }
+<span class="nc bnc" id="L1319" title="All 2 branches missed.">        } else if (sm != null) {</span>
+<span class="nc" id="L1320">            return doPrivileged(GetContextClassLoaderAction.getInstance(), getCallerAccessControlContext());</span>
+        }
+
+<span class="nc" id="L1323">        return currentThread().getContextClassLoader();</span>
+    }
+
+    /**
+     * Set the current thread's context class loader, doing a faster permission check that skips having to execute a
+     * privileged action frame.
+     *
+     * @param newClassLoader the new class loader to set
+     * @return the previously set context class loader
+     */
+    public static ClassLoader setCurrentContextClassLoaderPrivileged(ClassLoader newClassLoader) {
+<span class="nc" id="L1334">        final SecurityManager sm = System.getSecurityManager();</span>
+<span class="nc" id="L1335">        final Thread thread = currentThread();</span>
+<span class="nc bnc" id="L1336" title="All 2 branches missed.">        if (sm instanceof WildFlySecurityManager) {</span>
+<span class="nc" id="L1337">            final Context ctx = CTX.get();</span>
+<span class="nc bnc" id="L1338" title="All 2 branches missed.">            if (! ctx.checking) try {</span>
+<span class="nc" id="L1339">                return thread.getContextClassLoader();</span>
+            } finally {
+<span class="nc" id="L1341">                thread.setContextClassLoader(newClassLoader);</span>
+            }
+<span class="nc" id="L1343">            ctx.checking = false;</span>
+            // separate try/finally to guarantee proper exception flow
+            try {
+<span class="nc" id="L1346">                checkPDPermission(getCallerClass(1), SET_CLASS_LOADER_PERMISSION);</span>
+                try {
+<span class="nc" id="L1348">                    return thread.getContextClassLoader();</span>
+                } finally {
+<span class="nc" id="L1350">                    thread.setContextClassLoader(newClassLoader);</span>
+                }
+            } finally {
+<span class="nc" id="L1353">                ctx.checking = true;</span>
+            }
+<span class="nc bnc" id="L1355" title="All 2 branches missed.">        } else if (sm != null) {</span>
+<span class="nc" id="L1356">            return doPrivileged(new SetContextClassLoaderAction(newClassLoader), ACC_CACHE.get(getCallerClass(1)));</span>
+        }
+
+        try {
+<span class="nc" id="L1360">            return thread.getContextClassLoader();</span>
+        } finally {
+<span class="nc" id="L1362">            thread.setContextClassLoader(newClassLoader);</span>
+        }
+    }
+
+    /**
+     * Set the current thread's context class loader, doing a faster permission check that skips having to execute a
+     * privileged action frame.
+     *
+     * @param clazz the class whose class loader is the new class loader to set
+     * @return the previously set context class loader
+     */
+    public static ClassLoader setCurrentContextClassLoaderPrivileged(final Class&lt;?&gt; clazz) {
+<span class="nc" id="L1374">        final SecurityManager sm = System.getSecurityManager();</span>
+<span class="nc" id="L1375">        final Thread thread = currentThread();</span>
+<span class="nc bnc" id="L1376" title="All 2 branches missed.">        if (sm instanceof WildFlySecurityManager) {</span>
+<span class="nc" id="L1377">            final Context ctx = CTX.get();</span>
+<span class="nc bnc" id="L1378" title="All 2 branches missed.">            if (! ctx.checking) try {</span>
+<span class="nc" id="L1379">                return thread.getContextClassLoader();</span>
+            } finally {
+<span class="nc" id="L1381">                thread.setContextClassLoader(clazz.getClassLoader());</span>
+            }
+<span class="nc" id="L1383">            ctx.checking = false;</span>
+            // separate try/finally to guarantee proper exception flow
+            try {
+<span class="nc" id="L1386">                final Class&lt;?&gt; caller = getCallerClass(1);</span>
+<span class="nc" id="L1387">                checkPDPermission(caller, SET_CLASS_LOADER_PERMISSION);</span>
+<span class="nc" id="L1388">                checkPDPermission(caller, GET_CLASS_LOADER_PERMISSION);</span>
+                try {
+<span class="nc" id="L1390">                    return thread.getContextClassLoader();</span>
+                } finally {
+<span class="nc" id="L1392">                    thread.setContextClassLoader(clazz.getClassLoader());</span>
+                }
+            } finally {
+<span class="nc" id="L1395">                ctx.checking = true;</span>
+            }
+<span class="nc bnc" id="L1397" title="All 2 branches missed.">        } else if (sm != null) {</span>
+<span class="nc" id="L1398">            return doPrivileged(new SetContextClassLoaderAction(clazz.getClassLoader()), getCallerAccessControlContext());</span>
+        }
+
+        try {
+<span class="nc" id="L1402">            return thread.getContextClassLoader();</span>
+        } finally {
+<span class="nc" id="L1404">            thread.setContextClassLoader(clazz.getClassLoader());</span>
+        }
+    }
+
+    /**
+     * Get the system properties map, doing a faster permission check that skips having to execute a privileged action
+     * frame.
+     *
+     * @return the system property map
+     */
+    public static Properties getSystemPropertiesPrivileged() {
+<span class="nc" id="L1415">        final SecurityManager sm = System.getSecurityManager();</span>
+<span class="nc bnc" id="L1416" title="All 2 branches missed.">        if (sm instanceof WildFlySecurityManager) {</span>
+<span class="nc" id="L1417">            final Context ctx = CTX.get();</span>
+<span class="nc bnc" id="L1418" title="All 2 branches missed.">            if (! ctx.checking) {</span>
+<span class="nc" id="L1419">                return getProperties();</span>
+            }
+<span class="nc" id="L1421">            ctx.checking = false;</span>
+            try {
+<span class="nc" id="L1423">                checkPDPermission(getCallerClass(1), PROPERTIES_PERMISSION);</span>
+<span class="nc" id="L1424">                return getProperties();</span>
+            } finally {
+<span class="nc" id="L1426">                ctx.checking = true;</span>
+            }
+<span class="nc bnc" id="L1428" title="All 2 branches missed.">        } else if (sm != null) {</span>
+<span class="nc" id="L1429">            return doPrivileged(GetSystemPropertiesAction.getInstance(), getCallerAccessControlContext());</span>
+        }
+
+<span class="nc" id="L1432">        return getProperties();</span>
+    }
+
+    /**
+     * Get the system environment map, doing a faster permission check that skips having to execute a privileged action
+     * frame.
+     *
+     * @return the system environment map
+     */
+    public static Map&lt;String, String&gt; getSystemEnvironmentPrivileged() {
+<span class="nc" id="L1442">        final SecurityManager sm = System.getSecurityManager();</span>
+<span class="nc bnc" id="L1443" title="All 2 branches missed.">        if (sm instanceof WildFlySecurityManager) {</span>
+<span class="nc" id="L1444">            final Context ctx = CTX.get();</span>
+<span class="nc bnc" id="L1445" title="All 2 branches missed.">            if (! ctx.checking) {</span>
+<span class="nc" id="L1446">                return getenv();</span>
+            }
+<span class="nc" id="L1448">            ctx.checking = false;</span>
+            try {
+<span class="nc" id="L1450">                checkPDPermission(getCallerClass(1), ENVIRONMENT_PERMISSION);</span>
+<span class="nc" id="L1451">                return getenv();</span>
+            } finally {
+<span class="nc" id="L1453">                ctx.checking = true;</span>
+            }
+<span class="nc bnc" id="L1455" title="All 2 branches missed.">        } else if (sm != null) {</span>
+<span class="nc" id="L1456">            return doPrivileged(GetEnvironmentAction.getInstance(), getCallerAccessControlContext());</span>
+        }
+
+<span class="nc" id="L1459">        return getenv();</span>
+    }
+
+    /**
+     * Get the class loader for a class, doing a faster permission check that skips having to execute a privileged action
+     * frame.
+     *
+     * @param clazz the class to check
+     * @return the class loader
+     */
+    public static ClassLoader getClassLoaderPrivileged(Class&lt;?&gt; clazz) {
+<span class="nc" id="L1470">        final SecurityManager sm = System.getSecurityManager();</span>
+<span class="nc bnc" id="L1471" title="All 2 branches missed.">        if (sm instanceof WildFlySecurityManager) {</span>
+<span class="nc" id="L1472">            final Context ctx = CTX.get();</span>
+<span class="nc bnc" id="L1473" title="All 2 branches missed.">            if (! ctx.checking) {</span>
+<span class="nc" id="L1474">                return clazz.getClassLoader();</span>
+            }
+<span class="nc" id="L1476">            ctx.checking = false;</span>
+            try {
+<span class="nc" id="L1478">                checkPDPermission(getCallerClass(1), GET_CLASS_LOADER_PERMISSION);</span>
+<span class="nc" id="L1479">                return clazz.getClassLoader();</span>
+            } finally {
+<span class="nc" id="L1481">                ctx.checking = true;</span>
+            }
+<span class="nc bnc" id="L1483" title="All 2 branches missed.">        } else if (sm != null) {</span>
+<span class="nc" id="L1484">            return doPrivileged(new GetClassLoaderAction(clazz), getCallerAccessControlContext());</span>
+        }
+
+<span class="nc" id="L1487">        return clazz.getClassLoader();</span>
+    }
+
+<span class="pc bpc" id="L1490" title="1 of 2 branches missed.">    private static final ClassValue&lt;AccessControlContext&gt; ACC_CACHE = new ClassValue&lt;AccessControlContext&gt;() {</span>
+        protected AccessControlContext computeValue(final Class&lt;?&gt; type) {
+<span class="fc" id="L1492">            final Context ctx = CTX.get();</span>
+<span class="pc bpc" id="L1493" title="2 of 4 branches missed.">            assert ! ctx.entered;</span>
+<span class="fc" id="L1494">            ctx.entered = true;</span>
+            try {
+<span class="fc" id="L1496">                return new AccessControlContext(new ProtectionDomain[] { type.getProtectionDomain() });</span>
+            } finally {
+<span class="fc" id="L1498">                ctx.entered = false;</span>
+            }
+        }
+    };
+
+    // Cannot be lambda due to JDK race conditions
+    @SuppressWarnings(&quot;Convert2Lambda&quot;)
+<span class="fc" id="L1505">    private static final PrivilegedAction&lt;Object&gt; PA_TRAMPOLINE1 = new PrivilegedAction&lt;Object&gt;() {</span>
+        public Object run() {
+<span class="fc" id="L1507">            final Context ctx = CTX.get();</span>
+<span class="fc" id="L1508">            final ParametricPrivilegedAction&lt;Object, Object&gt; a = ctx.action1;</span>
+<span class="fc" id="L1509">            final Object p = ctx.parameter;</span>
+<span class="fc" id="L1510">            ctx.action1 = null;</span>
+<span class="fc" id="L1511">            ctx.parameter = null;</span>
+<span class="fc" id="L1512">            return a.run(p);</span>
+        }
+    };
+
+    // Cannot be lambda due to JDK race conditions
+    @SuppressWarnings(&quot;Convert2Lambda&quot;)
+<span class="fc" id="L1518">    private static final PrivilegedExceptionAction&lt;Object&gt; PA_TRAMPOLINE2 = new PrivilegedExceptionAction&lt;Object&gt;() {</span>
+        public Object run() throws Exception {
+<span class="nc" id="L1520">            final Context ctx = CTX.get();</span>
+<span class="nc" id="L1521">            final ParametricPrivilegedExceptionAction&lt;Object, Object&gt; a = ctx.action2;</span>
+<span class="nc" id="L1522">            final Object p = ctx.parameter;</span>
+<span class="nc" id="L1523">            ctx.action2 = null;</span>
+<span class="nc" id="L1524">            ctx.parameter = null;</span>
+<span class="nc" id="L1525">            return a.run(p);</span>
+        }
+    };
+
+    /**
+     * Execute a parametric privileged action with the given parameter in a privileged context.
+     *
+     * @param parameter the parameter to send in to the action
+     * @param action the action to execute
+     * @param &lt;T&gt; the action result type
+     * @param &lt;P&gt; the parameter type
+     * @return the action result
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public static &lt;T, P&gt; T doPrivilegedWithParameter(P parameter, ParametricPrivilegedAction&lt;T, P&gt; action) {
+<span class="fc" id="L1540">        final Context ctx = CTX.get();</span>
+<span class="fc" id="L1541">        ctx.action1 = (ParametricPrivilegedAction&lt;Object, Object&gt;) action;</span>
+<span class="fc" id="L1542">        ctx.parameter = parameter;</span>
+<span class="fc" id="L1543">        return (T) doPrivileged(PA_TRAMPOLINE1, ACC_CACHE.get(getCallerClass(1)));</span>
+    }
+
+    /**
+     * Execute a parametric privileged action with the given parameter in a privileged context.
+     *
+     * @param parameter the parameter to send in to the action
+     * @param action the action to execute
+     * @param &lt;T&gt; the action result type
+     * @param &lt;P&gt; the parameter type
+     * @return the action result
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public static &lt;T, P&gt; T doPrivilegedWithParameter(P parameter, ParametricPrivilegedExceptionAction&lt;T, P&gt; action) throws PrivilegedActionException {
+<span class="nc" id="L1557">        final Context ctx = CTX.get();</span>
+<span class="nc" id="L1558">        ctx.action2 = (ParametricPrivilegedExceptionAction&lt;Object, Object&gt;) action;</span>
+<span class="nc" id="L1559">        ctx.parameter = parameter;</span>
+<span class="nc" id="L1560">        return (T) doPrivileged(PA_TRAMPOLINE2, ACC_CACHE.get(getCallerClass(1)));</span>
+    }
+
+    /**
+     * Execute a parametric privileged action with the given parameter with the given context.
+     *
+     * @param parameter the parameter to send in to the action
+     * @param action the action to execute
+     * @param accessControlContext the context to use
+     * @param &lt;T&gt; the action result type
+     * @param &lt;P&gt; the parameter type
+     * @return the action result
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public static &lt;T, P&gt; T doPrivilegedWithParameter(P parameter, ParametricPrivilegedAction&lt;T, P&gt; action, AccessControlContext accessControlContext) {
+<span class="fc" id="L1575">        final Context ctx = CTX.get();</span>
+<span class="fc" id="L1576">        ctx.action1 = (ParametricPrivilegedAction&lt;Object, Object&gt;) action;</span>
+<span class="fc" id="L1577">        ctx.parameter = parameter;</span>
+<span class="fc" id="L1578">        ctx.entered = true;</span>
+        final AccessControlContext combined;
+        try {
+            ProtectionDomain[] protectionDomainStack;
+<span class="pc bpc" id="L1582" title="3 of 6 branches missed.">            if (accessControlContext == null || (protectionDomainStack = getProtectionDomainStack(accessControlContext)) == null || protectionDomainStack.length == 0) {</span>
+<span class="nc" id="L1583">                combined = ACC_CACHE.get(getCallerClass(1));</span>
+            } else {
+<span class="fc" id="L1585">                final ProtectionDomain[] finalDomains = Arrays.copyOf(protectionDomainStack, protectionDomainStack.length + 1);</span>
+<span class="fc" id="L1586">                finalDomains[protectionDomainStack.length] = getCallerClass(1).getProtectionDomain();</span>
+<span class="fc" id="L1587">                combined = new AccessControlContext(finalDomains);</span>
+            }
+        } finally {
+<span class="fc" id="L1590">            ctx.entered = false;</span>
+        }
+<span class="fc" id="L1592">        return (T) doPrivileged(PA_TRAMPOLINE1, combined);</span>
+    }
+
+    /**
+     * Execute a parametric privileged action with the given parameter with the given context.
+     *
+     * @param parameter the parameter to send in to the action
+     * @param action the action to execute
+     * @param accessControlContext the context to use
+     * @param &lt;T&gt; the action result type
+     * @param &lt;P&gt; the parameter type
+     * @return the action result
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public static &lt;T, P&gt; T doPrivilegedWithParameter(P parameter, ParametricPrivilegedExceptionAction&lt;T, P&gt; action, AccessControlContext accessControlContext) throws PrivilegedActionException {
+<span class="nc" id="L1607">        final Context ctx = CTX.get();</span>
+<span class="nc" id="L1608">        ctx.action2 = (ParametricPrivilegedExceptionAction&lt;Object, Object&gt;) action;</span>
+<span class="nc" id="L1609">        ctx.parameter = parameter;</span>
+<span class="nc" id="L1610">        ctx.entered = true;</span>
+        final AccessControlContext combined;
+        try {
+<span class="nc" id="L1613">            ProtectionDomain[] protectionDomainStack = getProtectionDomainStack(accessControlContext);</span>
+<span class="nc bnc" id="L1614" title="All 4 branches missed.">            if (protectionDomainStack == null || protectionDomainStack.length == 0) {</span>
+<span class="nc" id="L1615">                combined = ACC_CACHE.get(getCallerClass(1));</span>
+            } else {
+<span class="nc" id="L1617">                final ProtectionDomain[] finalDomains = Arrays.copyOf(protectionDomainStack, protectionDomainStack.length + 1);</span>
+<span class="nc" id="L1618">                finalDomains[protectionDomainStack.length] = getCallerClass(1).getProtectionDomain();</span>
+<span class="nc" id="L1619">                combined = new AccessControlContext(finalDomains);</span>
+            }
+        } finally {
+<span class="nc" id="L1622">            ctx.entered = false;</span>
+        }
+<span class="nc" id="L1624">        return (T) doPrivileged(PA_TRAMPOLINE2, combined);</span>
+    }
+
+    private static AccessControlContext getCallerAccessControlContext() {
+<span class="fc" id="L1628">        final SecurityManager sm = getSecurityManager();</span>
+<span class="fc" id="L1629">        final Context ctx = CTX.get();</span>
+        try {
+<span class="pc bpc" id="L1631" title="2 of 4 branches missed.">            if (sm == null || sm instanceof WildFlySecurityManager) {</span>
+<span class="nc bnc" id="L1632" title="All 2 branches missed.">                return ACC_CACHE.get(getCallerClass(usingStackWalker ? 2 : 1));</span>
+            } else {
+<span class="pc bpc" id="L1634" title="1 of 2 branches missed.">               final Class caller = getCallerClass(usingStackWalker ? 2 : 1);</span>
+<span class="fc" id="L1635">               return doPrivileged( (PrivilegedAction&lt;AccessControlContext&gt;) () -&gt; ACC_CACHE.get(caller));</span>
+            }
+        } finally {
+<span class="fc" id="L1638">            ctx.entered = false;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

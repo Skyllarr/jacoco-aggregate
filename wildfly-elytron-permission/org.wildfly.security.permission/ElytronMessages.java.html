@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-permission</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.permission</a> &gt; <span class="el_source">ElytronMessages.java</span></div><h1>ElytronMessages.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.permission;
+
+import java.io.InvalidObjectException;
+import java.security.Permission;
+
+import org.jboss.logging.BasicLogger;
+import org.jboss.logging.Logger;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageLogger;
+import org.jboss.logging.annotations.ValidIdRange;
+import org.jboss.logging.annotations.ValidIdRanges;
+
+/**
+ * Log messages and exceptions for Elytron.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+@MessageLogger(projectCode = &quot;ELY&quot;, length = 5)
+@ValidIdRanges({
+    @ValidIdRange(min = 3013, max = 3022)
+})
+interface ElytronMessages extends BasicLogger {
+
+<span class="nc" id="L44">    ElytronMessages log = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security&quot;);</span>
+
+    @Message(id = 3013, value = &quot;Permission collection must be read-only&quot;)
+    SecurityException permissionCollectionMustBeReadOnly();
+
+    @Message(id = 3015, value = &quot;Could not load permission class \&quot;%s\&quot;&quot;)
+    InvalidPermissionClassException permissionClassMissing(String className, @Cause ClassNotFoundException cause);
+
+    @Message(id = 3016, value = &quot;Could not instantiate permission class \&quot;%s\&quot;&quot;)
+    InvalidPermissionClassException permissionInstantiation(String className, @Cause Throwable cause);
+
+    @Message(id = 3017, value = &quot;No valid permission constructor found on class \&quot;%s\&quot;&quot;)
+    InvalidPermissionClassException noPermissionConstructor(String className);
+
+    @Message(id = 3018, value = &quot;Cannot add permissions to a read-only permission collection&quot;)
+    SecurityException readOnlyPermissionCollection();
+
+    @Message(id = 3019, value = &quot;Failure to deserialize object: field \&quot;%s\&quot; is null&quot;)
+    InvalidObjectException invalidObjectNull(String fieldName);
+
+    @Message(id = 3020, value = &quot;Expected empty actions string, got \&quot;%s\&quot;&quot;)
+    IllegalArgumentException expectedEmptyActions(String actions);
+
+    @Message(id = 3021, value = &quot;Invalid permission type; expected %s, got %s&quot;)
+    IllegalArgumentException invalidPermissionType(Class&lt;? extends Permission&gt; expected, Permission actual);
+
+    @Message(id = 3022, value = &quot;Permission check failed: %s is not implied by %s&quot;)
+    SecurityException permissionCheckFailed(Permission permission, PermissionVerifier permissionVerifier);
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

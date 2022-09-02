@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages_$logger.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-credential-store</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.credential.store._private</a> &gt; <span class="el_source">ElytronMessages_$logger.java</span></div><h1>ElytronMessages_$logger.java</h1><pre class="source lang-java linenums">package org.wildfly.security.credential.store._private;
+
+import java.util.Locale;
+import java.io.Serializable;
+import javax.annotation.Generated;
+import org.jboss.logging.DelegatingBasicLogger;
+import org.wildfly.security.credential.store.UnsupportedCredentialTypeException;
+import java.io.IOException;
+import org.wildfly.security.credential.store.CredentialStoreException;
+import java.lang.String;
+import org.jboss.logging.Logger;
+import java.lang.Exception;
+import org.jboss.logging.BasicLogger;
+import java.lang.Throwable;
+import java.lang.Class;
+import java.util.List;
+import java.util.Arrays;
+import org.wildfly.security.credential.store.CredentialStore.ProtectionParameter;
+
+
+import static org.jboss.logging.Logger.Level.DEBUG;
+import static org.jboss.logging.Logger.Level.WARN;
+
+/**
+ * Warning this class consists of generated code.
+ */
+@Generated(value = &quot;org.jboss.logging.processor.generator.model.MessageLoggerImplementor&quot;, date = &quot;2022-09-02T20:21:26+0200&quot;)
+public class ElytronMessages_$logger extends DelegatingBasicLogger implements ElytronMessages, BasicLogger, Serializable {
+    private static final long serialVersionUID = 1L;
+<span class="fc" id="L30">    private static final String FQCN = ElytronMessages_$logger.class.getName();</span>
+    public ElytronMessages_$logger(final Logger log) {
+<span class="fc" id="L32">        super(log);</span>
+<span class="fc" id="L33">    }</span>
+<span class="fc" id="L34">    private static final Locale LOCALE = Locale.ROOT;</span>
+    protected Locale getLoggingLocale() {
+<span class="fc" id="L36">        return LOCALE;</span>
+    }
+    protected String unableToCreateKeyStore$str() {
+<span class="nc" id="L39">        return &quot;ELY02009: Unable to create a new KeyStore instance&quot;;</span>
+    }
+    @Override
+    public final IOException unableToCreateKeyStore(final Exception cause) {
+<span class="nc" id="L43">        final IOException result = new IOException(String.format(getLoggingLocale(), unableToCreateKeyStore$str()), cause);</span>
+<span class="nc" id="L44">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L45">        return result;</span>
+    }
+    private static void _copyStackTraceMinusOne(final Throwable e) {
+<span class="fc" id="L48">        final StackTraceElement[] st = e.getStackTrace();</span>
+<span class="fc" id="L49">        e.setStackTrace(Arrays.copyOfRange(st, 1, st.length));</span>
+<span class="fc" id="L50">    }</span>
+    protected String wrongTypeOfExternalStorageKey$str() {
+<span class="nc" id="L52">        return &quot;ELY09500: External storage key under alias \&quot;%s\&quot; has to be a SecretKey&quot;;</span>
+    }
+    @Override
+    public final CredentialStoreException wrongTypeOfExternalStorageKey(final String keyAlias) {
+<span class="nc" id="L56">        final CredentialStoreException result = new CredentialStoreException(String.format(getLoggingLocale(), wrongTypeOfExternalStorageKey$str(), keyAlias));</span>
+<span class="nc" id="L57">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L58">        return result;</span>
+    }
+    protected String cannotAcquireCredentialFromStore$str() {
+<span class="nc" id="L61">        return &quot;ELY09504: Cannot acquire a credential from the credential store&quot;;</span>
+    }
+    @Override
+    public final CredentialStoreException cannotAcquireCredentialFromStore(final Throwable cause) {
+<span class="nc" id="L65">        final CredentialStoreException result = new CredentialStoreException(String.format(getLoggingLocale(), cannotAcquireCredentialFromStore$str()), cause);</span>
+<span class="nc" id="L66">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L67">        return result;</span>
+    }
+    protected String nonModifiableCredentialStore$str() {
+<span class="nc" id="L70">        return &quot;ELY09505: Cannot perform operation '%s': Credential store is set non modifiable&quot;;</span>
+    }
+    @Override
+    public final CredentialStoreException nonModifiableCredentialStore(final String operation) {
+<span class="nc" id="L74">        final CredentialStoreException result = new CredentialStoreException(String.format(getLoggingLocale(), nonModifiableCredentialStore$str(), operation));</span>
+<span class="nc" id="L75">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L76">        return result;</span>
+    }
+    protected String invalidProtectionParameter$str() {
+<span class="nc" id="L79">        return &quot;ELY09507: Invalid protection parameter given: %s&quot;;</span>
+    }
+    @Override
+    public final CredentialStoreException invalidProtectionParameter(final ProtectionParameter protectionParameter) {
+<span class="nc" id="L83">        final CredentialStoreException result = new CredentialStoreException(String.format(getLoggingLocale(), invalidProtectionParameter$str(), protectionParameter));</span>
+<span class="nc" id="L84">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L85">        return result;</span>
+    }
+    protected String cannotWriteCredentialToStore$str() {
+<span class="nc" id="L88">        return &quot;ELY09508: Cannot write credential to store&quot;;</span>
+    }
+    @Override
+    public final CredentialStoreException cannotWriteCredentialToStore(final Throwable cause) {
+<span class="nc" id="L92">        final CredentialStoreException result = new CredentialStoreException(String.format(getLoggingLocale(), cannotWriteCredentialToStore$str()), cause);</span>
+<span class="nc" id="L93">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L94">        return result;</span>
+    }
+    protected String unsupportedCredentialType$str() {
+<span class="nc" id="L97">        return &quot;ELY09509: Unsupported credential type %s&quot;;</span>
+    }
+    @Override
+    public final UnsupportedCredentialTypeException unsupportedCredentialType(final Class&lt;?&gt; type) {
+<span class="nc" id="L101">        final UnsupportedCredentialTypeException result = new UnsupportedCredentialTypeException(String.format(getLoggingLocale(), unsupportedCredentialType$str(), type));</span>
+<span class="nc" id="L102">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L103">        return result;</span>
+    }
+    protected String invalidCredentialStoreEntryType$str() {
+<span class="nc" id="L106">        return &quot;ELY09510: Invalid credential store keystore entry %s: expected %s&quot;;</span>
+    }
+    @Override
+    public final CredentialStoreException invalidCredentialStoreEntryType(final Class&lt;? extends java.security.KeyStore.Entry&gt; entryType, final Class&lt;? extends java.security.KeyStore.Entry&gt; expectedType) {
+<span class="nc" id="L110">        final CredentialStoreException result = new CredentialStoreException(String.format(getLoggingLocale(), invalidCredentialStoreEntryType$str(), entryType, expectedType));</span>
+<span class="nc" id="L111">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L112">        return result;</span>
+    }
+    protected String unableToReadCredentialTypeFromStore$str() {
+<span class="nc" id="L115">        return &quot;ELY09511: Unable to read credential %s from store&quot;;</span>
+    }
+    @Override
+    public final CredentialStoreException unableToReadCredentialTypeFromStore(final Class&lt;? extends org.wildfly.security.credential.Credential&gt; credentialType) {
+<span class="nc" id="L119">        final CredentialStoreException result = new CredentialStoreException(String.format(getLoggingLocale(), unableToReadCredentialTypeFromStore$str(), credentialType));</span>
+<span class="nc" id="L120">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L121">        return result;</span>
+    }
+    protected String cannotRemoveCredentialFromStore$str() {
+<span class="nc" id="L124">        return &quot;ELY09512: Unable to remove credential from store&quot;;</span>
+    }
+    @Override
+    public final CredentialStoreException cannotRemoveCredentialFromStore(final Throwable cause) {
+<span class="nc" id="L128">        final CredentialStoreException result = new CredentialStoreException(String.format(getLoggingLocale(), cannotRemoveCredentialFromStore$str()), cause);</span>
+<span class="nc" id="L129">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L130">        return result;</span>
+    }
+    protected String cannotFlushCredentialStore$str() {
+<span class="nc" id="L133">        return &quot;ELY09513: Unable to flush credential store to storage&quot;;</span>
+    }
+    @Override
+    public final CredentialStoreException cannotFlushCredentialStore(final Throwable cause) {
+<span class="nc" id="L137">        final CredentialStoreException result = new CredentialStoreException(String.format(getLoggingLocale(), cannotFlushCredentialStore$str()), cause);</span>
+<span class="nc" id="L138">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L139">        return result;</span>
+    }
+    protected String cannotInitializeCredentialStore$str() {
+<span class="nc" id="L142">        return &quot;ELY09514: Unable to initialize credential store&quot;;</span>
+    }
+    @Override
+    public final CredentialStoreException cannotInitializeCredentialStore(final Throwable cause) {
+<span class="nc" id="L146">        final CredentialStoreException result = new CredentialStoreException(String.format(getLoggingLocale(), cannotInitializeCredentialStore$str()), cause);</span>
+<span class="nc" id="L147">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L148">        return result;</span>
+    }
+    @Override
+    public final void logIgnoredUnrecognizedKeyStoreEntry(final String alias) {
+<span class="nc" id="L152">        super.log.logf(FQCN, DEBUG, null, logIgnoredUnrecognizedKeyStoreEntry$str(), alias);</span>
+<span class="nc" id="L153">    }</span>
+    protected String logIgnoredUnrecognizedKeyStoreEntry$str() {
+<span class="nc" id="L155">        return &quot;ELY09515: Ignored unrecognized key store entry \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final void logFailedToReadKeyFromKeyStore(final Throwable cause) {
+<span class="nc" id="L159">        super.log.logf(FQCN, WARN, cause, logFailedToReadKeyFromKeyStore$str());</span>
+<span class="nc" id="L160">    }</span>
+    protected String logFailedToReadKeyFromKeyStore$str() {
+<span class="nc" id="L162">        return &quot;ELY09516: Failed to read a credential entry from the key store&quot;;</span>
+    }
+    protected String protectionParameterRequired$str() {
+<span class="nc" id="L165">        return &quot;ELY09517: This credential store type requires a store-wide protection parameter&quot;;</span>
+    }
+    @Override
+    public final CredentialStoreException protectionParameterRequired() {
+<span class="nc" id="L169">        final CredentialStoreException result = new CredentialStoreException(String.format(getLoggingLocale(), protectionParameterRequired$str()));</span>
+<span class="nc" id="L170">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L171">        return result;</span>
+    }
+    protected String automaticStorageCreationDisabled$str() {
+<span class="fc" id="L174">        return &quot;ELY09518: Automatic storage creation for the Credential Store is disabled \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final CredentialStoreException automaticStorageCreationDisabled(final String location) {
+<span class="fc" id="L178">        final CredentialStoreException result = new CredentialStoreException(String.format(getLoggingLocale(), automaticStorageCreationDisabled$str(), location));</span>
+<span class="fc" id="L179">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L180">        return result;</span>
+    }
+    protected String unexpectedFileVersion$str() {
+<span class="nc" id="L183">        return &quot;ELY09519: Unexpected credential store external storage file version \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final IOException unexpectedFileVersion(final String version) {
+<span class="nc" id="L187">        final IOException result = new IOException(String.format(getLoggingLocale(), unexpectedFileVersion$str(), version));</span>
+<span class="nc" id="L188">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L189">        return result;</span>
+    }
+    protected String unrecognizedEntryType$str() {
+<span class="nc" id="L192">        return &quot;ELY09520: Unrecognized entry type \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final IOException unrecognizedEntryType(final String entryType) {
+<span class="nc" id="L196">        final IOException result = new IOException(String.format(getLoggingLocale(), unrecognizedEntryType$str(), entryType));</span>
+<span class="nc" id="L197">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L198">        return result;</span>
+    }
+    protected String internalEncryptionProblem$str() {
+<span class="nc" id="L201">        return &quot;ELY09521: Internal encryption problem while reading \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final IOException internalEncryptionProblem(final Exception e, final String location) {
+<span class="nc" id="L205">        final IOException result = new IOException(String.format(getLoggingLocale(), internalEncryptionProblem$str(), location), e);</span>
+<span class="nc" id="L206">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L207">        return result;</span>
+    }
+    protected String algorithmNotBlockBased$str() {
+<span class="nc" id="L210">        return &quot;ELY09522: \&quot;%s\&quot; is not a block based algorithm&quot;;</span>
+    }
+    @Override
+    public final CredentialStoreException algorithmNotBlockBased(final String algorithm) {
+<span class="nc" id="L214">        final CredentialStoreException result = new CredentialStoreException(String.format(getLoggingLocale(), algorithmNotBlockBased$str(), algorithm));</span>
+<span class="nc" id="L215">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L216">        return result;</span>
+    }
+    protected String algorithmNotIV$str() {
+<span class="nc" id="L219">        return &quot;ELY09523: Algorithm \&quot;%s\&quot; does not use an initialization vector (IV)&quot;;</span>
+    }
+    @Override
+    public final CredentialStoreException algorithmNotIV(final String algorithm) {
+<span class="nc" id="L223">        final CredentialStoreException result = new CredentialStoreException(String.format(getLoggingLocale(), algorithmNotIV$str(), algorithm));</span>
+<span class="nc" id="L224">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L225">        return result;</span>
+    }
+    protected String readBytesMismatch$str() {
+<span class="nc" id="L228">        return &quot;ELY09524: The actual number of bytes read %d is different from the expected number of bytes %d to be read&quot;;</span>
+    }
+    @Override
+    public final IOException readBytesMismatch(final int actual, final int expected) {
+<span class="nc" id="L232">        final IOException result = new IOException(String.format(getLoggingLocale(), readBytesMismatch$str(), actual, expected));</span>
+<span class="nc" id="L233">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L234">        return result;</span>
+    }
+    protected String locationAndExternalPathAreIdentical$str() {
+<span class="nc" id="L237">        return &quot;ELY09525: location and externalPath initial attributes are the same. [location=%s, externalPath=%s]&quot;;</span>
+    }
+    @Override
+    public final CredentialStoreException locationAndExternalPathAreIdentical(final String location, final String externalPath) {
+<span class="nc" id="L241">        final CredentialStoreException result = new CredentialStoreException(String.format(getLoggingLocale(), locationAndExternalPathAreIdentical$str(), location, externalPath));</span>
+<span class="nc" id="L242">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L243">        return result;</span>
+    }
+    protected String unsupportedAttribute$str() {
+<span class="nc" id="L246">        return &quot;ELY09526: Unable to initialize credential store as attribute %s is unsupported in %s&quot;;</span>
+    }
+    @Override
+    public final CredentialStoreException unsupportedAttribute(final String attribute, final List&lt;String&gt; validAttribute) {
+<span class="nc" id="L250">        final CredentialStoreException result = new CredentialStoreException(String.format(getLoggingLocale(), unsupportedAttribute$str(), attribute, validAttribute));</span>
+<span class="nc" id="L251">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L252">        return result;</span>
+    }
+    protected String externalPathMissing$str() {
+<span class="nc" id="L255">        return &quot;ELY09528: The externalPath attribute for key store type %s is missing.&quot;;</span>
+    }
+    @Override
+    public final CredentialStoreException externalPathMissing(final String keyStoreType) {
+<span class="nc" id="L259">        final CredentialStoreException result = new CredentialStoreException(String.format(getLoggingLocale(), externalPathMissing$str(), keyStoreType));</span>
+<span class="nc" id="L260">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L261">        return result;</span>
+    }
+    protected String externalStorageKeyDoesNotExist$str() {
+<span class="nc" id="L264">        return &quot;ELY11006: External storage key under alias \&quot;%s\&quot; does not exist&quot;;</span>
+    }
+    @Override
+    public final CredentialStoreException externalStorageKeyDoesNotExist(final String keyAlias) {
+<span class="nc" id="L268">        final CredentialStoreException result = new CredentialStoreException(String.format(getLoggingLocale(), externalStorageKeyDoesNotExist$str(), keyAlias));</span>
+<span class="nc" id="L269">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L270">        return result;</span>
+    }
+    protected String credentialStoreFileDoesNotExist$str() {
+<span class="nc" id="L273">        return &quot;ELY20000: The credential store file %s does not exist or cannot be accessed.&quot;;</span>
+    }
+    @Override
+    public final CredentialStoreException credentialStoreFileDoesNotExist(final String fileLocation) {
+<span class="nc" id="L277">        final CredentialStoreException result = new CredentialStoreException(String.format(getLoggingLocale(), credentialStoreFileDoesNotExist$str(), fileLocation));</span>
+<span class="nc" id="L278">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L279">        return result;</span>
+    }
+    protected String storeNotInitialised$str() {
+<span class="nc" id="L282">        return &quot;ELY20001: The credential store has not been initialised.&quot;;</span>
+    }
+    @Override
+    public final CredentialStoreException storeNotInitialised() {
+<span class="nc" id="L286">        final CredentialStoreException result = new CredentialStoreException(String.format(getLoggingLocale(), storeNotInitialised$str()));</span>
+<span class="nc" id="L287">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L288">        return result;</span>
+    }
+    protected String missingInitialisationAttribute$str() {
+<span class="nc" id="L291">        return &quot;ELY20002: The required initialisation attribute '%s' has not been specified.&quot;;</span>
+    }
+    @Override
+    public final CredentialStoreException missingInitialisationAttribute(final String attribute) {
+<span class="nc" id="L295">        final CredentialStoreException result = new CredentialStoreException(String.format(getLoggingLocale(), missingInitialisationAttribute$str(), attribute));</span>
+<span class="nc" id="L296">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L297">        return result;</span>
+    }
+    protected String invalidCredentialStoreProperty$str() {
+<span class="fc" id="L300">        return &quot;ELY20003: Invalid CredentialStore property '%s'.&quot;;</span>
+    }
+    @Override
+    public final CredentialStoreException invalidCredentialStoreProperty(final String data) {
+<span class="fc" id="L304">        final CredentialStoreException result = new CredentialStoreException(String.format(getLoggingLocale(), invalidCredentialStoreProperty$str(), data));</span>
+<span class="fc" id="L305">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L306">        return result;</span>
+    }
+    protected String canNotLoadSecretKey$str() {
+<span class="fc" id="L309">        return &quot;ELY20004: Can not load SecretKey for '%s'.&quot;;</span>
+    }
+    @Override
+    public final CredentialStoreException canNotLoadSecretKey(final String alias, final Throwable cause) {
+<span class="fc" id="L313">        final CredentialStoreException result = new CredentialStoreException(String.format(getLoggingLocale(), canNotLoadSecretKey$str(), alias), cause);</span>
+<span class="fc" id="L314">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L315">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AuthorizationIdentity.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.authz</a> &gt; <span class="el_source">AuthorizationIdentity.java</span></div><h1>AuthorizationIdentity.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.authz;
+
+import java.util.function.Supplier;
+
+/**
+ * A realm's authorization identity.  Objects of this class represent an active identity which may be examined for
+ * authorization decisions.  Since there is no upper bound in the lifespan of instances of this class, they should
+ * not retain references to scarce resources like database connections or file handles.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public interface AuthorizationIdentity {
+
+    /**
+     * Get the attributes which pertain to this identity.  By default, an empty attribute collection is returned.
+     *
+     * @return the attributes (must not be {@code null})
+     */
+    default Attributes getAttributes() {
+<span class="nc" id="L38">        return Attributes.EMPTY;</span>
+    }
+
+    /**
+     * Get the runtime attributes which pertain to this identity.  By default, an empty attribute collection is returned.
+     *
+     * @return the runtime attributes (must not be {@code null})
+     */
+    default Attributes getRuntimeAttributes() {
+<span class="fc" id="L47">        return Attributes.EMPTY;</span>
+    }
+
+    /**
+     * The empty authorization identity.
+     */
+<span class="fc" id="L53">    AuthorizationIdentity EMPTY = basicIdentity(Attributes.EMPTY);</span>
+
+    /**
+     * Create a basic authorization identity implementation.
+     *
+     * @param attributes the identity attributes
+     * @return the authorization identity
+     */
+    static AuthorizationIdentity basicIdentity(Attributes attributes) {
+<span class="fc" id="L62">        return basicIdentity(() -&gt; attributes, &quot;EMPTY&quot;);</span>
+    }
+
+    /**
+     * Create a basic authorization identity implementation.
+     *
+     * @param attributes the identity attributes
+     * @return the authorization identity
+     */
+    static AuthorizationIdentity basicIdentity(Supplier&lt;Attributes&gt; attributes, final String string) {
+<span class="fc" id="L72">        return new AuthorizationIdentity() {</span>
+
+            public Attributes getAttributes() {
+<span class="fc" id="L75">                return attributes.get();</span>
+            }
+
+            @Override
+            public String toString() {
+<span class="nc" id="L80">                return string;</span>
+            }
+
+        };
+    }
+
+    /**
+     * Create a basic authorization identity implementation using the given attributes and runtime attributes.
+     *
+     * @param attributes the attributes
+     * @param runtimeAttributes the runtime attributes
+     * @return the authorization identity
+     */
+    static AuthorizationIdentity basicIdentity(Supplier&lt;Attributes&gt; attributes, Supplier&lt;Attributes&gt; runtimeAttributes, final String string) {
+<span class="fc" id="L94">        return new AuthorizationIdentity() {</span>
+
+            public Attributes getAttributes() {
+<span class="nc" id="L97">                return attributes.get();</span>
+            }
+
+            public Attributes getRuntimeAttributes() {
+<span class="fc" id="L101">                return runtimeAttributes.get();</span>
+            }
+
+            @Override
+            public String toString() {
+<span class="nc" id="L106">                return string;</span>
+            }
+
+        };
+    }
+
+    /**
+     * Create a basic authorization identity implementation using the given authorization
+     * identity and runtime attributes.
+     *
+     * @param authorizationIdentity the authorization identity
+     * @param runtimeAttributes the identity runtime attributes
+     * @return the authorization identity
+     */
+    static AuthorizationIdentity basicIdentity(AuthorizationIdentity authorizationIdentity, Attributes runtimeAttributes) {
+<span class="fc" id="L121">        Attributes attributes = authorizationIdentity.getAttributes();</span>
+<span class="fc" id="L122">        Attributes combinedRuntimeAttributes = AggregateAttributes.aggregateOf(authorizationIdentity.getRuntimeAttributes(), runtimeAttributes);</span>
+<span class="pc" id="L123">        return basicIdentity(() -&gt; attributes, () -&gt; combinedRuntimeAttributes, &quot;EMPTY&quot;);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

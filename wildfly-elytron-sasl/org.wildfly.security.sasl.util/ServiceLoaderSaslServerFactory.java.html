@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ServiceLoaderSaslServerFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.util</a> &gt; <span class="el_source">ServiceLoaderSaslServerFactory.java</span></div><h1>ServiceLoaderSaslServerFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.util;
+
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.ServiceConfigurationError;
+import java.util.ServiceLoader;
+import java.util.Set;
+
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.sasl.SaslServer;
+import javax.security.sasl.SaslServerFactory;
+import javax.security.sasl.SaslException;
+
+/**
+ * A {@link SaslServerFactory} which uses a {@link ServiceLoader} to find implementations.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class ServiceLoaderSaslServerFactory implements SaslServerFactory {
+    private final ServiceLoader&lt;SaslServerFactory&gt; loader;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param loader the service loader to use
+     */
+<span class="nc" id="L47">    public ServiceLoaderSaslServerFactory(final ServiceLoader&lt;SaslServerFactory&gt; loader) {</span>
+<span class="nc" id="L48">        this.loader = loader;</span>
+<span class="nc" id="L49">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param classLoader the class loader to use as the basis of the provider search, or {@code null} to use the system
+     *      or bootstrap class loader
+     */
+    public ServiceLoaderSaslServerFactory(final ClassLoader classLoader) {
+<span class="nc" id="L58">        this(ServiceLoader.load(SaslServerFactory.class, classLoader));</span>
+<span class="nc" id="L59">    }</span>
+
+    public SaslServer createSaslServer(final String mechanism, final String protocol, final String serverName, final Map&lt;String, ?&gt; props, final CallbackHandler cbh) throws SaslException {
+<span class="nc" id="L62">        synchronized (loader) {</span>
+<span class="nc" id="L63">            final Iterator&lt;SaslServerFactory&gt; iterator = loader.iterator();</span>
+            SaslServerFactory serverFactory;
+            SaslServer saslServer;
+            for (;;) try {
+                // Service loader iterators can blow up in various ways; that's why the loop is structured this way
+<span class="nc bnc" id="L68" title="All 2 branches missed.">                if (! iterator.hasNext()) {</span>
+<span class="nc" id="L69">                    break;</span>
+                }
+<span class="nc" id="L71">                serverFactory = iterator.next();</span>
+                // let SaslException bubble up
+<span class="nc" id="L73">                saslServer = serverFactory.createSaslServer(mechanism, protocol, serverName, props, cbh);</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">                if (saslServer != null) {</span>
+<span class="nc" id="L75">                    return saslServer;</span>
+                }
+<span class="nc" id="L77">            } catch (ServiceConfigurationError ignored) {}</span>
+<span class="nc" id="L78">            return null;</span>
+        }
+    }
+
+    public String[] getMechanismNames(final Map&lt;String, ?&gt; props) {
+<span class="nc" id="L83">        synchronized (loader){</span>
+<span class="nc" id="L84">            final Set&lt;String&gt; set = new LinkedHashSet&lt;&gt;();</span>
+<span class="nc" id="L85">            final Iterator&lt;SaslServerFactory&gt; iterator = loader.iterator();</span>
+            SaslServerFactory serverFactory;
+            for (; ; )
+                try {
+                    // Service loader iterators can blow up in various ways; that's why the loop is structured this way
+<span class="nc bnc" id="L90" title="All 2 branches missed.">                    if (!iterator.hasNext()) {</span>
+<span class="nc" id="L91">                        break;</span>
+                    }
+<span class="nc" id="L93">                    serverFactory = iterator.next();</span>
+                    // let SaslException bubble up
+<span class="nc" id="L95">                    Collections.addAll(set, serverFactory.getMechanismNames(props));</span>
+<span class="nc" id="L96">                } catch (ServiceConfigurationError ignored) {</span>
+<span class="nc" id="L97">                }</span>
+<span class="nc" id="L98">            return set.toArray(new String[set.size()]);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

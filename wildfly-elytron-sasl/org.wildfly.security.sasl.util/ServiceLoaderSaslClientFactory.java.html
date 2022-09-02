@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ServiceLoaderSaslClientFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.util</a> &gt; <span class="el_source">ServiceLoaderSaslClientFactory.java</span></div><h1>ServiceLoaderSaslClientFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.util;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.ServiceConfigurationError;
+import java.util.ServiceLoader;
+import java.util.Set;
+
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.sasl.SaslClient;
+import javax.security.sasl.SaslClientFactory;
+import javax.security.sasl.SaslException;
+
+/**
+ * A {@link SaslClientFactory} which uses a {@link ServiceLoader} to find implementations.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class ServiceLoaderSaslClientFactory implements SaslClientFactory {
+    private final ServiceLoader&lt;SaslClientFactory&gt; loader;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param loader the service loader to use
+     */
+<span class="nc" id="L48">    public ServiceLoaderSaslClientFactory(final ServiceLoader&lt;SaslClientFactory&gt; loader) {</span>
+<span class="nc" id="L49">        this.loader = loader;</span>
+<span class="nc" id="L50">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param classLoader the class loader to use as the basis of the provider search, or {@code null} to use the system
+     *      or bootstrap class loader
+     */
+    public ServiceLoaderSaslClientFactory(final ClassLoader classLoader) {
+<span class="nc" id="L59">        this(ServiceLoader.load(SaslClientFactory.class, classLoader));</span>
+<span class="nc" id="L60">    }</span>
+
+    public SaslClient createSaslClient(final String[] mechanisms, final String authorizationId, final String protocol, final String serverName, final Map&lt;String, ?&gt; props, final CallbackHandler cbh) throws SaslException {
+<span class="nc" id="L63">        final ArrayList&lt;SaslClientFactory&gt; factoryList = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L64">        synchronized (loader) {</span>
+<span class="nc" id="L65">            final Iterator&lt;SaslClientFactory&gt; iterator = loader.iterator();</span>
+            for (;;) try {
+                // Service loader iterators can blow up in various ways; that's why the loop is structured this way
+<span class="nc bnc" id="L68" title="All 2 branches missed.">                if (! iterator.hasNext()) {</span>
+<span class="nc" id="L69">                    break;</span>
+                }
+<span class="nc" id="L71">                factoryList.add(iterator.next());</span>
+<span class="nc" id="L72">            } catch (ServiceConfigurationError ignored) {}</span>
+<span class="nc" id="L73">        }</span>
+        SaslClient saslClient;
+<span class="nc" id="L75">        final String[] mechArray = new String[1];</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">        for (String mechanism : mechanisms) {</span>
+<span class="nc" id="L77">            mechArray[0] = mechanism;</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">            for (SaslClientFactory clientFactory : factoryList) {</span>
+                // let SaslException bubble up
+<span class="nc" id="L80">                saslClient = clientFactory.createSaslClient(mechArray, authorizationId, protocol, serverName, props, cbh);</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">                if (saslClient != null) {</span>
+<span class="nc" id="L82">                    return saslClient;</span>
+                }
+<span class="nc" id="L84">            }</span>
+        }
+        // no mechs found
+<span class="nc" id="L87">        return null;</span>
+    }
+
+    public String[] getMechanismNames(final Map&lt;String, ?&gt; props) {
+<span class="nc" id="L91">        synchronized (loader) {</span>
+<span class="nc" id="L92">            final Set&lt;String&gt; set = new LinkedHashSet&lt;&gt;();</span>
+<span class="nc" id="L93">            final Iterator&lt;SaslClientFactory&gt; iterator = loader.iterator();</span>
+            SaslClientFactory clientFactory;
+            for (;;) try {
+                // Service loader iterators can blow up in various ways; that's why the loop is structured this way
+<span class="nc bnc" id="L97" title="All 2 branches missed.">                if (! iterator.hasNext()) {</span>
+<span class="nc" id="L98">                    break;</span>
+                }
+<span class="nc" id="L100">                clientFactory = iterator.next();</span>
+                // let SaslException bubble up
+<span class="nc" id="L102">                Collections.addAll(set, clientFactory.getMechanismNames(props));</span>
+<span class="nc" id="L103">            } catch (ServiceConfigurationError ignored) {}</span>
+<span class="nc" id="L104">            return set.toArray(new String[set.size()]);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AnonymousSaslClient.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl-anonymous</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.anonymous</a> &gt; <span class="el_source">AnonymousSaslClient.java</span></div><h1>AnonymousSaslClient.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.anonymous;
+
+import static org.wildfly.security.mechanism._private.ElytronMessages.saslAnonymous;
+
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.NameCallback;
+import javax.security.sasl.SaslException;
+
+import org.wildfly.common.Assert;
+import org.wildfly.common.bytes.ByteStringBuilder;
+import org.wildfly.security.auth.principal.AnonymousPrincipal;
+import org.wildfly.security.sasl.WildFlySasl;
+import org.wildfly.security.sasl.util.AbstractSaslClient;
+import org.wildfly.security.sasl.util.SaslMechanismInformation;
+import org.wildfly.security.sasl.util.StringPrep;
+
+/**
+ * A client implementation of the RFC 4505 {@code ANONYMOUS} mechanism.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class AnonymousSaslClient extends AbstractSaslClient {
+
+    private static final int INITIAL_STATE = 1;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param protocol the protocol
+     * @param serverName the server name
+     * @param callbackHandler the callback handler to use for authentication
+     * @param authorizationId the possibly {@code null} protocol-dependent name used for authorization
+     */
+    AnonymousSaslClient(final String protocol, final String serverName, final CallbackHandler callbackHandler, final String authorizationId) {
+<span class="nc" id="L53">        super(SaslMechanismInformation.Names.ANONYMOUS, protocol, serverName, callbackHandler, authorizationId, true, saslAnonymous);</span>
+<span class="nc" id="L54">        setNegotiationState(INITIAL_STATE);</span>
+<span class="nc" id="L55">    }</span>
+
+    @Override
+    protected byte[] evaluateMessage(int state, final byte[] message) throws SaslException {
+<span class="nc bnc" id="L59" title="All 2 branches missed.">        switch (state) {</span>
+            case INITIAL_STATE:
+<span class="nc bnc" id="L61" title="All 4 branches missed.">                if (message != null &amp;&amp; message.length &gt; 0) {</span>
+<span class="nc" id="L62">                    throw saslAnonymous.mechInvalidServerMessage().toSaslException();</span>
+                }
+<span class="nc" id="L64">                NameCallback nameCallback = new NameCallback(&quot;Authentication name&quot;, &quot;anonymous&quot;);</span>
+<span class="nc" id="L65">                handleCallbacks(nameCallback);</span>
+<span class="nc" id="L66">                String name = nameCallback.getName();</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">                if (name == null) {</span>
+<span class="nc" id="L68">                    throw saslAnonymous.mechNotProvidedUserName().toSaslException();</span>
+                }
+<span class="nc bnc" id="L70" title="All 2 branches missed.">                if (name.length() &gt; 255) {</span>
+<span class="nc" id="L71">                    throw saslAnonymous.mechAuthenticationNameTooLong().toSaslException();</span>
+                }
+<span class="nc bnc" id="L73" title="All 2 branches missed.">                if (name.isEmpty()) {</span>
+<span class="nc" id="L74">                    throw saslAnonymous.mechAuthenticationNameIsEmpty().toSaslException();</span>
+                }
+<span class="nc" id="L76">                ByteStringBuilder b = new ByteStringBuilder();</span>
+<span class="nc" id="L77">                StringPrep.encode(name, b, 0</span>
+                    | StringPrep.MAP_TO_NOTHING
+                    | StringPrep.MAP_TO_SPACE
+                    | StringPrep.FORBID_ASCII_CONTROL
+                    | StringPrep.FORBID_NON_ASCII_CONTROL
+                    | StringPrep.FORBID_PRIVATE_USE
+                    | StringPrep.FORBID_NON_CHARACTER
+                    | StringPrep.FORBID_SURROGATE
+                    | StringPrep.FORBID_INAPPROPRIATE_FOR_PLAIN_TEXT
+                    | StringPrep.FORBID_CHANGE_DISPLAY_AND_DEPRECATED
+                    | StringPrep.FORBID_TAGGING
+                    | StringPrep.NORMALIZE_KC
+                );
+<span class="nc" id="L90">                negotiationComplete();</span>
+<span class="nc" id="L91">                return b.toArray();</span>
+        }
+<span class="nc" id="L93">        throw Assert.impossibleSwitchCase(state);</span>
+    }
+
+    public Object getNegotiatedProperty(final String propName) {
+<span class="nc" id="L97">        assertComplete();</span>
+        // Our principal is always anonymous, even if an authz name was requested.
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        return WildFlySasl.PRINCIPAL.equals(propName) ? AnonymousPrincipal.getInstance() : super.getNegotiatedProperty(propName);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

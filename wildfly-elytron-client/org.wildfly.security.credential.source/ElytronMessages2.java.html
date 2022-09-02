@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages2.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-client</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.credential.source</a> &gt; <span class="el_source">ElytronMessages2.java</span></div><h1>ElytronMessages2.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.credential.source;
+
+import org.jboss.logging.BasicLogger;
+import org.jboss.logging.Logger;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageLogger;
+import org.jboss.logging.annotations.ValidIdRange;
+import org.jboss.logging.annotations.ValidIdRanges;
+import org.wildfly.security.mechanism.AuthenticationMechanismException;
+
+/**
+ * Log messages and exceptions for Elytron.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+@MessageLogger(projectCode = &quot;ELY&quot;, length = 5)
+@ValidIdRanges({
+    @ValidIdRange(min = 1106, max = 1106),
+    @ValidIdRange(min = 5053, max = 5053),
+    @ValidIdRange(min = 5125, max = 5125),
+    @ValidIdRange(min = 9001, max = 9001)
+})
+interface ElytronMessages2 extends BasicLogger {
+
+<span class="nc" id="L45">    ElytronMessages2 saslOAuth2 = Logger.getMessageLogger(ElytronMessages2.class, &quot;org.wildfly.security.sasl.oauth2&quot;);</span>
+
+    @Message(id = 1106, value = &quot;Could not obtain SSLContext&quot;)
+    IllegalStateException failedToObtainSSLContext(@Cause Throwable cause);
+
+    @Message(id = 5053, value = &quot;Callback handler failed for unknown reason&quot;)
+    AuthenticationMechanismException mechCallbackHandlerFailedForUnknownReason(@Cause Throwable cause);
+
+    @Message(id = 5125, value = &quot;Unable to handle response from server&quot;)
+    AuthenticationMechanismException mechUnableToHandleResponseFromServer(@Cause Throwable cause);
+
+    @Message(id = 9001, value = &quot;Client credentials not provided&quot;)
+    IllegalStateException oauth2ClientCredentialsNotProvided();
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

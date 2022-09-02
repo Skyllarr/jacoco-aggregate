@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-jacc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.authz.jacc</a> &gt; <span class="el_source">ElytronMessages.java</span></div><h1>ElytronMessages.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.authz.jacc;
+
+import static org.jboss.logging.Logger.Level.DEBUG;
+import static org.jboss.logging.Logger.Level.ERROR;
+
+import java.security.Permission;
+import java.security.ProtectionDomain;
+
+import javax.security.jacc.PolicyContextException;
+
+import org.jboss.logging.BasicLogger;
+import org.jboss.logging.Logger;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.LogMessage;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageLogger;
+import org.jboss.logging.annotations.ValidIdRange;
+import org.jboss.logging.annotations.ValidIdRanges;
+
+/**
+ * Log messages and exceptions for Elytron.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+@MessageLogger(projectCode = &quot;ELY&quot;, length = 5)
+@ValidIdRanges({
+    @ValidIdRange(min = 3018, max = 3018),
+    @ValidIdRange(min = 8500, max = 8508)
+})
+interface ElytronMessages extends BasicLogger {
+
+<span class="fc" id="L51">    ElytronMessages log = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security&quot;);</span>
+
+    /* authz package */
+
+    @Message(id = 3018, value = &quot;Cannot add permissions to a read-only permission collection&quot;)
+    SecurityException readOnlyPermissionCollection();
+
+    @LogMessage(level = ERROR)
+    @Message(id = 8500, value = &quot;Failed to check permissions for protection domain [%s] and permission [%s].&quot;)
+    void authzFailedToCheckPermission(ProtectionDomain domain, Permission permission, @Cause Throwable cause);
+
+    @Message(id = 8501, value = &quot;Invalid state [%s] for operation.&quot;)
+    UnsupportedOperationException authzInvalidStateForOperation(String actualState);
+
+    @Message(id = 8502, value = &quot;Can't link policy configuration [%s] to itself.&quot;)
+    IllegalArgumentException authzLinkSamePolicyConfiguration(String contextID);
+
+    @Message(id = 8503, value = &quot;ContextID not set. Check if the context id was set using PolicyContext.setContextID.&quot;)
+    IllegalStateException authzContextIdentifierNotSet();
+
+    @Message(id = 8504, value = &quot;Invalid policy context identifier [%s].&quot;)
+    IllegalArgumentException authzInvalidPolicyContextIdentifier(String contextID);
+
+    @Message(id = 8505, value = &quot;Could not obtain PolicyConfiguration for contextID [%s].&quot;)
+    PolicyContextException authzUnableToObtainPolicyConfiguration(String contextId, @Cause Throwable cause);
+
+    @Message(id = 8506, value = &quot;Policy configuration with contextID [%s] is not in service state.&quot;)
+    IllegalStateException authzPolicyConfigurationNotInService(String contextID);
+
+    // @LogMessage(level = ERROR)
+    // @Message(id = 8507, value = &quot;Could not obtain dynamic permissions.&quot;)
+    // void authzFailedGetDynamicPermissions(@Cause Throwable cause);
+
+    @LogMessage(level = DEBUG)
+    @Message(id = 8508, value = &quot;Could not obtain authorized identity.&quot;)
+    void authzCouldNotObtainSecurityIdentity(@Cause Throwable cause);
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

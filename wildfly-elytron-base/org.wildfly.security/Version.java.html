@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Version.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-base</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security</a> &gt; <span class="el_source">Version.java</span></div><h1>Version.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2013 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.Properties;
+
+/**
+ * The version of this JAR.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class Version {
+
+    private Version() {
+    }
+
+    private static final String VERSION;
+    private static final String JAR_NAME;
+
+    static {
+<span class="fc" id="L41">        Properties versionProps = new Properties();</span>
+<span class="fc" id="L42">        String versionString = &quot;(unknown)&quot;;</span>
+<span class="fc" id="L43">        String jarName = &quot;(unknown)&quot;;</span>
+<span class="fc" id="L44">        try (final InputStream stream = Version.class.getResourceAsStream(&quot;Version.properties&quot;)) {</span>
+<span class="fc" id="L45">            try (final InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {</span>
+<span class="fc" id="L46">                versionProps.load(reader);</span>
+<span class="fc" id="L47">                versionString = versionProps.getProperty(&quot;version&quot;, versionString);</span>
+<span class="fc" id="L48">                jarName = versionProps.getProperty(&quot;jarName&quot;, jarName);</span>
+            }
+<span class="nc" id="L50">        } catch (IOException ignored) {</span>
+<span class="fc" id="L51">        }</span>
+<span class="fc" id="L52">        VERSION = versionString;</span>
+<span class="fc" id="L53">        JAR_NAME = jarName;</span>
+        try {
+<span class="fc" id="L55">            ElytronMessages.log.logVersion(versionString);</span>
+<span class="pc" id="L56">        } catch (Throwable ignored) {}</span>
+<span class="fc" id="L57">    }</span>
+
+    /**
+     * Get the version.
+     *
+     * @return the version
+     */
+    public static String getVersion() {
+<span class="fc" id="L65">        return VERSION;</span>
+    }
+
+    /**
+     * Get the JAR name.
+     *
+     * @return the JAR name
+     */
+    public static String getJarName() {
+<span class="nc" id="L74">        return JAR_NAME;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

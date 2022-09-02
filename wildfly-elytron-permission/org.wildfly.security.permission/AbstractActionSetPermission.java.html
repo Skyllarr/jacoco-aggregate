@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractActionSetPermission.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-permission</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.permission</a> &gt; <span class="el_source">AbstractActionSetPermission.java</span></div><h1>AbstractActionSetPermission.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.permission;
+
+import org.wildfly.security.util.StringEnumeration;
+
+/**
+ * An abstract base class for permissions which use a bit set to represent actions.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public abstract class AbstractActionSetPermission&lt;This extends AbstractActionSetPermission&lt;This&gt;&gt; extends AbstractActionPermission&lt;This&gt; {
+    private static final long serialVersionUID = 897239118282921196L;
+
+    private final StringEnumeration actionEnumeration;
+    private final int actionBits;
+    private String actions;
+
+    /**
+     * Construct a new instance.  The given bits are masked by {@link #actionsMask()} before being stored in the object
+     * instance.
+     *
+     * @param name the permission name
+     * @param actionBits the permission action bits
+     * @param actionEnumeration the permission actions enumeration
+     */
+    protected AbstractActionSetPermission(final String name, final int actionBits, final StringEnumeration actionEnumeration) {
+<span class="nc" id="L44">        super(name);</span>
+<span class="nc" id="L45">        this.actionEnumeration = actionEnumeration;</span>
+<span class="nc" id="L46">        this.actionBits = actionBits &amp; actionsMask();</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        if (actionBits == actionsMask()) actions = &quot;*&quot;;</span>
+<span class="nc" id="L48">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param name the permission name
+     * @param actions the permission actions string
+     * @param actionEnumeration the permission actions enumeration
+     */
+    protected AbstractActionSetPermission(final String name, final String actions, final StringEnumeration actionEnumeration) {
+<span class="nc" id="L58">        super(name);</span>
+<span class="nc" id="L59">        this.actionEnumeration = actionEnumeration;</span>
+<span class="nc" id="L60">        final int actionBits = parseActions(actions);</span>
+<span class="nc" id="L61">        this.actionBits = actionBits &amp; actionsMask();</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        if (actionBits == actionsMask()) this.actions = &quot;*&quot;;</span>
+<span class="nc" id="L63">    }</span>
+
+    /**
+     * Get the action bits of this permission.
+     *
+     * @return the action bits
+     */
+    public final int getActionBits() {
+<span class="nc" id="L71">        return actionBits;</span>
+    }
+
+    public final boolean actionsEquals(final This permission) {
+<span class="nc bnc" id="L75" title="All 4 branches missed.">        return permission != null &amp;&amp; actionBits == permission.getActionBits();</span>
+    }
+
+    public final boolean impliesActions(final This permission) {
+<span class="nc bnc" id="L79" title="All 4 branches missed.">        return permission != null &amp;&amp; isSet(actionBits, permission.getActionBits());</span>
+    }
+
+    public final boolean impliesActions(final String actions) {
+<span class="nc" id="L83">        return impliesActionBits(parseActions(actions));</span>
+    }
+
+    /**
+     * Determine whether this permission's actions value implies the given action bits.
+     *
+     * @param actionBits the actions bits to test
+     * @return {@code true} if this permission implies the given action bits; {@code false} otherwise
+     */
+    public final boolean impliesActionBits(final int actionBits) {
+<span class="nc" id="L93">        return isSet(this.actionBits, actionBits &amp; actionsMask());</span>
+    }
+
+    private int actionsMask() {
+<span class="nc" id="L97">        return (1 &lt;&lt; actionEnumeration.size()) - 1;</span>
+    }
+
+    private int getActionBit(final String actionName) throws IllegalArgumentException {
+<span class="nc" id="L101">        return 1 &lt;&lt; actionEnumeration.indexOf(actionName);</span>
+    }
+
+    private String getActionName(final int bit) throws IllegalArgumentException {
+<span class="nc" id="L105">        return actionEnumeration.nameOf(Integer.numberOfTrailingZeros(bit));</span>
+    }
+
+    protected final int actionsHashCode() {
+<span class="nc" id="L109">        return actionBits;</span>
+    }
+
+    /**
+     * Get the actions string.  The string is computed the first time this method is called, and cached thereafter.
+     *
+     * @return the actions string (not {@code null})
+     */
+    public final String getActions() {
+<span class="nc" id="L118">        final String actions = this.actions;</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">        if (actions != null) {</span>
+<span class="nc" id="L120">            return actions;</span>
+        }
+<span class="nc" id="L122">        return this.actions = PermissionUtil.toActionsString(actionBits, this::getActionName);</span>
+    }
+
+    /**
+     * Parse the actions string into a bit set.
+     *
+     * @param actionsString the actions string
+     * @return the bit set
+     * @throws IllegalArgumentException if the actions string contained an invalid name or invalid syntax
+     */
+    public final int parseActions(final String actionsString) throws IllegalArgumentException {
+<span class="nc" id="L133">        return PermissionUtil.parseActions(actionsString, this::getActionBit);</span>
+    }
+
+    public final This withActions(final String actionsString) {
+<span class="nc" id="L137">        return withActionBits(parseActions(actionsString));</span>
+    }
+
+    public final This withActionsFrom(final This permission) {
+<span class="nc" id="L141">        return withActionBits(permission.getActionBits());</span>
+    }
+
+    /**
+     * Get a permission which is identical to this one, but with new actions which consist of the union of the actions
+     * from this permission and the action bits from the given value.  The returned permission may or may not be a new
+     * instance, and may be equal to this instance.
+     *
+     * @param actionBits the action bits
+     * @return the permission (not {@code null})
+     */
+    public final This withActionBits(int actionBits) {
+<span class="nc" id="L153">        return withNewActionBits(this.actionBits | actionBits &amp; actionsMask());</span>
+    }
+
+    public final This withoutActions(String actionsString) {
+<span class="nc" id="L157">        return withoutActionBits(parseActions(actionsString));</span>
+    }
+
+    public final This withoutActionsFrom(final This permission) {
+<span class="nc" id="L161">        return withoutActionBits(permission.getActionBits());</span>
+    }
+
+    /**
+     * Get a permission which is identical to this one, but with new actions which consist of the actions
+     * from this permission without the action bits from the given value.  The returned permission may or may not be a new
+     * instance, and may be equal to this instance.
+     *
+     * @param actionBits the action bits
+     * @return the permission (not {@code null})
+     */
+    public final This withoutActionBits(int actionBits) {
+<span class="nc" id="L173">        return withNewActionBits(this.actionBits &amp; ~actionBits);</span>
+    }
+
+    public final This withNewActions(String actionsString) {
+<span class="nc" id="L177">        return withNewActionBits(parseActions(actionsString));</span>
+    }
+
+    public final This withNewActionsFrom(final This permission) {
+<span class="nc" id="L181">        return withNewActionBits(permission.getActionBits());</span>
+    }
+
+    /**
+     * Get a permission which is identical to this one, but with new action bits as given by {@code actionBits}.
+     * The returned permission may or may not be a new instance, and may be equal to this instance.
+     *
+     * @param actionBits the action bits
+     * @return the permission (not {@code null})
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public final This withNewActionBits(int actionBits) {
+<span class="nc" id="L193">        final int masked = actionBits &amp; actionsMask();</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">        if (masked == this.actionBits) {</span>
+<span class="nc" id="L195">            return (This) this;</span>
+        } else {
+<span class="nc" id="L197">            return constructWithActionBits(masked);</span>
+        }
+    }
+
+    /**
+     * Construct or return a permission of this type with the same name as this one but with the given action bits.
+     *
+     * @param actionBits the action bits
+     * @return the permission
+     */
+    protected abstract This constructWithActionBits(int actionBits);
+
+    // private
+
+    private static boolean isSet(final int bits, final int test) {
+<span class="nc bnc" id="L212" title="All 2 branches missed.">        return (bits &amp; test) == test;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

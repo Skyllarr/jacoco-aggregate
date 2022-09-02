@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>JWKUtil.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-jose-jwk</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.jose.jwk</a> &gt; <span class="el_source">JWKUtil.java</span></div><h1>JWKUtil.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2020 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.jose.jwk;
+
+
+import static org.wildfly.security.pem.Pem.extractDerContent;
+
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+
+import org.wildfly.common.Assert;
+import org.wildfly.common.codec.Base64Alphabet;
+import org.wildfly.common.iteration.ByteIterator;
+import org.wildfly.common.iteration.CodePointIterator;
+
+/**
+ * Utility methods for use with JSON Web Keys.
+ *
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ * @since 1.14.0
+ */
+<span class="nc" id="L38">public class JWKUtil {</span>
+
+    public static String base64UrlEncode(byte[] data) {
+<span class="nc" id="L41">        return ByteIterator.ofBytes(data).base64Encode(BASE64_URL, false).drainToString();</span>
+    }
+
+    public static byte[] base64UrlDecode(String data) {
+<span class="nc" id="L45">        return CodePointIterator.ofString(data).base64Decode(BASE64_URL, false).drain();</span>
+    }
+
+    /**
+     * The &lt;a href=&quot;http://tools.ietf.org/html/rfc4648&quot;&gt;RFC 4648&lt;/a&gt; base64url alphabet.
+     */
+<span class="nc bnc" id="L51" title="All 2 branches missed.">    public static final Base64Alphabet BASE64_URL = new Base64Alphabet(false) {</span>
+        public int encode(final int val) {
+<span class="nc bnc" id="L53" title="All 2 branches missed.">            if (val &lt;= 25) {</span>
+<span class="nc" id="L54">                return 'A' + val;</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">            } else if (val &lt;= 51) {</span>
+<span class="nc" id="L56">                return 'a' + val - 26;</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">            } else if (val &lt;= 61) {</span>
+<span class="nc" id="L58">                return '0' + val - 52;</span>
+<span class="nc bnc" id="L59" title="All 2 branches missed.">            } else if (val == 62) {</span>
+<span class="nc" id="L60">                return '-';</span>
+            } else {
+<span class="nc bnc" id="L62" title="All 4 branches missed.">                assert val == 63;</span>
+<span class="nc" id="L63">                return '_';</span>
+            }
+        }
+
+        public int decode(final int codePoint) throws IllegalArgumentException {
+<span class="nc bnc" id="L68" title="All 4 branches missed.">            if ('A' &lt;= codePoint &amp;&amp; codePoint &lt;= 'Z') {</span>
+<span class="nc" id="L69">                return codePoint - 'A';</span>
+<span class="nc bnc" id="L70" title="All 4 branches missed.">            } else if ('a' &lt;= codePoint &amp;&amp; codePoint &lt;= 'z') {</span>
+<span class="nc" id="L71">                return codePoint - 'a' + 26;</span>
+<span class="nc bnc" id="L72" title="All 4 branches missed.">            } else if ('0' &lt;= codePoint &amp;&amp; codePoint &lt;= '9') {</span>
+<span class="nc" id="L73">                return codePoint - '0' + 52;</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">            } else if (codePoint == '-') {</span>
+<span class="nc" id="L75">                return 62;</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">            } else if (codePoint == '_') {</span>
+<span class="nc" id="L77">                return 63;</span>
+            } else {
+<span class="nc" id="L79">                return -1;</span>
+            }
+        }
+    };
+
+    /**
+     * Generate the thumbprint for the first certificate in the given certificate chain.
+     *
+     * @param certChain the certificate chain in PEM format
+     * @param algorithm the algorithm to use
+     * @return the generated thumbprint for the first certificate in the given certificate chain in base64url format
+     * @throws NoSuchAlgorithmException if the given algorithm cannot be used
+     */
+    public static String generateThumbprint(String[] certChain, String algorithm) throws NoSuchAlgorithmException {
+<span class="nc" id="L93">        Assert.checkNotNullParam(&quot;certChain&quot;, certChain);</span>
+<span class="nc" id="L94">        Assert.checkNotNullParam(&quot;algorithm&quot;, algorithm);</span>
+<span class="nc" id="L95">        return ByteIterator.ofBytes(generateThumbprintBytes(certChain, algorithm)).base64Encode(BASE64_URL, false).drainToString();</span>
+    }
+
+    static byte[] generateThumbprintBytes(String[] certChain, String algorithm) throws NoSuchAlgorithmException {
+<span class="nc" id="L99">        return MessageDigest.getInstance(algorithm).digest(extractDerContent(CodePointIterator.ofString(certChain[0])));</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

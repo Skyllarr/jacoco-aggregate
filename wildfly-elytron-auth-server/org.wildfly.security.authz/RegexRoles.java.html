@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RegexRoles.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.authz</a> &gt; <span class="el_source">RegexRoles.java</span></div><h1>RegexRoles.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2019 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.authz;
+
+import java.util.Iterator;
+import java.util.NoSuchElementException;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
+import java.util.stream.StreamSupport;
+
+import static org.wildfly.security.auth.server._private.ElytronMessages.log;
+
+/**
+ * A regex roles.
+ * &lt;p&gt;
+ * Roles that are checked against pattern. Roles that contain the pattern are then replaced using the replacement. Pattern can capture groups that replacement can make use of.
+ * It is possible to replace all occurrences or only the first occurrence of the pattern in role.
+ *
+ * @author &lt;a href=&quot;mailto:dvilkola@redhat.com&quot;&gt;Diana Vilkolakova&lt;/a&gt;
+ */
+class RegexRoles implements Roles {
+    private final Roles delegate;
+    private final Pattern pattern;
+    private final String replace;
+    private final boolean keepNonMapped;
+    private final boolean replaceAll;
+
+<span class="fc" id="L43">    RegexRoles(final Roles delegate, Pattern pattern, final String replace, final boolean keepNonMapped, final boolean replaceAll) {</span>
+<span class="fc" id="L44">        this.delegate = delegate;</span>
+<span class="fc" id="L45">        this.pattern = pattern;</span>
+<span class="fc" id="L46">        this.replace = replace;</span>
+<span class="fc" id="L47">        this.keepNonMapped = keepNonMapped;</span>
+<span class="fc" id="L48">        this.replaceAll = replaceAll;</span>
+<span class="fc" id="L49">    }</span>
+
+    public boolean contains(final String roleName) {
+        try {
+<span class="fc" id="L53">            return StreamSupport.stream(delegate.spliterator(), false).anyMatch(role -&gt;</span>
+            {
+<span class="fc" id="L55">                String pattern = this.pattern.pattern();</span>
+<span class="fc" id="L56">                boolean containsRegex = this.pattern.matcher(role).find();</span>
+<span class="fc bfc" id="L57" title="All 4 branches covered.">                boolean containsRegexAndRoleExists = containsRegex &amp;&amp;</span>
+<span class="fc bfc" id="L58" title="All 4 branches covered.">                        (replaceAll ? role.replaceAll(pattern, replace).equals(roleName) : role.replaceFirst(pattern, replace).equals(roleName));</span>
+<span class="fc bfc" id="L59" title="All 6 branches covered.">                boolean doesNotContainRegexButRoleExists = !containsRegex &amp;&amp; keepNonMapped &amp;&amp; role.equals(roleName);</span>
+<span class="fc bfc" id="L60" title="All 4 branches covered.">                return containsRegexAndRoleExists || doesNotContainRegexButRoleExists;</span>
+            });
+<span class="fc" id="L62">        } catch (PatternSyntaxException | IndexOutOfBoundsException ex) {</span>
+<span class="fc" id="L63">            throw log.invalidReplacementInRegexRoleMapper();</span>
+        }
+    }
+
+    @Override
+    public Iterator&lt;String&gt; iterator() {
+<span class="fc" id="L69">        final Iterator&lt;String&gt; iterator = delegate.iterator();</span>
+
+<span class="fc" id="L71">        return new Iterator&lt;String&gt;() {</span>
+<span class="fc" id="L72">            String next = null;</span>
+
+            @Override
+            public boolean hasNext() {
+<span class="fc bfc" id="L76" title="All 2 branches covered.">                if (next != null) return true;</span>
+
+<span class="fc bfc" id="L78" title="All 2 branches covered.">                while (iterator.hasNext()) {</span>
+<span class="fc" id="L79">                    String nextt = iterator.next();</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">                    if (pattern.matcher(nextt).find()) {</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">                        next = replaceAll ? nextt.replaceAll(pattern.pattern(), replace) : nextt.replaceFirst(pattern.pattern(), replace);</span>
+<span class="fc" id="L82">                        return true;</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">                    } else if (keepNonMapped) {</span>
+<span class="fc" id="L84">                        next = nextt;</span>
+<span class="fc" id="L85">                        return true;</span>
+                    }
+<span class="fc" id="L87">                }</span>
+<span class="fc" id="L88">                return false;</span>
+            }
+
+            @Override
+            public String next() {
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">                if (!hasNext()) {</span>
+<span class="nc" id="L94">                    throw new NoSuchElementException();</span>
+                }
+<span class="fc" id="L96">                final String next = this.next;</span>
+<span class="fc" id="L97">                this.next = null;</span>
+<span class="fc" id="L98">                return next;</span>
+            }
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

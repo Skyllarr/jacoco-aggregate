@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LocalUserClient.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl-localuser</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.localuser</a> &gt; <span class="el_source">LocalUserClient.java</span></div><h1>LocalUserClient.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.localuser;
+
+import static org.wildfly.security.mechanism._private.ElytronMessages.saslLocal;
+
+import java.io.Closeable;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
+
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.NameCallback;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.sasl.RealmCallback;
+import javax.security.sasl.SaslException;
+
+import org.wildfly.common.Assert;
+import org.wildfly.common.bytes.ByteStringBuilder;
+import org.wildfly.common.iteration.CodePointIterator;
+import org.wildfly.security.auth.callback.OptionalNameCallback;
+import org.wildfly.security.sasl.util.AbstractSaslClient;
+
+/**
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class LocalUserClient extends AbstractSaslClient {
+
+    public static final String QUIET_AUTH = &quot;wildfly.sasl.local-user.quiet-auth&quot;;
+    public static final String LEGACY_QUIET_AUTH = &quot;jboss.sasl.local-user.quiet-auth&quot;;
+
+    private static final int INITIAL_CHALLENGE_STATE = 1;
+    private static final int CHALLENGE_RESPONSE_STATE = 2;
+
+    private final boolean quietAuth;
+
+    private static final byte UTF8NUL = 0x00;
+
+    LocalUserClient(final String protocol, final String serverName, final Map&lt;String, ?&gt; props, final CallbackHandler callbackHandler, final String authorizationId) {
+<span class="nc" id="L58">        super(LocalUserSaslFactory.JBOSS_LOCAL_USER, protocol, serverName, callbackHandler, authorizationId, true, saslLocal);</span>
+
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        if (props == null) {</span>
+<span class="nc" id="L61">            quietAuth = false;</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        } else if (props.containsKey(QUIET_AUTH)) {</span>
+<span class="nc" id="L63">            quietAuth = Boolean.parseBoolean((String) props.get(QUIET_AUTH));</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        } else if (props.containsKey(LEGACY_QUIET_AUTH)) {</span>
+<span class="nc" id="L65">            quietAuth = Boolean.parseBoolean((String) props.get(LEGACY_QUIET_AUTH));</span>
+        } else {
+<span class="nc" id="L67">            quietAuth = false;</span>
+        }
+<span class="nc" id="L69">    }</span>
+
+    public void init() {
+<span class="nc" id="L72">        setNegotiationState(INITIAL_CHALLENGE_STATE);</span>
+<span class="nc" id="L73">    }</span>
+
+    @Override
+    protected byte[] evaluateMessage(int state, final byte[] message) throws SaslException {
+<span class="nc bnc" id="L77" title="All 3 branches missed.">        switch (state) {</span>
+            case INITIAL_CHALLENGE_STATE:
+<span class="nc" id="L79">                final String authorizationId = getAuthorizationId();</span>
+                final byte[] bytes;
+<span class="nc bnc" id="L81" title="All 2 branches missed.">                if (authorizationId != null) {</span>
+<span class="nc" id="L82">                    bytes = CodePointIterator.ofString(authorizationId).asUtf8(true).drain();</span>
+                } else {
+<span class="nc" id="L84">                    bytes = new byte[] { UTF8NUL };</span>
+                }
+<span class="nc" id="L86">                setNegotiationState(CHALLENGE_RESPONSE_STATE);</span>
+<span class="nc" id="L87">                return bytes;</span>
+            case CHALLENGE_RESPONSE_STATE:
+<span class="nc" id="L89">                final String path = new String(message, StandardCharsets.UTF_8);</span>
+<span class="nc" id="L90">                final File file = new File(path);</span>
+<span class="nc" id="L91">                final byte[] challenge = new byte[8];</span>
+<span class="nc" id="L92">                int t = 0;</span>
+                try {
+<span class="nc" id="L94">                    final FileInputStream stream = new FileInputStream(file);</span>
+                    try {
+<span class="nc bnc" id="L96" title="All 2 branches missed.">                        while (t &lt; 8) {</span>
+<span class="nc" id="L97">                            int r = stream.read(challenge, t, 8-t);</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">                            if (r &lt; 0) {</span>
+<span class="nc" id="L99">                                throw saslLocal.mechInvalidServerMessage().toSaslException();</span>
+                            } else {
+<span class="nc" id="L101">                                t += r;</span>
+                            }
+<span class="nc" id="L103">                        }</span>
+                    } finally {
+<span class="nc" id="L105">                        safeClose(stream);</span>
+                    }
+<span class="nc" id="L107">                } catch (IOException e) {</span>
+<span class="nc" id="L108">                    throw saslLocal.mechFailedToReadChallengeFile(e).toSaslException();</span>
+<span class="nc" id="L109">                }</span>
+<span class="nc" id="L110">                String authenticationId = getAuthorizationId();</span>
+<span class="nc" id="L111">                String authenticationRealm = null;</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">                if (quietAuth == false) {</span>
+<span class="nc bnc" id="L113" title="All 4 branches missed.">                    final NameCallback nameCallback = authenticationId != null &amp;&amp; ! authenticationId.isEmpty() ?</span>
+<span class="nc" id="L114">                            new OptionalNameCallback(&quot;User name&quot;, authenticationId) : new OptionalNameCallback(&quot;User name&quot;);</span>
+<span class="nc" id="L115">                    final RealmCallback realmCallback = new RealmCallback(&quot;User realm&quot;);</span>
+
+                    try {
+<span class="nc" id="L118">                        tryHandleCallbacks(nameCallback, realmCallback);</span>
+<span class="nc" id="L119">                        authenticationId = nameCallback.getName();</span>
+<span class="nc" id="L120">                        authenticationRealm = realmCallback.getText();</span>
+<span class="nc" id="L121">                    } catch (UnsupportedCallbackException e) {</span>
+<span class="nc" id="L122">                        saslLocal.trace(&quot;CallbackHandler does not support name or realm callback&quot;, e);</span>
+<span class="nc" id="L123">                    }</span>
+                }
+<span class="nc bnc" id="L125" title="All 2 branches missed.">                if (authenticationId == null) authenticationId = &quot;&quot;;</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">                if (authenticationRealm == null) authenticationRealm = &quot;&quot;;</span>
+<span class="nc" id="L127">                ByteStringBuilder b = new ByteStringBuilder();</span>
+<span class="nc" id="L128">                b.append(challenge, 0, 8);</span>
+<span class="nc" id="L129">                b.append(authenticationId).append((byte) 0).append(authenticationRealm);</span>
+<span class="nc" id="L130">                final byte[] response = b.toArray();</span>
+<span class="nc" id="L131">                negotiationComplete();</span>
+<span class="nc" id="L132">                return response;</span>
+        }
+<span class="nc" id="L134">        throw Assert.impossibleSwitchCase(state);</span>
+    }
+
+    private static void safeClose(Closeable c) {
+<span class="nc bnc" id="L138" title="All 2 branches missed.">        if (c != null) try {</span>
+<span class="nc" id="L139">            c.close();</span>
+<span class="nc" id="L140">        } catch (Throwable ignored) {}</span>
+<span class="nc" id="L141">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

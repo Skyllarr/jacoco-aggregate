@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronServerAuthContext.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-jaspi</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.jaspi.impl</a> &gt; <span class="el_source">ElytronServerAuthContext.java</span></div><h1>ElytronServerAuthContext.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2018 Red Hat, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.jaspi.impl;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+import static org.wildfly.security.auth.jaspi._private.ElytronMessages.log;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.security.auth.Subject;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.message.AuthException;
+import javax.security.auth.message.AuthStatus;
+import javax.security.auth.message.MessageInfo;
+import javax.security.auth.message.config.ServerAuthContext;
+import javax.security.auth.message.module.ServerAuthModule;
+
+import org.wildfly.security.auth.jaspi.Flag;
+import org.wildfly.security.auth.jaspi.impl.ElytronMessageInfo.State;
+/**
+ * The WildFly Elytron implementation of {@link ServerAuthContext}.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">class ElytronServerAuthContext implements ServerAuthContext {</span>
+
+    // Don't bother with an intermediate ServerAuth - even though the API is reused
+    // the implementations are different.
+
+    private final List&lt;AuthModuleWrapper&gt; authModules;
+
+<span class="fc" id="L49">    private boolean initialised = false;</span>
+    private Subject serviceSubject;
+
+    /*
+     * TODO - Message Policies need to be defined / calculated.
+     */
+
+<span class="fc" id="L56">    ElytronServerAuthContext(final List&lt;AuthenticationModuleDefinition&gt; serverAuthModuleDefinitions) {</span>
+<span class="fc" id="L57">        List&lt;AuthModuleWrapper&gt; authModules = new ArrayList&lt;&gt;(serverAuthModuleDefinitions.size());</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        for (AuthenticationModuleDefinition authenticationModuleDefinition : serverAuthModuleDefinitions) {</span>
+<span class="fc" id="L59">            authModules.add(new AuthModuleWrapper(authenticationModuleDefinition.getFlag(),</span>
+<span class="fc" id="L60">                    authenticationModuleDefinition.getOptions(), authenticationModuleDefinition.getServerAuthModuleFactory().get()));</span>
+<span class="fc" id="L61">        }</span>
+<span class="fc" id="L62">        this.authModules = authModules;</span>
+<span class="fc" id="L63">    }</span>
+
+    /**
+     * @see javax.security.auth.message.ServerAuth#validateRequest(javax.security.auth.message.MessageInfo,
+     *      javax.security.auth.Subject, javax.security.auth.Subject)
+     */
+    @Override
+    public AuthStatus validateRequest(MessageInfo messageInfo, Subject clientSubject, Subject serviceSubject) throws AuthException {
+<span class="pc bpc" id="L71" title="2 of 4 branches missed.">        assert initialised : &quot;Not initialised&quot;;</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (messageInfo instanceof ElytronMessageInfo)</span>
+<span class="fc" id="L73">            ((ElytronMessageInfo) messageInfo).setState(State.VALIDATE);</span>
+
+<span class="fc" id="L75">        AuthStatus requiredResult = null;</span>
+<span class="fc" id="L76">        AuthStatus optionalResult = null;</span>
+
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        for (AuthModuleWrapper wrapper : authModules) {</span>
+<span class="fc" id="L79">            final ServerAuthModule sam = wrapper.getModule();</span>
+
+<span class="fc" id="L81">            final Object originalRequest = messageInfo.getRequestMessage();</span>
+<span class="fc" id="L82">            final Object originalResponse = messageInfo.getResponseMessage();</span>
+
+<span class="fc" id="L84">            final AuthStatus currentResult = sam.validateRequest(messageInfo, clientSubject, serviceSubject);</span>
+
+<span class="pc bpc" id="L86" title="2 of 4 branches missed.">            if (currentResult == null || currentResult == AuthStatus.FAILURE) {</span>
+<span class="nc" id="L87">                throw log.invalidAuthStatus(currentResult, sam.getClass().getName());</span>
+<span class="pc bpc" id="L88" title="1 of 4 branches missed.">            } else if (currentResult != AuthStatus.SUCCESS &amp;&amp; (originalRequest != messageInfo.getRequestMessage()</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">                    || originalResponse != messageInfo.getResponseMessage())) {</span>
+                // If a SAM wraps the request or response message it MUST return SUCCESS Spec 3.8.3.5
+<span class="nc" id="L91">                throw log.messageWrappedWithoutSuccess(sam.getClass().getName());</span>
+            }
+
+<span class="pc bpc" id="L94" title="1 of 5 branches missed.">            switch (wrapper.getFlag()) {</span>
+                case REQUIRED:
+<span class="pc bpc" id="L96" title="1 of 4 branches missed.">                    if (requiredResult == null || (toIndex(currentResult) &gt; toIndex(requiredResult))) {</span>
+<span class="fc" id="L97">                        requiredResult = currentResult;</span>
+                    }
+                    break;
+                case REQUISITE:
+<span class="fc bfc" id="L101" title="All 2 branches covered.">                    if (currentResult != AuthStatus.SUCCESS) {</span>
+<span class="fc" id="L102">                        return currentResult;</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">                    } else if (requiredResult == null) {</span>
+<span class="fc" id="L104">                        requiredResult = currentResult; // SUCCESS</span>
+                    }
+                    break;
+                case SUFFICIENT:
+                    // It is correct this flag takes into account requiredResult but manipulates optionalResult.
+<span class="fc bfc" id="L109" title="All 2 branches covered.">                    if (currentResult == AuthStatus.SUCCESS) {</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">                        return requiredResult == null ? currentResult : requiredResult;</span>
+<span class="pc bpc" id="L111" title="3 of 4 branches missed.">                    } else if (optionalResult == null || (toIndex(currentResult) &lt; toIndex(optionalResult))) {</span>
+<span class="fc" id="L112">                        optionalResult = currentResult;</span>
+                    }
+                    break;
+                case OPTIONAL:
+<span class="pc bpc" id="L116" title="1 of 4 branches missed.">                    if (optionalResult == null || (toIndex(currentResult) &lt; toIndex(optionalResult))) {</span>
+<span class="fc" id="L117">                        optionalResult = currentResult;</span>
+                    }
+                    break;
+            }
+<span class="fc" id="L121">        }</span>
+
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        final AuthStatus finalResult = requiredResult != null ? requiredResult : optionalResult;</span>
+<span class="pc bpc" id="L124" title="2 of 4 branches missed.">        assert finalResult != null : &quot;Resulting AuthStatus can not be null.&quot;;</span>
+
+<span class="fc" id="L126">        return finalResult;</span>
+    }
+
+    private static int toIndex(final AuthStatus authStatus) {
+<span class="fc" id="L130">        checkNotNullParam(&quot;authStatus&quot;, authStatus);</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (AuthStatus.SUCCESS == authStatus) {</span>
+<span class="fc" id="L132">            return 1;</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        } else if (AuthStatus.SEND_SUCCESS == authStatus) {</span>
+<span class="fc" id="L134">            return 2;</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        } else if (AuthStatus.SEND_CONTINUE == authStatus) {</span>
+<span class="fc" id="L136">            return 3;</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        } else if (AuthStatus.FAILURE == authStatus) {</span>
+<span class="nc" id="L138">            return 4;</span>
+        } else {
+<span class="fc" id="L140">            return 5;</span>
+        }
+    }
+
+    /**
+     * @see javax.security.auth.message.ServerAuth#secureResponse(javax.security.auth.message.MessageInfo, javax.security.auth.Subject)
+     */
+    @Override
+    public AuthStatus secureResponse(MessageInfo messageInfo, Subject serviceSubject) throws AuthException {
+<span class="pc bpc" id="L149" title="2 of 4 branches missed.">        assert initialised : &quot;Not initialised&quot;;</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (messageInfo instanceof ElytronMessageInfo) ((ElytronMessageInfo) messageInfo).setState(State.SECURE);</span>
+
+<span class="fc" id="L152">        AuthStatus result = null;</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        for (int i = authModules.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L154">            ServerAuthModule sam = authModules.get(i).getModule();</span>
+<span class="fc" id="L155">            AuthStatus currentResult = sam.secureResponse(messageInfo, serviceSubject);</span>
+<span class="pc bpc" id="L156" title="3 of 6 branches missed.">            if (currentResult == null || currentResult == AuthStatus.SUCCESS || currentResult == AuthStatus.FAILURE) {</span>
+<span class="nc" id="L157">                throw log.invalidAuthStatus(currentResult, sam.getClass().getName());</span>
+            }
+
+<span class="fc bfc" id="L160" title="All 4 branches covered.">            if (result == null || toIndex(currentResult) &gt; toIndex(result)) {</span>
+<span class="fc" id="L161">                result = currentResult;</span>
+            }
+
+<span class="fc bfc" id="L164" title="All 2 branches covered.">            if (currentResult == AuthStatus.SEND_FAILURE) {</span>
+<span class="fc" id="L165">                break;</span>
+            }
+        }
+
+<span class="fc" id="L169">        return result;</span>
+    }
+
+    /**
+     * @see javax.security.auth.message.ServerAuth#cleanSubject(javax.security.auth.message.MessageInfo, javax.security.auth.Subject)
+     */
+    @Override
+    public void cleanSubject(MessageInfo messageInfo, Subject subject) throws AuthException {
+<span class="nc bnc" id="L177" title="All 4 branches missed.">        assert initialised : &quot;Not initialised&quot;;</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        if (messageInfo instanceof ElytronMessageInfo) ((ElytronMessageInfo) messageInfo).setState(State.CLEAN);</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">        for (int i = authModules.size() - 1; i &gt; 0; i--) {</span>
+<span class="nc" id="L180">            ServerAuthModule sam = authModules.get(i).getModule();</span>
+<span class="nc" id="L181">            sam.cleanSubject(messageInfo, subject);</span>
+        }
+<span class="nc" id="L183">    }</span>
+
+    /*
+     * Internal Methods
+     */
+
+    void initialise(final Subject serviceSubject, final CallbackHandler callbackHandler, final Map properties) throws AuthException {
+<span class="pc bpc" id="L190" title="2 of 4 branches missed.">        assert initialised == false : &quot;Already initialised&quot;;</span>
+<span class="fc" id="L191">        this.serviceSubject = serviceSubject;</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        for (AuthModuleWrapper wrapper : authModules) {</span>
+<span class="fc" id="L193">            ServerAuthModule sam = wrapper.getModule();</span>
+<span class="fc" id="L194">            Map combined = new HashMap(properties);</span>
+<span class="fc" id="L195">            combined.putAll(wrapper.getOptions());</span>
+
+            // TODO Pass in appropriate MessagePolicy instances.
+            // TODO MessagePolicy is actually defined in 3.7.4
+
+<span class="fc" id="L200">            sam.initialize(null, null, callbackHandler, combined);</span>
+<span class="fc" id="L201">        }</span>
+
+<span class="fc" id="L203">        initialised = true;</span>
+<span class="fc" id="L204">    }</span>
+
+    /**
+     * Test that the request and response messages in the supplied {@link MessageInfo} are compatible
+     *
+     * @param messageInfo the {@link MessageInfo} to test is compatible with the {@link ServerAuthModule} instances.
+     * @throws IllegalArgumentException
+     */
+    void testMessageInfo(MessageInfo messageInfo) throws IllegalArgumentException {
+<span class="fc" id="L213">        Object requestMessage = messageInfo.getRequestMessage();</span>
+<span class="fc" id="L214">        Object responseMessage = messageInfo.getResponseMessage();</span>
+
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        for (AuthModuleWrapper wrapper : authModules) {</span>
+<span class="fc" id="L217">            ServerAuthModule sam = wrapper.getModule();</span>
+<span class="fc" id="L218">            boolean requestAccepted = false;</span>
+<span class="fc" id="L219">            boolean responseAccepted = false;</span>
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">            for (Class acceptedType : sam.getSupportedMessageTypes()) {</span>
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">                if (acceptedType.isInstance(requestMessage)) requestAccepted = true;</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">                if (acceptedType.isInstance(responseMessage)) responseAccepted = true;</span>
+
+<span class="pc bpc" id="L224" title="2 of 4 branches missed.">                if (responseAccepted &amp;&amp; requestAccepted) {</span>
+<span class="fc" id="L225">                    break;</span>
+                }
+            }
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">            if (requestAccepted == false) throw log.unsupportedMessageType(requestMessage.getClass().getName(), sam.getClass().getName());</span>
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">            if (responseAccepted == false) throw log.unsupportedMessageType(responseMessage.getClass().getName(), sam.getClass().getName());</span>
+<span class="fc" id="L230">        }</span>
+<span class="fc" id="L231">    }</span>
+
+    class AuthModuleWrapper {
+        private final Flag flag;
+        private final Map options;
+        private final ServerAuthModule module;
+
+<span class="fc" id="L238">        AuthModuleWrapper(Flag flag, Map options, ServerAuthModule module) {</span>
+<span class="fc" id="L239">            super();</span>
+<span class="fc" id="L240">            this.flag = flag;</span>
+<span class="fc" id="L241">            this.options = options;</span>
+<span class="fc" id="L242">            this.module = module;</span>
+<span class="fc" id="L243">        }</span>
+
+        Flag getFlag() {
+<span class="fc" id="L246">            return flag;</span>
+        }
+
+        Map getOptions() {
+<span class="fc" id="L250">            return options;</span>
+        }
+
+        ServerAuthModule getModule() {
+<span class="fc" id="L254">            return module;</span>
+        }
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FastUnsupportedCallbackException.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.callback</a> &gt; <span class="el_source">FastUnsupportedCallbackException.java</span></div><h1>FastUnsupportedCallbackException.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.callback;
+
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.UnsupportedCallbackException;
+
+/**
+ * A version of {@code UnsupportedCallbackException} which does not initialize a full stack trace, and thus is much
+ * more efficient to construct.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public class FastUnsupportedCallbackException extends UnsupportedCallbackException {
+
+    private static final long serialVersionUID = -990072831042809709L;
+
+<span class="nc" id="L34">    private static final StackTraceElement[] NO_STACK = new StackTraceElement[0];</span>
+
+    /**
+     * Constructs a new {@code FastUnsupportedCallbackException} instance.  The message is left blank ({@code null}),
+     * and no cause is specified.
+     *
+     * @param callback the callback which is not supported (should not be {@code null})
+     */
+    public FastUnsupportedCallbackException(final Callback callback) {
+<span class="nc" id="L43">        super(callback);</span>
+<span class="nc" id="L44">    }</span>
+
+    /**
+     * Constructs a new {@code FastUnsupportedCallbackException} instance with an initial message.  No cause is
+     * specified.
+     *
+     * @param callback the callback which is not supported (should not be {@code null})
+     * @param msg the message
+     */
+    public FastUnsupportedCallbackException(final Callback callback, final String msg) {
+<span class="nc" id="L54">        super(callback, msg);</span>
+<span class="nc" id="L55">    }</span>
+
+    /**
+     * Does nothing but return this instance.
+     *
+     * @param cause ignored
+     * @return this instance
+     */
+    public Throwable initCause(final Throwable cause) {
+<span class="nc" id="L64">        return this;</span>
+    }
+
+    /**
+     * Returns an empty stack.
+     *
+     * @return an empty stack
+     */
+    public StackTraceElement[] getStackTrace() {
+<span class="nc" id="L73">        return NO_STACK;</span>
+    }
+
+    /**
+     * Does nothing but return this instance.
+     *
+     * @return this instance
+     */
+    public Throwable fillInStackTrace() {
+<span class="nc" id="L82">        return this;</span>
+    }
+
+    /**
+     * Does nothing.
+     *
+     * @param stackTrace ignored
+     */
+    public void setStackTrace(final StackTraceElement[] stackTrace) {
+<span class="nc" id="L91">    }</span>
+
+    /**
+     * Get the message for this exception, formatted with the callback.
+     *
+     * @return the message for this exception, with the callback (not {@code null})
+     */
+    public String getMessage() {
+<span class="nc" id="L99">        final String message = super.getMessage();</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        return message != null ? String.format(&quot;%s: %s&quot;, getCallback(), message) : String.valueOf(getCallback());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,710 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Attributes.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.authz</a> &gt; <span class="el_source">Attributes.java</span></div><h1>Attributes.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.authz;
+
+import java.util.AbstractCollection;
+import java.util.AbstractSet;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Set;
+import java.util.Spliterator;
+import java.util.Spliterators;
+
+import org.wildfly.common.Assert;
+
+/**
+ * &lt;p&gt;A collection of string attributes.
+ *
+ * &lt;p&gt;By default, this interface provides a default implementation for all methods that perform writes to the collection. The default
+ * implementation will always throw a {@link UnsupportedOperationException}, which means the collection is &lt;em&gt;read-only&lt;/em&gt; by default.
+ *
+ * &lt;p&gt;If an implementation needs to also support writes it must override and implement all these default methods.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public interface Attributes {
+
+    /**
+     * Empty, read-only attribute collection.
+     */
+<span class="fc" id="L52">    Attributes EMPTY = new Attributes() {</span>
+        @Override
+        public Collection&lt;Entry&gt; entries() {
+<span class="fc" id="L55">            return Collections.emptySet();</span>
+        }
+
+        @Override
+        public int size(final String key) {
+<span class="fc" id="L60">            return 0;</span>
+        }
+
+        @Override
+        public boolean remove(final String key) {
+<span class="nc" id="L65">            return false;</span>
+        }
+
+        @Override
+        public String get(final String key, final int idx) {
+<span class="nc" id="L70">            return null;</span>
+        }
+
+        @Override
+        public Entry get(final String key) {
+<span class="fc" id="L75">            return new SimpleAttributesEntry(this, key);</span>
+        }
+
+        @Override
+        public int size() {
+<span class="fc" id="L80">            return 0;</span>
+        }
+    };
+
+    /**
+     * Get the entry collection.  Changes to the entry collection will modify this attribute collection, if it is
+     * writable.  The returned entries will remain up to date with the state of this collection.
+     *
+     * @return the entry collection
+     */
+    Collection&lt;Entry&gt; entries();
+
+    /**
+     * Get the number of values mapped to the given key.
+     *
+     * @param key the key
+     * @return the number of mapped values
+     */
+    int size(String key);
+
+    /**
+     * Get the collection of values for the given key.  The result may implement {@link SetEntry} if the values
+     * are distinct (for example, a role or group set).
+     *
+     * @param key the attribute name
+     * @return the (possibly empty) attribute value collection
+     */
+    Entry get(String key);
+
+    /**
+     * Get the mapping for the given key at the given position.
+     *
+     * @param key the key
+     * @param idx the index
+     * @return the mapping value
+     * @throws IndexOutOfBoundsException if {@code idx} is less than 0 or greater than or equal to {@code size(key)}
+     */
+    String get(String key, int idx);
+
+    /**
+     * Get the number of keys in this attribute collection.
+     *
+     * @return the number of keys
+     */
+    int size();
+
+    /**
+     * Remove all values for the given key from this collection.
+     *
+     * @param key the key
+     * @return {@code true} if the key was found, {@code false} otherwise
+     * @throws UnsupportedOperationException if this method is not implemented and the operation is not supported
+     */
+    default boolean remove(String key) {
+<span class="nc" id="L134">        throw Assert.unsupported();</span>
+    }
+
+    /**
+     * Add a mapping for the given key at the given position.
+     *
+     * @param key the key
+     * @param idx the index
+     * @param value the mapping value
+     * @throws IndexOutOfBoundsException if {@code idx} is less than 0 or greater than or equal to {@code size(key)}
+     * @throws UnsupportedOperationException if this method is not implemented and the operation is not supported
+     */
+    default void add(String key, int idx, String value) {
+<span class="nc" id="L147">        throw Assert.unsupported();</span>
+    }
+
+    /**
+     * Modify the mapping for the given key at the given position.
+     *
+     * @param key the key
+     * @param idx the index
+     * @param value the mapping value
+     * @return the previous mapping value
+     * @throws IndexOutOfBoundsException if {@code idx} is less than 0 or greater than or equal to {@code size(key)}
+     * @throws UnsupportedOperationException if this method is not implemented and the operation is not supported
+     */
+    default String set(String key, int idx, String value) {
+<span class="nc" id="L161">        throw Assert.unsupported();</span>
+    }
+
+    /**
+     * Remove and return the mapping for the given key at the given position.  All later entries for that key are shifted
+     * up to fill in the gap left by the removed element.
+     *
+     * @param key the key
+     * @param idx the index
+     * @return the previous mapping value
+     * @throws IndexOutOfBoundsException if {@code idx} is less than 0 or greater than or equal to {@code size(key)}
+     * @throws UnsupportedOperationException if this method is not implemented and the operation is not supported
+     */
+    default String remove(String key, int idx) {
+<span class="nc" id="L175">        throw Assert.unsupported();</span>
+    }
+
+    /**
+     * Clear this collection, resetting its size to zero.
+     *
+     * @throws UnsupportedOperationException if this method is not implemented and the operation is not supported
+     */
+    default void clear() {
+<span class="nc" id="L184">        throw Assert.unsupported();</span>
+    }
+
+    /**
+     * Remove all values for the given key from this collection, copying the values into a list which is returned.
+     *
+     * @param key the key
+     * @return the values as a list (not {@code null})
+     */
+    default List&lt;String&gt; copyAndRemove(String key) {
+<span class="nc" id="L194">        final Entry values = get(key);</span>
+<span class="nc bnc" id="L195" title="All 2 branches missed.">        List&lt;String&gt; copy = values.isEmpty() ? Collections.emptyList() : new ArrayList&lt;&gt;(values);</span>
+<span class="nc" id="L196">        remove(key);</span>
+<span class="nc" id="L197">        return copy;</span>
+    }
+
+    /**
+     * Get all the values of all the keys in this collection.  The returned collection can be used to modify this
+     * attributes collection.
+     *
+     * @return the collection of all values (not {@code null})
+     */
+    default Collection&lt;String&gt; values() {
+<span class="nc" id="L207">        return new AbstractCollection&lt;String&gt;() {</span>
+            public Iterator&lt;String&gt; iterator() {
+<span class="nc" id="L209">                final Iterator&lt;Entry&gt; entries = entries().iterator();</span>
+<span class="nc" id="L210">                return new Iterator&lt;String&gt;() {</span>
+                    private Iterator&lt;String&gt; values;
+
+                    public boolean hasNext() {
+                        for (;;) {
+<span class="nc bnc" id="L215" title="All 2 branches missed.">                            if (values == null) {</span>
+<span class="nc bnc" id="L216" title="All 2 branches missed.">                                if (! entries.hasNext()) {</span>
+<span class="nc" id="L217">                                    return false;</span>
+                                }
+<span class="nc" id="L219">                                values = entries.next().iterator();</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">                            } else if (values.hasNext()) {</span>
+<span class="nc" id="L221">                                return true;</span>
+                            } else {
+<span class="nc" id="L223">                                values = null;</span>
+                            }
+                        }
+                    }
+
+                    public String next() {
+<span class="nc bnc" id="L229" title="All 2 branches missed.">                        if (! hasNext()) throw new NoSuchElementException();</span>
+<span class="nc" id="L230">                        return values.next();</span>
+                    }
+
+                    public void remove() {
+<span class="nc" id="L234">                        final Iterator&lt;String&gt; values = this.values;</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">                        if (values == null) {</span>
+<span class="nc" id="L236">                            throw new IllegalStateException();</span>
+                        }
+<span class="nc" id="L238">                        values.remove();</span>
+<span class="nc" id="L239">                    }</span>
+                };
+            }
+
+            public void clear() {
+<span class="nc" id="L244">                Attributes.this.clear();</span>
+<span class="nc" id="L245">            }</span>
+
+            public boolean removeAll(final Collection&lt;?&gt; c) {
+<span class="nc" id="L248">                boolean changed = false;</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">                for (Entry entries : entries()) {</span>
+<span class="nc bnc" id="L250" title="All 4 branches missed.">                    changed = entries.removeAll(c) || changed;</span>
+<span class="nc" id="L251">                }</span>
+<span class="nc" id="L252">                return changed;</span>
+            }
+
+            public boolean retainAll(final Collection&lt;?&gt; c) {
+<span class="nc" id="L256">                boolean changed = false;</span>
+<span class="nc bnc" id="L257" title="All 2 branches missed.">                for (Entry entries : entries()) {</span>
+<span class="nc bnc" id="L258" title="All 4 branches missed.">                    changed = entries.retainAll(c) || changed;</span>
+<span class="nc" id="L259">                }</span>
+<span class="nc" id="L260">                return changed;</span>
+            }
+
+            public boolean isEmpty() {
+<span class="nc bnc" id="L264" title="All 2 branches missed.">                for (Entry entries : entries()) {</span>
+<span class="nc bnc" id="L265" title="All 2 branches missed.">                    if (! entries.isEmpty()) {</span>
+<span class="nc" id="L266">                        return false;</span>
+                    }
+<span class="nc" id="L268">                }</span>
+<span class="nc" id="L269">                return true;</span>
+            }
+
+            public int size() {
+<span class="nc" id="L273">                int size = 0;</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">                for (Entry entries : entries()) {</span>
+<span class="nc" id="L275">                    size += entries.size();</span>
+<span class="nc" id="L276">                }</span>
+<span class="nc" id="L277">                return size;</span>
+            }
+        };
+    }
+
+    /**
+     * Get a set comprised of all the keys in this collection.  The returned set can be used to modify this attributes
+     * collection.
+     *
+     * @return the set of all keys (not {@code null})
+     */
+    default Set&lt;String&gt; keySet() {
+<span class="nc" id="L289">        return new AbstractSet&lt;String&gt;() {</span>
+            public Iterator&lt;String&gt; iterator() {
+<span class="nc" id="L291">                final Iterator&lt;Entry&gt; entries = entries().iterator();</span>
+<span class="nc" id="L292">                return new Iterator&lt;String&gt;() {</span>
+                    public boolean hasNext() {
+<span class="nc" id="L294">                        return entries.hasNext();</span>
+                    }
+
+                    public String next() {
+<span class="nc" id="L298">                        return entries.next().getKey();</span>
+                    }
+
+                    public void remove() {
+<span class="nc" id="L302">                        entries.remove();</span>
+<span class="nc" id="L303">                    }</span>
+                };
+            }
+
+            public boolean contains(final Object o) {
+<span class="nc bnc" id="L308" title="All 4 branches missed.">                return o instanceof String &amp;&amp; Attributes.this.containsKey((String) o);</span>
+            }
+
+            public boolean remove(final Object o) {
+<span class="nc bnc" id="L312" title="All 4 branches missed.">                return o instanceof String &amp;&amp; Attributes.this.remove((String) o);</span>
+            }
+
+            public void clear() {
+<span class="nc" id="L316">                Attributes.this.clear();</span>
+<span class="nc" id="L317">            }</span>
+
+            public int size() {
+<span class="nc" id="L320">                return Attributes.this.size();</span>
+            }
+        };
+    }
+
+    /**
+     * Conditionally set a specific value of a given key to a new value, if the existing value matches the {@code expect}
+     * parameter.
+     *
+     * @param key the key
+     * @param idx the index
+     * @param expect the expected value
+     * @param update the value to set
+     * @return {@code true} if the actual value matched the expected value and was updated, {@code false} otherwise
+     * @throws IndexOutOfBoundsException if {@code idx} is less than 0 or greater than or equal to {@code size(key)}
+     */
+    default boolean set(String key, int idx, String expect, String update) {
+<span class="nc" id="L337">        Assert.checkNotNullParam(&quot;update&quot;, update);</span>
+<span class="nc bnc" id="L338" title="All 8 branches missed.">        if (expect == null || idx &lt; 0 || idx &gt;= size(key) || ! get(key, idx).equals(expect)) {</span>
+<span class="nc" id="L339">            return false;</span>
+        }
+<span class="nc" id="L341">        set(key, idx, update);</span>
+<span class="nc" id="L342">        return true;</span>
+    }
+
+    /**
+     * Get the index of the first occurrence of the given value at the given key, if any.
+     *
+     * @param key the key
+     * @param value the value
+     * @return the index, or -1 if the value was not found at the given key
+     */
+    default int indexOf(String key, String value) {
+<span class="nc" id="L353">        final int size = size(key);</span>
+<span class="nc bnc" id="L354" title="All 2 branches missed.">        for (int i = 0; i &lt; size; i ++) {</span>
+<span class="nc bnc" id="L355" title="All 2 branches missed.">            if (get(key, i).equals(value)) {</span>
+<span class="nc" id="L356">                return i;</span>
+            }
+        }
+<span class="nc" id="L359">        return -1;</span>
+    }
+
+    /**
+     * Get the index of the last occurrence of the given value at the given key, if any.
+     *
+     * @param key the key
+     * @param value the value
+     * @return the index, or -1 if the value was not found at the given key
+     */
+    default int lastIndexOf(String key, String value) {
+<span class="nc" id="L370">        final int size = size(key);</span>
+<span class="nc bnc" id="L371" title="All 2 branches missed.">        for (int i = size - 1; i &gt;= 0; i --) {</span>
+<span class="nc bnc" id="L372" title="All 2 branches missed.">            if (get(key, i).equals(value)) {</span>
+<span class="nc" id="L373">                return i;</span>
+            }
+        }
+<span class="nc" id="L376">        return -1;</span>
+    }
+
+    /**
+     * Remove all the values for the given key between the {@code from} index (inclusive) and the {@code to} index
+     * (exclusive).
+     *
+     * @param key the key
+     * @param from the start index (inclusive)
+     * @param to the end index (exclusive)
+     * @throws IndexOutOfBoundsException if {@code idx} is less than 0 or greater than or equal to {@code size(key)}
+     */
+    default void removeRange(String key, int from, int to) {
+<span class="nc bnc" id="L389" title="All 2 branches missed.">        for (int i = to - 1; i &gt;= from; i --) {</span>
+<span class="nc" id="L390">            remove(key, i);</span>
+        }
+<span class="nc" id="L392">    }</span>
+
+    /**
+     * Get the first value mapped to the given key.
+     *
+     * @param key the key
+     * @return the value
+     * @throws IndexOutOfBoundsException if there are no values for the given key
+     */
+    default String getFirst(String key) {
+<span class="fc" id="L402">        return get(key, 0);</span>
+    }
+
+    /**
+     * Get the last value mapped to the given key.
+     *
+     * @param key the key
+     * @return the value
+     * @throws IndexOutOfBoundsException if there are no values for the given key
+     */
+    default String getLast(String key) {
+<span class="nc" id="L413">        return get(key, size(key) - 1);</span>
+    }
+
+    /**
+     * Add a value before the first mapping for the given key.
+     *
+     * @param key the key
+     * @param value the value
+     */
+    default void addFirst(String key, String value) {
+<span class="nc" id="L423">        add(key, 0, value);</span>
+<span class="nc" id="L424">    }</span>
+
+    /**
+     * Add a value after the last mapping for the given key.
+     *
+     * @param key the key
+     * @param value the value
+     */
+    default void addLast(String key, String value) {
+<span class="nc" id="L433">        add(key, size(key), value);</span>
+<span class="nc" id="L434">    }</span>
+
+    /**
+     * Remove the first value mapped to the given key.
+     *
+     * @param key the key
+     * @return the value
+     * @throws IndexOutOfBoundsException if there are no values for the given key
+     */
+    default String removeFirst(String key) {
+<span class="nc" id="L444">        return remove(key, 0);</span>
+    }
+
+    /**
+     * Remove the last value mapped to the given key.
+     *
+     * @param key the key
+     * @return the value
+     * @throws IndexOutOfBoundsException if there are no values for the given key
+     */
+    default String removeLast(String key) {
+<span class="nc" id="L455">        return remove(key, size(key) - 1);</span>
+    }
+
+    /**
+     * Remove the mapping for the given key at the given position if it matches the given existing value.  All later
+     * entries for that key are shifted up to fill in the gap left by the removed element.
+     *
+     * @param key the key
+     * @param idx the index
+     * @param value the expected previous mapping value
+     * @return {@code true} if the value matched and was removed, {@code false} otherwise
+     * @throws IndexOutOfBoundsException if {@code idx} is less than 0 or greater than or equal to {@code size(key)}
+     */
+    default boolean remove(String key, int idx, String value) {
+<span class="nc bnc" id="L469" title="All 2 branches missed.">        if (get(key, idx).equals(value)) {</span>
+<span class="nc" id="L470">            remove(key, idx);</span>
+<span class="nc" id="L471">            return true;</span>
+        } else {
+<span class="nc" id="L473">            return false;</span>
+        }
+    }
+
+    /**
+     * Remove the first occurrence of the given value under the given key, if any.
+     *
+     * @param key the key
+     * @param value the value to remove
+     * @return {@code true} if the value was found and removed, {@code false} otherwise
+     */
+    default boolean removeFirst(String key, String value) {
+<span class="nc" id="L485">        final int idx = indexOf(key, value);</span>
+<span class="nc bnc" id="L486" title="All 4 branches missed.">        return idx &gt;= 0 &amp;&amp; remove(key, idx, value);</span>
+    }
+
+    /**
+     * Remove the last occurrence of the given value under the given key, if any.
+     *
+     * @param key the key
+     * @param value the value to remove
+     * @return {@code true} if the value was found and removed, {@code false} otherwise
+     */
+    default boolean removeLast(String key, String value) {
+<span class="nc" id="L497">        final int idx = lastIndexOf(key, value);</span>
+<span class="nc bnc" id="L498" title="All 4 branches missed.">        return idx &gt;= 0 &amp;&amp; remove(key, idx, value);</span>
+    }
+
+    /**
+     * Remove the all occurrences of the given value under the given key, if any.
+     *
+     * @param key the key
+     * @param value the value to remove
+     * @return {@code true} if the value was found and removed, {@code false} otherwise
+     */
+    default boolean removeAll(String key, String value) {
+<span class="nc" id="L509">        int idx = lastIndexOf(key, value);</span>
+<span class="nc bnc" id="L510" title="All 2 branches missed.">        if (idx == -1) return false;</span>
+<span class="nc bnc" id="L511" title="All 2 branches missed.">        while (idx &gt;= 0) {</span>
+<span class="nc" id="L512">            remove(key, idx, value);</span>
+<span class="nc" id="L513">            idx = lastIndexOf(key, value);</span>
+        }
+<span class="nc" id="L515">        return true;</span>
+    }
+
+    /**
+     * Add all the values from the given map to this attributes collection.
+     *
+     * @param map the map to copy from
+     * @return {@code true} if elements were added, {@code false} otherwise
+     */
+    default boolean addAll(Map&lt;String, ? extends Collection&lt;String&gt;&gt; map) {
+<span class="nc" id="L525">        Assert.checkNotNullParam(&quot;map&quot;, map);</span>
+<span class="nc" id="L526">        boolean changed = false;</span>
+<span class="nc bnc" id="L527" title="All 2 branches missed.">        for (Map.Entry&lt;String, ? extends Collection&lt;String&gt;&gt; entry : map.entrySet()) {</span>
+<span class="nc" id="L528">            final Collection&lt;String&gt; value = entry.getValue();</span>
+<span class="nc bnc" id="L529" title="All 4 branches missed.">            if (value != null &amp;&amp; ! value.isEmpty()) {</span>
+<span class="nc" id="L530">                final String key = entry.getKey();</span>
+<span class="nc bnc" id="L531" title="All 4 branches missed.">                changed = addAll(key, value) || changed;</span>
+            }
+<span class="nc" id="L533">        }</span>
+<span class="nc" id="L534">        return changed;</span>
+    }
+
+    /**
+     * Add all the values from the given collection to the value collection for the given key.
+     *
+     * @param key the key
+     * @param values the values to add
+     * @return {@code true} if elements were added, {@code false} otherwise
+     */
+    default boolean addAll(String key, Collection&lt;String&gt; values) {
+<span class="fc" id="L545">        Assert.checkNotNullParam(&quot;key&quot;, key);</span>
+<span class="fc" id="L546">        Assert.checkNotNullParam(&quot;values&quot;, values);</span>
+<span class="fc" id="L547">        boolean changed = false;</span>
+<span class="fc bfc" id="L548" title="All 2 branches covered.">        for (String s : values) {</span>
+<span class="pc bpc" id="L549" title="1 of 2 branches missed.">            if (s != null) {</span>
+<span class="fc" id="L550">                addLast(key, s);</span>
+<span class="fc" id="L551">                changed = true;</span>
+            }
+<span class="fc" id="L553">        }</span>
+<span class="fc" id="L554">        return changed;</span>
+    }
+
+    /**
+     * Determine if the given key has values in this collection.
+     *
+     * @param key the key
+     * @return {@code true} if the key has values, {@code false} otherwise
+     */
+    default boolean containsKey(String key) {
+<span class="pc bpc" id="L564" title="1 of 4 branches missed.">        return key != null &amp;&amp; size(key) &gt; 0;</span>
+    }
+
+    /**
+     * Determine if the given key has a mapping for the given value in this collection.
+     *
+     * @param key the key
+     * @param value the value
+     * @return {@code true} if the key has a mapping to the given value, {@code false} otherwise
+     */
+    default boolean containsValue(String key, String value) {
+<span class="nc bnc" id="L575" title="All 6 branches missed.">        return key != null &amp;&amp; value != null &amp;&amp; indexOf(key, value) &gt;= 0;</span>
+    }
+
+    /**
+     * Replace the mapping for the given key with the values copied from the given collection.
+     *
+     * @param key the key
+     * @param values the new values
+     * @return a list containing the previously mapped values
+     */
+    default List&lt;String&gt; copyAndReplace(String key, Collection&lt;String&gt; values) {
+<span class="nc" id="L586">        final List&lt;String&gt; old = copyAndRemove(key);</span>
+<span class="nc" id="L587">        addAll(key, values);</span>
+<span class="nc" id="L588">        return old;</span>
+    }
+
+    /**
+     * Determine if this collection is empty.
+     *
+     * @return {@code true} if the collection is empty, {@code false} otherwise
+     */
+    default boolean isEmpty() {
+<span class="nc bnc" id="L597" title="All 2 branches missed.">        return size() == 0;</span>
+    }
+
+    /**
+     * Returns a read-only instance of this instance.
+     *
+     * @return a read-only instance of this instance.
+     */
+    default Attributes asReadOnly() {
+<span class="fc" id="L606">        return new Attributes() {</span>
+<span class="fc" id="L607">            private Map&lt;String, Entry&gt; entryCache = new HashMap&lt;&gt;();</span>
+            private Collection&lt;Entry&gt; cachedEntries;
+
+            @Override
+            public Collection&lt;Entry&gt; entries() {
+<span class="nc bnc" id="L612" title="All 2 branches missed.">                if (this.cachedEntries != null) {</span>
+<span class="nc" id="L613">                    return this.cachedEntries;</span>
+                }
+
+<span class="nc" id="L616">                return this.cachedEntries = new AbstractCollection&lt;Entry&gt;() {</span>
+                    @Override
+                    public Iterator&lt;Entry&gt; iterator() {
+<span class="nc" id="L619">                        Iterator&lt;String&gt; iterator = Attributes.this.keySet().iterator();</span>
+
+<span class="nc" id="L621">                        return new Iterator&lt;Entry&gt;() {</span>
+                            @Override
+                            public boolean hasNext() {
+<span class="nc" id="L624">                                return iterator.hasNext();</span>
+                            }
+
+                            @Override
+                            public Entry next() {
+<span class="nc" id="L629">                                return get(iterator.next());</span>
+                            }
+                        };
+                    }
+
+                    @Override
+                    public int size() {
+<span class="nc" id="L636">                        return Attributes.this.keySet().size();</span>
+                    }
+                };
+            }
+
+            @Override
+            public int size(String key) {
+<span class="fc" id="L643">                return Attributes.this.size(key);</span>
+            }
+
+            @Override
+            public String get(String key, int idx) {
+<span class="fc" id="L648">                return Attributes.this.get(key, idx);</span>
+            }
+
+            @Override
+            public int size() {
+<span class="fc" id="L653">                return Attributes.this.size();</span>
+            }
+
+            @Override
+            public Entry get(String key) {
+<span class="fc" id="L658">                return this.entryCache.computeIfAbsent(key, s -&gt; new SimpleAttributesEntry(this, s));</span>
+            }
+        };
+    }
+
+    /**
+     * The entry collection for a mapping.
+     */
+    interface Entry extends List&lt;String&gt; {
+
+        /**
+         * Get the mapping key.
+         *
+         * @return the mapping key
+         */
+        String getKey();
+
+        /**
+         * Remove all the values for the given key between the {@code from} index (inclusive) and the {@code to} index
+         * (exclusive).
+         *
+         * @param from the start index (inclusive)
+         * @param to the end index (exclusive)
+         * @throws IndexOutOfBoundsException if {@code from} or {@code to} is outside of the allowed range
+         */
+        void removeRange(int from, int to);
+
+        /**
+         * Create a spliterator over the elements of this ordered and non-null collection.
+         *
+         * @return the spliterator
+         */
+        default Spliterator&lt;String&gt; spliterator() {
+<span class="nc" id="L691">            return Spliterators.spliterator(this, Spliterator.ORDERED | Spliterator.NONNULL);</span>
+        }
+    }
+
+    /**
+     * The entry collection for a mapping whose values are a distinct set.
+     */
+    interface SetEntry extends Entry, Set&lt;String&gt; {
+
+        /**
+         * Create a spliterator over the elements of this distinct, ordered, and non-null collection.
+         *
+         * @return the spliterator
+         */
+        default Spliterator&lt;String&gt; spliterator() {
+<span class="nc" id="L706">            return Spliterators.spliterator(this, Spliterator.DISTINCT | Spliterator.ORDERED | Spliterator.NONNULL);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

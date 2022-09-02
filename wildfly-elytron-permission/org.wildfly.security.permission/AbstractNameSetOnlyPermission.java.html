@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractNameSetOnlyPermission.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-permission</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.permission</a> &gt; <span class="el_source">AbstractNameSetOnlyPermission.java</span></div><h1>AbstractNameSetOnlyPermission.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.permission;
+
+import org.wildfly.security.util.StringEnumeration;
+
+/**
+ * An actionless permission with a finite, fixed set of possible names.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public abstract class AbstractNameSetOnlyPermission&lt;This extends AbstractNameSetOnlyPermission&lt;This&gt;&gt; extends AbstractNameOnlyPermission&lt;This&gt; {
+
+    private final StringEnumeration nameEnumeration;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param name the name of this permission
+     * @param nameEnumeration the set of valid names for this permission type
+     */
+    protected AbstractNameSetOnlyPermission(final String name, final StringEnumeration nameEnumeration) {
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        super(&quot;*&quot;.equals(name) ? &quot;*&quot; : nameEnumeration.canonicalName(name));</span>
+<span class="fc" id="L40">        this.nameEnumeration = nameEnumeration;</span>
+<span class="fc" id="L41">    }</span>
+
+    StringEnumeration getNameEnumeration() {
+<span class="nc" id="L44">        return nameEnumeration;</span>
+    }
+
+    public AbstractPermissionCollection newPermissionCollection() {
+<span class="nc" id="L48">        return NameSetPermissionCollection.newInstance(this, nameEnumeration);</span>
+    }
+
+    public final boolean nameEquals(final String name) {
+<span class="nc" id="L52">        return super.nameEquals(name);</span>
+    }
+
+    public final boolean impliesName(final String name) {
+<span class="nc" id="L56">        return super.impliesName(name);</span>
+    }
+
+    protected final int nameHashCode() {
+<span class="nc" id="L60">        return nameEnumeration.indexOf(getName());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

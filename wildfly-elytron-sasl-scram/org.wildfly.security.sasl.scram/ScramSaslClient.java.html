@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ScramSaslClient.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl-scram</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.scram</a> &gt; <span class="el_source">ScramSaslClient.java</span></div><h1>ScramSaslClient.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.scram;
+
+import static org.wildfly.security.mechanism._private.ElytronMessages.saslScram;
+
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.sasl.SaslException;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.mechanism.AuthenticationMechanismException;
+import org.wildfly.security.mechanism.scram.ScramClient;
+import org.wildfly.security.mechanism.scram.ScramFinalClientMessage;
+import org.wildfly.security.mechanism.scram.ScramFinalServerMessage;
+import org.wildfly.security.mechanism.scram.ScramInitialClientMessage;
+import org.wildfly.security.mechanism.scram.ScramInitialServerMessage;
+import org.wildfly.security.sasl.util.AbstractSaslClient;
+
+/**
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+final class ScramSaslClient extends AbstractSaslClient {
+
+    private static final int ST_NEW = 1;
+    private static final int ST_R1_SENT = 2;
+    private static final int ST_R2_SENT = 3;
+
+    private final ScramClient scramClient;
+
+    private ScramInitialClientMessage initialResponse;
+    private ScramFinalClientMessage finalResponse;
+
+    ScramSaslClient(final String mechanismName, final String protocol, final String serverName, final CallbackHandler callbackHandler, final String authorizationId, final ScramClient scramClient) {
+<span class="nc" id="L50">        super(mechanismName, protocol, serverName, callbackHandler, authorizationId, true, saslScram);</span>
+<span class="nc" id="L51">        this.scramClient = scramClient;</span>
+<span class="nc" id="L52">        setNegotiationState(ST_NEW);</span>
+<span class="nc" id="L53">    }</span>
+
+    public void dispose() throws SaslException {
+<span class="nc" id="L56">        initialResponse = null;</span>
+<span class="nc" id="L57">        finalResponse = null;</span>
+<span class="nc" id="L58">        setNegotiationState(FAILED_STATE);</span>
+<span class="nc" id="L59">    }</span>
+
+    protected byte[] evaluateMessage(final int state, final byte[] challenge) throws SaslException {
+<span class="nc" id="L62">        boolean ok = false;</span>
+        try {
+<span class="nc bnc" id="L64" title="All 4 branches missed.">            switch (state) {</span>
+                case ST_NEW: {
+                    // initial response
+<span class="nc bnc" id="L67" title="All 2 branches missed.">                    if (challenge.length != 0) throw saslScram.mechInitialChallengeMustBeEmpty().toSaslException();</span>
+<span class="nc" id="L68">                    this.initialResponse = scramClient.getInitialResponse();</span>
+<span class="nc" id="L69">                    setNegotiationState(ST_R1_SENT);</span>
+<span class="nc" id="L70">                    ok = true;</span>
+<span class="nc" id="L71">                    return initialResponse.getMessageBytes();</span>
+                }
+                case ST_R1_SENT: {
+<span class="nc" id="L74">                    final ScramInitialServerMessage initialChallenge = scramClient.parseInitialServerMessage(initialResponse, challenge);</span>
+<span class="nc" id="L75">                    this.finalResponse = scramClient.handleInitialChallenge(initialResponse, initialChallenge);</span>
+<span class="nc" id="L76">                    setNegotiationState(ST_R2_SENT);</span>
+<span class="nc" id="L77">                    ok = true;</span>
+<span class="nc" id="L78">                    return finalResponse.getMessageBytes();</span>
+                }
+                case ST_R2_SENT: {
+<span class="nc" id="L81">                    final ScramFinalServerMessage finalChallenge = scramClient.parseFinalServerMessage(challenge);</span>
+<span class="nc" id="L82">                    scramClient.verifyFinalChallenge(finalResponse, finalChallenge);</span>
+<span class="nc" id="L83">                    negotiationComplete();</span>
+<span class="nc" id="L84">                    ok = true;</span>
+<span class="nc" id="L85">                    return null;</span>
+                }
+            }
+<span class="nc" id="L88">            throw Assert.impossibleSwitchCase(state);</span>
+<span class="nc" id="L89">        } catch (AuthenticationMechanismException e) {</span>
+<span class="nc" id="L90">            throw e.toSaslException();</span>
+        } finally {
+<span class="nc bnc" id="L92" title="All 2 branches missed.">            if (! ok) {</span>
+<span class="nc" id="L93">                setNegotiationState(FAILED_STATE);</span>
+            }
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

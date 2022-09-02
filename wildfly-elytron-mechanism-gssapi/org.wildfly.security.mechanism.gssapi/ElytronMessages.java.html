@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-mechanism-gssapi</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.mechanism.gssapi</a> &gt; <span class="el_source">ElytronMessages.java</span></div><h1>ElytronMessages.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.mechanism.gssapi;
+
+import java.io.IOException;
+import java.security.GeneralSecurityException;
+
+import javax.security.auth.login.LoginException;
+
+import org.jboss.logging.BasicLogger;
+import org.jboss.logging.Logger;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageLogger;
+import org.jboss.logging.annotations.ValidIdRange;
+import org.jboss.logging.annotations.ValidIdRanges;
+
+
+/**
+ * Log messages and exceptions for Elytron.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+@MessageLogger(projectCode = &quot;ELY&quot;, length = 5)
+@ValidIdRanges({
+    @ValidIdRange(min = 3, max = 3),
+    @ValidIdRange(min = 1121, max = 1123),
+    @ValidIdRange(min = 1160, max = 1165),
+    @ValidIdRange(min = 3031, max = 3031)
+})
+interface ElytronMessages extends BasicLogger {
+
+<span class="nc" id="L50">    ElytronMessages log = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security&quot;);</span>
+
+    @Message(id = 3, value = &quot;This builder has already been built&quot;)
+    IllegalStateException builderAlreadyBuilt();
+
+    @Message(id = 1121, value = &quot;Unable to perform initial JAAS login.&quot;)
+    GeneralSecurityException unableToPerformInitialLogin(@Cause LoginException cause);
+
+    @Message(id = 1122, value = &quot;No Kerberos principals found.&quot;)
+    GeneralSecurityException noKerberosPrincipalsFound();
+
+    @Message(id = 1123, value = &quot;Too many Kerberos principals found.&quot;)
+    GeneralSecurityException tooManyKerberosPrincipalsFound();
+
+    @Message(id = 1160, value = &quot;KeyTab [%s] does not exists.&quot;)
+    IOException keyTabDoesNotExists(String keyTab);
+
+    @Message(id = 1161, value = &quot;No keys for Kerberos principal [%s] was found in KeyTab [%s].&quot;)
+    IOException noKeysForPrincipalInKeyTab(String principal, String keyTab);
+
+    @Message(id = 1165, value = &quot;Initial JAAS login skipped as it has failed in last %d seconds&quot;)
+    GeneralSecurityException initialLoginSkipped(long seconds);
+
+    @Message(id = 3031, value = &quot;Too many KerberosTicket instances in private credentials&quot;)
+    GeneralSecurityException tooManyKerberosTicketsFound();
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

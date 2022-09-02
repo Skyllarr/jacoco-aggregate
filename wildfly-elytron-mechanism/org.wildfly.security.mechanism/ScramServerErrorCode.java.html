@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ScramServerErrorCode.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-mechanism</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.mechanism</a> &gt; <span class="el_source">ScramServerErrorCode.java</span></div><h1>ScramServerErrorCode.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.mechanism;
+
+import java.nio.charset.StandardCharsets;
+import java.util.EnumSet;
+import java.util.Locale;
+
+/**
+ * This enum lists server error codes for SCRAM authentication mechanism.
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+<span class="nc" id="L29">public enum ScramServerErrorCode {</span>
+<span class="nc" id="L30">    INVALID_ENCODING,</span>
+<span class="nc" id="L31">    EXTENSIONS_NOT_SUPPORTED,</span>
+<span class="nc" id="L32">    INVALID_PROOF,</span>
+<span class="nc" id="L33">    CHANNEL_BINDINGS_DONT_MATCH,</span>
+<span class="nc" id="L34">    SERVER_DOES_NOT_SUPPORT_CHANNEL_BINDING,</span>
+<span class="nc" id="L35">    SERVER_DOES_SUPPORT_CHANNEL_BINDING,</span>
+<span class="nc" id="L36">    CHANNEL_BINDING_NOT_SUPPORTED,</span>
+<span class="nc" id="L37">    CHANNEL_BINDING_NOT_PROVIDED,</span>
+<span class="nc" id="L38">    UNSUPPORTED_CHANNEL_BINDING_TYPE,</span>
+<span class="nc" id="L39">    UNKNOWN_USER,</span>
+<span class="nc" id="L40">    INVALID_USERNAME_ENCODING,</span>
+<span class="nc" id="L41">    NO_RESOURCES,</span>
+<span class="nc" id="L42">    OTHER_ERROR,</span>
+    ;
+
+    private final String text;
+    private final byte[] messageBytes;
+
+<span class="nc" id="L48">    ScramServerErrorCode() {</span>
+<span class="nc" id="L49">        text = name().replace('_', '-').toLowerCase(Locale.US);</span>
+<span class="nc" id="L50">        final int length = text.length();</span>
+<span class="nc" id="L51">        byte[] msg = new byte[length + 2];</span>
+<span class="nc" id="L52">        msg[0] = 'e'; msg[1] = '=';</span>
+<span class="nc" id="L53">        System.arraycopy(text.getBytes(StandardCharsets.UTF_8), 0, msg, 2, length);</span>
+<span class="nc" id="L54">        messageBytes = msg;</span>
+<span class="nc" id="L55">    }</span>
+
+    public String getText() {
+<span class="nc" id="L58">        return text;</span>
+    }
+
+    public byte[] getMessageBytes() {
+<span class="nc" id="L62">        return messageBytes.clone();</span>
+    }
+
+    byte[] getRawMessageBytes() {
+<span class="nc" id="L66">        return messageBytes;</span>
+    }
+
+    /**
+     * Convert the error string to the respective {@code ScramServerErrorCode} enum value, or to the {@code OTHER_ERROR} value if can't match.
+     * @param value the error value as string
+     * @return the respective {@code ScramServerErrorCode} enum value from error string, {@code OTHER_ERROR} otherwise
+     */
+    public static ScramServerErrorCode fromErrorString(String value) {
+        try {
+<span class="nc" id="L76">            return valueOf(value.replace('-', '_').toUpperCase(Locale.US));</span>
+<span class="nc" id="L77">        } catch (IllegalArgumentException ignored) {</span>
+<span class="nc" id="L78">            return OTHER_ERROR;</span>
+        }
+    }
+
+<span class="nc" id="L82">    private static final int fullSize = values().length;</span>
+
+    /**
+     * Determine whether the given set is fully populated (or &quot;full&quot;), meaning it contains all possible values.
+     *
+     * @param set the set
+     *
+     * @return {@code true} if the set is full, {@code false} otherwise
+     */
+    public static boolean isFull(final EnumSet&lt;ScramServerErrorCode&gt; set) {
+<span class="nc bnc" id="L92" title="All 4 branches missed.">        return set != null &amp;&amp; set.size() == fullSize;</span>
+    }
+
+    /**
+     * Determine whether this instance is equal to one of the given instances.
+     *
+     * @param v1 the first instance
+     *
+     * @return {@code true} if one of the instances matches this one, {@code false} otherwise
+     */
+    public boolean in(final ScramServerErrorCode v1) {
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        return this == v1;</span>
+    }
+
+    /**
+     * Determine whether this instance is equal to one of the given instances.
+     *
+     * @param v1 the first instance
+     * @param v2 the second instance
+     *
+     * @return {@code true} if one of the instances matches this one, {@code false} otherwise
+     */
+    public boolean in(final ScramServerErrorCode v1, final ScramServerErrorCode v2) {
+<span class="nc bnc" id="L115" title="All 4 branches missed.">        return this == v1 || this == v2;</span>
+    }
+
+    /**
+     * Determine whether this instance is equal to one of the given instances.
+     *
+     * @param v1 the first instance
+     * @param v2 the second instance
+     * @param v3 the third instance
+     *
+     * @return {@code true} if one of the instances matches this one, {@code false} otherwise
+     */
+    public boolean in(final ScramServerErrorCode v1, final ScramServerErrorCode v2, final ScramServerErrorCode v3) {
+<span class="nc bnc" id="L128" title="All 6 branches missed.">        return this == v1 || this == v2 || this == v3;</span>
+    }
+
+    /**
+     * Determine whether this instance is equal to one of the given instances.
+     *
+     * @param values the possible values
+     *
+     * @return {@code true} if one of the instances matches this one, {@code false} otherwise
+     */
+    public boolean in(final ScramServerErrorCode... values) {
+<span class="nc bnc" id="L139" title="All 4 branches missed.">        if (values != null) for (ScramServerErrorCode value : values) {</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">            if (this == value) return true;</span>
+        }
+<span class="nc" id="L142">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

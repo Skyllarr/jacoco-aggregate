@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-asn1</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.asn1</a> &gt; <span class="el_source">ElytronMessages.java</span></div><h1>ElytronMessages.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.asn1;
+
+import org.jboss.logging.BasicLogger;
+import org.jboss.logging.Logger;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageLogger;
+import org.jboss.logging.annotations.ValidIdRange;
+import org.jboss.logging.annotations.ValidIdRanges;
+
+
+/**
+ * Log messages and exceptions for Elytron.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+@MessageLogger(projectCode = &quot;ELY&quot;, length = 5)
+@ValidIdRanges({
+    @ValidIdRange(min = 12, max = 12),
+    @ValidIdRange(min = 7004, max = 7024)
+})
+interface ElytronMessages extends BasicLogger {
+
+<span class="fc" id="L43">    ElytronMessages log = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security&quot;);</span>
+
+    @Message(id = 12, value = &quot;Unable to load OIDs database from properties file&quot;)
+    IllegalStateException unableToLoadOidsFromPropertiesFile(@Cause Throwable cause);
+
+    @Message(id = 7004, value = &quot;Unexpected ASN.1 tag encountered&quot;)
+    ASN1Exception asnUnexpectedTag();
+
+    @Message(id = 7005, value = &quot;Unable to read X.509 certificate data&quot;)
+    ASN1Exception asnUnableToReadCertificateData(@Cause Throwable cause);
+
+    @Message(id = 7009, value = &quot;No sequence to end&quot;)
+    IllegalStateException noSequenceToEnd();
+
+    @Message(id = 7010, value = &quot;No set to end&quot;)
+    IllegalStateException noSetToEnd();
+
+    @Message(id = 7011, value = &quot;No explicitly tagged element to end&quot;)
+    IllegalStateException noExplicitlyTaggedElementToEnd();
+
+    @Message(id = 7012, value = &quot;Unexpected end of input&quot;)
+    ASN1Exception asnUnexpectedEndOfInput();
+
+    @Message(id = 7013, value = &quot;Invalid number of unused bits&quot;)
+    ASN1Exception asnInvalidNumberOfUnusedBits();
+
+    @Message(id = 7014, value = &quot;Non-zero length encountered for null type tag&quot;)
+    ASN1Exception asnNonZeroLengthForNullTypeTag();
+
+    @Message(id = 7015, value = &quot;Invalid high-tag-number form&quot;)
+    ASN1Exception asnInvalidHighTagNumberForm();
+
+    @Message(id = 7016, value = &quot;Length encoding exceeds 4 bytes&quot;)
+    ASN1Exception asnLengthEncodingExceeds4bytes();
+
+    @Message(id = 7017, value = &quot;Invalid OID character&quot;)
+    ASN1Exception asnInvalidOidCharacter();
+
+    @Message(id = 7018, value = &quot;OID must have at least 2 components&quot;)
+    ASN1Exception asnOidMustHaveAtLeast2Components();
+
+    @Message(id = 7019, value = &quot;Invalid value for first OID component; expected 0, 1, or 2&quot;)
+    ASN1Exception asnInvalidValueForFirstOidComponent();
+
+    @Message(id = 7020, value = &quot;Invalid value for second OID component; expected a value between 0 and 39 (inclusive)&quot;)
+    ASN1Exception asnInvalidValueForSecondOidComponent();
+
+    @Message(id = 7021, value = &quot;Invalid length&quot;)
+    ASN1Exception asnInvalidLength();
+
+    @Message(id = 7022, value = &quot;Unknown tag type: %d&quot;)
+    ASN1Exception asnUnknownTagType(int type);
+
+    @Message(id = 7023, value = &quot;Unexpected character byte for printable string&quot;)
+    ASN1Exception asnUnexpectedCharacterByteForPrintableString();
+
+    @Message(id = 7024, value = &quot;Invalid length encountered for boolean type tag&quot;)
+    ASN1Exception asnInvalidLengthForBooleanTypeTag();
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

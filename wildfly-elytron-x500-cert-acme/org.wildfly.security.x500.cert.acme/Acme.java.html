@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Acme.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-x500-cert-acme</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.x500.cert.acme</a> &gt; <span class="el_source">Acme.java</span></div><h1>Acme.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2018 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.x500.cert.acme;
+
+import static org.wildfly.security.x500.cert.acme.ElytronMessages.acme;
+
+import java.math.BigInteger;
+import java.security.PublicKey;
+import java.security.interfaces.ECPublicKey;
+import java.security.interfaces.RSAPublicKey;
+
+import javax.json.Json;
+import javax.json.JsonObject;
+
+import org.wildfly.common.codec.Base64Alphabet;
+import org.wildfly.common.iteration.ByteIterator;
+
+/**
+ * Useful constants and utilities related to the &lt;a href=&quot;https://www.ietf.org/id/draft-ietf-acme-acme-14.txt&quot;&gt;Automatic Certificate
+ * Management Environment (ACME)&lt;/a&gt; protocol.
+ *
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ * @since 1.5.0
+ */
+<span class="nc" id="L41">public final class Acme {</span>
+
+    public static final String ACCOUNT = &quot;account&quot;;
+    public static final String ALG = &quot;alg&quot;;
+    public static final String AUTHORIZATION = &quot;authorization&quot;;
+    public static final String AUTHORIZATIONS = &quot;authorizations&quot;;
+    public static final String CAA_IDENTITIES = &quot;caaIdentities&quot;;
+    public static final String CERTIFICATE = &quot;certificate&quot;;
+    public static final String CHALLENGES = &quot;challenges&quot;;
+    public static final String CONTACT = &quot;contact&quot;;
+    public static final String CURVE = &quot;crv&quot;;
+    public static final String CSR = &quot;csr&quot;;
+    public static final String DEACTIVATED = &quot;deactivated&quot;;
+    public static final String DETAIL = &quot;detail&quot;;
+    public static final String DNS = &quot;dns&quot;;
+    public static final String EXPONENT = &quot;e&quot;;
+    public static final String EXTERNAL_ACCOUNT_REQUIRED = &quot;externalAccountRequired&quot;;
+    public static final String FINALIZE = &quot;finalize&quot;;
+    public static final String IDENTIFIER = &quot;identifier&quot;;
+    public static final String IDENTIFIERS = &quot;identifiers&quot;;
+    public static final String INSTANCE = &quot;instance&quot;;
+    public static final String INVALID = &quot;invalid&quot;;
+    public static final String JWK = &quot;jwk&quot;;
+    public static final String KEY_TYPE = &quot;kty&quot;;
+    public static final String KID = &quot;kid&quot;;
+    public static final String META = &quot;meta&quot;;
+    public static final String MODULUS = &quot;n&quot;;
+    public static final String NEW_KEY = &quot;newKey&quot;;
+    public static final String NONCE = &quot;nonce&quot;;
+    public static final String OLD_KEY = &quot;oldKey&quot;;
+    public static final String ONLY_RETURN_EXISTING = &quot;onlyReturnExisting&quot;;
+    public static final String ORDER = &quot;order&quot;;
+    public static final String PAYLOAD = &quot;payload&quot;;
+    public static final String PENDING = &quot;pending&quot;;
+    public static final String PROTECTED = &quot;protected&quot;;
+    public static final String REASON = &quot;reason&quot;;
+    public static final String SIGNATURE = &quot;signature&quot;;
+    public static final String STATUS = &quot;status&quot;;
+    public static final String SUBPROBLEMS = &quot;subproblems&quot;;
+    public static final String TERMS_OF_SERVICE = &quot;termsOfService&quot;;
+    public static final String TERMS_OF_SERVICE_AGREED = &quot;termsOfServiceAgreed&quot;;
+    public static final String TOKEN = &quot;token&quot;;
+    public static final String TITLE = &quot;title&quot;;
+    public static final String TYPE = &quot;type&quot;;
+    public static final String URL = &quot;url&quot;;
+    public static final String VALID = &quot;valid&quot;;
+    public static final String VALUE = &quot;value&quot;;
+    public static final String WEBSITE = &quot;website&quot;;
+    public static final String X_COORDINATE = &quot;x&quot;;
+    public static final String Y_COORDINATE = &quot;y&quot;;
+
+    public static final String GET = &quot;GET&quot;;
+    public static final String HEAD = &quot;HEAD&quot;;
+    public static final String POST = &quot;POST&quot;;
+    public static final String ACCEPT_LANGUAGE = &quot;Accept-Language&quot;;
+    public static final String CONTENT_TYPE = &quot;Content-Type&quot;;
+    public static final String LOCATION = &quot;Location&quot;;
+    public static final String REPLAY_NONCE = &quot;Replay-Nonce&quot;;
+    public static final String RETRY_AFTER = &quot;Retry-After&quot;;
+    public static final String JSON_CONTENT_TYPE = &quot;application/json&quot;;
+    public static final String PROBLEM_JSON_CONTENT_TYPE = &quot;application/problem+json&quot;;
+    public static final String JOSE_JSON_CONTENT_TYPE = &quot;application/jose+json&quot;;
+    public static final String PEM_CERTIFICATE_CHAIN_CONTENT_TYPE = &quot;application/pem-certificate-chain&quot;;
+    public static final String USER_AGENT = &quot;User-Agent&quot;;
+
+    public static final String ERROR_TYPE_PREFIX = &quot;urn:ietf:params:acme:error:&quot;;
+    public static final String BAD_NONCE = ERROR_TYPE_PREFIX + &quot;badNonce&quot;;
+    public static final String USER_ACTION_REQUIRED = ERROR_TYPE_PREFIX + &quot;userActionRequired&quot;;
+    public static final String RATE_LIMITED = ERROR_TYPE_PREFIX + &quot;rateLimited&quot;;
+
+    /**
+     * Get the JWS &quot;alg&quot; header parameter value that corresponds to the given signature algorithm.
+     *
+     * @param signatureAlgorithm the signature algorithm
+     * @return the JWS &quot;alg&quot; header parameter value that corresponds to the given signature algorithm
+     * @throws IllegalArgumentException if the given signature algorithm is not supported
+     */
+    static String getAlgHeaderFromSignatureAlgorithm(String signatureAlgorithm) {
+<span class="pc bpc" id="L119" title="5 of 7 branches missed.">        switch (signatureAlgorithm) {</span>
+            case &quot;SHA256withRSA&quot;:
+<span class="fc" id="L121">                return &quot;RS256&quot;;</span>
+            case &quot;SHA384withRSA&quot;:
+<span class="nc" id="L123">                return &quot;RS384&quot;;</span>
+            case &quot;SHA512withRSA&quot;:
+<span class="nc" id="L125">                return &quot;RS512&quot;;</span>
+            case &quot;SHA256withECDSA&quot;:
+<span class="fc" id="L127">                return &quot;ES256&quot;;</span>
+            case &quot;SHA384withECDSA&quot;:
+<span class="nc" id="L129">                return &quot;ES384&quot;;</span>
+            case &quot;SHA512withECDSA&quot;:
+<span class="nc" id="L131">                return &quot;ES512&quot;;</span>
+            default:
+<span class="nc" id="L133">                throw acme.unsupportedAcmeAccountSignatureAlgorithm(signatureAlgorithm);</span>
+        }
+    }
+
+    static JsonObject getJwk(PublicKey publicKey, String algHeader) {
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (publicKey instanceof RSAPublicKey) {</span>
+<span class="fc" id="L139">            RSAPublicKey rsaPublicKey = (RSAPublicKey) publicKey;</span>
+<span class="fc" id="L140">            return Json.createObjectBuilder()</span>
+<span class="fc" id="L141">                    .add(EXPONENT, base64UrlEncode(rsaPublicKey.getPublicExponent().toByteArray()))</span>
+<span class="fc" id="L142">                    .add(KEY_TYPE, &quot;RSA&quot;)</span>
+<span class="fc" id="L143">                    .add(MODULUS, base64UrlEncode(modulusToByteArray(rsaPublicKey.getModulus())))</span>
+<span class="fc" id="L144">                    .build();</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        } else if (publicKey instanceof ECPublicKey) {</span>
+<span class="fc" id="L146">            ECPublicKey ecPublicKey = (ECPublicKey) publicKey;</span>
+<span class="fc" id="L147">            int fieldSize = ecPublicKey.getParams().getCurve().getField().getFieldSize();</span>
+<span class="fc" id="L148">            return Json.createObjectBuilder()</span>
+<span class="fc" id="L149">                    .add(CURVE, getCurveParameterFromAlgHeader(algHeader))</span>
+<span class="fc" id="L150">                    .add(KEY_TYPE, &quot;EC&quot;)</span>
+<span class="fc" id="L151">                    .add(X_COORDINATE, base64UrlEncode(coordinateToByteArray(fieldSize, ecPublicKey.getW().getAffineX())))</span>
+<span class="fc" id="L152">                    .add(Y_COORDINATE, base64UrlEncode(coordinateToByteArray(fieldSize, ecPublicKey.getW().getAffineY())))</span>
+<span class="fc" id="L153">                    .build();</span>
+        } else {
+<span class="nc" id="L155">            throw acme.unsupportedAcmeAccountPublicKeyType(publicKey.getAlgorithm());</span>
+        }
+    }
+
+    private static byte[] modulusToByteArray(BigInteger modulus) {
+        // As specified in https://tools.ietf.org/html/rfc7518#section-6.3.1, the extra zero-valued octet
+        // needs to be omitted if present
+<span class="fc" id="L162">        byte[] modulusByteArray = modulus.toByteArray();</span>
+<span class="pc bpc" id="L163" title="2 of 6 branches missed.">        if ((modulus.bitLength() % 8 == 0) &amp;&amp; (modulusByteArray[0] == 0) &amp;&amp; modulusByteArray.length &gt; 1) {</span>
+<span class="fc" id="L164">            return ByteIterator.ofBytes(modulusByteArray, 1, modulusByteArray.length - 1).drain();</span>
+        } else {
+<span class="fc" id="L166">            return modulusByteArray;</span>
+        }
+    }
+
+    private static byte[] coordinateToByteArray(int fieldSize, BigInteger coordinate) {
+<span class="fc" id="L171">        byte[] coordinateByteArray = modulusToByteArray(coordinate);</span>
+<span class="fc" id="L172">        int fullSize = (int) Math.ceil(fieldSize / 8d);</span>
+
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        if (fullSize &gt; coordinateByteArray.length) {</span>
+<span class="nc" id="L175">            final byte[] fullSizeCoordinateByteArray = new byte[fullSize];</span>
+<span class="nc" id="L176">            System.arraycopy(coordinateByteArray, 0, fullSizeCoordinateByteArray, fullSize - coordinateByteArray.length, coordinateByteArray.length);</span>
+<span class="nc" id="L177">            return fullSizeCoordinateByteArray;</span>
+        } else {
+<span class="fc" id="L179">            return coordinateByteArray;</span>
+        }
+
+    }
+
+    private static String getCurveParameterFromAlgHeader(String algHeader) {
+<span class="pc bpc" id="L185" title="3 of 4 branches missed.">        switch (algHeader) {</span>
+            case &quot;ES256&quot;:
+<span class="fc" id="L187">                return &quot;P-256&quot;;</span>
+            case &quot;ES384&quot;:
+<span class="nc" id="L189">                return &quot;P-384&quot;;</span>
+            case &quot;ES512&quot;:
+<span class="nc" id="L191">                return &quot;P-521&quot;;</span>
+            default:
+<span class="nc" id="L193">                throw acme.unableToDetermineCurveParameterFromAlgHeader(algHeader);</span>
+        }
+    }
+
+
+
+    static String base64UrlEncode(byte[] data) {
+<span class="fc" id="L200">        return ByteIterator.ofBytes(data).base64Encode(BASE64_URL, false).drainToString();</span>
+    }
+
+    /**
+     * The &lt;a href=&quot;http://tools.ietf.org/html/rfc4648&quot;&gt;RFC 4648&lt;/a&gt; base64url alphabet.
+     */
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">    static final Base64Alphabet BASE64_URL = new Base64Alphabet(false) {</span>
+        public int encode(final int val) {
+<span class="fc bfc" id="L208" title="All 2 branches covered.">            if (val &lt;= 25) {</span>
+<span class="fc" id="L209">                return 'A' + val;</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">            } else if (val &lt;= 51) {</span>
+<span class="fc" id="L211">                return 'a' + val - 26;</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">            } else if (val &lt;= 61) {</span>
+<span class="fc" id="L213">                return '0' + val - 52;</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">            } else if (val == 62) {</span>
+<span class="fc" id="L215">                return '-';</span>
+            } else {
+<span class="pc bpc" id="L217" title="2 of 4 branches missed.">                assert val == 63;</span>
+<span class="fc" id="L218">                return '_';</span>
+            }
+        }
+
+        public int decode(final int codePoint) throws IllegalArgumentException {
+<span class="fc bfc" id="L223" title="All 4 branches covered.">            if ('A' &lt;= codePoint &amp;&amp; codePoint &lt;= 'Z') {</span>
+<span class="fc" id="L224">                return codePoint - 'A';</span>
+<span class="pc bpc" id="L225" title="1 of 4 branches missed.">            } else if ('a' &lt;= codePoint &amp;&amp; codePoint &lt;= 'z') {</span>
+<span class="fc" id="L226">                return codePoint - 'a' + 26;</span>
+<span class="fc bfc" id="L227" title="All 4 branches covered.">            } else if ('0' &lt;= codePoint &amp;&amp; codePoint &lt;= '9') {</span>
+<span class="fc" id="L228">                return codePoint - '0' + 52;</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">            } else if (codePoint == '-') {</span>
+<span class="fc" id="L230">                return 62;</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">            } else if (codePoint == '_') {</span>
+<span class="fc" id="L232">                return 63;</span>
+            } else {
+<span class="nc" id="L234">                return -1;</span>
+            }
+        }
+    };
+
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

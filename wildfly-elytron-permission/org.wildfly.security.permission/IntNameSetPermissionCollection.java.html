@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>IntNameSetPermissionCollection.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-permission</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.permission</a> &gt; <span class="el_source">IntNameSetPermissionCollection.java</span></div><h1>IntNameSetPermissionCollection.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.permission;
+
+import java.security.Permission;
+import java.util.NoSuchElementException;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.wildfly.security.util.EnumerationIterator;
+import org.wildfly.security.util.StringEnumeration;
+
+final class IntNameSetPermissionCollection extends NameSetPermissionCollection {
+
+<span class="nc" id="L30">    private final AtomicInteger bitSet = new AtomicInteger();</span>
+
+    IntNameSetPermissionCollection(final AbstractPermission&lt;?&gt; sourcePermission, final StringEnumeration nameEnumeration) {
+<span class="nc" id="L33">        super(sourcePermission, nameEnumeration);</span>
+<span class="nc" id="L34">    }</span>
+
+    private Permission permissionFor(int id) {
+<span class="nc" id="L37">        return ((AbstractNamedPermission&lt;?&gt;)getSourcePermission()).withName(getNameEnumeration().nameOf(id));</span>
+    }
+
+    protected void doAdd(final AbstractPermission&lt;?&gt; permission) {
+<span class="nc" id="L41">        int setBits= getBitsForName(permission);</span>
+<span class="nc" id="L42">        final AtomicInteger bitSet = this.bitSet;</span>
+        int oldVal;
+        do {
+<span class="nc" id="L45">            oldVal = bitSet.get();</span>
+<span class="nc bnc" id="L46" title="All 2 branches missed.">            if ((oldVal &amp; setBits) == setBits) {</span>
+<span class="nc" id="L47">                return;</span>
+            }
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        } while (! bitSet.compareAndSet(oldVal, oldVal | setBits));</span>
+<span class="nc" id="L50">    }</span>
+
+    public boolean implies(final Permission permission) {
+<span class="nc bnc" id="L53" title="All 2 branches missed.">        if (permission.getClass() != getSourcePermission().getClass()) {</span>
+<span class="nc" id="L54">            return false;</span>
+        }
+<span class="nc" id="L56">        long testBits = getBitsForName(permission);</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        return (bitSet.get() &amp; testBits) == testBits;</span>
+    }
+
+    public int size() {
+<span class="nc" id="L61">        final int size = Integer.bitCount(bitSet.get());</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        return size == getNameEnumeration().size() ? 1 : size;</span>
+    }
+
+    public EnumerationIterator&lt;Permission&gt; iterator() {
+<span class="nc" id="L66">        return new Iter(bitSet.get());</span>
+    }
+
+    public EnumerationIterator&lt;Permission&gt; elements() {
+<span class="nc" id="L70">        return iterator();</span>
+    }
+
+    private int getBitsForName(final Permission permission) {
+        final int bits;
+<span class="nc" id="L75">        final String name = permission.getName();</span>
+<span class="nc" id="L76">        final StringEnumeration nameEnumeration = getNameEnumeration();</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        if (&quot;*&quot;.equals(name)) {</span>
+            // add all names
+<span class="nc" id="L79">            bits = (1 &lt;&lt; nameEnumeration.size()) - 1;</span>
+        } else {
+<span class="nc" id="L81">            bits = 1 &lt;&lt; nameEnumeration.indexOf(name);</span>
+        }
+<span class="nc" id="L83">        return bits;</span>
+    }
+
+    private class Iter implements EnumerationIterator&lt;Permission&gt; {
+        private int bits;
+
+<span class="nc" id="L89">        Iter(final int bits) {</span>
+<span class="nc" id="L90">            this.bits = bits;</span>
+<span class="nc" id="L91">        }</span>
+
+        public boolean hasMoreElements() {
+<span class="nc bnc" id="L94" title="All 2 branches missed.">            return bits != 0;</span>
+        }
+
+        public Permission nextElement() {
+<span class="nc" id="L98">            final int bits = this.bits;</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            if (bits == 0) throw new NoSuchElementException();</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">            if (Integer.bitCount(bits) == getNameEnumeration().size()) {</span>
+<span class="nc" id="L101">                this.bits = 0;</span>
+<span class="nc" id="L102">                return ((AbstractNamedPermission&lt;?&gt;) getSourcePermission()).withName(&quot;*&quot;);</span>
+            }
+<span class="nc" id="L104">            int bit = Integer.lowestOneBit(bits);</span>
+<span class="nc" id="L105">            this.bits = bits &amp; ~bit;</span>
+<span class="nc" id="L106">            return permissionFor(Integer.numberOfTrailingZeros(bit));</span>
+        }
+
+        public boolean hasNext() {
+<span class="nc" id="L110">            return hasMoreElements();</span>
+        }
+
+        public Permission next() {
+<span class="nc" id="L114">            return nextElement();</span>
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

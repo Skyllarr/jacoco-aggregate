@@ -1,0 +1,476 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SimpleDirContextFactoryBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-realm-ldap</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.realm.ldap</a> &gt; <span class="el_source">SimpleDirContextFactoryBuilder.java</span></div><h1>SimpleDirContextFactoryBuilder.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.realm.ldap;
+
+import static org.wildfly.security.auth.realm.ldap.ElytronMessages.log;
+
+import java.net.URI;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
+import java.util.Hashtable;
+import java.util.Properties;
+
+import javax.naming.NamingException;
+import javax.naming.directory.DirContext;
+import javax.naming.directory.InitialDirContext;
+import javax.naming.ldap.InitialLdapContext;
+import javax.net.SocketFactory;
+import javax.net.ssl.SSLContext;
+import javax.security.auth.DestroyFailedException;
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.NameCallback;
+import javax.security.auth.callback.PasswordCallback;
+
+import org.jboss.modules.Module;
+import org.wildfly.common.array.Arrays2;
+import org.wildfly.security.SecurityFactory;
+import org.wildfly.security.auth.callback.CredentialCallback;
+import org.wildfly.security.auth.client.AuthenticationConfiguration;
+import org.wildfly.security.auth.client.AuthenticationContext;
+import org.wildfly.security.auth.client.AuthenticationContextConfigurationClient;
+import org.wildfly.security.credential.PasswordCredential;
+import org.wildfly.security.credential.source.CredentialSource;
+import org.wildfly.security.manager.action.GetClassLoaderAction;
+import org.wildfly.security.manager.action.GetModuleClassLoaderAction;
+import org.wildfly.security.manager.action.SetContextClassLoaderAction;
+import org.wildfly.security.password.interfaces.ClearPassword;
+
+/**
+ * A simple builder for a {@link DirContextFactory} which creates new contexts on demand and disposes of them as soon as they
+ * are returned.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public class SimpleDirContextFactoryBuilder {
+
+    private static final String CONNECT_TIMEOUT = &quot;com.sun.jndi.ldap.connect.timeout&quot;;
+    private static final String READ_TIMEOUT = &quot;com.sun.jndi.ldap.read.timeout&quot;;
+    private static final String SOCKET_FACTORY = &quot;java.naming.ldap.factory.socket&quot;;
+
+    private static final int DEFAULT_CONNECT_TIMEOUT = 5000; // ms
+    private static final int DEFAULT_READ_TIMEOUT = 60000; // ms
+    private static final String LDAPS_SCHEME = &quot;ldaps&quot;;
+
+<span class="nc" id="L71">    private boolean built = false;</span>
+<span class="nc" id="L72">    private String initialContextFactory = &quot;com.sun.jndi.ldap.LdapCtxFactory&quot;;</span>
+<span class="nc" id="L73">    private String providerUrl = null;</span>
+<span class="nc" id="L74">    private String securityAuthentication = &quot;simple&quot;;</span>
+<span class="nc" id="L75">    private String securityPrincipal = null;</span>
+<span class="nc" id="L76">    private String securityCredential = null;</span>
+<span class="nc" id="L77">    private CredentialSource credentialSource = null;</span>
+<span class="nc" id="L78">    private AuthenticationContext authenticationContext = null;</span>
+<span class="nc" id="L79">    private SocketFactory socketFactory = null;</span>
+    private Properties connectionProperties;
+<span class="nc" id="L81">    private int connectTimeout = DEFAULT_CONNECT_TIMEOUT;</span>
+<span class="nc" id="L82">    private int readTimeout = DEFAULT_READ_TIMEOUT;</span>
+    private Module targetModule;
+    private ClassLoader targetClassLoader;
+
+<span class="nc" id="L86">    private static final AuthenticationContextConfigurationClient authClient = doPrivileged(AuthenticationContextConfigurationClient.ACTION);</span>
+
+<span class="nc" id="L88">    private SimpleDirContextFactoryBuilder() {</span>
+<span class="nc" id="L89">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @return the new builder
+     */
+    public static SimpleDirContextFactoryBuilder builder() {
+<span class="nc" id="L97">        return new SimpleDirContextFactoryBuilder();</span>
+    }
+
+    /**
+     * Set the initial context factory class name.
+     *
+     * @param initialContextFactory the class name
+     * @return this builder
+     */
+    public SimpleDirContextFactoryBuilder setInitialContextFactory(final String initialContextFactory) {
+<span class="nc" id="L107">        assertNotBuilt();</span>
+<span class="nc" id="L108">        this.initialContextFactory = initialContextFactory;</span>
+
+<span class="nc" id="L110">        return this;</span>
+    }
+
+    /**
+     * Set the provider URL.
+     *
+     * @param providerUrl the provider URL
+     * @return this builder
+     */
+    public SimpleDirContextFactoryBuilder setProviderUrl(final String providerUrl) {
+<span class="nc" id="L120">        assertNotBuilt();</span>
+<span class="nc" id="L121">        this.providerUrl = providerUrl;</span>
+
+<span class="nc" id="L123">        return this;</span>
+    }
+
+    /**
+     * Set the security authentication method.
+     *
+     * @param securityAuthentication the authentication method
+     * @return this builder
+     */
+    public SimpleDirContextFactoryBuilder setSecurityAuthentication(final String securityAuthentication) {
+<span class="nc" id="L133">        assertNotBuilt();</span>
+<span class="nc" id="L134">        this.securityAuthentication = securityAuthentication;</span>
+
+<span class="nc" id="L136">        return this;</span>
+    }
+
+    /**
+     * Set the authentication principal.
+     *
+     * @param securityPrincipal the principal
+     * @return this builder
+     */
+    public SimpleDirContextFactoryBuilder setSecurityPrincipal(final String securityPrincipal) {
+<span class="nc" id="L146">        assertNotBuilt();</span>
+<span class="nc" id="L147">        this.securityPrincipal = securityPrincipal;</span>
+
+<span class="nc" id="L149">        return this;</span>
+    }
+
+    /**
+     * Set the authentication credential.
+     * If not set, factory try to obtain it from {@link CredentialSource} specified by
+     * {@link #setCredentialSource(org.wildfly.security.credential.source.CredentialSource)} of from
+     * {@link AuthenticationContext} specified by {@link #setAuthenticationContext(AuthenticationContext)}.
+     *
+     * @param securityCredential the credential
+     * @return this builder
+     */
+    public SimpleDirContextFactoryBuilder setSecurityCredential(final String securityCredential) {
+<span class="nc" id="L162">        assertNotBuilt();</span>
+<span class="nc" id="L163">        this.securityCredential = securityCredential;</span>
+
+<span class="nc" id="L165">        return this;</span>
+    }
+
+    /**
+     * Set the authentication credential source.
+     * Alternative to {@link #setSecurityCredential(String)}.
+     *
+     * @param credentialSource the credential source
+     * @return this builder
+     */
+    public SimpleDirContextFactoryBuilder setCredentialSource(final CredentialSource credentialSource) {
+<span class="nc" id="L176">        assertNotBuilt();</span>
+<span class="nc" id="L177">        this.credentialSource = credentialSource;</span>
+
+<span class="nc" id="L179">        return this;</span>
+    }
+
+    /**
+     * Set the authentication context as source of security credential.
+     * Alternative to {@link #setSecurityCredential(String)}.
+     *
+     * @param authenticationContext the credential source
+     * @return this builder
+     */
+    public SimpleDirContextFactoryBuilder setAuthenticationContext(final AuthenticationContext authenticationContext) {
+<span class="nc" id="L190">        assertNotBuilt();</span>
+<span class="nc" id="L191">        this.authenticationContext = authenticationContext;</span>
+
+<span class="nc" id="L193">        return this;</span>
+    }
+
+    /**
+     * Set the socket factory to be used by LDAP context.
+     * Used primarily for SSL connections.
+     *
+     * If not set, factory try to obtain it from {@link AuthenticationContext} specified by {@link #setAuthenticationContext(AuthenticationContext)}.
+     *
+     * @param socketFactory the socket factory
+     * @return this builder
+     */
+    public SimpleDirContextFactoryBuilder setSocketFactory(final SocketFactory socketFactory) {
+<span class="nc" id="L206">        assertNotBuilt();</span>
+<span class="nc" id="L207">        this.socketFactory = socketFactory;</span>
+
+<span class="nc" id="L209">        return this;</span>
+    }
+
+    /**
+     * Set the timeout for connecting to the server.
+     * Set to 0 to ensure waiting for the response infinitely.
+     * If not set, {@value #DEFAULT_CONNECT_TIMEOUT} ms will be used.
+     *
+     * @param connectTimeout the timeout for connecting to the server in microseconds
+     * @return this builder
+     */
+    public SimpleDirContextFactoryBuilder setConnectTimeout(int connectTimeout) {
+<span class="nc" id="L221">        assertNotBuilt();</span>
+<span class="nc" id="L222">        this.connectTimeout = connectTimeout;</span>
+
+<span class="nc" id="L224">        return this;</span>
+    }
+
+    /**
+     * Set the read timeout for an LDAP operation.
+     * Set to 0 to ensure waiting for the response infinitely.
+     * If not set, {@value #DEFAULT_READ_TIMEOUT} ms will be used.
+     *
+     * @param readTimeout the read timeout for an LDAP operation in microseconds
+     * @return this builder
+     */
+    public SimpleDirContextFactoryBuilder setReadTimeout(int readTimeout) {
+<span class="nc" id="L236">        assertNotBuilt();</span>
+<span class="nc" id="L237">        this.readTimeout = readTimeout;</span>
+
+<span class="nc" id="L239">        return this;</span>
+    }
+
+
+    /**
+     * &lt;p&gt;Set additional connection properties.
+     *
+     * @param connectionProperties the additional connection properties.
+     * @return this builder
+     */
+    public SimpleDirContextFactoryBuilder setConnectionProperties(Properties connectionProperties) {
+<span class="nc" id="L250">        assertNotBuilt();</span>
+<span class="nc" id="L251">        this.connectionProperties = connectionProperties;</span>
+
+<span class="nc" id="L253">        return this;</span>
+    }
+
+    /**
+     * Set module which will be used to load context factory and context.
+     *
+     * @param module - module that will be used.
+     * @return this builder
+     */
+    public SimpleDirContextFactoryBuilder setModule(final Module module) {
+<span class="nc" id="L263">        assertNotBuilt();</span>
+<span class="nc" id="L264">        this.targetModule = module;</span>
+
+<span class="nc" id="L266">        return this;</span>
+    }
+
+    /**
+     * Build this context factory.
+     *
+     * @return the context factory
+     */
+    public DirContextFactory build() {
+<span class="nc" id="L275">        assertNotBuilt();</span>
+
+<span class="nc bnc" id="L277" title="All 2 branches missed.">        if (providerUrl == null) {</span>
+<span class="nc" id="L278">            throw log.noProviderUrlSet();</span>
+        }
+<span class="nc bnc" id="L280" title="All 2 branches missed.">        if(this.targetModule != null){</span>
+<span class="nc" id="L281">            this.targetClassLoader = doPrivileged(new GetModuleClassLoaderAction(this.targetModule));</span>
+        } else {
+<span class="nc" id="L283">            this.targetClassLoader = doPrivileged(new GetClassLoaderAction(this.getClass()));</span>
+        }
+<span class="nc" id="L285">        built = true;</span>
+<span class="nc" id="L286">        return new SimpleDirContextFactory();</span>
+    }
+
+    private void assertNotBuilt() {
+<span class="nc bnc" id="L290" title="All 2 branches missed.">        if (built) {</span>
+<span class="nc" id="L291">            throw log.builderAlreadyBuilt();</span>
+        }
+<span class="nc" id="L293">    }</span>
+
+<span class="nc" id="L295">    private class SimpleDirContextFactory implements DirContextFactory {</span>
+
+        @Override
+        public DirContext obtainDirContext(ReferralMode mode) throws NamingException {
+<span class="nc" id="L299">            String securityPrincipal = SimpleDirContextFactoryBuilder.this.securityPrincipal;</span>
+<span class="nc" id="L300">            char[] charPassword = null;</span>
+<span class="nc bnc" id="L301" title="All 2 branches missed.">            if (securityCredential != null) { // password from String</span>
+<span class="nc" id="L302">                charPassword = securityCredential.toCharArray();</span>
+<span class="nc bnc" id="L303" title="All 2 branches missed.">            } else if (credentialSource != null) { // password from CredentialSource</span>
+<span class="nc" id="L304">                ClearPassword password = null;</span>
+                try {
+<span class="nc" id="L306">                    PasswordCredential credential = credentialSource.getCredential(PasswordCredential.class);</span>
+<span class="nc bnc" id="L307" title="All 2 branches missed.">                    if (credential == null) throw log.couldNotObtainCredential();</span>
+<span class="nc" id="L308">                    password = credential.getPassword(ClearPassword.class);</span>
+<span class="nc bnc" id="L309" title="All 2 branches missed.">                    if (password == null) throw log.couldNotObtainCredential();</span>
+<span class="nc" id="L310">                    charPassword = password.getPassword();</span>
+<span class="nc" id="L311">                } catch (Exception e) {</span>
+<span class="nc" id="L312">                    throw log.couldNotObtainCredentialWithCause(e);</span>
+                } finally {
+                    try {
+<span class="nc bnc" id="L315" title="All 2 branches missed.">                        if (password != null) password.destroy();</span>
+<span class="nc" id="L316">                    } catch (DestroyFailedException e){</span>
+<span class="nc" id="L317">                        log.credentialDestroyingFailed(e);</span>
+<span class="nc" id="L318">                    }</span>
+                }
+<span class="nc bnc" id="L320" title="All 2 branches missed.">            } else if (authenticationContext != null) { // password from AuthenticationContext</span>
+<span class="nc" id="L321">                ClearPassword password = null;</span>
+                try {
+<span class="nc" id="L323">                    URI uri = new URI(providerUrl.split(&quot; &quot;)[0]); // only first URI used for AC resolution</span>
+<span class="nc" id="L324">                    AuthenticationConfiguration configuration = authClient.getAuthenticationConfiguration(uri, authenticationContext, 0, null, null);</span>
+
+<span class="nc" id="L326">                    NameCallback nameCallback = new NameCallback(&quot;LDAP principal&quot;);</span>
+<span class="nc" id="L327">                    CredentialCallback credentialCallback = new CredentialCallback(PasswordCredential.class, ClearPassword.ALGORITHM_CLEAR);</span>
+                    try {
+<span class="nc" id="L329">                        authClient.getCallbackHandler(configuration).handle(new Callback[]{nameCallback, credentialCallback});</span>
+<span class="nc" id="L330">                    } catch (Exception e) {</span>
+<span class="nc" id="L331">                        throw log.couldNotObtainCredentialWithCause(e);</span>
+<span class="nc" id="L332">                    }</span>
+
+<span class="nc" id="L334">                    securityPrincipal = nameCallback.getName();</span>
+<span class="nc" id="L335">                    PasswordCredential credential = credentialCallback.getCredential(PasswordCredential.class);</span>
+<span class="nc bnc" id="L336" title="All 2 branches missed.">                    if (credential == null) throw log.couldNotObtainCredential();</span>
+<span class="nc" id="L337">                    password = credential.getPassword(ClearPassword.class);</span>
+<span class="nc bnc" id="L338" title="All 2 branches missed.">                    if (password == null) throw log.couldNotObtainCredential();</span>
+<span class="nc" id="L339">                    charPassword = password.getPassword();</span>
+<span class="nc" id="L340">                } catch (Exception e) {</span>
+<span class="nc" id="L341">                    throw log.obtainingDirContextCredentialFromAuthenticationContextFailed(e);</span>
+                } finally {
+                    try {
+<span class="nc bnc" id="L344" title="All 2 branches missed.">                        if (password != null) password.destroy();</span>
+<span class="nc" id="L345">                    } catch (DestroyFailedException e){</span>
+<span class="nc" id="L346">                        log.credentialDestroyingFailed(e);</span>
+<span class="nc" id="L347">                    }</span>
+                }
+            }
+<span class="nc" id="L350">            return createDirContext(securityPrincipal, charPassword, mode, getSocketFactory());</span>
+        }
+
+        @Override
+        public DirContext obtainDirContext(CallbackHandler handler, ReferralMode mode) throws NamingException {
+<span class="nc" id="L355">            NameCallback nameCallback = new NameCallback(&quot;Principal Name&quot;);</span>
+<span class="nc" id="L356">            PasswordCallback passwordCallback = new PasswordCallback(&quot;Password&quot;, false);</span>
+
+            try {
+<span class="nc" id="L359">                handler.handle(new Callback[] {nameCallback, passwordCallback});</span>
+<span class="nc" id="L360">            } catch (Exception e) {</span>
+<span class="nc" id="L361">                throw log.couldNotObtainCredentialWithCause(e);</span>
+<span class="nc" id="L362">            }</span>
+
+<span class="nc" id="L364">            String securityPrincipal = nameCallback.getName();</span>
+
+<span class="nc bnc" id="L366" title="All 2 branches missed.">            if (securityPrincipal == null) {</span>
+<span class="nc" id="L367">                throw log.couldNotObtainPrincipal();</span>
+            }
+
+<span class="nc" id="L370">            char[] securityCredential = passwordCallback.getPassword();</span>
+
+<span class="nc bnc" id="L372" title="All 2 branches missed.">            if (securityCredential == null) {</span>
+<span class="nc" id="L373">                throw log.couldNotObtainCredential();</span>
+            }
+
+<span class="nc" id="L376">            return createDirContext(securityPrincipal, securityCredential, mode, getSocketFactory());</span>
+        }
+
+        private SocketFactory getSocketFactory() throws NamingException {
+<span class="nc bnc" id="L380" title="All 4 branches missed.">            if (socketFactory == null &amp;&amp; authenticationContext != null) {</span>
+                try {
+<span class="nc" id="L382">                    URI uri = new URI(providerUrl.split(&quot; &quot;)[0]); // only first URI used for AC resolution</span>
+<span class="nc bnc" id="L383" title="All 2 branches missed.">                    if ( ! uri.getScheme().equalsIgnoreCase(LDAPS_SCHEME)) {</span>
+<span class="nc" id="L384">                        return socketFactory; // non-SSL connection</span>
+                    }
+<span class="nc" id="L386">                    SecurityFactory&lt;SSLContext&gt; sslContextFactory = authClient.getSSLContextFactory(uri, authenticationContext, null, null);</span>
+<span class="nc" id="L387">                    return sslContextFactory.create().getSocketFactory();</span>
+<span class="nc" id="L388">                } catch (Exception e) {</span>
+<span class="nc" id="L389">                    throw log.obtainingDirContextCredentialFromAuthenticationContextFailed(e);</span>
+                }
+            }
+<span class="nc" id="L392">            return socketFactory;</span>
+        }
+
+        private DirContext createDirContext(String securityPrincipal, char[] securityCredential, ReferralMode mode, SocketFactory socketFactory) throws NamingException {
+<span class="nc" id="L396">            final ClassLoader oldClassLoader = setClassLoaderTo(targetClassLoader);</span>
+            try{
+<span class="nc" id="L398">                Hashtable&lt;String, Object&gt; env = new Hashtable&lt;&gt;();</span>
+
+<span class="nc" id="L400">                env.put(InitialDirContext.INITIAL_CONTEXT_FACTORY, initialContextFactory);</span>
+<span class="nc" id="L401">                env.put(InitialDirContext.PROVIDER_URL, providerUrl);</span>
+<span class="nc" id="L402">                env.put(InitialDirContext.SECURITY_AUTHENTICATION, securityAuthentication);</span>
+<span class="nc bnc" id="L403" title="All 2 branches missed.">                if (securityPrincipal != null) env.put(InitialDirContext.SECURITY_PRINCIPAL, securityPrincipal);</span>
+<span class="nc bnc" id="L404" title="All 2 branches missed.">                if (securityCredential != null) env.put(InitialDirContext.SECURITY_CREDENTIALS, securityCredential);</span>
+<span class="nc bnc" id="L405" title="All 2 branches missed.">                env.put(InitialDirContext.REFERRAL, mode == null ? ReferralMode.IGNORE.getValue() : mode.getValue());</span>
+<span class="nc bnc" id="L406" title="All 2 branches missed.">                if (socketFactory != null) env.put(SOCKET_FACTORY, ThreadLocalSSLSocketFactory.class.getName());</span>
+<span class="nc" id="L407">                env.put(CONNECT_TIMEOUT, Integer.toString(connectTimeout));</span>
+<span class="nc" id="L408">                env.put(READ_TIMEOUT, Integer.toString(readTimeout));</span>
+
+                // set any additional connection property
+<span class="nc bnc" id="L411" title="All 2 branches missed.">                if (connectionProperties != null) {</span>
+<span class="nc bnc" id="L412" title="All 2 branches missed.">                    for (Object key : connectionProperties.keySet()) {</span>
+<span class="nc" id="L413">                        Object value = connectionProperties.get(key.toString());</span>
+
+<span class="nc bnc" id="L415" title="All 2 branches missed.">                        if (value != null) {</span>
+<span class="nc" id="L416">                            env.put(key.toString(), value);</span>
+                        }
+<span class="nc" id="L418">                    }</span>
+                }
+
+<span class="nc bnc" id="L421" title="All 2 branches missed.">                if (log.isDebugEnabled()) {</span>
+<span class="nc" id="L422">                    log.debugf(&quot;Creating [&quot; + InitialDirContext.class + &quot;] with environment:&quot;);</span>
+<span class="nc" id="L423">                    env.forEach((key, value) -&gt; log.debugf(&quot;    Property [%s] with value [%s]&quot;, key,</span>
+<span class="nc bnc" id="L424" title="All 2 branches missed.">                            key.equals(InitialDirContext.SECURITY_CREDENTIALS) ? &quot;******&quot; : Arrays2.objectToString(value)));</span>
+                }
+
+                InitialLdapContext initialContext;
+
+                try {
+<span class="nc bnc" id="L430" title="All 2 branches missed.">                    if (socketFactory != null) ThreadLocalSSLSocketFactory.set(socketFactory);</span>
+<span class="nc" id="L431">                    initialContext = new InitialLdapContext(env, null);</span>
+<span class="nc" id="L432">                } catch (NamingException ne) {</span>
+<span class="nc" id="L433">                    log.debugf(ne, &quot;Could not create [%s]. Failed to connect to LDAP server.&quot;, InitialLdapContext.class);</span>
+<span class="nc" id="L434">                    throw ne;</span>
+                } finally {
+<span class="nc bnc" id="L436" title="All 2 branches missed.">                    if (socketFactory != null) ThreadLocalSSLSocketFactory.unset();</span>
+                }
+
+<span class="nc" id="L439">                log.debugf(&quot;[%s] successfully created. Connection established to LDAP server.&quot;, initialContext);</span>
+
+<span class="nc" id="L441">                return new DelegatingLdapContext(initialContext, this::returnContext, socketFactory);</span>
+            } finally{
+<span class="nc" id="L443">                setClassLoaderTo(oldClassLoader);</span>
+            }
+        }
+
+        @Override
+        public void returnContext(DirContext context) {
+
+<span class="nc bnc" id="L450" title="All 2 branches missed.">            if (context == null) {</span>
+<span class="nc" id="L451">                return;</span>
+            }
+
+<span class="nc bnc" id="L454" title="All 2 branches missed.">            if (context instanceof InitialDirContext) {</span>
+<span class="nc" id="L455">                final ClassLoader oldClassLoader = setClassLoaderTo(targetClassLoader);</span>
+                try {
+<span class="nc" id="L457">                    context.close();</span>
+<span class="nc" id="L458">                    log.debugf(&quot;Context [%s] was closed. Connection closed or just returned to the pool.&quot;, context);</span>
+<span class="nc" id="L459">                } catch (NamingException ignored) {</span>
+                } finally {
+<span class="nc" id="L461">                    setClassLoaderTo(oldClassLoader);</span>
+                }
+            }
+<span class="nc" id="L464">        }</span>
+
+        private ClassLoader setClassLoaderTo(final ClassLoader targetClassLoader){
+<span class="nc" id="L467">            return doPrivileged(new SetContextClassLoaderAction(targetClassLoader));</span>
+        }
+    }
+
+    private static &lt;T&gt; T doPrivileged(final PrivilegedAction&lt;T&gt; action) {
+<span class="nc bnc" id="L472" title="All 2 branches missed.">        return System.getSecurityManager() != null ? AccessController.doPrivileged(action) : action.run();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,313 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>StringPrep.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.util</a> &gt; <span class="el_source">StringPrep.java</span></div><h1>StringPrep.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.util;
+
+import static org.wildfly.security.sasl._private.ElytronMessages.log;
+
+import java.text.Normalizer;
+
+/**
+ * Preparation of Internationalized Strings (&quot;stringprep&quot;) by RFC 3454
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:jkalina@redhat.com&quot;&gt;Jan Kalina&lt;/a&gt;
+ */
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">public final class StringPrep {</span>
+    // these flags must keep their numeric values permanently, and must not conflict
+
+    // mappings
+
+    public static final long MAP_TO_NOTHING             = 1L &lt;&lt; 0;
+    public static final long MAP_TO_SPACE               = 1L &lt;&lt; 1;
+    // XXX case folding would go here
+
+    public static final long MAP_SCRAM_LOGIN_CHARS      = 1L &lt;&lt; 30;
+    public static final long MAP_GS2_LOGIN_CHARS        = 1L &lt;&lt; 31;
+
+    public static final long UNMAP_SCRAM_LOGIN_CHARS    = 1L &lt;&lt; 28;
+    public static final long UNMAP_GS2_LOGIN_CHARS      = 1L &lt;&lt; 29;
+
+    // normalizations
+
+    public static final long NORMALIZE_KC               = 1L &lt;&lt; 2;
+
+    // prohibitions
+
+    public static final long FORBID_NON_ASCII_SPACES                = 1L &lt;&lt; 3;
+    public static final long FORBID_ASCII_CONTROL                   = 1L &lt;&lt; 4;
+    public static final long FORBID_NON_ASCII_CONTROL               = 1L &lt;&lt; 5;
+    public static final long FORBID_PRIVATE_USE                     = 1L &lt;&lt; 6;
+    public static final long FORBID_NON_CHARACTER                   = 1L &lt;&lt; 7;
+    public static final long FORBID_SURROGATE                       = 1L &lt;&lt; 8;
+    public static final long FORBID_INAPPROPRIATE_FOR_PLAIN_TEXT    = 1L &lt;&lt; 9;
+    public static final long FORBID_INAPPROPRIATE_FOR_CANON_REP     = 1L &lt;&lt; 10;
+    public static final long FORBID_CHANGE_DISPLAY_AND_DEPRECATED   = 1L &lt;&lt; 11;
+    public static final long FORBID_TAGGING                         = 1L &lt;&lt; 12;
+    public static final long FORBID_UNASSIGNED                      = 1L &lt;&lt; 13;
+
+    public static final long PROFILE_SASL_QUERY = 0
+        | MAP_TO_NOTHING
+        | MAP_TO_SPACE
+        | NORMALIZE_KC
+        | FORBID_NON_ASCII_SPACES
+        | FORBID_ASCII_CONTROL
+        | FORBID_NON_ASCII_CONTROL
+        | FORBID_PRIVATE_USE
+        | FORBID_NON_CHARACTER
+        | FORBID_SURROGATE
+        | FORBID_INAPPROPRIATE_FOR_PLAIN_TEXT
+        | FORBID_INAPPROPRIATE_FOR_CANON_REP
+        | FORBID_CHANGE_DISPLAY_AND_DEPRECATED
+        | FORBID_TAGGING;
+
+    public static final long PROFILE_SASL_STORED = 0
+        | PROFILE_SASL_QUERY
+        | FORBID_UNASSIGNED;
+
+    public static final long PROFILE_SASL_STORED_NON_NORMALIZED = (0
+            | PROFILE_SASL_STORED)
+            &amp; ~NORMALIZE_KC;
+
+    // StringPrep section 3 - Mapping
+
+    public static boolean mapCodePointToNothing(int input) {
+<span class="fc bfc" id="L90" title="All 22 branches covered.">        return input == 0xAD</span>
+            || input == 0x034F
+            || input == 0x1806
+            || input &gt;= 0x180B &amp;&amp; input &lt;= 0x180D
+            || input &gt;= 0x200B &amp;&amp; input &lt;= 0x200D
+            || input == 0x2060
+            || input &gt;= 0xFE00 &amp;&amp; input &lt;= 0xFE0F
+            || input == 0xFEFF;
+    }
+
+    public static boolean mapCodePointToSpace(int input) {
+<span class="fc bfc" id="L101" title="All 14 branches covered.">        return input == 0xA0</span>
+            || input == 0x1680
+            || input &gt;= 0x2000 &amp;&amp; input &lt;= 0x200B
+            || input == 0x202F
+            || input == 0x205F
+            || input == 0x3000;
+    }
+
+    // StringPrep section 5 - Prohibited I/O
+
+    public static void forbidNonAsciiSpaces(int input) {
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (mapCodePointToSpace(input)) {</span>
+<span class="fc" id="L113">            throw log.invalidNonAsciiSpace(input);</span>
+        }
+<span class="fc" id="L115">    }</span>
+
+    public static void forbidAsciiControl(int input) {
+<span class="fc bfc" id="L118" title="All 4 branches covered.">        if (input &lt; 0x20 || input == 0x7F) {</span>
+<span class="fc" id="L119">            throw log.invalidAsciiControl(input);</span>
+        }
+<span class="fc" id="L121">    }</span>
+
+    public static void forbidNonAsciiControl(int input) {
+<span class="fc bfc" id="L124" title="All 36 branches covered.">        if (input &gt;= 0x80 &amp;&amp; input &lt;= 0x9F</span>
+            || input == 0x06DD
+            || input == 0x070F
+            || input == 0x180E
+            || input &gt;= 0x200C &amp;&amp; input &lt;= 0x200D
+            || input &gt;= 0x2028 &amp;&amp; input &lt;= 0x2029
+            || input &gt;= 0x2060 &amp;&amp; input &lt;= 0x2063
+            || input &gt;= 0x206A &amp;&amp; input &lt;= 0x206F
+            || input == 0xFEFF
+            || input &gt;= 0xFFF9 &amp;&amp; input &lt;= 0xFFFC
+            || input &gt;= 0x01D173 &amp;&amp; input &lt;= 0x01D17A
+        ) {
+<span class="fc" id="L136">            throw log.invalidNonAsciiControl(input);</span>
+        }
+<span class="fc" id="L138">    }</span>
+
+    public static void forbidPrivateUse(int input) {
+<span class="fc bfc" id="L141" title="All 12 branches covered.">        if (input &gt;= 0xE000 &amp;&amp; input &lt;= 0xF8FF || input &gt;= 0xF0000 &amp;&amp; input &lt;= 0xFFFFD || input &gt;= 0x100000 &amp;&amp; input &lt;= 0x10FFFD) {</span>
+<span class="fc" id="L142">            throw log.invalidPrivateUseCharacter(input);</span>
+        }
+<span class="fc" id="L144">    }</span>
+
+    public static void forbidNonCharacter(int input) {
+<span class="fc bfc" id="L147" title="All 6 branches covered.">        if ((input &amp; 0xFFFE) == 0xFFFE || input &gt;= 0xFDD0 &amp;&amp; input &lt;= 0xFDEF) {</span>
+<span class="fc" id="L148">            throw log.invalidNonCharacterCodePoint(input);</span>
+        }
+<span class="fc" id="L150">    }</span>
+
+    public static void forbidSurrogate(int input) {
+<span class="pc bpc" id="L153" title="1 of 4 branches missed.">        if (input &gt;= 0xD800 &amp;&amp; input &lt;= 0xDFFF) {</span>
+<span class="nc" id="L154">            throw log.invalidSurrogateCodePoint(input);</span>
+        }
+<span class="fc" id="L156">    }</span>
+
+    public static void forbidInappropriateForPlainText(int input) {
+<span class="fc bfc" id="L159" title="All 4 branches covered.">        if (input &gt;= 0xFFF9 &amp;&amp; input &lt;= 0xFFFD) {</span>
+<span class="fc" id="L160">            throw log.invalidPlainTextCodePoint(input);</span>
+        }
+<span class="fc" id="L162">    }</span>
+
+    public static void forbidInappropriateForCanonicalRepresentation(int input) {
+<span class="fc bfc" id="L165" title="All 4 branches covered.">        if (input &gt;= 0x2FF0 &amp;&amp; input &lt;= 0x2FFB) {</span>
+<span class="fc" id="L166">            throw log.invalidNonCanonicalCodePoint(input);</span>
+        }
+<span class="fc" id="L168">    }</span>
+
+    public static void forbidChangeDisplayPropertiesOrDeprecated(int input) {
+<span class="fc bfc" id="L171" title="All 16 branches covered.">        if (input &gt;= 0x0340 &amp;&amp; input &lt;= 0x0341</span>
+            || input &gt;= 0x200E &amp;&amp; input &lt;= 0x200F
+            || input &gt;= 0x202A &amp;&amp; input &lt;= 0x202E
+            || input &gt;= 0x206A &amp;&amp; input &lt;= 0x206F) {
+<span class="fc" id="L175">            throw log.invalidControlCharacter(input);</span>
+        }
+<span class="fc" id="L177">    }</span>
+
+    public static void forbidTagging(int input) {
+<span class="pc bpc" id="L180" title="1 of 6 branches missed.">        if (input == 0x0E0001 || input &gt;= 0x0E0020 &amp;&amp; input &lt;= 0x0E007F) {</span>
+<span class="fc" id="L181">            throw log.invalidTaggingCharacter(input);</span>
+        }
+<span class="fc" id="L183">    }</span>
+
+    public static void forbidUnassigned(int input) {
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        if (Character.getType(input) == Character.UNASSIGNED) {</span>
+<span class="nc" id="L187">            throw log.unassignedCodePoint(input);</span>
+        }
+<span class="nc" id="L189">    }</span>
+
+    private static boolean isSet(long test, long bit) {
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        return (test &amp; bit) != 0L;</span>
+    }
+
+    // Encoding
+
+    public static void encode(char[] string, org.wildfly.common.bytes.ByteStringBuilder target, long profile) {
+<span class="nc" id="L198">        encode(new String(string), target, profile);</span>
+<span class="nc" id="L199">    }</span>
+
+    public static void encode(String string, org.wildfly.common.bytes.ByteStringBuilder target, long profile) {
+        // technically we're supposed to normalize after mapping, but it should be equivalent if we don't
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        if (isSet(profile, NORMALIZE_KC)) string = Normalizer.normalize(string, Normalizer.Form.NFKC);</span>
+<span class="fc" id="L204">        final int len = string.length();</span>
+<span class="fc" id="L205">        boolean isRALString = false;</span>
+<span class="fc" id="L206">        boolean first = true;</span>
+<span class="fc" id="L207">        int i = 0;</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        while (i &lt; len) {</span>
+<span class="fc" id="L209">            char ch = string.charAt(i++);</span>
+            int cp;
+<span class="fc bfc" id="L211" title="All 2 branches covered.">            if (Character.isHighSurrogate(ch)) {</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">                if (i == len) {</span>
+<span class="nc" id="L213">                    throw log.invalidSurrogatePairHightAtEnd(ch);</span>
+                }
+<span class="fc" id="L215">                char low = string.charAt(i++);</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">                if (!Character.isLowSurrogate(low)) {</span>
+<span class="nc" id="L217">                    throw log.invalidSurrogatePairSecondIsNotLow(ch, low);</span>
+                }
+<span class="fc" id="L219">                cp = Character.toCodePoint(ch, low);</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">            } else if (Character.isLowSurrogate(ch)) {</span>
+<span class="nc" id="L221">                throw log.invalidSurrogatePairLowWithoutHigh(ch);</span>
+            } else {
+<span class="fc" id="L223">                cp = ch;</span>
+            }
+
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">            if (!Character.isValidCodePoint(cp)) {</span>
+<span class="nc" id="L227">                throw log.invalidCodePoint(cp);</span>
+            }
+
+<span class="pc bpc" id="L230" title="3 of 6 branches missed.">            assert Character.MIN_CODE_POINT &lt;= cp &amp;&amp; cp &lt;= Character.MAX_CODE_POINT;</span>
+
+            // StringPrep 6 - Bidirectional Characters
+<span class="fc bfc" id="L233" title="All 3 branches covered.">            switch (Character.getDirectionality(cp)) {</span>
+                case Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC:
+                case Character.DIRECTIONALITY_RIGHT_TO_LEFT: // R/AL character
+<span class="fc bfc" id="L236" title="All 2 branches covered.">                    if (first) {</span>
+<span class="fc" id="L237">                        isRALString = true;</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">                    } else if (!isRALString) {</span>
+<span class="fc" id="L239">                        throw log.disallowedRalDirectionalityInL();</span>
+                    }
+                    break;
+                case Character.DIRECTIONALITY_LEFT_TO_RIGHT: // L character
+<span class="fc bfc" id="L243" title="All 2 branches covered.">                    if (isRALString) {</span>
+<span class="fc" id="L244">                        throw log.disallowedLDirectionalityInRal();</span>
+                    }
+                    break;
+                default: // neutral character
+<span class="fc bfc" id="L248" title="All 4 branches covered.">                    if (i == len &amp;&amp; isRALString) {</span>
+<span class="fc" id="L249">                        throw log.missingTrailingRal();</span>
+                    }
+            }
+<span class="fc bfc" id="L252" title="All 2 branches covered.">            if (first) {</span>
+<span class="fc" id="L253">                first = false;</span>
+            }
+
+            // StringPrep 3 - Mapping
+<span class="fc bfc" id="L257" title="All 4 branches covered.">            if (isSet(profile, MAP_TO_NOTHING) &amp;&amp; mapCodePointToNothing(cp)) continue;</span>
+<span class="fc bfc" id="L258" title="All 4 branches covered.">            if (isSet(profile, MAP_TO_SPACE) &amp;&amp; mapCodePointToSpace(cp)) {</span>
+<span class="fc" id="L259">                target.append(' ');</span>
+<span class="fc" id="L260">                continue;</span>
+            }
+
+            // Escaping used in GS2 and SCRAM username/authzid (RFC 5801,5802)
+<span class="pc bpc" id="L264" title="1 of 4 branches missed.">            if (isSet(profile, MAP_SCRAM_LOGIN_CHARS) || isSet(profile, MAP_GS2_LOGIN_CHARS)) {</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">                if (cp == '=') {</span>
+<span class="fc" id="L266">                    target.append('=').append('3').append('D');</span>
+<span class="fc" id="L267">                    continue;</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">                } else if (cp == ',') {</span>
+<span class="fc" id="L269">                    target.append('=').append('2').append('C');</span>
+<span class="fc" id="L270">                    continue;</span>
+                }
+            }
+
+            // Unescaping used in GS2 and SCRAM username/authzid (RFC 5801,5802)
+<span class="pc bpc" id="L275" title="1 of 4 branches missed.">            else if (isSet(profile, UNMAP_SCRAM_LOGIN_CHARS) || isSet(profile, UNMAP_GS2_LOGIN_CHARS)) {</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">                if (cp == '=') {</span>
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">                    if (i + 1 &gt;= len) {</span>
+<span class="nc" id="L278">                        throw log.invalidEscapeSequence();</span>
+                    }
+<span class="fc" id="L280">                    char ch1 = string.charAt(i++);</span>
+<span class="fc" id="L281">                    char ch2 = string.charAt(i++);</span>
+
+<span class="pc bpc" id="L283" title="1 of 4 branches missed.">                    if (ch1 == '3' &amp;&amp; ch2 == 'D') {</span>
+<span class="fc" id="L284">                        target.append('=');</span>
+<span class="fc" id="L285">                        continue;</span>
+<span class="pc bpc" id="L286" title="2 of 4 branches missed.">                    } else if (ch1 == '2' &amp;&amp; ch2 == 'C') {</span>
+<span class="fc" id="L287">                        target.append(',');</span>
+<span class="fc" id="L288">                        continue;</span>
+                    } else {
+<span class="nc" id="L290">                        throw log.invalidEscapeSequence();</span>
+                    }
+                }
+            }
+
+            // StringPrep 5 - Prohibition
+<span class="fc bfc" id="L296" title="All 2 branches covered.">            if (isSet(profile, FORBID_NON_ASCII_SPACES)) forbidNonAsciiSpaces(cp);</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">            if (isSet(profile, FORBID_ASCII_CONTROL)) forbidAsciiControl(cp);</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">            if (isSet(profile, FORBID_NON_ASCII_CONTROL)) forbidNonAsciiControl(cp);</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">            if (isSet(profile, FORBID_PRIVATE_USE)) forbidPrivateUse(cp);</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">            if (isSet(profile, FORBID_NON_CHARACTER)) forbidNonCharacter(cp);</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">            if (isSet(profile, FORBID_SURROGATE)) forbidSurrogate(cp);</span>
+<span class="fc bfc" id="L302" title="All 2 branches covered.">            if (isSet(profile, FORBID_INAPPROPRIATE_FOR_PLAIN_TEXT)) forbidInappropriateForPlainText(cp);</span>
+<span class="fc bfc" id="L303" title="All 2 branches covered.">            if (isSet(profile, FORBID_INAPPROPRIATE_FOR_CANON_REP)) forbidInappropriateForCanonicalRepresentation(cp);</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">            if (isSet(profile, FORBID_CHANGE_DISPLAY_AND_DEPRECATED)) forbidChangeDisplayPropertiesOrDeprecated(cp);</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">            if (isSet(profile, FORBID_TAGGING)) forbidTagging(cp);</span>
+<span class="pc bpc" id="L306" title="1 of 2 branches missed.">            if (isSet(profile, FORBID_UNASSIGNED)) forbidUnassigned(cp);</span>
+
+            // Now, encode that one
+<span class="fc" id="L309">            target.appendUtf8Raw(cp);</span>
+<span class="fc" id="L310">        }</span>
+<span class="fc" id="L311">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

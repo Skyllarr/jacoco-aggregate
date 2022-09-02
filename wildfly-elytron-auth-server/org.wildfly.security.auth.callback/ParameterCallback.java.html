@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ParameterCallback.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.callback</a> &gt; <span class="el_source">ParameterCallback.java</span></div><h1>ParameterCallback.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.callback;
+
+import static org.wildfly.security.auth.server._private.ElytronMessages.log;
+
+import java.io.Serializable;
+import java.security.spec.AlgorithmParameterSpec;
+
+/**
+ * A callback used to acquire parameter specifications, either for outbound or inbound authentication.  The supplied parameter
+ * information may be used to select an authentication mechanism, or to set parameters for an establishing mechanism.
+ * The supplied parameter specification should be of a &lt;em&gt;supported&lt;/em&gt;
+ * type; the {@link #isParameterSupported(AlgorithmParameterSpec)} and {@link #isParameterTypeSupported(Class)} methods can be
+ * used to query the types that are supported.  If no credential is available, {@code null} is set, and
+ * authentication may fail.  If an unsupported credential type is set, authentication may fail.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class ParameterCallback implements ExtendedCallback, Serializable {
+
+    private static final long serialVersionUID = -6000106115779144082L;
+
+    /**
+     * @serial The list of allowed parameter specification types.
+     */
+    private final Class&lt;? extends AlgorithmParameterSpec&gt;[] allowedTypes;
+    /**
+     * @serial The algorithm parameter specification.
+     */
+    private AlgorithmParameterSpec parameterSpec;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param allowedTypes the allowed types of parameter specification
+     */
+    @SafeVarargs
+<span class="nc" id="L55">    public ParameterCallback(final Class&lt;? extends AlgorithmParameterSpec&gt;... allowedTypes) {</span>
+<span class="nc" id="L56">        this.allowedTypes = allowedTypes;</span>
+<span class="nc" id="L57">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param parameterSpec the default parameter spec value, if any
+     * @param allowedTypes the allowed types of parameter spec
+     */
+    @SafeVarargs
+<span class="nc" id="L66">    public ParameterCallback(final AlgorithmParameterSpec parameterSpec, final Class&lt;? extends AlgorithmParameterSpec&gt;... allowedTypes) {</span>
+<span class="nc" id="L67">        this.allowedTypes = allowedTypes;</span>
+<span class="nc" id="L68">        this.parameterSpec = parameterSpec;</span>
+<span class="nc" id="L69">    }</span>
+
+    /**
+     * Get the parameter specification.
+     *
+     * @return the parameter specification, or {@code null} if it wasn't set yet
+     */
+    public AlgorithmParameterSpec getParameterSpec() {
+<span class="nc" id="L77">        return parameterSpec;</span>
+    }
+
+    /**
+     * Set the parameter specification.
+     *
+     * @param parameterSpec the parameter specification, or {@code null} if no parameter specification is available
+     */
+    public void setParameterSpec(final AlgorithmParameterSpec parameterSpec) {
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        if (! isParameterSupported(parameterSpec)) {</span>
+<span class="nc" id="L87">            throw log.invalidCredentialTypeSpecified();</span>
+        }
+<span class="nc" id="L89">        this.parameterSpec = parameterSpec;</span>
+<span class="nc" id="L90">    }</span>
+
+    /**
+     * Determine whether a parameter specification would be supported by the authentication.
+     *
+     * @param parameterSpec the parameter specification to test
+     * @return {@code true} if the parameter specification is non-{@code null} and supported, {@code false} otherwise
+     */
+    public boolean isParameterSupported(final AlgorithmParameterSpec parameterSpec) {
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        for (final Class&lt;?&gt; allowedType : allowedTypes) {</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">            if (allowedType.isInstance(parameterSpec)) return true;</span>
+        }
+<span class="nc" id="L102">        return false;</span>
+    }
+
+    /**
+     * Determine whether a credential type would be supported by the authentication.
+     *
+     * @param parameterType the parameter specification type to test
+     * @return {@code true} if the parameter specification type is supported, {@code false} otherwise
+     */
+    public boolean isParameterTypeSupported(final Class&lt;? extends AlgorithmParameterSpec&gt; parameterType) {
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        for (final Class&lt;? extends AlgorithmParameterSpec&gt; allowedType : allowedTypes) {</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">            if (allowedType.isAssignableFrom(parameterType)) return true;</span>
+        }
+<span class="nc" id="L115">        return false;</span>
+    }
+
+    public boolean isOptional() {
+<span class="nc bnc" id="L119" title="All 2 branches missed.">        return parameterSpec != null;</span>
+    }
+
+    public boolean needsInformation() {
+<span class="nc" id="L123">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,336 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Oidc.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-oidc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.oidc</a> &gt; <span class="el_source">Oidc.java</span></div><h1>Oidc.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2020 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.http.oidc;
+
+import static org.wildfly.security.http.oidc.ElytronMessages.log;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.Map;
+import java.util.StringTokenizer;
+import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.HttpRequestBase;
+import org.jose4j.jws.AlgorithmIdentifiers;
+import org.wildfly.security.jose.util.JsonSerialization;
+
+/**
+ * Constants and utility methods related to the OpenID Connect HTTP mechanism.
+ *
+ * @author &lt;a href=&quot;mailto:mposolda@redhat.com&quot;&gt;Marek Posolda&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+<span class="nc" id="L45">public class Oidc {</span>
+
+    public static final String OIDC_NAME = &quot;OIDC&quot;;
+    public static final String JSON_CONTENT_TYPE = &quot;application/json&quot;;
+    public static final String HTML_CONTENT_TYPE = &quot;text/html&quot;;
+    public static final String WILDCARD_CONTENT_TYPE = &quot;*/*&quot;;
+    public static final String TEXT_CONTENT_TYPE = &quot;text/*&quot;;
+    public static final String DISCOVERY_PATH = &quot;.well-known/openid-configuration&quot;;
+    public static final String KEYCLOAK_REALMS_PATH = &quot;realms/&quot;;
+    public static final String JSON_CONFIG_CONTEXT_PARAM = &quot;org.wildfly.security.http.oidc.json.config&quot;;
+    static final String ACCOUNT_PATH = &quot;account&quot;;
+    public static final String CLIENTS_MANAGEMENT_REGISTER_NODE_PATH = &quot;clients-managements/register-node&quot;;
+    public static final String CLIENTS_MANAGEMENT_UNREGISTER_NODE_PATH = &quot;clients-managements/unregister-node&quot;;
+    public static final String SLASH = &quot;/&quot;;
+<span class="fc" id="L59">    public static final String OIDC_CLIENT_CONTEXT_KEY = OidcClientContext.class.getName();</span>
+    public static final String CLIENT_ID = &quot;client_id&quot;;
+    public static final String CODE = &quot;code&quot;;
+    public static final String ERROR = &quot;error&quot;;
+    public static final String GRANT_TYPE = &quot;grant_type&quot;;
+    public static final String LOGIN_HINT = &quot;login_hint&quot;;
+    public static final String DOMAIN_HINT = &quot;domain_hint&quot;;
+    public static final String MAX_AGE = &quot;max_age&quot;;
+    public static final String PASSWORD = &quot;password&quot;;
+    public static final String PROMPT = &quot;prompt&quot;;
+    public static final String SCOPE = &quot;scope&quot;;
+    public static final String UI_LOCALES = &quot;ui_locales&quot;;
+    public static final String USERNAME = &quot;username&quot;;
+    public static final String OIDC_SCOPE = &quot;openid&quot;;
+    public static final String REDIRECT_URI = &quot;redirect_uri&quot;;
+    public static final String REFRESH_TOKEN = &quot;refresh_token&quot;;
+    public static final String RESPONSE_TYPE = &quot;response_type&quot;;
+    public static final String SESSION_STATE = &quot;session_state&quot;;
+    public static final String STATE = &quot;state&quot;;
+    public static final int INVALID_ISSUED_FOR_CLAIM = -1;
+    public static final int INVALID_AT_HASH_CLAIM = -2;
+    public static final int INVALID_TYPE_CLAIM = -3;
+    static final String OIDC_CLIENT_CONFIG_RESOLVER = &quot;oidc.config.resolver&quot;;
+    static final String OIDC_CONFIG_FILE_LOCATION = &quot;oidc.config.file&quot;;
+    static final String OIDC_JSON_FILE = &quot;/WEB-INF/oidc.json&quot;;
+    static final String AUTHORIZATION = &quot;authorization&quot;;
+    static final String AUTHORIZATION_CODE = &quot;authorization_code&quot;;
+    static final String CLIENT_ASSERTION_TYPE = &quot;client_assertion_type&quot;;
+    static final String CLIENT_ASSERTION = &quot;client_assertion&quot;;
+    static final String CLIENT_ASSERTION_TYPE_JWT = &quot;urn:ietf:params:oauth:client-assertion-type:jwt-bearer&quot;;
+    static final String RS256 = &quot;SHA256withRSA&quot;;
+    static final String RS384 = &quot;SHA384withRSA&quot;;
+    static final String RS512 = &quot;SHA512withRSA&quot;;
+    static final String HS256 = &quot;HMACSHA256&quot;;
+    static final String HS384 = &quot;HMACSHA384&quot;;
+    static final String HS512 = &quot;HMACSHA512&quot;;
+    static final String ES256 = &quot;SHA256withECDSA&quot;;
+    static final String ES384 = &quot;SHA384withECDSA&quot;;
+    static final String ES512 = &quot;SHA512withECDSA&quot;;
+    public static final String SHA256 = &quot;SHA-256&quot;;
+    public static final String SHA384 = &quot;SHA-384&quot;;
+    public static final String SHA512 = &quot;SHA-512&quot;;
+    static final String PROTOCOL_CLASSPATH = &quot;classpath:&quot;;
+    static final String OIDC_STATE_COOKIE = &quot;OIDC_STATE&quot;;
+    static final String KEYCLOAK_CLIENT_CLUSTER_HOST = &quot;client_cluster_host&quot;;
+    static final String KEYCLOAK_QUERY_BEARER_TOKEN = &quot;k_query_bearer_token&quot;;
+    static final String DEFAULT_TOKEN_SIGNATURE_ALGORITHM = &quot;RS256&quot;;
+
+
+    // keycloak-specific request parameter used to specify the identifier of the identity provider that should be used to authenticate a user
+    public static final String KC_IDP_HINT = &quot;kc_idp_hint&quot;;
+
+   static &lt;T&gt; T sendJsonHttpRequest(OidcClientConfiguration oidcClientConfiguration, HttpRequestBase httpRequest, Class&lt;T&gt; clazz) throws OidcException {
+        try {
+<span class="nc" id="L113">            HttpResponse response = oidcClientConfiguration.getClient().execute(httpRequest);</span>
+<span class="nc" id="L114">            int status = response.getStatusLine().getStatusCode();</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">            if (status != 200) {</span>
+<span class="nc" id="L116">                close(response);</span>
+<span class="nc" id="L117">                log.unexpectedResponseCodeFromOidcProvider(status);</span>
+            }
+<span class="nc" id="L119">            HttpEntity entity = response.getEntity();</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">            if (entity == null) {</span>
+<span class="nc" id="L121">                log.noEntityInResponse();</span>
+            }
+<span class="nc" id="L123">            InputStream is = entity.getContent();</span>
+            try {
+<span class="nc" id="L125">                return JsonSerialization.readValue(is, clazz);</span>
+            } finally {
+                try {
+<span class="nc" id="L128">                    is.close();</span>
+<span class="nc" id="L129">                } catch (IOException ignored) {</span>
+
+<span class="nc" id="L131">                }</span>
+            }
+<span class="nc" id="L133">        } catch (IOException e) {</span>
+<span class="nc" id="L134">            throw log.unexpectedErrorSendingRequestToOidcProvider(e);</span>
+        }
+    }
+
+    private static void close(HttpResponse response) {
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        if (response.getEntity() != null) {</span>
+            try {
+<span class="nc" id="L141">                response.getEntity().getContent().close();</span>
+<span class="nc" id="L142">            } catch (IOException e) {</span>
+
+<span class="nc" id="L144">            }</span>
+        }
+<span class="nc" id="L146">    }</span>
+
+<span class="fc" id="L148">    public enum SSLRequired {</span>
+
+<span class="fc" id="L150">        ALL,</span>
+<span class="fc" id="L151">        EXTERNAL,</span>
+<span class="fc" id="L152">        NONE;</span>
+
+        public boolean isRequired(String address) {
+<span class="nc bnc" id="L155" title="All 4 branches missed.">            switch (this) {</span>
+                case ALL:
+<span class="nc" id="L157">                    return true;</span>
+                case NONE:
+<span class="nc" id="L159">                    return false;</span>
+                case EXTERNAL:
+<span class="nc bnc" id="L161" title="All 2 branches missed.">                    return !isLocal(address);</span>
+                default:
+<span class="nc" id="L163">                    return true;</span>
+            }
+        }
+
+        private boolean isLocal(String remoteAddress) {
+            try {
+<span class="nc" id="L169">                InetAddress inetAddress = InetAddress.getByName(remoteAddress);</span>
+<span class="nc bnc" id="L170" title="All 6 branches missed.">                return inetAddress.isAnyLocalAddress() || inetAddress.isLoopbackAddress() || inetAddress.isSiteLocalAddress();</span>
+<span class="nc" id="L171">            } catch (UnknownHostException e) {</span>
+<span class="nc" id="L172">                return false;</span>
+            }
+        }
+    }
+
+<span class="fc" id="L177">    public enum TokenStore {</span>
+<span class="fc" id="L178">        SESSION,</span>
+<span class="fc" id="L179">        COOKIE</span>
+    }
+
+<span class="nc" id="L182">    public enum ClientCredentialsProviderType {</span>
+<span class="nc" id="L183">        SECRET(&quot;secret&quot;),</span>
+<span class="nc" id="L184">        JWT(&quot;jwt&quot;),</span>
+<span class="nc" id="L185">        SECRET_JWT(&quot;secret-jwt&quot;)</span>
+        ;
+
+        private final String value;
+
+<span class="nc" id="L190">        private ClientCredentialsProviderType(final String value) {</span>
+<span class="nc" id="L191">            this.value = value;</span>
+<span class="nc" id="L192">        }</span>
+
+        /**
+         * Get the string value for this referral mode.
+         *
+         * @return the string value for this referral mode
+         */
+        public String getValue() {
+<span class="nc" id="L200">            return value;</span>
+        }
+
+    }
+
+    /**
+     * Replaces any ${} strings with their corresponding system property.
+     *
+     * @author &lt;a href=&quot;mailto:bill@burkecentral.com&quot;&gt;Bill Burke&lt;/a&gt;
+     * @version $Revision: 1 $
+     */
+    public static final class EnvUtil {
+<span class="nc" id="L212">        private static final Pattern p = Pattern.compile(&quot;[$][{]([^}]+)[}]&quot;);</span>
+
+        private EnvUtil() {
+
+        }
+
+        /**
+         * Replaces any ${} strings with their corresponding system property.
+         *
+         * @param val
+         * @return
+         */
+        public static String replace(String val) {
+<span class="nc" id="L225">            Matcher matcher = p.matcher(val);</span>
+<span class="nc" id="L226">            StringBuffer buf = new StringBuffer();</span>
+<span class="nc bnc" id="L227" title="All 2 branches missed.">            while (matcher.find()) {</span>
+<span class="nc" id="L228">                String envVar = matcher.group(1);</span>
+<span class="nc" id="L229">                String envVal = System.getProperty(envVar);</span>
+<span class="nc bnc" id="L230" title="All 2 branches missed.">                if (envVal == null) envVal = &quot;NOT-SPECIFIED&quot;;</span>
+<span class="nc" id="L231">                matcher.appendReplacement(buf, envVal.replace(&quot;\\&quot;, &quot;\\\\&quot;));</span>
+<span class="nc" id="L232">            }</span>
+<span class="nc" id="L233">            matcher.appendTail(buf);</span>
+<span class="nc" id="L234">            return buf.toString();</span>
+        }
+    }
+
+
+    public static String getJavaAlgorithm(String algorithm) {
+<span class="nc bnc" id="L240" title="All 10 branches missed.">        switch (algorithm) {</span>
+            case AlgorithmIdentifiers.RSA_USING_SHA256:
+<span class="nc" id="L242">                return RS256;</span>
+            case AlgorithmIdentifiers.RSA_USING_SHA384:
+<span class="nc" id="L244">                return RS384;</span>
+            case AlgorithmIdentifiers.RSA_USING_SHA512:
+<span class="nc" id="L246">                return RS512;</span>
+            case AlgorithmIdentifiers.HMAC_SHA256:
+<span class="nc" id="L248">                return HS256;</span>
+            case AlgorithmIdentifiers.HMAC_SHA384:
+<span class="nc" id="L250">                return HS384;</span>
+            case AlgorithmIdentifiers.HMAC_SHA512:
+<span class="nc" id="L252">                return HS512;</span>
+            case AlgorithmIdentifiers.ECDSA_USING_P256_CURVE_AND_SHA256:
+<span class="nc" id="L254">                return ES256;</span>
+            case AlgorithmIdentifiers.ECDSA_USING_P384_CURVE_AND_SHA384:
+<span class="nc" id="L256">                return ES384;</span>
+            case AlgorithmIdentifiers.ECDSA_USING_P521_CURVE_AND_SHA512:
+<span class="nc" id="L258">                return ES512;</span>
+            default:
+<span class="nc" id="L260">                throw log.unknownAlgorithm(algorithm);</span>
+        }
+    }
+
+    public static String getJavaAlgorithmForHash(String algorithm) {
+<span class="nc bnc" id="L265" title="All 10 branches missed.">        switch (algorithm) {</span>
+            case AlgorithmIdentifiers.RSA_USING_SHA256:
+<span class="nc" id="L267">                return SHA256;</span>
+            case AlgorithmIdentifiers.RSA_USING_SHA384:
+<span class="nc" id="L269">                return SHA384;</span>
+            case AlgorithmIdentifiers.RSA_USING_SHA512:
+<span class="nc" id="L271">                return SHA512;</span>
+            case AlgorithmIdentifiers.HMAC_SHA256:
+<span class="nc" id="L273">                return SHA256;</span>
+            case AlgorithmIdentifiers.HMAC_SHA384:
+<span class="nc" id="L275">                return SHA384;</span>
+            case AlgorithmIdentifiers.HMAC_SHA512:
+<span class="nc" id="L277">                return SHA512;</span>
+            case AlgorithmIdentifiers.ECDSA_USING_P256_CURVE_AND_SHA256:
+<span class="nc" id="L279">                return SHA256;</span>
+            case AlgorithmIdentifiers.ECDSA_USING_P384_CURVE_AND_SHA384:
+<span class="nc" id="L281">                return SHA384;</span>
+            case AlgorithmIdentifiers.ECDSA_USING_P521_CURVE_AND_SHA512:
+<span class="nc" id="L283">                return SHA512;</span>
+            default:
+<span class="nc" id="L285">                throw log.unknownAlgorithm(algorithm);</span>
+        }
+    }
+
+<span class="nc" id="L289">    public enum AuthOutcome {</span>
+<span class="nc" id="L290">        NOT_ATTEMPTED, FAILED, AUTHENTICATED, NOT_AUTHENTICATED, LOGGED_OUT</span>
+    }
+
+    public static String generateId() {
+<span class="nc" id="L294">        return UUID.randomUUID().toString();</span>
+    }
+
+    static int getCurrentTimeInSeconds() {
+<span class="fc" id="L298">        return ((int) (System.currentTimeMillis() / 1000));</span>
+    }
+
+    static Integer asInt(Map&lt;String, Object&gt; cfg, String cfgKey, int defaultValue) {
+<span class="nc" id="L302">        Object cfgObj = cfg.get(cfgKey);</span>
+<span class="nc bnc" id="L303" title="All 2 branches missed.">        if (cfgObj == null) {</span>
+<span class="nc" id="L304">            return defaultValue;</span>
+        }
+<span class="nc bnc" id="L306" title="All 2 branches missed.">        if (cfgObj instanceof String) {</span>
+<span class="nc" id="L307">            return Integer.parseInt(cfgObj.toString());</span>
+<span class="nc bnc" id="L308" title="All 2 branches missed.">        } else if (cfgObj instanceof Number) {</span>
+<span class="nc" id="L309">            return ((Number) cfgObj).intValue();</span>
+        } else {
+<span class="nc" id="L311">            throw log.unableToParseKeyWithValue(cfgKey, cfgObj);</span>
+        }
+    }
+
+    public static String getQueryParamValue(OidcHttpFacade facade, String paramName) {
+<span class="nc" id="L316">        return facade.getRequest().getQueryParamValue(paramName);</span>
+    }
+
+    protected static String stripQueryParam(String url, String paramName){
+<span class="nc" id="L320">        return url.replaceFirst(&quot;[\\?&amp;]&quot; + paramName + &quot;=[^&amp;]*$|&quot; + paramName + &quot;=[^&amp;]*&amp;&quot;, &quot;&quot;);</span>
+    }
+
+    public static boolean isOpaqueToken(String token) {
+<span class="nc bnc" id="L324" title="All 2 branches missed.">        return new StringTokenizer(token, &quot;.&quot;).countTokens() != 3;</span>
+    }
+
+    public static void logToken(String name, String token) {
+<span class="nc bnc" id="L328" title="All 4 branches missed.">        if (token == null || isOpaqueToken(token)) {</span>
+<span class="nc" id="L329">            log.tracef(&quot;\t%s: %s&quot;, name, token);</span>
+        } else {
+<span class="nc" id="L331">            log.tracef(&quot;\t%s: %s&quot;, name, token.substring(0, token.lastIndexOf(&quot;.&quot;)) + &quot;.signature&quot;);</span>
+        }
+<span class="nc" id="L333">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

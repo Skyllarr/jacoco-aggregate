@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>EvidenceDecodePrincipalCallback.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.callback</a> &gt; <span class="el_source">EvidenceDecodePrincipalCallback.java</span></div><h1>EvidenceDecodePrincipalCallback.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2019 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.auth.callback;
+
+import java.util.function.Function;
+
+import javax.security.auth.callback.Callback;
+
+import org.wildfly.security.evidence.Evidence;
+
+/**
+ * A server-side {@link Callback} to pass the decoded evidence principal from the callback handler
+ * to the authentication mechanism.
+ *
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ * @since 1.10.0
+ */
+public class EvidenceDecodePrincipalCallback implements ExtendedCallback {
+
+    private final Evidence evidence;
+
+    /**
+     * Construct a new instance of this {@link Callback}.
+     *
+     * @param evidence the evidence to be decoded
+     */
+<span class="nc" id="L42">    public EvidenceDecodePrincipalCallback(final Evidence evidence) {</span>
+<span class="nc" id="L43">        this.evidence = evidence;</span>
+<span class="nc" id="L44">    }</span>
+
+    /**
+     * Get the evidence being decoded.
+     *
+     * @return the evidence being decoded
+     */
+    public Evidence getEvidence() {
+<span class="nc" id="L52">        return evidence;</span>
+    }
+
+    /**
+     * Get the acquired evidence, if it is set and of the given type, and if so, return the evidence cast to the type.
+     *
+     * @param evidenceType the evidence type class (must not be {@code null})
+     * @param &lt;C&gt; the evidence type
+     * @return the evidence, or {@code null} if the criteria wasn't met
+     */
+    public &lt;C extends Evidence&gt; C getEvidence(Class&lt;C&gt; evidenceType) {
+<span class="nc" id="L63">        return applyToEvidence(evidenceType, Function.identity());</span>
+    }
+
+    /**
+     * Get the acquired evidence, if it is set and of the given type and algorithm, and if so, return the evidence cast to the type.
+     *
+     * @param evidenceType the evidence type class (must not be {@code null})
+     * @param algorithmName the algorithm name
+     * @param &lt;C&gt; the evidence type
+     * @return the evidence, or {@code null} if the criteria are not met
+     */
+    public &lt;C extends Evidence&gt; C getEvidence(Class&lt;C&gt; evidenceType, String algorithmName) {
+<span class="nc" id="L75">        return applyToEvidence(evidenceType, algorithmName, Function.identity());</span>
+    }
+
+    /**
+     * Apply the given function to the acquired evidence, if it is set and of the given type.
+     *
+     * @param evidenceType the evidence type class (must not be {@code null})
+     * @param function the function to apply (must not be {@code null})
+     * @param &lt;C&gt; the evidence type
+     * @param &lt;R&gt; the return type
+     * @return the result of the function, or {@code null} if the criteria are not met
+     */
+    public &lt;C extends Evidence, R&gt; R applyToEvidence(Class&lt;C&gt; evidenceType, Function&lt;C, R&gt; function) {
+<span class="nc" id="L88">        final Evidence evidence = this.evidence;</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        return evidence == null ? null : evidence.castAndApply(evidenceType, function);</span>
+    }
+
+    /**
+     * Apply the given function to the acquired evidence, if it is set and of the given type and algorithm.
+     *
+     * @param evidenceType the evidence type class (must not be {@code null})
+     * @param algorithmName the algorithm name
+     * @param function the function to apply (must not be {@code null})
+     * @param &lt;C&gt; the evidence type
+     * @param &lt;R&gt; the return type
+     * @return the result of the function, or {@code null} if the criteria are not met
+     */
+    public &lt;C extends Evidence, R&gt; R applyToEvidence(Class&lt;C&gt; evidenceType, String algorithmName, Function&lt;C, R&gt; function) {
+<span class="nc" id="L103">        final Evidence evidence = this.evidence;</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        return evidence == null ? null : evidence.castAndApply(evidenceType, algorithmName, function);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

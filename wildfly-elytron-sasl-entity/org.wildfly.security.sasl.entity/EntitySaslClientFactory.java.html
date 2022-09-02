@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>EntitySaslClientFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl-entity</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.entity</a> &gt; <span class="el_source">EntitySaslClientFactory.java</span></div><h1>EntitySaslClientFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.entity;
+
+import static org.wildfly.security.sasl.entity.Entity.*;
+
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.security.Signature;
+import java.util.Collections;
+import java.util.Map;
+
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.sasl.Sasl;
+import javax.security.sasl.SaslClient;
+import javax.security.sasl.SaslClientFactory;
+import javax.security.sasl.SaslException;
+
+import org.kohsuke.MetaInfServices;
+import org.wildfly.security.sasl.WildFlySasl;
+import org.wildfly.security.sasl.util.SaslMechanismInformation;
+
+/**
+ * The client factory for the ISO/IEC 9798-3 authentication SASL mechanism.
+ *
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+@MetaInfServices(value = SaslClientFactory.class)
+public final class EntitySaslClientFactory implements SaslClientFactory {
+
+    public EntitySaslClientFactory() {
+<span class="nc" id="L48">        super();</span>
+<span class="nc" id="L49">    }</span>
+
+    public SaslClient createSaslClient(final String[] mechanisms, final String authorizationId, final String protocol, final String serverName, Map&lt;String, ?&gt; props, final CallbackHandler cbh) throws SaslException {
+        String name;
+        Signature signature;
+        boolean mutual;
+<span class="nc bnc" id="L55" title="All 4 branches missed.">        final boolean serverAuth = props != null &amp;&amp; Boolean.parseBoolean(String.valueOf(props.get(Sasl.SERVER_AUTH)));</span>
+        out: {
+<span class="nc bnc" id="L57" title="All 2 branches missed.">            for (String mechanism : mechanisms) {</span>
+<span class="nc" id="L58">                mutual = false;</span>
+<span class="nc bnc" id="L59" title="All 7 branches missed.">                switch (mechanism) {</span>
+                    case SaslMechanismInformation.Names.IEC_ISO_9798_M_RSA_SHA1_ENC:
+<span class="nc" id="L61">                        mutual = true;</span>
+                        // Fall through
+                    case SaslMechanismInformation.Names.IEC_ISO_9798_U_RSA_SHA1_ENC:
+<span class="nc bnc" id="L64" title="All 4 branches missed.">                        if (serverAuth &amp;&amp; ! mutual) break;</span>
+<span class="nc" id="L65">                        name = mechanism;</span>
+                        try {
+<span class="nc" id="L67">                            signature = Signature.getInstance(SHA1_WITH_RSA);</span>
+<span class="nc" id="L68">                        } catch (NoSuchAlgorithmException e) {</span>
+<span class="nc" id="L69">                            break;</span>
+<span class="nc" id="L70">                        }</span>
+                        break out;
+                    case SaslMechanismInformation.Names.IEC_ISO_9798_M_DSA_SHA1:
+<span class="nc" id="L73">                        mutual = true;</span>
+                        // Fall through
+                    case SaslMechanismInformation.Names.IEC_ISO_9798_U_DSA_SHA1:
+<span class="nc bnc" id="L76" title="All 4 branches missed.">                        if (serverAuth &amp;&amp; ! mutual) break;</span>
+<span class="nc" id="L77">                        name = mechanism;</span>
+                        try {
+<span class="nc" id="L79">                            signature = Signature.getInstance(SHA1_WITH_DSA);</span>
+<span class="nc" id="L80">                        } catch (NoSuchAlgorithmException e) {</span>
+<span class="nc" id="L81">                            break;</span>
+<span class="nc" id="L82">                        }</span>
+                        break out;
+                    case SaslMechanismInformation.Names.IEC_ISO_9798_M_ECDSA_SHA1:
+<span class="nc" id="L85">                        mutual = true;</span>
+                        // Fall through
+                    case SaslMechanismInformation.Names.IEC_ISO_9798_U_ECDSA_SHA1:
+<span class="nc bnc" id="L88" title="All 4 branches missed.">                        if (serverAuth &amp;&amp; ! mutual) break;</span>
+<span class="nc" id="L89">                        name = mechanism;</span>
+                        try {
+<span class="nc" id="L91">                            signature = Signature.getInstance(SHA1_WITH_ECDSA);</span>
+<span class="nc" id="L92">                        } catch (NoSuchAlgorithmException e) {</span>
+<span class="nc" id="L93">                            break;</span>
+<span class="nc" id="L94">                        }</span>
+                        break out;
+                }
+            }
+<span class="nc" id="L98">            return null;</span>
+        }
+
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        final Object rngNameValue = props == null ? null : props.get(WildFlySasl.SECURE_RNG);</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        final String rngName = rngNameValue instanceof String ? (String) rngNameValue : null;</span>
+<span class="nc" id="L103">        SecureRandom secureRandom = null;</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        if (rngName != null) {</span>
+            try {
+<span class="nc" id="L106">                secureRandom = SecureRandom.getInstance(rngName);</span>
+<span class="nc" id="L107">            } catch (NoSuchAlgorithmException ignored) {</span>
+<span class="nc" id="L108">            }</span>
+        }
+
+<span class="nc" id="L111">        final EntitySaslClient client = new EntitySaslClient(name, mutual, signature, secureRandom, protocol, serverName, cbh, authorizationId);</span>
+<span class="nc" id="L112">        client.init();</span>
+<span class="nc" id="L113">        return client;</span>
+    }
+
+    public String[] getMechanismNames(Map&lt;String, ?&gt; props) {
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        if (props == null) props = Collections.emptyMap();</span>
+<span class="nc bnc" id="L118" title="All 4 branches missed.">        if (!&quot;true&quot;.equals(props.get(WildFlySasl.MECHANISM_QUERY_ALL)) &amp;&amp; &quot;true&quot;.equals(props.get(Sasl.SERVER_AUTH))) {</span>
+<span class="nc" id="L119">            return new String[] {</span>
+                SaslMechanismInformation.Names.IEC_ISO_9798_M_RSA_SHA1_ENC,
+                SaslMechanismInformation.Names.IEC_ISO_9798_M_DSA_SHA1,
+                SaslMechanismInformation.Names.IEC_ISO_9798_M_ECDSA_SHA1,
+            };
+        } else {
+<span class="nc" id="L125">            return new String[] {</span>
+                SaslMechanismInformation.Names.IEC_ISO_9798_U_RSA_SHA1_ENC,
+                SaslMechanismInformation.Names.IEC_ISO_9798_M_RSA_SHA1_ENC,
+                SaslMechanismInformation.Names.IEC_ISO_9798_U_DSA_SHA1,
+                SaslMechanismInformation.Names.IEC_ISO_9798_M_DSA_SHA1,
+                SaslMechanismInformation.Names.IEC_ISO_9798_U_ECDSA_SHA1,
+                SaslMechanismInformation.Names.IEC_ISO_9798_M_ECDSA_SHA1
+            };
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

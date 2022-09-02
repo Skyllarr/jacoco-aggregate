@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>HttpConstants.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http</a> &gt; <span class="el_source">HttpConstants.java</span></div><h1>HttpConstants.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.http;
+
+import java.util.regex.Pattern;
+
+import org.ietf.jgss.GSSManager;
+
+/**
+ * Constants used within HTTP based authentication.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public class HttpConstants {
+
+
+    private HttpConstants() {
+    }
+
+    /*
+     * Negotiated Properties
+     */
+
+    /**
+     * The property which holds the negotiated security identity after a successful HTTP server-side authentication.
+     */
+    public static final String SECURITY_IDENTITY = &quot;wildfly.http.security-identity&quot;;
+
+    /*
+     * Mechanism Configuration Properties
+     */
+
+<span class="nc" id="L48">    private static final String CONFIG_BASE = HttpConstants.class.getPackage().getName();</span>
+<span class="nc" id="L49">    public static final String CONFIG_CONTEXT_PATH = CONFIG_BASE + &quot;.context-path&quot;;</span>
+<span class="nc" id="L50">    public static final String CONFIG_REALM = CONFIG_BASE + &quot;.realm&quot;;</span>
+
+<span class="nc" id="L52">    public static final String CONFIG_VALIDATE_DIGEST_URI = CONFIG_BASE + &quot;.validate-digest-uri&quot;;</span>
+<span class="nc" id="L53">    public static final String CONFIG_SKIP_CERTIFICATE_VERIFICATION = CONFIG_BASE + &quot;.skip-certificate-verification&quot;;</span>
+
+    /**
+     * The context relative path of the login page.
+     */
+<span class="nc" id="L58">    public static final String CONFIG_LOGIN_PAGE = CONFIG_BASE + &quot;.login-page&quot;;</span>
+
+    /**
+     * The context relative path of the error page.
+     */
+<span class="nc" id="L63">    public static final String CONFIG_ERROR_PAGE = CONFIG_BASE + &quot;.error-page&quot;;</span>
+
+    /**
+     * This defines the location used by mechanisms dependent on the response to the challenge being sent in using 'POST'.
+     */
+<span class="nc" id="L68">    public static final String CONFIG_POST_LOCATION = CONFIG_BASE + &quot;.post-location&quot;;</span>
+
+    /**
+     * This allows a {@link GSSManager} instance to be passed into the authentication mechanisms.
+     */
+<span class="nc" id="L73">    public static final String CONFIG_GSS_MANAGER = CONFIG_BASE + &quot;.gss-manager&quot;;</span>
+
+    /**
+     * This enables workaround for native GSS, where createName() needs to be called for correct GSSContext initialization.
+     * Set to &quot;true&quot; to call createName() as part of GSSContext initialization.
+     * This is workaround of JDK-8194073.
+     */
+<span class="nc" id="L80">    public static final String CONFIG_CREATE_NAME_GSS_INIT = CONFIG_BASE + &quot;.create-name-gss-init&quot;;</span>
+
+    /**
+     * In clustered environment Security Identity is restored during failover, load balancer change node (not sticky behavior) and session passivation/activation.
+     * Set to &quot;true&quot; to disable this behavior.
+     */
+<span class="nc" id="L86">    public static final String CONFIG_DISABLE_RESTORE_SECURITY_IDENTITY = CONFIG_BASE + &quot;.disable-restore-security-identity&quot;;</span>
+
+    /**
+     * A comma separated list of scopes in preferred order the mechanism should attempt to use to persist state including the
+     * caching of any previously authenticated identity.
+     *
+     * Accepted values are: -
+     * &lt;p&gt;&lt;ul&gt;
+     * &lt;li&gt;CONNECTION
+     * &lt;li&gt;SESSION
+     * &lt;li&gt;SSL_SESSION
+     * &lt;li&gt;NONE
+     * &lt;/ul&gt;&lt;/p&gt;
+     *
+     * Presently only supported by the SPNEGO mechanism.
+     */
+<span class="nc" id="L102">    public static final String CONFIG_STATE_SCOPES = CONFIG_BASE + &quot;.state-scopes&quot;;</span>
+
+    /**
+     * If set to {@code true} the SPNEGO and FORM authentication mechanisms will not change the session ID
+     * after a successful authentication.
+     *
+     * Where set the web application should be configured to use cookies exclusively for session management.
+     */
+<span class="nc" id="L110">    public static final String DISABLE_SESSION_ID_CHANGE = CONFIG_BASE + &quot;.unsafe.disable-session-change-id&quot;;</span>
+
+    /*
+     * Header Fields
+     */
+    public static final String ALGORITHM = &quot;algorithm&quot;;
+    public static final String AUTH = &quot;auth&quot;;
+    public static final String AUTH_PARAM = &quot;auth-param&quot;;
+    public static final String CHARSET = &quot;charset&quot;;
+    public static final String CNONCE = &quot;cnonce&quot;;
+    public static final String DOMAIN = &quot;domain&quot;;
+    public static final String NC = &quot;nc&quot;;
+    public static final String NEGOTIATE = &quot;Negotiate&quot;;
+    public static final String NEXT_NONCE = &quot;nextnonce&quot;;
+    public static final String NONCE = &quot;nonce&quot;;
+    public static final String PARTIAL = &quot;partial/&quot;;
+    public static final String OPAQUE = &quot;opaque&quot;;
+    public static final String QOP = &quot;qop&quot;;
+    public static final String REALM = &quot;realm&quot;;
+    public static final String RSPAUTH = &quot;rspauth&quot;;
+    public static final String RESPONSE = &quot;response&quot;;
+    public static final String STALE = &quot;stale&quot;;
+    public static final String URI = &quot;uri&quot;;
+    public static final String USERNAME = &quot;username&quot;;
+    public static final String USERNAME_STAR = &quot;username*&quot;;
+    public static final String XML_HTTP_REQUEST = &quot;XMLHttpRequest&quot;;
+
+    /*
+     * Header Names
+     */
+
+    public static final String ACCEPT = &quot;Accept&quot;;
+    public static final String AUTHENTICATION_INFO = &quot;Authentication-Info&quot;;
+    public static final String AUTHORIZATION = &quot;Authorization&quot;;
+    public static final String FACES_REQUEST = &quot;Faces-Request&quot;;
+    public static final String HOST = &quot;Host&quot;;
+    public static final String LOCATION = &quot;Location&quot;;
+    public static final String SOAP_ACTION = &quot;SOAPAction&quot;;
+    public static final String WWW_AUTHENTICATE = &quot;WWW-Authenticate&quot;;
+    public static final String X_REQUESTED_WITH = &quot;X-Requested-With&quot;;
+
+    /**
+     * Errors
+     */
+    public static final String ERROR = &quot;error&quot;;
+    public static final String ERROR_DESCRIPTION = &quot;error_description&quot;;
+    public static final String INVALID_TOKEN = &quot;invalid_token&quot;;
+    public static final String STALE_TOKEN = &quot;Stale token&quot;;
+    public static final String NO_TOKEN = &quot;no_token&quot;;
+
+    /*
+     * Mechanism Names
+     */
+
+    public static final String BASIC_NAME = &quot;BASIC&quot;;
+    public static final String CLIENT_CERT_NAME = &quot;CLIENT_CERT&quot;;
+    public static final String DIGEST_NAME = &quot;DIGEST&quot;;
+    public static final String DIGEST_SHA256_NAME = &quot;DIGEST-SHA-256&quot;;
+    public static final String DIGEST_SHA512_256_NAME = &quot;DIGEST-SHA-512-256&quot;;
+    public static final String EXTERNAL_NAME = &quot;EXTERNAL&quot;;
+    public static final String FORM_NAME = &quot;FORM&quot;;
+    public static final String SPNEGO_NAME = &quot;SPNEGO&quot;;
+    public static final String BEARER_TOKEN = &quot;BEARER_TOKEN&quot;;
+
+    /*
+     * Response Codes
+     */
+
+    public static final int OK = 200;
+    public static final int FOUND = 302;
+    public static final int SEE_OTHER = 303;
+    public static final int TEMPORARY_REDIRECT = 307;
+    public static final int BAD_REQUEST = 400;
+    public static final int UNAUTHORIZED = 401;
+    public static final int FORBIDDEN = 403;
+
+    /*
+     * Methods
+     */
+
+    public static final String POST = &quot;POST&quot;;
+    public static final String OPTIONS = &quot;OPTIONS&quot;;
+
+    /*
+     * Algorithms
+     */
+
+    public static final String MD5 = &quot;MD5&quot;;
+    public static final String SHA256 = &quot;SHA-256&quot;;
+    public static final String SHA512_256 = &quot;SHA-512-256&quot;;
+
+    /*
+     * Schemes
+     */
+
+    public static final String HTTP = &quot;http&quot;;
+    public static final String HTTPS = &quot;https&quot;;
+
+    /**
+     * Bearer token pattern.
+     * The Bearer token authorization header is of the form &quot;Bearer&quot;, followed by optional whitespace, followed by
+     * the token itself, followed by optional whitespace. The token itself must be one or more characters and must
+     * not contain any whitespace.
+     */
+<span class="nc" id="L214">    public static final Pattern BEARER_TOKEN_PATTERN = Pattern.compile(&quot;^Bearer *([^ ]+) *$&quot;, Pattern.CASE_INSENSITIVE);</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractDelegatingSaslClientFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.util</a> &gt; <span class="el_source">AbstractDelegatingSaslClientFactory.java</span></div><h1>AbstractDelegatingSaslClientFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.util;
+
+import java.util.Map;
+
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.sasl.SaslClient;
+import javax.security.sasl.SaslClientFactory;
+import javax.security.sasl.SaslException;
+
+/**
+ * An abstract base for {@link SaslClientFactory} instances which delegate to another {@code SaslClientFactory}.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public abstract class AbstractDelegatingSaslClientFactory implements SaslClientFactory {
+
+    /**
+     * The delegate {@code SaslClientFactory}.
+     */
+    protected final SaslClientFactory delegate;
+
+    private int hashCode;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param delegate the delegate client factory
+     */
+<span class="nc" id="L47">    protected AbstractDelegatingSaslClientFactory(final SaslClientFactory delegate) {</span>
+<span class="nc" id="L48">        this.delegate = delegate;</span>
+<span class="nc" id="L49">    }</span>
+
+    /**
+     * Determine whether this chain of delegating factories delegates through an instance of the given class.
+     *
+     * @param factoryClass the SASL client factory class
+     * @return {@code true} if this chain delegates through the factory class, {@code false} otherwise
+     */
+    public final boolean delegatesThrough(Class&lt;? extends SaslClientFactory&gt; factoryClass) {
+<span class="nc bnc" id="L58" title="All 4 branches missed.">        return factoryClass != null &amp;&amp; delegatesThroughNN(factoryClass);</span>
+    }
+
+    boolean delegatesThroughNN(Class&lt;? extends SaslClientFactory&gt; factoryClass) {
+<span class="nc bnc" id="L62" title="All 6 branches missed.">        return factoryClass.isInstance(this) || delegate instanceof AbstractDelegatingSaslClientFactory &amp;&amp; ((AbstractDelegatingSaslClientFactory) delegate).delegatesThroughNN(factoryClass);</span>
+    }
+
+    public SaslClient createSaslClient(final String[] mechanisms, final String authorizationId, final String protocol, final String serverName, final Map&lt;String, ?&gt; props, final CallbackHandler cbh) throws SaslException {
+<span class="nc" id="L66">        return delegate.createSaslClient(mechanisms, authorizationId, protocol, serverName, props, cbh);</span>
+    }
+
+    public String[] getMechanismNames(final Map&lt;String, ?&gt; props) {
+<span class="nc" id="L70">        return delegate.getMechanismNames(props);</span>
+    }
+
+    public boolean equals(final Object other) {
+<span class="nc bnc" id="L74" title="All 4 branches missed.">        return other instanceof AbstractDelegatingSaslClientFactory &amp;&amp; equals((AbstractDelegatingSaslClientFactory) other);</span>
+    }
+
+    public boolean equals(final AbstractDelegatingSaslClientFactory other) {
+<span class="nc bnc" id="L78" title="All 6 branches missed.">        return this == other || other != null &amp;&amp; delegate.equals(other.delegate);</span>
+    }
+
+    public final int hashCode() {
+<span class="nc" id="L82">        int hashCode = this.hashCode;</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        if (hashCode == 0) {</span>
+<span class="nc" id="L84">            hashCode = calculateHashCode();</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">            if (hashCode == 0) hashCode = 1;</span>
+<span class="nc" id="L86">            return this.hashCode = hashCode;</span>
+        }
+<span class="nc" id="L88">        return hashCode;</span>
+    }
+
+    /**
+     * Perform the calculation of the hash code of this factory.
+     *
+     * @return the calculated hash code
+     */
+    protected int calculateHashCode() {
+<span class="nc" id="L97">        return delegate.hashCode();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L102">        return super.toString() + &quot;-&gt;&quot; + delegate.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

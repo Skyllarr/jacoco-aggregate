@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ClientCertAuthenticationMechanism.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-cert</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.cert</a> &gt; <span class="el_source">ClientCertAuthenticationMechanism.java</span></div><h1>ClientCertAuthenticationMechanism.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.http.cert;
+
+import static org.wildfly.security.http.HttpConstants.CLIENT_CERT_NAME;
+import static org.wildfly.security.mechanism._private.ElytronMessages.httpClientCert;
+
+import java.security.cert.Certificate;
+import java.security.cert.X509Certificate;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BooleanSupplier;
+import java.util.function.Function;
+
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.UnsupportedCallbackException;
+
+import org.wildfly.security.auth.callback.AuthenticationCompleteCallback;
+import org.wildfly.security.auth.callback.CachedIdentityAuthorizeCallback;
+import org.wildfly.security.auth.callback.EvidenceDecodePrincipalCallback;
+import org.wildfly.security.auth.callback.EvidenceVerifyCallback;
+import org.wildfly.security.auth.callback.PrincipalAuthorizeCallback;
+import org.wildfly.security.auth.server.SecurityDomain;
+import org.wildfly.security.auth.server.SecurityIdentity;
+import org.wildfly.security.cache.CachedIdentity;
+import org.wildfly.security.cache.IdentityCache;
+import org.wildfly.security.evidence.X509PeerCertificateChainEvidence;
+import org.wildfly.security.http.HttpAuthenticationException;
+import org.wildfly.security.http.HttpScope;
+import org.wildfly.security.http.HttpServerAuthenticationMechanism;
+import org.wildfly.security.http.HttpServerRequest;
+import org.wildfly.security.http.Scope;
+import org.wildfly.security.mechanism.AuthenticationMechanismException;
+import org.wildfly.security.mechanism._private.MechanismUtil;
+import org.wildfly.security.x500.X500;
+
+/**
+ * The CLIENT_CERT authentication mechanism.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+final class ClientCertAuthenticationMechanism implements HttpServerAuthenticationMechanism {
+
+    private final CallbackHandler callbackHandler;
+    private final boolean skipVerification;
+
+    /**
+     * Construct a new instance of the {@code ClientCertAuthenticationMechanism} mechanism.
+     *
+     * @param callbackHandler the {@link CallbackHandler} to use to verify the supplied credentials and to notify to establish the current identity.
+     * @param skipVerification whether the certificate verification using {@link EvidenceVerifyCallback} should be skipped
+     */
+<span class="nc" id="L70">    ClientCertAuthenticationMechanism(CallbackHandler callbackHandler, boolean skipVerification) {</span>
+<span class="nc" id="L71">        this.callbackHandler = callbackHandler;</span>
+<span class="nc" id="L72">        this.skipVerification = skipVerification;</span>
+<span class="nc" id="L73">    }</span>
+
+    /**
+     * @see org.wildfly.security.http.HttpServerAuthenticationMechanism#getMechanismName()
+     */
+    @Override
+    public String getMechanismName() {
+<span class="nc" id="L80">        return CLIENT_CERT_NAME;</span>
+    }
+
+    /**
+     * @see org.wildfly.security.http.HttpServerAuthenticationMechanism#evaluateRequest(org.wildfly.security.http.HttpServerRequest)
+     */
+    @Override
+    public void evaluateRequest(HttpServerRequest request) throws HttpAuthenticationException {
+<span class="nc" id="L88">        Function&lt;SecurityDomain, IdentityCache&gt; cacheFunction = createIdentityCacheFunction(request);</span>
+
+<span class="nc bnc" id="L90" title="All 4 branches missed.">        if (cacheFunction != null &amp;&amp; attemptReAuthentication(request, cacheFunction)) {</span>
+<span class="nc" id="L91">            httpClientCert.trace(&quot;Re-authentication succeed&quot;);</span>
+<span class="nc" id="L92">            return;</span>
+        }
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        if (attemptAuthentication(request, cacheFunction)) {</span>
+<span class="nc" id="L95">            return;</span>
+        }
+<span class="nc" id="L97">        httpClientCert.trace(&quot;Both, re-authentication and authentication, failed&quot;);</span>
+<span class="nc" id="L98">        fail(request);</span>
+<span class="nc" id="L99">    }</span>
+
+    private boolean attemptAuthentication(HttpServerRequest request, Function&lt;SecurityDomain, IdentityCache&gt; cacheFunction) throws HttpAuthenticationException {
+<span class="nc" id="L102">        Certificate[] peerCertificates = request.getPeerCertificates();</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        if (peerCertificates == null) {</span>
+<span class="nc" id="L104">            httpClientCert.trace(&quot;Peer Unverified&quot;);</span>
+<span class="nc" id="L105">            request.noAuthenticationInProgress();</span>
+<span class="nc" id="L106">            return true;</span>
+        }
+
+<span class="nc" id="L109">        X509Certificate[] x509Certificates = X500.asX509CertificateArray(peerCertificates);</span>
+<span class="nc" id="L110">        X509PeerCertificateChainEvidence evidence = new X509PeerCertificateChainEvidence(x509Certificates);</span>
+
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        if (httpClientCert.isTraceEnabled()) {</span>
+<span class="nc" id="L113">            httpClientCert.tracef(&quot;Authenticating using following certificates: [%s]&quot;, Arrays.toString(x509Certificates));</span>
+        }
+
+<span class="nc" id="L116">        EvidenceVerifyCallback callback = new EvidenceVerifyCallback(evidence);</span>
+
+            try {
+<span class="nc bnc" id="L119" title="All 2 branches missed.">                if (! skipVerification) {</span>
+<span class="nc" id="L120">                    MechanismUtil.handleCallbacks(httpClientCert, callbackHandler, callback);</span>
+                } else {
+                    // Since handling of EvidenceVerifyCallback is being skipped here, ensure evidence
+                    // decoding still takes place
+<span class="nc" id="L124">                    EvidenceDecodePrincipalCallback evidenceDecodePrincipalCallback = new EvidenceDecodePrincipalCallback(evidence);</span>
+<span class="nc" id="L125">                    MechanismUtil.handleCallbacks(httpClientCert, callbackHandler, evidenceDecodePrincipalCallback);</span>
+                }
+<span class="nc" id="L127">            } catch (AuthenticationMechanismException e) {</span>
+<span class="nc" id="L128">                throw e.toHttpAuthenticationException();</span>
+<span class="nc" id="L129">            } catch (UnsupportedCallbackException e) {</span>
+<span class="nc" id="L130">                throw httpClientCert.mechCallbackHandlerFailedForUnknownReason(e).toHttpAuthenticationException();</span>
+<span class="nc" id="L131">            }</span>
+
+<span class="nc" id="L133">        boolean verified = callback.isVerified();</span>
+<span class="nc" id="L134">        httpClientCert.tracef(&quot;X509PeerCertificateChainEvidence was verified by EvidenceVerifyCallback handler: %b  verification skipped: %b&quot;, verified, skipVerification);</span>
+
+<span class="nc bnc" id="L136" title="All 4 branches missed.">        if (verified || skipVerification) {</span>
+            final BooleanSupplier authorizedFunction;
+            final Callback authorizeCallBack;
+<span class="nc bnc" id="L139" title="All 2 branches missed.">            if (cacheFunction != null) {</span>
+<span class="nc" id="L140">                CachedIdentityAuthorizeCallback cacheCallback = new CachedIdentityAuthorizeCallback(evidence.getDecodedPrincipal(), cacheFunction, true);</span>
+<span class="nc" id="L141">                authorizedFunction = cacheCallback::isAuthorized;</span>
+<span class="nc" id="L142">                authorizeCallBack = cacheCallback;</span>
+<span class="nc" id="L143">            } else {</span>
+<span class="nc" id="L144">                PrincipalAuthorizeCallback principalCallback = new PrincipalAuthorizeCallback(evidence.getDecodedPrincipal());</span>
+<span class="nc" id="L145">                authorizedFunction = principalCallback::isAuthorized;</span>
+<span class="nc" id="L146">                authorizeCallBack = principalCallback;</span>
+            }
+
+            try {
+<span class="nc" id="L150">                MechanismUtil.handleCallbacks(httpClientCert, callbackHandler, authorizeCallBack);</span>
+<span class="nc" id="L151">            } catch (AuthenticationMechanismException e) {</span>
+<span class="nc" id="L152">                throw e.toHttpAuthenticationException();</span>
+<span class="nc" id="L153">            } catch (UnsupportedCallbackException e) {</span>
+<span class="nc" id="L154">                throw httpClientCert.mechCallbackHandlerFailedForUnknownReason(e).toHttpAuthenticationException();</span>
+<span class="nc" id="L155">            }</span>
+
+<span class="nc" id="L157">            boolean authorized = authorizedFunction.getAsBoolean();</span>
+<span class="nc" id="L158">            httpClientCert.tracef(&quot;X509PeerCertificateChainEvidence was authorized by CachedIdentityAuthorizeCallback(%s) handler: %b&quot;, evidence.getDecodedPrincipal(), authorized);</span>
+<span class="nc bnc" id="L159" title="All 4 branches missed.">            if (authorized &amp;&amp; succeed(request)) {</span>
+<span class="nc" id="L160">                httpClientCert.trace(&quot;Authentication succeed&quot;);</span>
+<span class="nc" id="L161">                return true;</span>
+            }
+        }
+<span class="nc" id="L164">        return false;</span>
+    }
+
+    private boolean succeed(HttpServerRequest request) throws HttpAuthenticationException {
+        try {
+<span class="nc" id="L169">            MechanismUtil.handleCallbacks(httpClientCert, callbackHandler, AuthenticationCompleteCallback.SUCCEEDED);</span>
+<span class="nc" id="L170">            request.authenticationComplete();</span>
+<span class="nc" id="L171">            return true;</span>
+<span class="nc" id="L172">        } catch (AuthenticationMechanismException e) {</span>
+<span class="nc" id="L173">            throw e.toHttpAuthenticationException();</span>
+<span class="nc" id="L174">        } catch (UnsupportedCallbackException ignored) {</span>
+            // ignored
+        }
+<span class="nc" id="L177">        return false;</span>
+    }
+
+    private void fail(HttpServerRequest request) throws HttpAuthenticationException {
+        try {
+<span class="nc" id="L182">            MechanismUtil.handleCallbacks(httpClientCert, callbackHandler, AuthenticationCompleteCallback.FAILED);</span>
+<span class="nc" id="L183">            request.authenticationFailed(httpClientCert.authenticationFailed());</span>
+<span class="nc" id="L184">        } catch (AuthenticationMechanismException e) {</span>
+<span class="nc" id="L185">            throw e.toHttpAuthenticationException();</span>
+<span class="nc" id="L186">        } catch (UnsupportedCallbackException ignored) {</span>
+            // ignored
+<span class="nc" id="L188">        }</span>
+<span class="nc" id="L189">    }</span>
+
+    private boolean attemptReAuthentication(HttpServerRequest request, Function&lt;SecurityDomain, IdentityCache&gt; cacheFunction) throws HttpAuthenticationException {
+<span class="nc" id="L192">        CachedIdentityAuthorizeCallback authorizeCallback = new CachedIdentityAuthorizeCallback(cacheFunction, true);</span>
+        try {
+<span class="nc" id="L194">            MechanismUtil.handleCallbacks(httpClientCert, callbackHandler, authorizeCallback);</span>
+<span class="nc" id="L195">        } catch (AuthenticationMechanismException e) {</span>
+<span class="nc" id="L196">            throw e.toHttpAuthenticationException();</span>
+<span class="nc" id="L197">        } catch (UnsupportedCallbackException e) {</span>
+<span class="nc" id="L198">            throw httpClientCert.mechCallbackHandlerFailedForUnknownReason(e).toHttpAuthenticationException();</span>
+<span class="nc" id="L199">        }</span>
+<span class="nc" id="L200">        boolean authorized = authorizeCallback.isAuthorized();</span>
+<span class="nc" id="L201">        httpClientCert.tracef(&quot;Identity was authorized by CachedIdentityAuthorizeCallback handler: %b&quot;, authorized);</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">        if (authorized) {</span>
+<span class="nc" id="L203">            return succeed(request);</span>
+        }
+<span class="nc" id="L205">        return false;</span>
+    }
+
+    private Function&lt;SecurityDomain, IdentityCache&gt; createIdentityCacheFunction(HttpServerRequest request) {
+<span class="nc" id="L209">        HttpScope scope = request.getScope(Scope.SSL_SESSION);</span>
+<span class="nc bnc" id="L210" title="All 2 branches missed.">        return scope == null ? null : securityDomain -&gt; new IdentityCache() {</span>
+
+<span class="nc" id="L212">            final Map&lt;SecurityDomain, CachedIdentity&gt; identities = MechanismUtil.computeIfAbsent(scope,</span>
+<span class="nc" id="L213">                    &quot;org.wildfly.elytron.identity-cache&quot;, key -&gt; new ConcurrentHashMap&lt;&gt;());</span>
+
+            @Override
+            public void put(SecurityIdentity identity) {
+<span class="nc" id="L217">                CachedIdentity cachedIdentity = new CachedIdentity(CLIENT_CERT_NAME, false, identity);</span>
+<span class="nc" id="L218">                httpClientCert.tracef(&quot;storing into cache: %s&quot;, cachedIdentity);</span>
+<span class="nc" id="L219">                identities.putIfAbsent(securityDomain, cachedIdentity);</span>
+<span class="nc" id="L220">            }</span>
+
+            @Override
+            public CachedIdentity get() {
+<span class="nc" id="L224">                CachedIdentity cachedIdentity = identities.get(securityDomain);</span>
+<span class="nc" id="L225">                httpClientCert.tracef(&quot;loading from cache: %s&quot;, cachedIdentity);</span>
+<span class="nc" id="L226">                return cachedIdentity;</span>
+            }
+
+            @Override
+            public CachedIdentity remove() {
+<span class="nc" id="L231">                httpClientCert.tracef(&quot;clearing identity cache&quot;);</span>
+<span class="nc" id="L232">                return identities.remove(securityDomain);</span>
+            }
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

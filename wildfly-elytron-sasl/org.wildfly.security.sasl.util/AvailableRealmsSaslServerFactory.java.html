@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AvailableRealmsSaslServerFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.util</a> &gt; <span class="el_source">AvailableRealmsSaslServerFactory.java</span></div><h1>AvailableRealmsSaslServerFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.util;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.Map;
+
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.sasl.SaslException;
+import javax.security.sasl.SaslServer;
+import javax.security.sasl.SaslServerFactory;
+
+import org.wildfly.common.iteration.CodePointIterator;
+import org.wildfly.security.auth.callback.AvailableRealmsCallback;
+import org.wildfly.security.sasl.WildFlySasl;
+
+/**
+ * A {@link SaslServerFactory} which sets the server's available realms using the legacy {@link WildFlySasl#REALM_LIST}
+ * property, if specified.
+ *
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+public final class AvailableRealmsSaslServerFactory extends AbstractDelegatingSaslServerFactory {
+
+    public static final int DEFAULT_DELIMITER = ' ';
+    public static final int DEFAULT_ESCAPE_CHARACTER = '\\';
+
+    private final int escapeCharacter;
+    private final int[] delims;
+
+    /**
+     * Construct a new instance. The delimiter used to separate the realm names in the list of realms is assumed to be
+     * {@value #DEFAULT_DELIMITER}. The escape character is assumed to be {@value #DEFAULT_ESCAPE_CHARACTER}.
+     *
+     * @param delegate the delegate {@code SaslServerFactory}
+     */
+    public AvailableRealmsSaslServerFactory(final SaslServerFactory delegate) {
+<span class="nc" id="L59">        this(delegate, DEFAULT_ESCAPE_CHARACTER, DEFAULT_DELIMITER);</span>
+<span class="nc" id="L60">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param delegate the delegate {@code SaslServerFactory}
+     * @param escapeCharacter the escape character
+     * @param delims the delimiters that separate the realm names in the list of realms
+     */
+    public AvailableRealmsSaslServerFactory(final SaslServerFactory delegate, final int escapeCharacter, final int... delims) {
+<span class="nc" id="L70">        super(delegate);</span>
+<span class="nc" id="L71">        this.escapeCharacter = checkNotNullParam(&quot;escapeCharacter&quot;, escapeCharacter);</span>
+<span class="nc" id="L72">        this.delims = checkNotNullParam(&quot;delims&quot;, delims);</span>
+<span class="nc" id="L73">    }</span>
+
+    public SaslServer createSaslServer(final String mechanism, final String protocol, final String serverName, final Map&lt;String, ?&gt; props, final CallbackHandler cbh) throws SaslException {
+<span class="nc" id="L76">        final String realmList = (String) props.get(WildFlySasl.REALM_LIST);</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        if (realmList == null) {</span>
+            // The legacy REALM_LIST property wasn't specified
+<span class="nc" id="L79">            return delegate.createSaslServer(mechanism, protocol, serverName, props, cbh);</span>
+        }
+<span class="nc" id="L81">        return delegate.createSaslServer(mechanism, protocol, serverName, props, callbacks -&gt; {</span>
+<span class="nc" id="L82">            final ArrayList&lt;Callback&gt; list = new ArrayList&lt;&gt;(Arrays.asList(callbacks));</span>
+<span class="nc" id="L83">            final Iterator&lt;Callback&gt; iterator = list.iterator();</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">            while (iterator.hasNext()) {</span>
+<span class="nc" id="L85">                Callback callback = iterator.next();</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">                if (callback instanceof AvailableRealmsCallback) {</span>
+<span class="nc" id="L87">                    String[] realms = realmListPropertyToArray(realmList, escapeCharacter, delims);</span>
+<span class="nc" id="L88">                    ((AvailableRealmsCallback) callback).setRealmNames(realms);</span>
+<span class="nc" id="L89">                    iterator.remove();</span>
+                }
+<span class="nc" id="L91">            }</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">            if (! list.isEmpty()) {</span>
+<span class="nc" id="L93">                cbh.handle(list.toArray(new Callback[list.size()]));</span>
+            }
+<span class="nc" id="L95">        });</span>
+    }
+
+
+    static String[] realmListPropertyToArray(String realmList) {
+<span class="fc" id="L100">        return realmListPropertyToArray(realmList, DEFAULT_ESCAPE_CHARACTER, DEFAULT_DELIMITER);</span>
+    }
+
+    static String[] realmListPropertyToArray(String realmList, int escapeCharacter, int... delims) {
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        if (realmList == null) {</span>
+<span class="nc" id="L105">            return null;</span>
+        }
+<span class="fc" id="L107">        final int[] escapeCharacterAndDelims = Arrays.copyOf(delims, delims.length + 1);</span>
+<span class="fc" id="L108">        escapeCharacterAndDelims[escapeCharacterAndDelims.length - 1] = escapeCharacter;</span>
+<span class="fc" id="L109">        final CodePointIterator cpi = CodePointIterator.ofString(realmList);</span>
+<span class="fc" id="L110">        final CodePointIterator di = cpi.delimitedBy(escapeCharacterAndDelims);</span>
+
+<span class="fc" id="L112">        final ArrayList&lt;String&gt; realms = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L113">        StringBuilder realm = new StringBuilder();</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        while (cpi.hasNext()) {</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            if (di.hasNext()) {</span>
+<span class="fc" id="L116">                di.drainTo(realm);</span>
+            } else {
+<span class="fc bfc" id="L118" title="All 2 branches covered.">                if (cpi.peekNext() == escapeCharacter) {</span>
+<span class="fc" id="L119">                    cpi.next(); // skip the escape character</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">                    if (cpi.hasNext()) {</span>
+<span class="fc" id="L121">                        realm.append((char) cpi.next());</span>
+                    }
+                } else {
+                    // reached the end of a realm name
+<span class="fc" id="L125">                    realms.add(realm.toString());</span>
+<span class="fc" id="L126">                    skipDelims(di, cpi, delims);</span>
+<span class="fc" id="L127">                    realm = new StringBuilder();</span>
+                }
+            }
+        }
+<span class="fc" id="L131">        realms.add(realm.toString());</span>
+<span class="fc" id="L132">        return realms.toArray(new String[realms.size()]);</span>
+    }
+
+    private static boolean isDelim(int c, int... delims) {
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        for (int delim : delims) {</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">            if (delim == c) {</span>
+<span class="fc" id="L138">                return true;</span>
+            }
+        }
+<span class="nc" id="L141">        return false;</span>
+    }
+
+    private static void skipDelims(CodePointIterator di, CodePointIterator cpi, int... delims) {
+<span class="pc bpc" id="L145" title="2 of 6 branches missed.">        while ((! di.hasNext()) &amp;&amp; cpi.hasNext() &amp;&amp; isDelim(cpi.peekNext(), delims)) {</span>
+<span class="fc" id="L146">            cpi.next();</span>
+        }
+<span class="fc" id="L148">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

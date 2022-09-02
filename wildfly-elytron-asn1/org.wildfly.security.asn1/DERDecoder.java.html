@@ -1,0 +1,630 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DERDecoder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-asn1</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.asn1</a> &gt; <span class="el_source">DERDecoder.java</span></div><h1>DERDecoder.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.asn1;
+
+import static org.wildfly.security.asn1.ElytronMessages.log;
+import static org.wildfly.security.asn1.ASN1.*;
+
+import java.io.UnsupportedEncodingException;
+import java.math.BigInteger;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
+import java.util.NoSuchElementException;
+
+import org.wildfly.common.iteration.ByteIterator;
+
+/**
+ * A class used to decode ASN.1 values that have been encoded using the Distinguished Encoding Rules (DER).
+ *
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+public class DERDecoder implements ASN1Decoder {
+
+    private static final int BOOLEAN_FALSE = 0;
+
+<span class="fc" id="L42">    private static final Charset UTF_32BE = Charset.forName(&quot;UTF-32BE&quot;);</span>
+
+    private final ByteIterator bi;
+<span class="pc" id="L45">    private final ArrayDeque&lt;DecoderState&gt; states = new ArrayDeque&lt;DecoderState&gt;();</span>
+<span class="pc" id="L46">    private int implicitTag = -1;</span>
+
+    /**
+     * Create a DER decoder that will decode values from the given byte array.
+     *
+     * @param buf the byte array to decode
+     */
+<span class="fc" id="L53">    public DERDecoder(byte[] buf) {</span>
+<span class="fc" id="L54">        this.bi = ByteIterator.ofBytes(buf);</span>
+<span class="fc" id="L55">    }</span>
+
+    /**
+     * Create a DER decoder that will decode values from the given byte array.
+     *
+     * @param buf the byte array to decode
+     * @param offset the offset in the byte array of the first byte to read
+     * @param length the maximum number of bytes to read from the byte array
+     */
+<span class="nc" id="L64">    public DERDecoder(byte[] buf, int offset, int length) {</span>
+<span class="nc" id="L65">        this.bi = ByteIterator.ofBytes(buf, offset, length);</span>
+<span class="nc" id="L66">    }</span>
+
+    /**
+     * Create a DER decoder that will decode values from the given {@code ByteIterator}.
+     *
+     * @param bi the {@code ByteIterator} from which DER encoded values will be decoded
+     */
+<span class="nc" id="L73">    DERDecoder(ByteIterator bi) {</span>
+<span class="nc" id="L74">        this.bi = bi;</span>
+<span class="nc" id="L75">    }</span>
+
+    @Override
+    public void startSequence() throws ASN1Exception {
+<span class="fc" id="L79">        readTag(SEQUENCE_TYPE);</span>
+<span class="fc" id="L80">        int length = readLength();</span>
+<span class="fc" id="L81">        states.add(new DecoderState(SEQUENCE_TYPE, bi.getIndex() + length));</span>
+<span class="fc" id="L82">    }</span>
+
+    @Override
+    public void endSequence() throws ASN1Exception {
+<span class="fc" id="L86">        DecoderState lastState = states.peekLast();</span>
+<span class="pc bpc" id="L87" title="2 of 4 branches missed.">        if ((lastState == null) || (lastState.getTag() != SEQUENCE_TYPE)) {</span>
+<span class="nc" id="L88">            throw log.noSequenceToEnd();</span>
+        }
+<span class="fc" id="L90">        endConstructedElement(lastState.getNextElementIndex());</span>
+<span class="fc" id="L91">        states.removeLast();</span>
+<span class="fc" id="L92">    }</span>
+
+    @Override
+    public void startSet() throws ASN1Exception {
+<span class="fc" id="L96">        readTag(SET_TYPE);</span>
+<span class="fc" id="L97">        int length = readLength();</span>
+<span class="fc" id="L98">        states.add(new DecoderState(SET_TYPE, bi.getIndex() + length));</span>
+<span class="fc" id="L99">    }</span>
+
+    @Override
+    public void endSet() throws ASN1Exception {
+<span class="fc" id="L103">        DecoderState lastState = states.peekLast();</span>
+<span class="pc bpc" id="L104" title="2 of 4 branches missed.">        if ((lastState == null) || (lastState.getTag() != SET_TYPE)) {</span>
+<span class="nc" id="L105">            throw log.noSetToEnd();</span>
+        }
+<span class="fc" id="L107">        endConstructedElement(lastState.getNextElementIndex());</span>
+<span class="fc" id="L108">        states.removeLast();</span>
+<span class="fc" id="L109">    }</span>
+
+    @Override
+    public void startSetOf() throws ASN1Exception {
+<span class="nc" id="L113">        startSet();</span>
+<span class="nc" id="L114">    }</span>
+
+    @Override
+    public void endSetOf() throws ASN1Exception {
+<span class="nc" id="L118">        endSet();</span>
+<span class="nc" id="L119">    }</span>
+
+    @Override
+    public void startExplicit(int number) throws ASN1Exception {
+<span class="nc" id="L123">        startExplicit(CONTEXT_SPECIFIC_MASK, number);</span>
+<span class="nc" id="L124">    }</span>
+
+    @Override
+    public void startExplicit(int clazz, int number) throws ASN1Exception {
+<span class="nc" id="L128">        int explicitTag = clazz | CONSTRUCTED_MASK | number;</span>
+<span class="nc" id="L129">        readTag(explicitTag);</span>
+<span class="nc" id="L130">        int length = readLength();</span>
+<span class="nc" id="L131">        states.add(new DecoderState(explicitTag, bi.getIndex() + length));</span>
+<span class="nc" id="L132">    }</span>
+
+    @Override
+    public void endExplicit() throws ASN1Exception {
+<span class="nc" id="L136">        DecoderState lastState = states.peekLast();</span>
+<span class="nc bnc" id="L137" title="All 4 branches missed.">        if ((lastState == null) || (lastState.getTag() == SEQUENCE_TYPE)</span>
+<span class="nc bnc" id="L138" title="All 4 branches missed.">                || (lastState.getTag() == SET_TYPE) || ((lastState.getTag() &amp; CONSTRUCTED_MASK) == 0)) {</span>
+<span class="nc" id="L139">            throw log.noExplicitlyTaggedElementToEnd();</span>
+        }
+<span class="nc" id="L141">        endConstructedElement(lastState.getNextElementIndex());</span>
+<span class="nc" id="L142">        states.removeLast();</span>
+<span class="nc" id="L143">    }</span>
+
+    private void endConstructedElement(long nextElementIndex) throws ASN1Exception {
+<span class="fc" id="L146">        long pos = bi.getIndex();</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        if (pos &lt; nextElementIndex) {</span>
+            // Any elements in this constructed element that have not yet been read will be discarded
+            int i;
+<span class="nc bnc" id="L150" title="All 4 branches missed.">            for (i = 0; i &lt; (nextElementIndex - pos) &amp;&amp; bi.hasNext(); i++) {</span>
+<span class="nc" id="L151">                bi.next();</span>
+            }
+<span class="nc bnc" id="L153" title="All 2 branches missed.">            if (i != (nextElementIndex - pos)) {</span>
+<span class="nc" id="L154">                throw log.asnUnexpectedEndOfInput();</span>
+            }
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        } else if (pos &gt; nextElementIndex) {</span>
+            // Shouldn't happen
+<span class="nc" id="L158">            throw new IllegalStateException();</span>
+        }
+<span class="fc" id="L160">    }</span>
+
+    @Override
+    public byte[] decodeOctetString() throws ASN1Exception {
+<span class="nc" id="L164">        readTag(OCTET_STRING_TYPE);</span>
+<span class="nc" id="L165">        int length = readLength();</span>
+<span class="nc" id="L166">        byte[] result = new byte[length];</span>
+<span class="nc bnc" id="L167" title="All 4 branches missed.">        if ((length != 0) &amp;&amp; (bi.drain(result, 0, length) != length)) {</span>
+<span class="nc" id="L168">            throw log.asnUnexpectedEndOfInput();</span>
+        }
+<span class="nc" id="L170">        return result;</span>
+    }
+
+    @Override
+    public String decodeOctetStringAsString() throws ASN1Exception {
+<span class="fc" id="L175">        return decodeOctetStringAsString(StandardCharsets.UTF_8.name());</span>
+    }
+
+    @Override
+    public String decodeOctetStringAsString(String charSet) throws ASN1Exception {
+<span class="fc" id="L180">        readTag(OCTET_STRING_TYPE);</span>
+<span class="fc" id="L181">        int length = readLength();</span>
+<span class="fc" id="L182">        byte[] octets = new byte[length];</span>
+<span class="pc bpc" id="L183" title="2 of 4 branches missed.">        if ((length != 0) &amp;&amp; (bi.drain(octets, 0, length) != length)) {</span>
+<span class="nc" id="L184">            throw log.asnUnexpectedEndOfInput();</span>
+        }
+        try {
+<span class="fc" id="L187">            return new String(octets, charSet);</span>
+<span class="nc" id="L188">        } catch (UnsupportedEncodingException e) {</span>
+<span class="nc" id="L189">            throw new ASN1Exception(e);</span>
+        }
+    }
+
+    @Override
+    public String decodeIA5String() throws ASN1Exception {
+<span class="fc" id="L195">        byte[] octets = decodeIA5StringAsBytes();</span>
+<span class="fc" id="L196">        return new String(octets, StandardCharsets.US_ASCII);</span>
+    }
+
+    @Override
+    public byte[] decodeIA5StringAsBytes() throws ASN1Exception {
+<span class="fc" id="L201">        readTag(IA5_STRING_TYPE);</span>
+<span class="fc" id="L202">        return decodeUncheckedStringAsBytes();</span>
+    }
+
+    @Override
+    public byte[] decodeBitString() throws ASN1Exception {
+<span class="fc" id="L207">        readTag(BIT_STRING_TYPE);</span>
+<span class="fc" id="L208">        int length = readLength();</span>
+<span class="fc" id="L209">        byte[] result = new byte[length - 1];</span>
+
+<span class="fc" id="L211">        int numUnusedBits = bi.next();</span>
+<span class="pc bpc" id="L212" title="2 of 4 branches missed.">        if (numUnusedBits &lt; 0 || numUnusedBits &gt; 7) {</span>
+<span class="nc" id="L213">            throw log.asnInvalidNumberOfUnusedBits();</span>
+        }
+
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        if (numUnusedBits == 0) {</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">            for (int i = 0; i &lt; (length -1); i++) {</span>
+<span class="fc" id="L218">                result[i] = (byte) bi.next();</span>
+            }
+        } else {
+            // Any unused bits will be removed
+<span class="nc" id="L222">            int leftShift = 8 - numUnusedBits;</span>
+<span class="nc" id="L223">            int previous = 0;</span>
+            int next;
+<span class="nc bnc" id="L225" title="All 2 branches missed.">            for (int i = 0; i &lt; (length -1); i++) {</span>
+<span class="nc" id="L226">                next = bi.next();</span>
+<span class="nc bnc" id="L227" title="All 2 branches missed.">                if (i == 0) {</span>
+<span class="nc" id="L228">                    result[i] = (byte) (next &gt;&gt;&gt; numUnusedBits);</span>
+                } else {
+<span class="nc" id="L230">                    result[i] = (byte) ((next &gt;&gt;&gt; numUnusedBits) | (previous &lt;&lt; leftShift));</span>
+                }
+<span class="nc" id="L232">                previous = next;</span>
+            }
+        }
+<span class="fc" id="L235">        return result;</span>
+    }
+
+    @Override
+    public BigInteger decodeBitStringAsInteger() {
+<span class="fc" id="L240">        DERDecoder decoder = new DERDecoder(decodeBitString());</span>
+
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">        if (decoder.peekType() != INTEGER_TYPE) {</span>
+<span class="nc" id="L243">            throw log.asnUnexpectedTag();</span>
+        }
+
+<span class="fc" id="L246">        return decoder.decodeInteger();</span>
+    }
+
+    @Override
+    public String decodeBitStringAsString() throws ASN1Exception {
+<span class="nc" id="L251">        readTag(BIT_STRING_TYPE);</span>
+<span class="nc" id="L252">        int length = readLength();</span>
+<span class="nc" id="L253">        int numUnusedBits = bi.next();</span>
+<span class="nc bnc" id="L254" title="All 4 branches missed.">        if (numUnusedBits &lt; 0 || numUnusedBits &gt; 7) {</span>
+<span class="nc" id="L255">            throw log.asnInvalidNumberOfUnusedBits();</span>
+        }
+
+<span class="nc" id="L258">        int k = 0, next;</span>
+<span class="nc" id="L259">        int numBits = (length - 1) * 8 - numUnusedBits;</span>
+<span class="nc" id="L260">        StringBuilder result = new StringBuilder(numBits);</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">        for (int i = 0; i &lt; (length - 1); i++) {</span>
+<span class="nc" id="L262">            next = bi.next();</span>
+<span class="nc bnc" id="L263" title="All 4 branches missed.">            for (int j = 7; j &gt;= 0 &amp;&amp; k &lt; numBits; j--) {</span>
+<span class="nc bnc" id="L264" title="All 2 branches missed.">                if ((next &amp; (1 &lt;&lt; j)) != 0) {</span>
+<span class="nc" id="L265">                    result.append(&quot;1&quot;);</span>
+                } else {
+<span class="nc" id="L267">                    result.append(&quot;0&quot;);</span>
+                }
+<span class="nc" id="L269">                k += 1;</span>
+            }
+        }
+<span class="nc" id="L272">        return result.toString();</span>
+    }
+
+    @Override
+    public String decodePrintableString() throws ASN1Exception {
+<span class="fc" id="L277">        return new String(decodePrintableStringAsBytes(), StandardCharsets.US_ASCII);</span>
+    }
+
+    @Override
+    public byte[] decodePrintableStringAsBytes() throws ASN1Exception {
+<span class="fc" id="L282">        readTag(PRINTABLE_STRING_TYPE);</span>
+<span class="fc" id="L283">        final int length = readLength();</span>
+<span class="fc" id="L284">        int c = 0;</span>
+<span class="fc" id="L285">        byte[] result = new byte[length];</span>
+<span class="fc bfc" id="L286" title="All 4 branches covered.">        while (bi.hasNext() &amp;&amp; c &lt; length) {</span>
+<span class="fc" id="L287">            final int b = bi.next();</span>
+<span class="fc" id="L288">            validatePrintableByte(b);</span>
+<span class="fc" id="L289">            result[c++] = (byte) b;</span>
+<span class="fc" id="L290">        }</span>
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">        if (c &lt; length) {</span>
+<span class="nc" id="L292">            throw log.asnUnexpectedEndOfInput();</span>
+        }
+<span class="fc" id="L294">        return result;</span>
+    }
+
+    public String decodeUniversalString() throws ASN1Exception {
+<span class="fc" id="L298">        return new String(decodeUniversalStringAsBytes(), UTF_32BE);</span>
+    }
+
+    public byte[] decodeUniversalStringAsBytes() throws ASN1Exception {
+<span class="fc" id="L302">        readTag(UNIVERSAL_STRING_TYPE);</span>
+<span class="fc" id="L303">        return decodeUncheckedStringAsBytes();</span>
+    }
+
+    public String decodeUtf8String() throws ASN1Exception {
+<span class="fc" id="L307">        return new String(decodeUtf8StringAsBytes(), StandardCharsets.UTF_8);</span>
+    }
+
+    public byte[] decodeUtf8StringAsBytes() throws ASN1Exception {
+<span class="fc" id="L311">        readTag(UTF8_STRING_TYPE);</span>
+<span class="fc" id="L312">        return decodeUncheckedStringAsBytes();</span>
+    }
+
+    public String decodeBMPString() throws ASN1Exception {
+<span class="fc" id="L316">        return new String(decodeBMPStringAsBytes(), StandardCharsets.UTF_16BE);</span>
+    }
+
+    public byte[] decodeBMPStringAsBytes() throws ASN1Exception {
+<span class="fc" id="L320">        readTag(BMP_STRING_TYPE);</span>
+<span class="fc" id="L321">        return decodeUncheckedStringAsBytes();</span>
+    }
+
+    private byte[] decodeUncheckedStringAsBytes() throws ASN1Exception {
+<span class="fc" id="L325">        int length = readLength();</span>
+<span class="fc" id="L326">        byte[] result = new byte[length];</span>
+<span class="pc bpc" id="L327" title="2 of 4 branches missed.">        if ((length != 0) &amp;&amp; (bi.drain(result, 0, length) != length)) {</span>
+<span class="nc" id="L328">            throw log.asnUnexpectedEndOfInput();</span>
+        }
+<span class="fc" id="L330">        return result;</span>
+    }
+
+    @Override
+    public String decodeObjectIdentifier() throws ASN1Exception {
+<span class="fc" id="L335">        readTag(OBJECT_IDENTIFIER_TYPE);</span>
+<span class="fc" id="L336">        int length = readLength();</span>
+        int octet;
+<span class="fc" id="L338">        long value = 0;</span>
+<span class="fc" id="L339">        BigInteger bigInt = null;</span>
+<span class="fc" id="L340">        boolean processedFirst = false;</span>
+<span class="fc" id="L341">        StringBuilder objectIdentifierStr = new StringBuilder();</span>
+
+<span class="fc bfc" id="L343" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L344">            octet = bi.next();</span>
+<span class="pc bpc" id="L345" title="1 of 2 branches missed.">            if (value &lt; 0x80000000000000L) {</span>
+<span class="fc" id="L346">                value = (value &lt;&lt; 7) + (octet &amp; 0x7f);</span>
+<span class="fc bfc" id="L347" title="All 2 branches covered.">                if ((octet &amp; 0x80) == 0) {</span>
+                    // Reached the end of a component value
+<span class="fc bfc" id="L349" title="All 2 branches covered.">                    if (!processedFirst) {</span>
+<span class="fc" id="L350">                        int first = ((int) value / 40);</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">                        if (first == 0) {</span>
+<span class="fc" id="L352">                            objectIdentifierStr.append(&quot;0&quot;);</span>
+<span class="fc bfc" id="L353" title="All 2 branches covered.">                        } else if (first == 1) {</span>
+<span class="fc" id="L354">                            value = value - 40;</span>
+<span class="fc" id="L355">                            objectIdentifierStr.append(&quot;1&quot;);</span>
+<span class="pc bpc" id="L356" title="1 of 2 branches missed.">                        } else if (first == 2) {</span>
+<span class="fc" id="L357">                            value = value - 80;</span>
+<span class="fc" id="L358">                            objectIdentifierStr.append(&quot;2&quot;);</span>
+                        }
+<span class="fc" id="L360">                        processedFirst = true;</span>
+                    }
+<span class="fc" id="L362">                    objectIdentifierStr.append('.');</span>
+<span class="fc" id="L363">                    objectIdentifierStr.append(value);</span>
+
+                    // Reset for the next component value
+<span class="fc" id="L366">                    value = 0;</span>
+                }
+            } else {
+<span class="nc bnc" id="L369" title="All 2 branches missed.">                if (bigInt == null) {</span>
+<span class="nc" id="L370">                    bigInt = BigInteger.valueOf(value);</span>
+                }
+<span class="nc" id="L372">                bigInt = bigInt.shiftLeft(7).add(BigInteger.valueOf(octet &amp; 0x7f));</span>
+<span class="nc bnc" id="L373" title="All 2 branches missed.">                if ((octet &amp; 0x80) == 0) {</span>
+                    // Reached the end of a component value
+<span class="nc" id="L375">                    objectIdentifierStr.append('.');</span>
+<span class="nc" id="L376">                    objectIdentifierStr.append(bigInt);</span>
+
+                    // Reset for the next component value
+<span class="nc" id="L379">                    bigInt = null;</span>
+<span class="nc" id="L380">                    value = 0;</span>
+                }
+            }
+        }
+<span class="fc" id="L384">        return objectIdentifierStr.toString();</span>
+    }
+
+    @Override
+    public BigInteger decodeInteger() throws ASN1Exception {
+<span class="pc bpc" id="L389" title="1 of 2 branches missed.">        if (INTEGER_TYPE != peekType()) {</span>
+<span class="nc" id="L390">            throw log.asnUnexpectedTag();</span>
+        }
+
+<span class="fc" id="L393">        return new BigInteger(drainElementValue());</span>
+    }
+
+    @Override
+    public void decodeNull() throws ASN1Exception {
+<span class="nc" id="L398">        readTag(NULL_TYPE);</span>
+<span class="nc" id="L399">        int length = readLength();</span>
+<span class="nc bnc" id="L400" title="All 2 branches missed.">        if (length != 0) {</span>
+<span class="nc" id="L401">            throw log.asnNonZeroLengthForNullTypeTag();</span>
+        }
+<span class="nc" id="L403">    }</span>
+
+    @Override
+    public void decodeImplicit(int number) {
+<span class="nc" id="L407">        decodeImplicit(CONTEXT_SPECIFIC_MASK, number);</span>
+<span class="nc" id="L408">    }</span>
+
+    @Override
+    public void decodeImplicit(int clazz, int number) {
+<span class="nc bnc" id="L412" title="All 2 branches missed.">        if (implicitTag == -1) {</span>
+<span class="nc" id="L413">            implicitTag = clazz | number;</span>
+        }
+<span class="nc" id="L415">    }</span>
+
+    @Override
+    public boolean decodeBoolean() throws ASN1Exception {
+<span class="nc" id="L419">        readTag(BOOLEAN_TYPE);</span>
+<span class="nc" id="L420">        int length = readLength();</span>
+<span class="nc bnc" id="L421" title="All 2 branches missed.">        if (length != 1) {</span>
+<span class="nc" id="L422">            throw log.asnInvalidLengthForBooleanTypeTag();</span>
+        }
+<span class="nc bnc" id="L424" title="All 2 branches missed.">        if (! bi.hasNext()) {</span>
+<span class="nc" id="L425">            throw log.asnUnexpectedEndOfInput();</span>
+        }
+<span class="nc bnc" id="L427" title="All 2 branches missed.">        return bi.next() != BOOLEAN_FALSE;</span>
+    }
+
+    @Override
+    public boolean isNextType(int clazz, int number, boolean isConstructed) {
+        try {
+<span class="nc bnc" id="L433" title="All 4 branches missed.">            return peekType() == (clazz | (isConstructed ? CONSTRUCTED_MASK : 0x00) | number);</span>
+<span class="nc" id="L434">        } catch (ASN1Exception e) {</span>
+<span class="nc" id="L435">            return false;</span>
+        }
+    }
+
+    @Override
+    public int peekType() throws ASN1Exception {
+<span class="fc" id="L441">        long currOffset = bi.getIndex();</span>
+<span class="fc" id="L442">        int tag = readTag();</span>
+<span class="pc bpc" id="L443" title="1 of 4 branches missed.">        while ((bi.getIndex() != currOffset) &amp;&amp; bi.hasPrevious()) {</span>
+<span class="fc" id="L444">            bi.previous();</span>
+        }
+<span class="fc" id="L446">        return tag;</span>
+    }
+
+    @Override
+    public void skipElement() throws ASN1Exception {
+<span class="fc" id="L451">        readTag();</span>
+<span class="fc" id="L452">        int length = readLength();</span>
+        int i;
+<span class="pc bpc" id="L454" title="1 of 4 branches missed.">        for (i = 0; i &lt; length &amp;&amp; bi.hasNext(); i++) {</span>
+<span class="fc" id="L455">            bi.next();</span>
+        }
+<span class="pc bpc" id="L457" title="1 of 2 branches missed.">        if (i != length) {</span>
+<span class="nc" id="L458">            throw log.asnUnexpectedEndOfInput();</span>
+        }
+<span class="fc" id="L460">    }</span>
+
+    @Override
+    public boolean hasNextElement() {
+<span class="fc" id="L464">        DecoderState lastState = states.peekLast();</span>
+        boolean hasNext;
+<span class="fc bfc" id="L466" title="All 2 branches covered.">        if (lastState != null) {</span>
+<span class="pc bpc" id="L467" title="1 of 4 branches missed.">            hasNext = ((bi.getIndex() &lt; lastState.getNextElementIndex()) &amp;&amp; hasCompleteElement());</span>
+        } else {
+<span class="fc" id="L469">            hasNext = hasCompleteElement();</span>
+        }
+<span class="fc" id="L471">        return hasNext;</span>
+    }
+
+    private  boolean hasCompleteElement() {
+        boolean hasNext;
+<span class="fc" id="L476">        long currOffset = bi.getIndex();</span>
+        try {
+<span class="fc" id="L478">            readTag();</span>
+<span class="fc" id="L479">            int length = readLength();</span>
+            int i;
+<span class="pc bpc" id="L481" title="1 of 4 branches missed.">            for (i = 0; (i &lt; length) &amp;&amp; bi.hasNext(); i++) {</span>
+<span class="fc" id="L482">                bi.next();</span>
+            }
+<span class="pc bpc" id="L484" title="1 of 2 branches missed.">            hasNext = (i == length);</span>
+<span class="fc" id="L485">        } catch (ASN1Exception e) {</span>
+<span class="fc" id="L486">            hasNext = false;</span>
+<span class="fc" id="L487">        }</span>
+<span class="pc bpc" id="L488" title="1 of 4 branches missed.">        while ((bi.getIndex() != currOffset) &amp;&amp; bi.hasPrevious()) {</span>
+<span class="fc" id="L489">            bi.previous();</span>
+        }
+<span class="fc" id="L491">        return hasNext;</span>
+    }
+
+    @Override
+    public byte[] drainElementValue() throws ASN1Exception {
+<span class="pc bpc" id="L496" title="1 of 2 branches missed.">        if (implicitTag != -1) {</span>
+<span class="nc" id="L497">            implicitTag = -1;</span>
+        }
+<span class="fc" id="L499">        readTag();</span>
+<span class="fc" id="L500">        int length = readLength();</span>
+<span class="fc" id="L501">        byte[] value = new byte[length];</span>
+<span class="pc bpc" id="L502" title="2 of 4 branches missed.">        if ((length != 0) &amp;&amp; (bi.drain(value) != length)) {</span>
+<span class="nc" id="L503">            throw log.asnUnexpectedEndOfInput();</span>
+        }
+<span class="fc" id="L505">        return value;</span>
+    }
+
+    @Override
+    public byte[] drainElement() throws ASN1Exception {
+<span class="nc bnc" id="L510" title="All 2 branches missed.">        if (implicitTag != -1) {</span>
+<span class="nc" id="L511">            implicitTag = -1;</span>
+        }
+<span class="nc" id="L513">        long currOffset = bi.getIndex();</span>
+<span class="nc" id="L514">        readTag();</span>
+<span class="nc" id="L515">        int valueLength = readLength();</span>
+<span class="nc" id="L516">        int length = (int) ((bi.getIndex() - currOffset) + valueLength);</span>
+<span class="nc bnc" id="L517" title="All 4 branches missed.">        while ((bi.getIndex() != currOffset) &amp;&amp; bi.hasPrevious()) {</span>
+<span class="nc" id="L518">            bi.previous();</span>
+        }
+<span class="nc" id="L520">        byte[] element = new byte[length];</span>
+<span class="nc bnc" id="L521" title="All 4 branches missed.">        if ((length != 0) &amp;&amp; (bi.drain(element) != length)) {</span>
+<span class="nc" id="L522">            throw log.asnUnexpectedEndOfInput();</span>
+        }
+<span class="nc" id="L524">        return element;</span>
+    }
+
+    @Override
+    public byte[] drain() {
+<span class="nc" id="L529">        return bi.drain();</span>
+    }
+
+    private int readTag() throws ASN1Exception {
+        try {
+<span class="fc" id="L534">            int tag = bi.next();</span>
+<span class="fc" id="L535">            int tagClass = tag &amp; CLASS_MASK;</span>
+<span class="fc" id="L536">            int constructed = tag &amp; CONSTRUCTED_MASK;</span>
+<span class="fc" id="L537">            int tagNumber = tag &amp; TAG_NUMBER_MASK;</span>
+<span class="pc bpc" id="L538" title="1 of 2 branches missed.">            if (tagNumber == 0x1f) {</span>
+                // High-tag-number form
+<span class="nc" id="L540">                tagNumber = 0;</span>
+<span class="nc" id="L541">                int octet = bi.next();</span>
+<span class="nc bnc" id="L542" title="All 2 branches missed.">                if ((octet &amp; 0x7f) == 0) {</span>
+                    // Bits 7 to 1 of the first subsequent octet cannot be 0
+<span class="nc" id="L544">                    throw log.asnInvalidHighTagNumberForm();</span>
+                }
+<span class="nc bnc" id="L546" title="All 4 branches missed.">                while ((octet &gt;= 0) &amp;&amp; ((octet &amp; 0x80) != 0)) {</span>
+<span class="nc" id="L547">                    tagNumber |= (octet &amp; 0x7f);</span>
+<span class="nc" id="L548">                    tagNumber &lt;&lt;= 7;</span>
+<span class="nc" id="L549">                    octet = bi.next();</span>
+                }
+<span class="nc" id="L551">                tagNumber |= (octet &amp; 0x7f);</span>
+            }
+<span class="fc" id="L553">            return (tagClass | constructed | tagNumber);</span>
+<span class="fc" id="L554">        } catch (NoSuchElementException e) {</span>
+<span class="fc" id="L555">            throw log.asnUnexpectedEndOfInput();</span>
+        }
+    }
+
+    private void readTag(int expectedTag) throws ASN1Exception {
+<span class="pc bpc" id="L560" title="1 of 2 branches missed.">        if (implicitTag != -1) {</span>
+<span class="nc" id="L561">            expectedTag = implicitTag | (expectedTag &amp; CONSTRUCTED_MASK);</span>
+<span class="nc" id="L562">            implicitTag = -1;</span>
+        }
+<span class="fc" id="L564">        long currOffset = bi.getIndex();</span>
+<span class="fc" id="L565">        int actualTag = readTag();</span>
+<span class="pc bpc" id="L566" title="1 of 2 branches missed.">        if (actualTag != expectedTag) {</span>
+<span class="nc bnc" id="L567" title="All 4 branches missed.">            while ((bi.getIndex() != currOffset) &amp;&amp; bi.hasPrevious()) {</span>
+<span class="nc" id="L568">                bi.previous();</span>
+            }
+<span class="nc" id="L570">            throw log.asnUnexpectedTag();</span>
+        }
+<span class="fc" id="L572">    }</span>
+
+    private int readLength() throws ASN1Exception {
+        try {
+<span class="fc" id="L576">            int length = bi.next();</span>
+<span class="fc bfc" id="L577" title="All 2 branches covered.">            if (length &gt; 127) {</span>
+                // Long form
+<span class="fc" id="L579">                int numOctets = length &amp; 0x7f;</span>
+<span class="pc bpc" id="L580" title="1 of 2 branches missed.">                if (numOctets &gt; 4) {</span>
+<span class="nc" id="L581">                    throw log.asnLengthEncodingExceeds4bytes();</span>
+                }
+<span class="fc" id="L583">                length = 0;</span>
+                int nextOctet;
+<span class="fc bfc" id="L585" title="All 2 branches covered.">                for (int i = 0; i &lt; numOctets; i++) {</span>
+<span class="fc" id="L586">                    nextOctet = bi.next();</span>
+<span class="fc" id="L587">                    length = (length &lt;&lt; 8) + nextOctet;</span>
+                }
+            }
+<span class="fc" id="L590">            return length;</span>
+<span class="nc" id="L591">        } catch (NoSuchElementException e) {</span>
+<span class="nc" id="L592">            throw log.asnUnexpectedEndOfInput();</span>
+        }
+    }
+
+    /**
+     * Decodes an OID and resolve its corresponding key algorithm.
+     *
+     * @return the key algorithm associated with the OID or null if no algorithm could be resolved
+     */
+    public String decodeObjectIdentifierAsKeyAlgorithm() {
+<span class="nc" id="L602">        return keyAlgorithmFromOid(decodeObjectIdentifier());</span>
+    }
+
+    /**
+     * A class used to maintain state information during DER decoding.
+     */
+    static class DecoderState {
+        // Tag number for a constructed element
+        private final int tag;
+
+        // The position of the first character in the encoded buffer that occurs after
+        // the encoding of the constructed element
+        private final long nextElementIndex;
+
+<span class="fc" id="L616">        DecoderState(int tag, long nextElementIndex) {</span>
+<span class="fc" id="L617">            this.tag = tag;</span>
+<span class="fc" id="L618">            this.nextElementIndex = nextElementIndex;</span>
+<span class="fc" id="L619">        }</span>
+
+        public int getTag() {
+<span class="fc" id="L622">            return tag;</span>
+        }
+
+        public long getNextElementIndex() {
+<span class="fc" id="L626">            return nextElementIndex;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

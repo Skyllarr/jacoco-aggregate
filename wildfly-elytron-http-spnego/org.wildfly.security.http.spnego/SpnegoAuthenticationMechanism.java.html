@@ -1,0 +1,478 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SpnegoAuthenticationMechanism.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-spnego</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.spnego</a> &gt; <span class="el_source">SpnegoAuthenticationMechanism.java</span></div><h1>SpnegoAuthenticationMechanism.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.http.spnego;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.wildfly.common.Assert.checkNotNullParam;
+import static org.wildfly.security.http.HttpConstants.AUTHORIZATION;
+import static org.wildfly.security.http.HttpConstants.CONFIG_CREATE_NAME_GSS_INIT;
+import static org.wildfly.security.http.HttpConstants.CONFIG_GSS_MANAGER;
+import static org.wildfly.security.http.HttpConstants.CONFIG_STATE_SCOPES;
+import static org.wildfly.security.http.HttpConstants.DISABLE_SESSION_ID_CHANGE;
+import static org.wildfly.security.http.HttpConstants.FORBIDDEN;
+import static org.wildfly.security.http.HttpConstants.NEGOTIATE;
+import static org.wildfly.security.http.HttpConstants.SPNEGO_NAME;
+import static org.wildfly.security.http.HttpConstants.UNAUTHORIZED;
+import static org.wildfly.security.http.HttpConstants.WWW_AUTHENTICATE;
+import static org.wildfly.security.http.HttpConstants.CONFIG_DISABLE_RESTORE_SECURITY_IDENTITY;
+import static org.wildfly.security.mechanism._private.ElytronMessages.httpSpnego;
+import static org.wildfly.security.mechanism.gssapi.GSSCredentialSecurityFactory.SPNEGO;
+
+import java.io.IOException;
+import java.io.Serializable;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.function.BooleanSupplier;
+
+import javax.security.auth.Subject;
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.auth.kerberos.KerberosTicket;
+import javax.security.sasl.AuthorizeCallback;
+
+import org.ietf.jgss.GSSContext;
+import org.ietf.jgss.GSSCredential;
+import org.ietf.jgss.GSSException;
+import org.ietf.jgss.GSSManager;
+import org.ietf.jgss.GSSName;
+import org.wildfly.common.array.Arrays2;
+import org.wildfly.common.iteration.ByteIterator;
+import org.wildfly.security.auth.callback.AuthenticationCompleteCallback;
+import org.wildfly.security.auth.callback.CachedIdentityAuthorizeCallback;
+import org.wildfly.security.auth.callback.IdentityCredentialCallback;
+import org.wildfly.security.auth.callback.ServerCredentialCallback;
+import org.wildfly.security.auth.principal.NamePrincipal;
+import org.wildfly.security.auth.server.SecurityIdentity;
+import org.wildfly.security.cache.CachedIdentity;
+import org.wildfly.security.cache.IdentityCache;
+import org.wildfly.security.credential.GSSKerberosCredential;
+import org.wildfly.security.http.HttpAuthenticationException;
+import org.wildfly.security.http.HttpScope;
+import org.wildfly.security.http.HttpServerAuthenticationMechanism;
+import org.wildfly.security.http.HttpServerRequest;
+import org.wildfly.security.http.HttpServerResponse;
+import org.wildfly.security.http.Scope;
+import org.wildfly.security.mechanism.AuthenticationMechanismException;
+import org.wildfly.security.mechanism._private.MechanismUtil;
+
+/**
+ * A {@link HttpServerAuthenticationMechanism} implementation to support SPNEGO.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public final class SpnegoAuthenticationMechanism implements HttpServerAuthenticationMechanism {
+
+    private static final String CHALLENGE_PREFIX = NEGOTIATE + &quot; &quot;;
+
+<span class="nc" id="L87">    private static final String SPNEGO_CONTEXT_KEY = SpnegoAuthenticationMechanism.class.getName() + &quot;.spnego-context&quot;;</span>
+<span class="nc" id="L88">    private static final String CACHED_IDENTITY_KEY = SpnegoAuthenticationMechanism.class.getName() + &quot;.elytron-identity&quot;;</span>
+
+<span class="nc" id="L90">    private static final byte[] NEG_STATE_REJECT = new byte[] { (byte) 0xA1, 0x07, 0x30, 0x05, (byte) 0xA0, 0x03, 0x0A, 0x01, 0x02 };</span>
+
+    private final CallbackHandler callbackHandler;
+    private final GSSManager gssManager;
+    private final Scope[] storageScopes;
+    private final boolean disableRestoreSecurityIdentity;
+    private final boolean disableSessionIdChange;
+
+<span class="nc" id="L98">    SpnegoAuthenticationMechanism(final CallbackHandler callbackHandler, final Map&lt;String, ?&gt; properties) {</span>
+<span class="nc" id="L99">        checkNotNullParam(&quot;callbackHandler&quot;, callbackHandler);</span>
+<span class="nc" id="L100">        checkNotNullParam(&quot;properties&quot;, properties);</span>
+
+<span class="nc" id="L102">        this.callbackHandler = callbackHandler;</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        this.gssManager = properties.containsKey(CONFIG_GSS_MANAGER) ? (GSSManager) properties.get(CONFIG_GSS_MANAGER) : GSSManager.getInstance();</span>
+<span class="nc bnc" id="L104" title="All 4 branches missed.">        this.disableRestoreSecurityIdentity = properties.containsKey(CONFIG_DISABLE_RESTORE_SECURITY_IDENTITY) &amp;&amp; Boolean.parseBoolean((String) properties.get(CONFIG_DISABLE_RESTORE_SECURITY_IDENTITY));</span>
+
+        // JDK-8194073 workaround (for Oracle JDK + native Kerberos)
+<span class="nc bnc" id="L107" title="All 4 branches missed.">        if (properties.containsKey(CONFIG_CREATE_NAME_GSS_INIT) &amp;&amp; Boolean.parseBoolean((String) properties.get(CONFIG_CREATE_NAME_GSS_INIT))) {</span>
+            try { // createName call ensure correct GSSManager initialization
+<span class="nc" id="L109">                gssManager.createName(&quot;dummy&quot;, GSSName.NT_USER_NAME, SPNEGO);</span>
+<span class="nc" id="L110">                httpSpnego.trace(&quot;createName workaround for native GSS initialization applied&quot;);</span>
+<span class="nc" id="L111">            } catch (GSSException e) {</span>
+<span class="nc" id="L112">                httpSpnego.trace(&quot;Exception while applying createName workaround for native GSS initialization&quot;, e);</span>
+<span class="nc" id="L113">            }</span>
+        }
+
+<span class="nc" id="L116">        String scopesProperty = (String) properties.get(CONFIG_STATE_SCOPES);</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        if (scopesProperty == null) {</span>
+<span class="nc" id="L118">            storageScopes = new Scope[] { Scope.SESSION, Scope.CONNECTION };</span>
+        } else {
+<span class="nc" id="L120">            String[] names = scopesProperty.split(&quot;,&quot;);</span>
+<span class="nc" id="L121">            storageScopes = new Scope[names.length];</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">            for (int i=0;i&lt;names.length;i++) {</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">                if (&quot;NONE&quot;.equals(names[i])) {</span>
+<span class="nc" id="L124">                    storageScopes[i] = null;</span>
+                } else {
+<span class="nc" id="L126">                    Scope scope = Scope.valueOf(names[i]);</span>
+<span class="nc bnc" id="L127" title="All 4 branches missed.">                    if (scope == Scope.APPLICATION || scope == Scope.GLOBAL) {</span>
+<span class="nc" id="L128">                        throw httpSpnego.unsuitableScope(scope.name());</span>
+                    }
+<span class="nc" id="L130">                    storageScopes[i] = scope;</span>
+                }
+            }
+        }
+<span class="nc" id="L134">        disableSessionIdChange = Boolean.valueOf((String) properties.get(DISABLE_SESSION_ID_CHANGE));</span>
+<span class="nc" id="L135">    }</span>
+
+    @Override
+    public String getMechanismName() {
+<span class="nc" id="L139">        return SPNEGO_NAME;</span>
+    }
+
+    @Override
+    public void evaluateRequest(HttpServerRequest request) throws HttpAuthenticationException {
+<span class="nc" id="L144">        HttpScope storageScope = getStorageScope(request);</span>
+<span class="nc" id="L145">        IdentityCache identityCache = null;</span>
+
+<span class="nc" id="L147">        identityCache = createIdentityCache(identityCache, storageScope, false);</span>
+<span class="nc bnc" id="L148" title="All 4 branches missed.">        if (identityCache != null &amp;&amp; attemptReAuthentication(identityCache, request)) {</span>
+<span class="nc" id="L149">            httpSpnego.trace(&quot;Successfully authorized using cached identity&quot;);</span>
+<span class="nc" id="L150">            return;</span>
+        }
+
+        // If the scope does not already exist it can't have previously been used to store state.
+<span class="nc bnc" id="L154" title="All 4 branches missed.">        SpnegoContext spnegoContext = storageScope != null &amp;&amp; storageScope.exists() ? storageScope.getAttachment(SPNEGO_CONTEXT_KEY, SpnegoContext.class) : null;</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">        GSSContext gssContext = spnegoContext != null ? spnegoContext.gssContext : null;</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">        KerberosTicket kerberosTicket = spnegoContext != null ? spnegoContext.kerberosTicket : null;</span>
+<span class="nc" id="L157">        httpSpnego.tracef(&quot;Evaluating SPNEGO request: cached GSSContext = %s&quot;, gssContext);</span>
+
+        // Do we already have a cached identity? If so use it.
+<span class="nc bnc" id="L160" title="All 4 branches missed.">        if (gssContext != null &amp;&amp; gssContext.isEstablished()) {</span>
+<span class="nc" id="L161">            identityCache = createIdentityCache(identityCache, storageScope, true);</span>
+
+<span class="nc bnc" id="L163" title="All 2 branches missed.">            if (authorizeSrcName(gssContext, identityCache)) {</span>
+<span class="nc" id="L164">                httpSpnego.trace(&quot;Successfully authorized using cached GSSContext&quot;);</span>
+<span class="nc" id="L165">                request.authenticationComplete();</span>
+<span class="nc" id="L166">                return;</span>
+            } else {
+<span class="nc" id="L168">                clearAttachments(storageScope);</span>
+<span class="nc" id="L169">                gssContext = null;</span>
+<span class="nc" id="L170">                kerberosTicket = null;</span>
+            }
+        }
+
+<span class="nc bnc" id="L174" title="All 2 branches missed.">        if (gssContext == null) { // init GSSContext</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">            if (spnegoContext == null) {</span>
+<span class="nc" id="L176">                spnegoContext = new SpnegoContext();</span>
+            }
+<span class="nc" id="L178">            ServerCredentialCallback gssCredentialCallback = new ServerCredentialCallback(GSSKerberosCredential.class);</span>
+            final GSSCredential serviceGssCredential;
+
+            try {
+<span class="nc" id="L182">                httpSpnego.trace(&quot;Obtaining GSSCredential for the service from callback handler...&quot;);</span>
+<span class="nc" id="L183">                callbackHandler.handle(new Callback[] { gssCredentialCallback });</span>
+<span class="nc" id="L184">                serviceGssCredential = gssCredentialCallback.applyToCredential(GSSKerberosCredential.class, GSSKerberosCredential::getGssCredential);</span>
+<span class="nc" id="L185">                kerberosTicket = gssCredentialCallback.applyToCredential(GSSKerberosCredential.class, GSSKerberosCredential::getKerberosTicket);</span>
+<span class="nc" id="L186">            } catch (IOException | UnsupportedCallbackException e) {</span>
+<span class="nc" id="L187">                throw httpSpnego.mechCallbackHandlerFailedForUnknownReason(e).toHttpAuthenticationException();</span>
+<span class="nc" id="L188">            }</span>
+
+<span class="nc bnc" id="L190" title="All 2 branches missed.">            if (serviceGssCredential == null) {</span>
+<span class="nc" id="L191">                throw httpSpnego.unableToObtainServerCredential().toHttpAuthenticationException();</span>
+            }
+
+            try {
+<span class="nc" id="L195">                gssContext = gssManager.createContext(serviceGssCredential);</span>
+
+<span class="nc bnc" id="L197" title="All 2 branches missed.">                if (httpSpnego.isTraceEnabled()) {</span>
+<span class="nc" id="L198">                    httpSpnego.tracef(&quot;Using SpnegoAuthenticationMechanism to authenticate %s using the following mechanisms: [%s]&quot;,</span>
+<span class="nc" id="L199">                            serviceGssCredential.getName(), Arrays2.objectToString(serviceGssCredential.getMechs()));</span>
+                }
+<span class="nc" id="L201">            } catch (GSSException e) {</span>
+<span class="nc" id="L202">                throw httpSpnego.mechUnableToCreateGssContext(e).toHttpAuthenticationException();</span>
+<span class="nc" id="L203">            }</span>
+<span class="nc" id="L204">            spnegoContext.gssContext = gssContext;</span>
+<span class="nc" id="L205">            spnegoContext.kerberosTicket = kerberosTicket;</span>
+        }
+
+        // authentication exchange
+<span class="nc" id="L209">        List&lt;String&gt; authorizationValues = request.getRequestHeaderValues(AUTHORIZATION);</span>
+<span class="nc" id="L210">        String challenge = null;</span>
+<span class="nc bnc" id="L211" title="All 4 branches missed.">        if (authorizationValues != null &amp;&amp; authorizationValues.isEmpty() == false) {</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">            for (String current : authorizationValues) {</span>
+<span class="nc bnc" id="L213" title="All 2 branches missed.">                if (current.startsWith(CHALLENGE_PREFIX)) {</span>
+<span class="nc" id="L214">                    challenge = current.substring(CHALLENGE_PREFIX.length());</span>
+<span class="nc" id="L215">                    break;</span>
+                }
+<span class="nc" id="L217">            }</span>
+        }
+
+<span class="nc bnc" id="L220" title="All 2 branches missed.">        if (httpSpnego.isTraceEnabled()) {</span>
+<span class="nc" id="L221">            httpSpnego.tracef(&quot;Sent HTTP authorizations: [%s]&quot;, Arrays2.objectToString(authorizationValues));</span>
+        }
+
+        // Do we have an incoming response to a challenge? If so, process it.
+<span class="nc bnc" id="L225" title="All 2 branches missed.">        if (challenge != null) {</span>
+<span class="nc" id="L226">            httpSpnego.trace(&quot;Processing incoming response to a challenge...&quot;);</span>
+
+            // We only need to store the scope if we have a challenge otherwise the next round
+            // trip will be a new response anyway.
+<span class="nc bnc" id="L230" title="All 6 branches missed.">            if (storageScope != null &amp;&amp; (storageScope.exists() || storageScope.create())) {</span>
+<span class="nc" id="L231">                httpSpnego.tracef(&quot;Caching SPNEGO Context with GSSContext %s and KerberosTicket %s&quot;, gssContext, kerberosTicket);</span>
+<span class="nc" id="L232">                storageScope.setAttachment(SPNEGO_CONTEXT_KEY, spnegoContext);</span>
+            } else {
+<span class="nc" id="L234">                storageScope = null;</span>
+<span class="nc" id="L235">                httpSpnego.trace(&quot;No usable HttpScope for storage, continuation will not be possible&quot;);</span>
+            }
+
+<span class="nc" id="L238">            byte[] decodedValue = ByteIterator.ofBytes(challenge.getBytes(UTF_8)).asUtf8String().base64Decode().drain();</span>
+
+<span class="nc bnc" id="L240" title="All 2 branches missed.">            Subject subject = new Subject(true, Collections.emptySet(), Collections.emptySet(), kerberosTicket != null ? Collections.singleton(kerberosTicket) : Collections.emptySet());</span>
+
+            byte[] responseToken;
+            try {
+<span class="nc" id="L244">                final GSSContext finalGssContext = gssContext;</span>
+<span class="nc" id="L245">                responseToken = Subject.doAs(subject, (PrivilegedExceptionAction&lt;byte[]&gt;) () -&gt; finalGssContext.acceptSecContext(decodedValue, 0, decodedValue.length));</span>
+<span class="nc" id="L246">            } catch (PrivilegedActionException e) {</span>
+<span class="nc" id="L247">                httpSpnego.trace(&quot;Call to acceptSecContext failed.&quot;, e.getCause());</span>
+<span class="nc" id="L248">                handleCallback(AuthenticationCompleteCallback.FAILED);</span>
+<span class="nc" id="L249">                clearAttachments(storageScope);</span>
+<span class="nc" id="L250">                request.authenticationFailed(httpSpnego.authenticationFailed());</span>
+<span class="nc" id="L251">                return;</span>
+<span class="nc" id="L252">            }</span>
+
+<span class="nc bnc" id="L254" title="All 2 branches missed.">            if (gssContext.isEstablished()) { // no more tokens are needed from the peer</span>
+<span class="nc" id="L255">                httpSpnego.trace(&quot;GSSContext established, authorizing...&quot;);</span>
+
+<span class="nc" id="L257">                identityCache = createIdentityCache(identityCache, storageScope, true);</span>
+<span class="nc bnc" id="L258" title="All 2 branches missed.">                if (authorizeSrcName(gssContext, identityCache)) {</span>
+<span class="nc" id="L259">                    httpSpnego.trace(&quot;GSSContext established and authorized - authentication complete&quot;);</span>
+<span class="nc" id="L260">                    request.authenticationComplete(</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">                            responseToken == null ? null : response -&gt; sendChallenge(responseToken, response, 0));</span>
+                } else {
+<span class="nc" id="L263">                    httpSpnego.trace(&quot;Authorization of established GSSContext failed&quot;);</span>
+<span class="nc" id="L264">                    handleCallback(AuthenticationCompleteCallback.FAILED);</span>
+<span class="nc" id="L265">                    clearAttachments(storageScope);</span>
+<span class="nc" id="L266">                    request.authenticationFailed(httpSpnego.authenticationFailed(),</span>
+<span class="nc bnc" id="L267" title="All 2 branches missed.">                            responseToken == null ? null : response -&gt; sendChallenge(responseToken, response, FORBIDDEN));</span>
+                }
+<span class="nc bnc" id="L269" title="All 2 branches missed.">            } else if (Arrays.equals(responseToken, NEG_STATE_REJECT)) {</span>
+                // for IBM java - prevent sending UNAUTHORIZED for [negState = reject] token
+<span class="nc" id="L271">                httpSpnego.trace(&quot;GSSContext failed - sending negotiation rejected to the peer&quot;);</span>
+<span class="nc" id="L272">                request.authenticationFailed(httpSpnego.authenticationFailed(),</span>
+<span class="nc" id="L273">                        response -&gt; sendChallenge(responseToken, response, FORBIDDEN));</span>
+<span class="nc bnc" id="L274" title="All 4 branches missed.">            } else if (responseToken != null &amp;&amp; storageScope != null) {</span>
+<span class="nc" id="L275">                httpSpnego.trace(&quot;GSSContext establishing - sending negotiation token to the peer&quot;);</span>
+<span class="nc" id="L276">                request.authenticationInProgress(response -&gt; sendChallenge(responseToken, response, UNAUTHORIZED));</span>
+            } else {
+<span class="nc" id="L278">                httpSpnego.trace(&quot;GSSContext establishing - unable to hold GSSContext so continuation will not be possible&quot;);</span>
+<span class="nc" id="L279">                handleCallback(AuthenticationCompleteCallback.FAILED);</span>
+<span class="nc" id="L280">                request.authenticationFailed(httpSpnego.authenticationFailed());</span>
+            }
+<span class="nc" id="L282">        } else {</span>
+<span class="nc" id="L283">            httpSpnego.trace(&quot;Request lacks valid authentication credentials&quot;);</span>
+<span class="nc" id="L284">            clearAttachments(storageScope);</span>
+<span class="nc" id="L285">            request.noAuthenticationInProgress(this::sendBareChallenge);</span>
+        }
+<span class="nc" id="L287">    }</span>
+
+    private HttpScope getStorageScope(HttpServerRequest request) throws HttpAuthenticationException {
+<span class="nc bnc" id="L290" title="All 2 branches missed.">        for (Scope scope : storageScopes) {</span>
+<span class="nc bnc" id="L291" title="All 2 branches missed.">            if (scope == null) {</span>
+<span class="nc" id="L292">                return null;</span>
+            }
+<span class="nc" id="L294">            HttpScope httpScope = request.getScope(scope);</span>
+<span class="nc bnc" id="L295" title="All 4 branches missed.">            if (httpScope != null &amp;&amp; httpScope.supportsAttachments()) {</span>
+<span class="nc bnc" id="L296" title="All 2 branches missed.">                if (httpSpnego.isTraceEnabled()) {</span>
+<span class="nc" id="L297">                    httpSpnego.tracef(&quot;Using HttpScope '%s' with ID '%s'&quot;, scope.name(), httpScope.getID());</span>
+                }
+<span class="nc" id="L299">                return httpScope;</span>
+            } else {
+<span class="nc bnc" id="L301" title="All 2 branches missed.">                if (httpSpnego.isTraceEnabled()) {</span>
+<span class="nc bnc" id="L302" title="All 2 branches missed.">                    httpSpnego.tracef(httpScope == null ? &quot;HttpScope %s not supported&quot; : &quot;HttpScope %s does not support attachments&quot;, scope);</span>
+                }
+            }
+        }
+
+<span class="nc" id="L307">        throw httpSpnego.unableToIdentifyHttpScope();</span>
+    }
+
+    private IdentityCache createIdentityCache(final IdentityCache existingCache, final HttpScope httpScope, boolean forUpdate) {
+<span class="nc bnc" id="L311" title="All 12 branches missed.">       if (disableRestoreSecurityIdentity ? existingCache != null &amp;&amp; existingCache.get() != null &amp;&amp; existingCache.get().getSecurityIdentity() != null</span>
+             : existingCache != null || // disable-restore-security-identity option is &quot;true&quot;: Use the cache only if it has SecurityIdentity.
+                                        // disable-restore-security-identity option is &quot;false&quot; (default): If we have a cache continue to use it.
+                httpScope == null || // If we don't have a scope we can't create a cache (existing cache is null so return it)
+<span class="nc bnc" id="L315" title="All 2 branches missed.">                !httpScope.supportsAttachments() || // It is not null but if it doesn't support attachments pointless to wrap in a cache</span>
+<span class="nc bnc" id="L316" title="All 6 branches missed.">                (!httpScope.exists() &amp;&amp; (!forUpdate || !httpScope.create())) // Doesn't exist and if update is requested can't be created</span>
+                ) {
+<span class="nc" id="L318">            return existingCache;</span>
+        }
+
+<span class="nc" id="L321">        return new IdentityCache() {</span>
+
+            @Override
+            public CachedIdentity remove() {
+<span class="nc" id="L325">                CachedIdentity cachedIdentity = get();</span>
+
+<span class="nc" id="L327">                httpScope.setAttachment(CACHED_IDENTITY_KEY, null);</span>
+
+<span class="nc" id="L329">                return cachedIdentity;</span>
+            }
+
+            @Override
+            public void put(SecurityIdentity identity) {
+                /*
+                 * If we are associating an identity with the session for the first time we need to
+                 * change the ID of the session, in other cases we can continue with the same ID.
+                 */
+<span class="nc bnc" id="L338" title="All 6 branches missed.">                if (!disableSessionIdChange &amp;&amp; httpScope.supportsChangeID() &amp;&amp; httpScope.getAttachment(CACHED_IDENTITY_KEY) == null) {</span>
+<span class="nc" id="L339">                    httpScope.changeID();</span>
+                }
+
+<span class="nc" id="L342">                httpScope.setAttachment(CACHED_IDENTITY_KEY, new CachedIdentity(SPNEGO_NAME, false, identity));</span>
+<span class="nc" id="L343">            }</span>
+
+            @Override
+            public CachedIdentity get() {
+<span class="nc" id="L347">                return httpScope.getAttachment(CACHED_IDENTITY_KEY, CachedIdentity.class);</span>
+            }
+        };
+
+    }
+
+    private static void clearAttachments(HttpScope scope) {
+<span class="nc bnc" id="L354" title="All 2 branches missed.">        if (scope != null) {</span>
+<span class="nc" id="L355">            scope.setAttachment(SPNEGO_CONTEXT_KEY, null); // clear cache</span>
+        }
+<span class="nc" id="L357">    }</span>
+
+    private void sendBareChallenge(HttpServerResponse response) {
+<span class="nc" id="L360">        response.addResponseHeader(WWW_AUTHENTICATE, NEGOTIATE);</span>
+<span class="nc" id="L361">        response.setStatusCode(UNAUTHORIZED);</span>
+<span class="nc" id="L362">    }</span>
+
+    private void sendChallenge(byte[] responseToken, HttpServerResponse response, int statusCode) {
+<span class="nc bnc" id="L365" title="All 2 branches missed.">        if (httpSpnego.isTraceEnabled()) {</span>
+<span class="nc" id="L366">            httpSpnego.tracef(&quot;Sending intermediate challenge: %s&quot;, Arrays2.objectToString(responseToken));</span>
+        }
+<span class="nc bnc" id="L368" title="All 2 branches missed.">        if (responseToken == null) {</span>
+<span class="nc" id="L369">            response.addResponseHeader(WWW_AUTHENTICATE, NEGOTIATE);</span>
+        } else {
+<span class="nc" id="L371">            String responseConverted = ByteIterator.ofBytes(responseToken).base64Encode().drainToString();</span>
+<span class="nc" id="L372">            response.addResponseHeader(WWW_AUTHENTICATE, CHALLENGE_PREFIX + responseConverted);</span>
+        }
+<span class="nc bnc" id="L374" title="All 2 branches missed.">        if (statusCode != 0) {</span>
+<span class="nc" id="L375">            response.setStatusCode(statusCode);</span>
+        }
+<span class="nc" id="L377">    }</span>
+
+    private boolean attemptReAuthentication(IdentityCache identityCache, HttpServerRequest request) throws HttpAuthenticationException {
+<span class="nc" id="L380">        CachedIdentityAuthorizeCallback authorizeCallback = new CachedIdentityAuthorizeCallback(identityCache);</span>
+        try {
+<span class="nc" id="L382">            callbackHandler.handle(new Callback[] { authorizeCallback });</span>
+<span class="nc" id="L383">        } catch (IOException | UnsupportedCallbackException e) {</span>
+<span class="nc" id="L384">            throw new HttpAuthenticationException(e);</span>
+<span class="nc" id="L385">        }</span>
+<span class="nc bnc" id="L386" title="All 2 branches missed.">        if (authorizeCallback.isAuthorized()) {</span>
+            try {
+<span class="nc" id="L388">                handleCallback(AuthenticationCompleteCallback.SUCCEEDED);</span>
+<span class="nc" id="L389">            } catch (IOException e) {</span>
+<span class="nc" id="L390">                throw new HttpAuthenticationException(e);</span>
+<span class="nc" id="L391">            }</span>
+<span class="nc" id="L392">            request.authenticationComplete(null, identityCache::remove);</span>
+<span class="nc" id="L393">            return true;</span>
+        }
+
+<span class="nc" id="L396">        return false;</span>
+    }
+
+    private boolean authorizeSrcName(GSSContext gssContext, IdentityCache identityCache) throws HttpAuthenticationException {
+        final GSSName srcName;
+        try {
+<span class="nc" id="L402">            srcName = gssContext.getSrcName();</span>
+<span class="nc bnc" id="L403" title="All 2 branches missed.">            if (srcName == null) {</span>
+<span class="nc" id="L404">                httpSpnego.trace(&quot;Authorization failed - srcName of GSSContext (name of initiator) is null - wrong realm or kdc?&quot;);</span>
+<span class="nc" id="L405">                return false;</span>
+            }
+<span class="nc" id="L407">        } catch (GSSException e) {</span>
+<span class="nc" id="L408">            httpSpnego.trace(&quot;Unable to obtain srcName from established GSSContext.&quot;, e);</span>
+<span class="nc" id="L409">            return false;</span>
+<span class="nc" id="L410">        }</span>
+
+        final BooleanSupplier authorizedFunction;
+        final Callback authorizeCallBack;
+
+<span class="nc bnc" id="L415" title="All 2 branches missed.">        if (gssContext.getCredDelegState()) {</span>
+            try {
+<span class="nc" id="L417">                GSSCredential credential = gssContext.getDelegCred();</span>
+<span class="nc" id="L418">                httpSpnego.tracef(&quot;Credential delegation enabled, delegated credential = %s&quot;, credential);</span>
+<span class="nc" id="L419">                MechanismUtil.handleCallbacks(httpSpnego, callbackHandler, new IdentityCredentialCallback(new GSSKerberosCredential(credential), true));</span>
+<span class="nc" id="L420">            } catch (UnsupportedCallbackException ignored) {</span>
+                // ignored
+<span class="nc" id="L422">            } catch (AuthenticationMechanismException e) {</span>
+<span class="nc" id="L423">                throw e.toHttpAuthenticationException();</span>
+<span class="nc" id="L424">            } catch (GSSException e) {</span>
+<span class="nc" id="L425">                throw new HttpAuthenticationException(e);</span>
+<span class="nc" id="L426">            }</span>
+        } else {
+<span class="nc" id="L428">            httpSpnego.trace(&quot;Credential delegation not enabled&quot;);</span>
+        }
+
+<span class="nc" id="L431">        boolean authorized = false;</span>
+        try {
+<span class="nc" id="L433">            String clientName = srcName.toString();</span>
+
+<span class="nc bnc" id="L435" title="All 2 branches missed.">            if (identityCache != null) {</span>
+<span class="nc" id="L436">                CachedIdentityAuthorizeCallback cacheCallback = new CachedIdentityAuthorizeCallback(new NamePrincipal(clientName), identityCache, true);</span>
+<span class="nc" id="L437">                authorizedFunction = cacheCallback::isAuthorized;</span>
+<span class="nc" id="L438">                authorizeCallBack = cacheCallback;</span>
+<span class="nc" id="L439">            } else {</span>
+<span class="nc" id="L440">                AuthorizeCallback plainCallback = new AuthorizeCallback(clientName, clientName);</span>
+<span class="nc" id="L441">                authorizedFunction = plainCallback::isAuthorized;</span>
+<span class="nc" id="L442">                authorizeCallBack = plainCallback;</span>
+            }
+<span class="nc" id="L444">            callbackHandler.handle(new Callback[] { authorizeCallBack });</span>
+<span class="nc" id="L445">            authorized = authorizedFunction.getAsBoolean();</span>
+<span class="nc" id="L446">            httpSpnego.tracef(&quot;Authorized by callback handler = %b  clientName = [%s]&quot;, authorized, clientName);</span>
+<span class="nc" id="L447">        } catch (IOException e) {</span>
+<span class="nc" id="L448">            httpSpnego.trace(&quot;IOException during AuthorizeCallback handling&quot;, e);</span>
+<span class="nc" id="L449">            throw httpSpnego.mechServerSideAuthenticationFailed(e).toHttpAuthenticationException();</span>
+<span class="nc" id="L450">        } catch (UnsupportedCallbackException ignored) {</span>
+<span class="nc" id="L451">        }</span>
+
+<span class="nc bnc" id="L453" title="All 2 branches missed.">        if (authorized) {</span>
+            // If we fail the caller may still decide to try and continue authentication.
+<span class="nc" id="L455">            handleCallback(AuthenticationCompleteCallback.SUCCEEDED);</span>
+        }
+<span class="nc" id="L457">        return authorized;</span>
+    }
+
+    private void handleCallback(Callback callback) throws HttpAuthenticationException {
+        try {
+<span class="nc" id="L462">            MechanismUtil.handleCallbacks(httpSpnego, callbackHandler, callback);</span>
+<span class="nc" id="L463">        } catch (AuthenticationMechanismException e) {</span>
+<span class="nc" id="L464">            throw e.toHttpAuthenticationException();</span>
+<span class="nc" id="L465">        } catch (UnsupportedCallbackException ignored) {</span>
+<span class="nc" id="L466">        }</span>
+<span class="nc" id="L467">    }</span>
+
+    private static class SpnegoContext implements Serializable {
+
+        private static final long serialVersionUID = 1168213910107551573L;
+
+        transient GSSContext gssContext;
+        transient KerberosTicket kerberosTicket;
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,378 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>KeyUtil.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-credential</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.key</a> &gt; <span class="el_source">KeyUtil.java</span></div><h1>KeyUtil.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.key;
+
+import static java.security.AccessController.doPrivileged;
+
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
+import java.lang.reflect.Method;
+import java.lang.reflect.UndeclaredThrowableException;
+import java.security.Key;
+import java.security.PrivateKey;
+import java.security.PrivilegedAction;
+import java.security.interfaces.DSAKey;
+import java.security.interfaces.DSAParams;
+import java.security.interfaces.DSAPrivateKey;
+import java.security.interfaces.ECKey;
+import java.security.interfaces.ECPrivateKey;
+import java.security.interfaces.RSAKey;
+import java.security.interfaces.RSAMultiPrimePrivateCrtKey;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.spec.AlgorithmParameterSpec;
+import java.security.spec.ECParameterSpec;
+import java.util.Arrays;
+import java.util.Objects;
+import java.util.function.UnaryOperator;
+
+import javax.crypto.SecretKey;
+import javax.crypto.interfaces.DHKey;
+import javax.crypto.interfaces.DHPrivateKey;
+import javax.crypto.interfaces.PBEKey;
+import javax.crypto.spec.DHParameterSpec;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.PBEParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+import javax.security.auth.Destroyable;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.password.Password;
+import org.wildfly.security.password.spec.DigestPasswordAlgorithmSpec;
+import org.wildfly.security.password.spec.IteratedPasswordAlgorithmSpec;
+import org.wildfly.security.password.spec.IteratedSaltedPasswordAlgorithmSpec;
+import org.wildfly.security.password.spec.MaskedPasswordAlgorithmSpec;
+import org.wildfly.security.password.spec.OneTimePasswordAlgorithmSpec;
+import org.wildfly.security.password.spec.SaltedPasswordAlgorithmSpec;
+
+/**
+ * Key utility methods.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class KeyUtil {
+    private KeyUtil() {}
+
+    /**
+     * Cache so that we only have to figure out a cloning strategy for a given class one time.
+     */
+<span class="fc" id="L75">    private static final KeyClonerCreator CLONER_CREATOR = new KeyClonerCreator();</span>
+
+    /**
+     * Attempt to acquire parameters from the given key.
+     *
+     * @param key the key (must not be {@code null})
+     * @return the parameters, or {@code null} if no known parameters are available
+     */
+    public static AlgorithmParameterSpec getParameters(Key key) {
+<span class="nc" id="L84">        return getParameters(key, AlgorithmParameterSpec.class);</span>
+    }
+
+    /**
+     * Attempt to acquire parameters of the given type from the given key.
+     *
+     * @param key the key (must not be {@code null})
+     * @param paramSpecClass the parameter specification class (must not be {@code null})
+     * @param &lt;P&gt; the parameter specification type
+     * @return the parameters, or {@code null} if no known parameters of the given type are available
+     */
+    public static &lt;P extends AlgorithmParameterSpec&gt; P getParameters(Key key, Class&lt;P&gt; paramSpecClass) {
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (key instanceof Password) {</span>
+<span class="nc" id="L97">            final AlgorithmParameterSpec parameterSpec = ((Password) key).getParameterSpec();</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            return paramSpecClass.isInstance(parameterSpec) ? paramSpecClass.cast(parameterSpec) : null;</span>
+<span class="pc bpc" id="L99" title="1 of 4 branches missed.">        } else if (key instanceof RSAKey &amp;&amp; paramSpecClass.isAssignableFrom(RSAParameterSpec.class)) {</span>
+<span class="fc" id="L100">            return paramSpecClass.cast(new RSAParameterSpec((RSAKey) key));</span>
+<span class="pc bpc" id="L101" title="1 of 4 branches missed.">        } else if (key instanceof DSAKey &amp;&amp; paramSpecClass.isAssignableFrom(DSAParams.class)) {</span>
+<span class="nc" id="L102">            return paramSpecClass.cast(((DSAKey) key).getParams());</span>
+<span class="pc bpc" id="L103" title="1 of 4 branches missed.">        } else if (key instanceof ECKey &amp;&amp; paramSpecClass.isAssignableFrom(ECParameterSpec.class)) {</span>
+<span class="fc" id="L104">            return paramSpecClass.cast(((ECKey) key).getParams());</span>
+<span class="pc bpc" id="L105" title="3 of 4 branches missed.">        } else if (key instanceof DHKey &amp;&amp; paramSpecClass.isAssignableFrom(DHParameterSpec.class)) {</span>
+<span class="nc" id="L106">            return paramSpecClass.cast(((DHKey) key).getParams());</span>
+<span class="pc bpc" id="L107" title="3 of 4 branches missed.">        } else if (key instanceof PBEKey &amp;&amp; paramSpecClass.isAssignableFrom(PBEParameterSpec.class)) {</span>
+<span class="nc" id="L108">            final PBEKey pbeKey = (PBEKey) key;</span>
+<span class="nc" id="L109">            final byte[] salt = pbeKey.getSalt();</span>
+            // TODO: we miss the IV here
+<span class="nc bnc" id="L111" title="All 2 branches missed.">            return salt == null ? null : paramSpecClass.cast(new PBEParameterSpec(salt, pbeKey.getIterationCount()));</span>
+        } else {
+<span class="fc" id="L113">            return null;</span>
+        }
+    }
+
+    /**
+     * Determine if the given key has parameters which match the given parameters.
+     *
+     * @param key the key (must not be {@code null})
+     * @param parameters the parameters (must not be {@code null})
+     * @return {@code true} if the parameters match, {@code false} otherwise
+     */
+    public static boolean hasParameters(final Key key, final AlgorithmParameterSpec parameters) {
+<span class="nc" id="L125">        Assert.checkNotNullParam(&quot;key&quot;, key);</span>
+<span class="nc" id="L126">        Assert.checkNotNullParam(&quot;parameters&quot;, parameters);</span>
+<span class="nc" id="L127">        final AlgorithmParameterSpec keyParameters = getParameters(key, AlgorithmParameterSpec.class);</span>
+<span class="nc bnc" id="L128" title="All 4 branches missed.">        return keyParameters != null &amp;&amp; parametersEqual(keyParameters, parameters);</span>
+    }
+
+    /**
+     * Attempt to determine if two algorithm parameter specifications are equal.  This method will return {@code true}
+     * if the parameters are definitely the same, or {@code false} if they are not definitely equal or equivalency cannot be determined.
+     *
+     * @param p1 the first parameter specification (must not be {@code null})
+     * @param p2 the second parameter specification (must not be {@code null})
+     * @return {@code true} if the parameters are definitely equal, {@code false} otherwise
+     */
+    public static boolean parametersEqual(final AlgorithmParameterSpec p1, final AlgorithmParameterSpec p2) {
+<span class="fc" id="L140">        Assert.checkNotNullParam(&quot;p1&quot;, p1);</span>
+<span class="fc" id="L141">        Assert.checkNotNullParam(&quot;p2&quot;, p2);</span>
+<span class="pc bpc" id="L142" title="3 of 4 branches missed.">        if (p1 instanceof DSAParams &amp;&amp; p2 instanceof DSAParams) {</span>
+<span class="nc" id="L143">            final DSAParams dsa1 = (DSAParams) p1;</span>
+<span class="nc" id="L144">            final DSAParams dsa2 = (DSAParams) p2;</span>
+<span class="nc bnc" id="L145" title="All 6 branches missed.">            return Objects.equals(dsa1.getG(), dsa2.getG()) &amp;&amp; Objects.equals(dsa1.getP(), dsa2.getP()) &amp;&amp; Objects.equals(dsa1.getQ(), dsa2.getQ());</span>
+<span class="pc bpc" id="L146" title="1 of 4 branches missed.">        } else if (p1 instanceof ECParameterSpec &amp;&amp; p2 instanceof ECParameterSpec) {</span>
+<span class="fc" id="L147">            final ECParameterSpec ec1 = (ECParameterSpec) p1;</span>
+<span class="fc" id="L148">            final ECParameterSpec ec2 = (ECParameterSpec) p2;</span>
+<span class="pc bpc" id="L149" title="2 of 4 branches missed.">            return ec1.getCofactor() == ec2.getCofactor() &amp;&amp; Objects.equals(ec1.getCurve(), ec2.getCurve())</span>
+<span class="pc bpc" id="L150" title="2 of 4 branches missed.">                &amp;&amp; Objects.equals(ec1.getGenerator(), ec2.getGenerator()) &amp;&amp; Objects.equals(ec1.getOrder(), ec2.getOrder());</span>
+<span class="pc bpc" id="L151" title="3 of 4 branches missed.">        } else if (p1 instanceof DHParameterSpec &amp;&amp; p2 instanceof DHParameterSpec) {</span>
+<span class="nc" id="L152">            final DHParameterSpec dh1 = (DHParameterSpec) p1;</span>
+<span class="nc" id="L153">            final DHParameterSpec dh2 = (DHParameterSpec) p2;</span>
+<span class="nc bnc" id="L154" title="All 6 branches missed.">            return dh1.getL() == dh2.getL() &amp;&amp; Objects.equals(dh1.getP(), dh2.getP()) &amp;&amp; Objects.equals(dh1.getG(), dh2.getG());</span>
+<span class="pc bpc" id="L155" title="3 of 4 branches missed.">        } else if (p1 instanceof PBEParameterSpec &amp;&amp; p2 instanceof PBEParameterSpec) {</span>
+<span class="nc" id="L156">            final PBEParameterSpec pbe1 = (PBEParameterSpec) p1;</span>
+<span class="nc" id="L157">            final PBEParameterSpec pbe2 = (PBEParameterSpec) p2;</span>
+<span class="nc" id="L158">            final AlgorithmParameterSpec param1 = pbe1.getParameterSpec();</span>
+<span class="nc" id="L159">            final AlgorithmParameterSpec param2 = pbe2.getParameterSpec();</span>
+<span class="nc bnc" id="L160" title="All 12 branches missed.">            return pbe1.getIterationCount() == pbe2.getIterationCount() &amp;&amp; Arrays.equals(pbe1.getSalt(), pbe2.getSalt()) &amp;&amp; (param1 == null ? param2 == null : param2 != null &amp;&amp; parametersEqual(param1, param2));</span>
+<span class="pc bpc" id="L161" title="3 of 4 branches missed.">        } else if (p1 instanceof IvParameterSpec &amp;&amp; p2 instanceof IvParameterSpec) {</span>
+<span class="nc" id="L162">            final IvParameterSpec iv1 = (IvParameterSpec) p1;</span>
+<span class="nc" id="L163">            final IvParameterSpec iv2 = (IvParameterSpec) p2;</span>
+<span class="nc" id="L164">            return Arrays.equals(iv1.getIV(), iv2.getIV());</span>
+        } else {
+            // best effort
+<span class="fc" id="L167">            return p1.equals(p2);</span>
+        }
+    }
+
+    /**
+     * Attempt to get a stable hash code for the given parameter specification.  If a stable hash code cannot be acquired,
+     * the hash code of the class is returned, which results in correct (if non-optimal) behavior.  If the parameter
+     * is {@code null}, a hash code of zero is returned.
+     *
+     * @param param the parameter specification
+     * @return the hash code
+     */
+    public static int parametersHashCode(final AlgorithmParameterSpec param) {
+<span class="nc bnc" id="L180" title="All 2 branches missed.">        if (param == null) {</span>
+<span class="nc" id="L181">            return 0;</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">        } else if (param instanceof DSAParams) {</span>
+<span class="nc" id="L183">            final DSAParams dsaParams = (DSAParams) param;</span>
+<span class="nc" id="L184">            return Objects.hash(dsaParams.getG(), dsaParams.getP(), dsaParams.getQ());</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">        } else if (param instanceof ECParameterSpec) {</span>
+<span class="nc" id="L186">            final ECParameterSpec ecSpec = (ECParameterSpec) param;</span>
+<span class="nc" id="L187">            return ecSpec.getCofactor() * 31 + Objects.hash(ecSpec.getCurve(), ecSpec.getGenerator(), ecSpec.getOrder());</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">        } else if (param instanceof DHParameterSpec) {</span>
+<span class="nc" id="L189">            final DHParameterSpec dhSpec = (DHParameterSpec) param;</span>
+<span class="nc" id="L190">            return dhSpec.getL() * 31 + Objects.hash(dhSpec.getP(), dhSpec.getG());</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        } else if (param instanceof PBEParameterSpec) {</span>
+<span class="nc" id="L192">            final PBEParameterSpec pbeSpec = (PBEParameterSpec) param;</span>
+<span class="nc" id="L193">            final AlgorithmParameterSpec parameterSpec = pbeSpec.getParameterSpec();</span>
+<span class="nc" id="L194">            return (pbeSpec.getIterationCount() * 31 + Arrays.hashCode(pbeSpec.getSalt())) * 31 + parametersHashCode(parameterSpec);</span>
+<span class="nc bnc" id="L195" title="All 2 branches missed.">        } else if (param instanceof IvParameterSpec) {</span>
+<span class="nc" id="L196">            return Arrays.hashCode(((IvParameterSpec) param).getIV());</span>
+<span class="nc bnc" id="L197" title="All 14 branches missed.">        } else if (param instanceof RSAParameterSpec</span>
+                || param instanceof IteratedSaltedPasswordAlgorithmSpec
+                || param instanceof IteratedPasswordAlgorithmSpec
+                || param instanceof SaltedPasswordAlgorithmSpec
+                || param instanceof DigestPasswordAlgorithmSpec
+                || param instanceof MaskedPasswordAlgorithmSpec
+                || param instanceof OneTimePasswordAlgorithmSpec
+        ) {
+            // our types all have proper hash codes
+<span class="nc" id="L206">            return param.hashCode();</span>
+        } else {
+<span class="nc" id="L208">            return param.getClass().hashCode();</span>
+        }
+    }
+
+    /**
+     * Attempt to determine if the two keys have the same parameters.  This method returns {@code true} if the keys
+     * definitely have the same parameters, or {@code false} if they do not or if parameter equivalency cannot be determined.
+     *
+     * @param key1 the first key (must not be {@code null})
+     * @param key2 the second key (must not be {@code null})
+     * @return {@code true} if the parameters are definitely equal, {@code false} otherwise
+     */
+    public static boolean hasSameParameters(final Key key1, final Key key2) {
+<span class="fc" id="L221">        Assert.checkNotNullParam(&quot;key1&quot;, key1);</span>
+<span class="fc" id="L222">        Assert.checkNotNullParam(&quot;key2&quot;, key2);</span>
+<span class="fc" id="L223">        final AlgorithmParameterSpec param1 = getParameters(key1, AlgorithmParameterSpec.class);</span>
+<span class="fc" id="L224">        final AlgorithmParameterSpec param2 = getParameters(key2, AlgorithmParameterSpec.class);</span>
+<span class="pc bpc" id="L225" title="4 of 10 branches missed.">        return param1 == null &amp;&amp; param2 == null || param1 != null &amp;&amp; param2 != null &amp;&amp; parametersEqual(param1, param2);</span>
+    }
+
+    /**
+     * Attempt to create a safe clone of the given key object.
+     * This algorithm first checks to see if the key's class implements {@link Destroyable}; if not, it is returned as-is.
+     * Next it checks to see if the key has been destroyed; if so, it is returned as-is.
+     * Next it determines if the key actually implements the {@link Destroyable} interface; if not, it is returned as-is.
+     * Then it determines if there is a public {@code clone} method that returns a compatible type; if so, that method is used.
+     * Then it determines if the key implements a known key interface; if so, a raw implementation of that interface is produced.
+     * Last it checks to see if the key is some other unknown {@link SecretKey} type; if so, it captures its value using a {@link SecretKeySpec}.
+     * If none of these checks succeed, an exception is thrown.
+     *
+     * @param expectType the expected result type (must not be {@code null})
+     * @param key the key object
+     * @return the cloned key, or the original if the key type is not destroyable
+     */
+    public static &lt;T extends Key&gt; T cloneKey(Class&lt;T&gt; expectType, T key) {
+<span class="fc" id="L243">        Assert.checkNotNullParam(&quot;expectType&quot;, expectType);</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">        if (key instanceof Destroyable) {</span>
+            // medium path
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">            if (((Destroyable) key).isDestroyed()) {</span>
+<span class="nc" id="L247">                return expectType.cast(key);</span>
+            } else {
+<span class="fc" id="L249">                return expectType.cast(CLONER_CREATOR.get(key.getClass()).apply(key));</span>
+            }
+        } else {
+            // fast path
+<span class="nc" id="L253">            return expectType.cast(key);</span>
+        }
+    }
+
+    private static class KeyClonerCreator extends ClassValue&lt;UnaryOperator&lt;Key&gt;&gt; {
+        protected UnaryOperator&lt;Key&gt; computeValue(final Class&lt;?&gt; type) {
+            // slow path
+            // check to see if it is *really* destroyable
+            final Method method;
+            try {
+<span class="fc" id="L263">                method = type.getMethod(&quot;destroy&quot;);</span>
+<span class="nc" id="L264">            } catch (NoSuchMethodException e) {</span>
+                // nope (because somehow there is no destroy method at all)
+<span class="nc" id="L266">                return UnaryOperator.identity();</span>
+<span class="fc" id="L267">            }</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">            if (method.getDeclaringClass() == Destroyable.class) {</span>
+                // also nope
+<span class="fc" id="L270">                return UnaryOperator.identity();</span>
+            }
+            // now figure out how to actually transform it.
+            // see if there's a clone method.
+<span class="nc" id="L274">            UnaryOperator&lt;Key&gt; op = checkForCloneMethod(type, type);</span>
+<span class="nc bnc" id="L275" title="All 2 branches missed.">            if (op != null) return op;</span>
+            // see if there's a copy constructor.
+<span class="nc" id="L277">            op = checkForCopyCtor(type, type);</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">            if (op != null) return op;</span>
+<span class="nc bnc" id="L279" title="All 2 branches missed.">            if (PrivateKey.class.isAssignableFrom(type)) {</span>
+                // some private key type...
+<span class="nc bnc" id="L281" title="All 2 branches missed.">                if (DSAPrivateKey.class.isAssignableFrom(type)) {</span>
+<span class="nc" id="L282">                    op = checkForCloneMethod(type, DSAPrivateKey.class);</span>
+<span class="nc bnc" id="L283" title="All 2 branches missed.">                    if (op != null) return op;</span>
+<span class="nc" id="L284">                    op = checkForCopyCtor(type, DSAPrivateKey.class);</span>
+<span class="nc bnc" id="L285" title="All 2 branches missed.">                    if (op != null) return op;</span>
+<span class="nc" id="L286">                    return RawDSAPrivateKey::new;</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">                } else if (ECPrivateKey.class.isAssignableFrom(type)) {</span>
+<span class="nc" id="L288">                    op = checkForCloneMethod(type, ECPrivateKey.class);</span>
+<span class="nc bnc" id="L289" title="All 2 branches missed.">                    if (op != null) return op;</span>
+<span class="nc" id="L290">                    op = checkForCopyCtor(type, ECPrivateKey.class);</span>
+<span class="nc bnc" id="L291" title="All 2 branches missed.">                    if (op != null) return op;</span>
+<span class="nc" id="L292">                    return RawECPrivateKey::new;</span>
+<span class="nc bnc" id="L293" title="All 2 branches missed.">                } else if (RSAMultiPrimePrivateCrtKey.class.isAssignableFrom(type)) {</span>
+<span class="nc" id="L294">                    op = checkForCloneMethod(type, RSAMultiPrimePrivateCrtKey.class);</span>
+<span class="nc bnc" id="L295" title="All 2 branches missed.">                    if (op != null) return op;</span>
+<span class="nc" id="L296">                    op = checkForCopyCtor(type, RSAMultiPrimePrivateCrtKey.class);</span>
+<span class="nc bnc" id="L297" title="All 2 branches missed.">                    if (op != null) return op;</span>
+<span class="nc" id="L298">                    return RawRSAMultiPrimePrivateCrtKey::new;</span>
+<span class="nc bnc" id="L299" title="All 2 branches missed.">                } else if (RSAPrivateKey.class.isAssignableFrom(type)) {</span>
+<span class="nc" id="L300">                    op = checkForCloneMethod(type, RSAPrivateKey.class);</span>
+<span class="nc bnc" id="L301" title="All 2 branches missed.">                    if (op != null) return op;</span>
+<span class="nc" id="L302">                    op = checkForCopyCtor(type, RSAPrivateKey.class);</span>
+<span class="nc bnc" id="L303" title="All 2 branches missed.">                    if (op != null) return op;</span>
+<span class="nc" id="L304">                    return RawRSAPrivateKey::new;</span>
+<span class="nc bnc" id="L305" title="All 2 branches missed.">                } else if (DHPrivateKey.class.isAssignableFrom(type)) {</span>
+<span class="nc" id="L306">                    op = checkForCloneMethod(type, DHPrivateKey.class);</span>
+<span class="nc bnc" id="L307" title="All 2 branches missed.">                    if (op != null) return op;</span>
+<span class="nc" id="L308">                    op = checkForCopyCtor(type, DHPrivateKey.class);</span>
+<span class="nc bnc" id="L309" title="All 2 branches missed.">                    if (op != null) return op;</span>
+<span class="nc" id="L310">                    return RawDHPrivateKey::new;</span>
+                }
+<span class="nc" id="L312">                op = checkForCloneMethod(type, PrivateKey.class);</span>
+<span class="nc bnc" id="L313" title="All 2 branches missed.">                if (op != null) return op;</span>
+<span class="nc" id="L314">                op = checkForCopyCtor(type, PrivateKey.class);</span>
+<span class="nc bnc" id="L315" title="All 2 branches missed.">                if (op != null) return op;</span>
+<span class="nc bnc" id="L316" title="All 2 branches missed.">            } else if (SecretKey.class.isAssignableFrom(type)) {</span>
+                // some secret key type...
+<span class="nc bnc" id="L318" title="All 2 branches missed.">                if (PBEKey.class.isAssignableFrom(type)) {</span>
+<span class="nc" id="L319">                    op = checkForCloneMethod(type, PBEKey.class);</span>
+<span class="nc bnc" id="L320" title="All 2 branches missed.">                    if (op != null) return op;</span>
+<span class="nc" id="L321">                    op = checkForCopyCtor(type, PBEKey.class);</span>
+<span class="nc bnc" id="L322" title="All 2 branches missed.">                    if (op != null) return op;</span>
+<span class="nc" id="L323">                    return RawPBEKey::new;</span>
+                } else {
+<span class="nc" id="L325">                    op = checkForCloneMethod(type, SecretKey.class);</span>
+<span class="nc bnc" id="L326" title="All 2 branches missed.">                    if (op != null) return op;</span>
+<span class="nc" id="L327">                    op = checkForCopyCtor(type, SecretKey.class);</span>
+<span class="nc bnc" id="L328" title="All 2 branches missed.">                    if (op != null) return op;</span>
+                    // best guess
+<span class="nc" id="L330">                    return orig -&gt; new SecretKeySpec(orig.getEncoded(), orig.getAlgorithm());</span>
+                }
+            } else {
+<span class="nc" id="L333">                op = checkForCloneMethod(type, Key.class);</span>
+<span class="nc bnc" id="L334" title="All 2 branches missed.">                if (op != null) return op;</span>
+            }
+<span class="nc" id="L336">            return orig -&gt; {</span>
+<span class="nc" id="L337">                throw Assert.unsupported();</span>
+            };
+        }
+
+        private UnaryOperator&lt;Key&gt; checkForCloneMethod(final Class&lt;?&gt; declType, final Class&lt;?&gt; returnType) {
+<span class="nc" id="L342">            final MethodHandles.Lookup lookup = MethodHandles.lookup();</span>
+<span class="nc" id="L343">            final MethodHandle handle = doPrivileged((PrivilegedAction&lt;MethodHandle&gt;) () -&gt; {</span>
+                try {
+<span class="nc" id="L345">                    return lookup.findVirtual(declType, &quot;clone&quot;, MethodType.methodType(returnType));</span>
+<span class="nc" id="L346">                } catch (NoSuchMethodException | IllegalAccessException e) {</span>
+<span class="nc" id="L347">                    return null;</span>
+                }
+            });
+<span class="nc bnc" id="L350" title="All 2 branches missed.">            return handle == null ? null : produceOp(handle);</span>
+        }
+
+        private UnaryOperator&lt;Key&gt; checkForCopyCtor(final Class&lt;?&gt; declType, final Class&lt;?&gt; paramType) {
+<span class="nc" id="L354">            final MethodHandles.Lookup lookup = MethodHandles.lookup();</span>
+<span class="nc" id="L355">            final MethodHandle handle = doPrivileged((PrivilegedAction&lt;MethodHandle&gt;) () -&gt; {</span>
+                try {
+<span class="nc" id="L357">                    return lookup.findConstructor(declType, MethodType.methodType(void.class, paramType));</span>
+<span class="nc" id="L358">                } catch (NoSuchMethodException | IllegalAccessException e) {</span>
+<span class="nc" id="L359">                    return null;</span>
+                }
+            });
+<span class="nc bnc" id="L362" title="All 2 branches missed.">            return handle == null ? null : produceOp(handle);</span>
+        }
+
+        private static UnaryOperator&lt;Key&gt; produceOp(final MethodHandle handle) {
+<span class="nc" id="L366">            return original -&gt; {</span>
+                try {
+<span class="nc" id="L368">                    return (Key) handle.invoke(original);</span>
+<span class="nc" id="L369">                } catch (RuntimeException | Error e) {</span>
+<span class="nc" id="L370">                    throw e;</span>
+<span class="nc" id="L371">                } catch (Throwable throwable) {</span>
+<span class="nc" id="L372">                    throw new UndeclaredThrowableException(throwable);</span>
+                }
+            };
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

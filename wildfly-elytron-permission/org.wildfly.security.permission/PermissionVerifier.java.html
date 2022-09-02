@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PermissionVerifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-permission</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.permission</a> &gt; <span class="el_source">PermissionVerifier.java</span></div><h1>PermissionVerifier.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.permission;
+
+import java.security.Permission;
+import java.security.PermissionCollection;
+import java.security.Policy;
+import java.security.ProtectionDomain;
+
+import org.wildfly.common.Assert;
+
+/**
+ * An interface for objects that can verify permissions.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+@FunctionalInterface
+public interface PermissionVerifier {
+    /**
+     * Determine if the permission is verified by this object.
+     *
+     * @param permission the permission to verify (must not be {@code null})
+     * @return {@code true} if the permission is implied by this verifier, {@code false} otherwise
+     */
+    boolean implies(Permission permission);
+
+    /**
+     * Return a new verifier which implies permissions which are implied both by this verifier and by the given verifier.
+     *
+     * @param other the other verifier (must not be {@code null})
+     * @return the new permission verifier (not {@code null})
+     */
+    default PermissionVerifier and(PermissionVerifier other) {
+<span class="nc" id="L50">        Assert.checkNotNullParam(&quot;other&quot;, other);</span>
+<span class="nc bnc" id="L51" title="All 4 branches missed.">        return permission -&gt; implies(permission) &amp;&amp; other.implies(permission);</span>
+    }
+
+    /**
+     * Return a new verifier which implies permissions which are implied either by this verifier or by the given verifier.
+     *
+     * @param other the other verifier (must not be {@code null})
+     * @return the new permission verifier (not {@code null})
+     */
+    default PermissionVerifier or(PermissionVerifier other) {
+<span class="nc" id="L61">        Assert.checkNotNullParam(&quot;other&quot;, other);</span>
+<span class="nc bnc" id="L62" title="All 4 branches missed.">        return permission -&gt; implies(permission) || other.implies(permission);</span>
+    }
+
+    /**
+     * Return a new verifier which implies permissions which are implied by only one of this verifier or the given verifier.
+     *
+     * @param other the other verifier (must not be {@code null})
+     * @return the new permission verifier (not {@code null})
+     */
+    default PermissionVerifier xor(PermissionVerifier other) {
+<span class="nc" id="L72">        Assert.checkNotNullParam(&quot;other&quot;, other);</span>
+<span class="nc" id="L73">        return permission -&gt; implies(permission) ^ other.implies(permission);</span>
+    }
+
+    /**
+     * Return a new verifier which implies the opposite of this verifier.
+     *
+     * @return the new permission verifier (not {@code null})
+     */
+    default PermissionVerifier not() {
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        return permission -&gt; ! implies(permission);</span>
+    }
+
+    /**
+     * Return a new verifier which implies permissions which are implied by this verifier but not the given verifier.
+     *
+     * @param other the other verifier (must not be {@code null})
+     * @return the new permission verifier (not {@code null})
+     */
+    default PermissionVerifier unless(PermissionVerifier other) {
+<span class="nc" id="L92">        Assert.checkNotNullParam(&quot;other&quot;, other);</span>
+<span class="nc bnc" id="L93" title="All 4 branches missed.">        return permission -&gt; implies(permission) &amp;&amp; ! other.implies(permission);</span>
+    }
+
+    /**
+     * Check a permission, throwing an exception if the permission is not implied.
+     *
+     * @param permission the permission to check (must not be {@code null})
+     * @throws SecurityException if the permission is not implied
+     */
+    default void checkPermission(Permission permission) throws SecurityException {
+<span class="nc" id="L103">        Assert.checkNotNullParam(&quot;permission&quot;, permission);</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        if (! implies(permission)) {</span>
+<span class="nc" id="L105">            throw ElytronMessages.log.permissionCheckFailed(permission, this);</span>
+        }
+<span class="nc" id="L107">    }</span>
+
+    /**
+     * Get a permission verifier for a single permission.
+     *
+     * @param permission the permission (must not be {@code null})
+     * @return the verifier (not {@code null})
+     */
+    static PermissionVerifier from(Permission permission) {
+<span class="fc" id="L116">        Assert.checkNotNullParam(&quot;permission&quot;, permission);</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        return permission instanceof PermissionVerifier ? (PermissionVerifier) permission : permission::implies;</span>
+    }
+
+    /**
+     * Get a permission verifier for a permission collection.
+     *
+     * @param permissionCollection the permission collection (must not be {@code null})
+     * @return the verifier (not {@code null})
+     */
+    static PermissionVerifier from(PermissionCollection permissionCollection) {
+<span class="fc" id="L127">        Assert.checkNotNullParam(&quot;permissionCollection&quot;, permissionCollection);</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        return permissionCollection instanceof PermissionVerifier ? (PermissionVerifier) permissionCollection : permissionCollection::implies;</span>
+    }
+
+    /**
+     * Get a permission verifier for a protection domain.
+     *
+     * @param protectionDomain the protection domain (must not be {@code null})
+     * @return the verifier (not {@code null})
+     */
+    static PermissionVerifier from(ProtectionDomain protectionDomain) {
+<span class="nc" id="L138">        Assert.checkNotNullParam(&quot;protectionDomain&quot;, protectionDomain);</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        return protectionDomain instanceof PermissionVerifier ? (PermissionVerifier) protectionDomain : protectionDomain::implies;</span>
+    }
+
+    /**
+     * Get a permission verifier for a policy's view of a protection domain.
+     *
+     * @param policy the policy (must not be {@code null})
+     * @param protectionDomain the protection domain (must not be {@code null})
+     * @return the verifier (not {@code null})
+     */
+    static PermissionVerifier from(Policy policy, ProtectionDomain protectionDomain) {
+<span class="nc" id="L150">        Assert.checkNotNullParam(&quot;policy&quot;, policy);</span>
+<span class="nc" id="L151">        Assert.checkNotNullParam(&quot;protectionDomain&quot;, protectionDomain);</span>
+<span class="nc" id="L152">        return permission -&gt; policy.implies(protectionDomain, permission);</span>
+    }
+
+    /**
+     * Convert this verifier a permission collection which implies everything this verifier implies.  If this instance
+     * is already a {@code PermissionCollection} instance, then this instance may be cast and returned.  Otherwise,
+     * this method may return a new, read-only collection, which cannot be iterated.
+     *
+     * @return the permission collection (not {@code null})
+     */
+    default PermissionCollection toPermissionCollection() {
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        if (this instanceof PermissionCollection) {</span>
+<span class="nc" id="L164">            return (PermissionCollection) this;</span>
+        } else {
+<span class="nc" id="L166">            return new PermissionVerifierPermissionCollection(this);</span>
+        }
+    }
+
+    /**
+     * A verifier which implies no permissions.
+     */
+<span class="pc" id="L173">    PermissionVerifier NONE = permission -&gt; false;</span>
+
+    /**
+     * A verifier which implies all permissions.
+     */
+<span class="pc" id="L178">    PermissionVerifier ALL = permission -&gt; true;</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

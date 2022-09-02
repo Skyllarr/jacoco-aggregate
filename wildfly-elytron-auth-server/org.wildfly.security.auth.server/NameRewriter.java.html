@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NameRewriter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.server</a> &gt; <span class="el_source">NameRewriter.java</span></div><h1>NameRewriter.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source
+ * Copyright 2013 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.server;
+
+import java.security.Principal;
+import java.util.function.UnaryOperator;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.auth.principal.NamePrincipal;
+
+/**
+ * A name rewriter.  Name rewriters transform names from one form to another for various purposes, including (but
+ * not limited to):
+ * &lt;ul&gt;
+ *     &lt;li&gt;Normalizing case&lt;/li&gt;
+ *     &lt;li&gt;Trimming extra whitespace&lt;/li&gt;
+ *     &lt;li&gt;Mapping one naming scheme to another (e.g. &quot;user@realm&quot; to/from &quot;realm/user&quot; or similar)&lt;/li&gt;
+ *     &lt;li&gt;Removing a realm component (e.g. &quot;user@realm&quot; to &quot;user&quot;)&lt;/li&gt;
+ * &lt;/ul&gt;
+ * A name rewriter may also be used to perform a validation step on the syntax of the name.  If the rewriter returns
+ * {@code null}, the name is not valid according to the rules of the rewriter.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+@FunctionalInterface
+public interface NameRewriter {
+
+    /**
+     * The simple identity name rewriter, which does no rewriting.
+     */
+<span class="fc" id="L47">    NameRewriter IDENTITY_REWRITER = original -&gt; original;</span>
+
+    /**
+     * Rewrite a name.  Must not return {@code null}.
+     *
+     * @param original the original name (must not be {@code null})
+     * @return the rewritten name, or {@code null} if the name is invalid
+     */
+    String rewriteName(String original);
+
+    /**
+     * Get this name rewriter as a principal rewriter that applies only to {@link NamePrincipal} instances.
+     *
+     * @return the principal rewriter (not {@code null})
+     */
+    default UnaryOperator&lt;Principal&gt; asPrincipalRewriter() {
+<span class="fc" id="L63">        return principal -&gt; {</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">            if (principal == null) return null;</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">            if (principal instanceof NamePrincipal) {</span>
+<span class="fc" id="L66">                String rewritten = NameRewriter.this.rewriteName(principal.getName());</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">                return rewritten == null ? null : new NamePrincipal(rewritten);</span>
+            }
+<span class="nc" id="L69">            return principal;</span>
+        };
+    }
+
+    /**
+     * Create a name rewriter which chains the given name rewriters; the name will be rewritten through the given rewriters
+     * in order and then returned.  If any rewriter returns {@code null}, then {@code null} is returned.
+     *
+     * @param rewriter1 the first name rewriter (must not be {@code null})
+     * @param rewriter2 the second name rewriter (must not be {@code null})
+     * @return the name rewriter (not {@code null})
+     */
+    static NameRewriter chain(NameRewriter rewriter1, NameRewriter rewriter2) {
+<span class="nc" id="L82">        Assert.checkNotNullParam(&quot;rewriter1&quot;, rewriter1);</span>
+<span class="nc" id="L83">        Assert.checkNotNullParam(&quot;rewriter2&quot;, rewriter2);</span>
+<span class="nc" id="L84">        return n -&gt; {</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">            if (n != null) n = rewriter1.rewriteName(n);</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">            if (n != null) n = rewriter2.rewriteName(n);</span>
+<span class="nc" id="L87">            return n;</span>
+        };
+    }
+
+    /**
+     * Create a name rewriter which chains the given name rewriters; the name will be rewritten through the given rewriters
+     * in order and then returned.  If any rewriter returns {@code null}, then {@code null} is returned.
+     *
+     * @param nameRewriters the name rewriters (must not be {@code null}, cannot have {@code null} elements)
+     * @return the name rewriter (not {@code null})
+     */
+    static NameRewriter chain(NameRewriter... nameRewriters) {
+<span class="nc" id="L99">        Assert.checkNotNullParam(&quot;nameRewriters&quot;, nameRewriters);</span>
+<span class="nc" id="L100">        final NameRewriter[] clone = nameRewriters.clone();</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        for (int i = 0; i &lt; clone.length; i++) {</span>
+<span class="nc" id="L102">            Assert.checkNotNullArrayParam(&quot;nameRewriters&quot;, i, clone[i]);</span>
+        }
+<span class="nc" id="L104">        return n -&gt; {</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">            for (NameRewriter r : clone) {</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">                if (n == null) return null;</span>
+<span class="nc" id="L107">                n = r.rewriteName(n);</span>
+            }
+<span class="nc" id="L109">            return n;</span>
+        };
+    }
+
+    /**
+     * Create a name rewriter which aggregates the given name rewriters; the first rewriter which successfully rewrites
+     * the name is used.  If all the rewriters return {@code null}, then {@code null} is returned.
+     *
+     * @param rewriter1 the first name rewriter (must not be {@code null})
+     * @param rewriter2 the second name rewriter (must not be {@code null})
+     * @return the name rewriter (not {@code null})
+     */
+    static NameRewriter aggregate(NameRewriter rewriter1, NameRewriter rewriter2) {
+<span class="nc" id="L122">        Assert.checkNotNullParam(&quot;rewriter1&quot;, rewriter1);</span>
+<span class="nc" id="L123">        Assert.checkNotNullParam(&quot;rewriter2&quot;, rewriter2);</span>
+<span class="nc" id="L124">        return n -&gt; {</span>
+<span class="nc" id="L125">            String rn = rewriter1.rewriteName(n);</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">            if (rn == null) rn = rewriter2.rewriteName(n);</span>
+<span class="nc" id="L127">            return rn;</span>
+        };
+    }
+
+    /**
+     * Create a name rewriter which aggregates the given name rewriters; the first rewriter which successfully rewrites
+     * the name is used.  If all the rewriters return {@code null}, then {@code null} is returned.
+     *
+     * @param nameRewriters the name rewriters (must not be {@code null}, cannot have {@code null} elements)
+     * @return the name rewriter (not {@code null})
+     */
+    static NameRewriter aggregate(NameRewriter... nameRewriters) {
+<span class="nc" id="L139">        Assert.checkNotNullParam(&quot;nameRewriters&quot;, nameRewriters);</span>
+<span class="nc" id="L140">        final NameRewriter[] clone = nameRewriters.clone();</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        for (int i = 0; i &lt; clone.length; i++) {</span>
+<span class="nc" id="L142">            Assert.checkNotNullArrayParam(&quot;nameRewriters&quot;, i, clone[i]);</span>
+        }
+<span class="nc" id="L144">        return n -&gt; {</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">            if (n == null) return null;</span>
+            String rn;
+<span class="nc bnc" id="L147" title="All 2 branches missed.">            for (NameRewriter r : clone) {</span>
+<span class="nc" id="L148">                rn = r.rewriteName(n);</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">                if (rn != null) {</span>
+<span class="nc" id="L150">                    return rn;</span>
+                }
+            }
+<span class="nc" id="L153">            return null;</span>
+        };
+    }
+
+    /**
+     * Create a name rewriter which always returns the same name.
+     *
+     * @param name the name to return
+     * @return the name
+     */
+    static NameRewriter constant(String name) {
+<span class="nc" id="L164">        return original -&gt; name;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

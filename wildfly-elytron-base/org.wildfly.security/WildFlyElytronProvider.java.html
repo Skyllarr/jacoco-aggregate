@@ -1,0 +1,331 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>WildFlyElytronProvider.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-base</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security</a> &gt; <span class="el_source">WildFlyElytronProvider.java</span></div><h1>WildFlyElytronProvider.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security;
+
+import static org.wildfly.security.ElytronMessages.log;
+
+import java.lang.ref.Reference;
+import java.lang.ref.SoftReference;
+import java.lang.ref.WeakReference;
+import java.lang.reflect.Constructor;
+import java.security.NoSuchAlgorithmException;
+import java.security.Provider;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+
+import org.kohsuke.MetaInfServices;
+
+
+/**
+ * The {@link Provider} implementation covering all security services made available by Elytron.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+@MetaInfServices(Provider.class)
+@Deprecated
+public class WildFlyElytronProvider extends VersionedProvider {
+
+    private static final long serialVersionUID = 1267015094996624988L;
+
+    private static final String HTTP_SERVER_FACTORY_TYPE = &quot;HttpServerAuthenticationMechanismFactory&quot;;
+
+    private static final String SASL_CLIENT_FACTORY_TYPE = &quot;SaslClientFactory&quot;;
+
+    private static final String SASL_SERVER_FACTORY_TYPE = &quot;SaslServerFactory&quot;;
+
+    private static final String PASSWORD_FACTORY_TYPE = &quot;PasswordFactory&quot;;
+
+    private static final String ALG_PARAMS_TYPE = &quot;AlgorithmParameters&quot;;
+
+    /**
+     * Default constructor for this security provider.
+     */
+    public WildFlyElytronProvider() {
+<span class="fc" id="L62">        super(&quot;WildFlyElytron&quot;, &quot;1.0&quot;, &quot;WildFly Elytron Provider&quot;);</span>
+
+<span class="fc" id="L64">        putHttpAuthenticationMechanismImplementations();</span>
+<span class="fc" id="L65">        putKeyStoreImplementations();</span>
+<span class="fc" id="L66">        putPasswordImplementations();</span>
+<span class="fc" id="L67">        putSaslMechanismImplementations();</span>
+<span class="fc" id="L68">        putCredentialStoreProviderImplementations();</span>
+<span class="fc" id="L69">        putAlgorithmParametersImplementations();</span>
+<span class="fc" id="L70">        putService(new Service(this, &quot;SecretKeyFactory&quot;, &quot;1.2.840.113549.1.7.1&quot;, &quot;org.wildfly.security.key.RawSecretKeyFactory&quot;, Collections.emptyList(), Collections.emptyMap()));</span>
+<span class="fc" id="L71">        putService(new Service(this, &quot;MessageDigest&quot;, &quot;SHA-512-256&quot;, &quot;org.wildfly.security.digest.SHA512_256MessageDigest&quot;, Collections.emptyList(), Collections.emptyMap()));</span>
+<span class="fc" id="L72">    }</span>
+
+    private void putAlgorithmParametersImplementations() {
+<span class="fc" id="L75">        final List&lt;String&gt; emptyList = Collections.emptyList();</span>
+<span class="fc" id="L76">        final Map&lt;String, String&gt; emptyMap = Collections.emptyMap();</span>
+
+<span class="fc" id="L78">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;RSA&quot;, &quot;org.wildfly.security.key.RSAParameterSpiImpl&quot;, emptyList, emptyMap));</span>
+
+<span class="fc" id="L80">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;crypt-md5&quot;, &quot;org.wildfly.security.password.impl.SaltedPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L81">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;sun-crypt-md5&quot;, &quot;org.wildfly.security.password.impl.IteratedSaltedPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L82">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;sun-crypt-md5-bare-salt&quot;, &quot;org.wildfly.security.password.impl.IteratedSaltedPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L83">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;crypt-sha-256&quot;, &quot;org.wildfly.security.password.impl.IteratedSaltedPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L84">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;crypt-sha-512&quot;, &quot;org.wildfly.security.password.impl.IteratedSaltedPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L85">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;digest-md5&quot;, &quot;org.wildfly.security.password.impl.DigestPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L86">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;digest-sha&quot;, &quot;org.wildfly.security.password.impl.DigestPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L87">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;digest-sha-256&quot;, &quot;org.wildfly.security.password.impl.DigestPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L88">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;digest-sha-384&quot;, &quot;org.wildfly.security.password.impl.DigestPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L89">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;digest-sha-512&quot;, &quot;org.wildfly.security.password.impl.DigestPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L90">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;digest-sha-512-256&quot;, &quot;org.wildfly.security.password.impl.DigestPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L91">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;password-salt-digest-md5&quot;, &quot;org.wildfly.security.password.impl.SaltedPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L92">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;password-salt-digest-sha-1&quot;, &quot;org.wildfly.security.password.impl.SaltedPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L93">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;password-salt-digest-sha-256&quot;, &quot;org.wildfly.security.password.impl.SaltedPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L94">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;password-salt-digest-sha-384&quot;, &quot;org.wildfly.security.password.impl.SaltedPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L95">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;password-salt-digest-sha-512&quot;, &quot;org.wildfly.security.password.impl.SaltedPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L96">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;salt-password-digest-md5&quot;, &quot;org.wildfly.security.password.impl.SaltedPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L97">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;salt-password-digest-sha-1&quot;, &quot;org.wildfly.security.password.impl.SaltedPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L98">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;salt-password-digest-sha-256&quot;, &quot;org.wildfly.security.password.impl.SaltedPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L99">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;salt-password-digest-sha-384&quot;, &quot;org.wildfly.security.password.impl.SaltedPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L100">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;salt-password-digest-sha-512&quot;, &quot;org.wildfly.security.password.impl.SaltedPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L101">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;crypt-des&quot;, &quot;org.wildfly.security.password.impl.SaltedPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L102">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;bsd-crypt-des&quot;, &quot;org.wildfly.security.password.impl.IteratedSaltedPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L103">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;bcrypt&quot;, &quot;org.wildfly.security.password.impl.IteratedSaltedPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L104">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;scram-sha-1&quot;, &quot;org.wildfly.security.password.impl.IteratedSaltedPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L105">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;scram-sha-256&quot;, &quot;org.wildfly.security.password.impl.IteratedSaltedPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L106">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;scram-sha-384&quot;, &quot;org.wildfly.security.password.impl.IteratedSaltedPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L107">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;scram-sha-512&quot;, &quot;org.wildfly.security.password.impl.IteratedSaltedPasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L108">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;otp-md5&quot;, &quot;org.wildfly.security.password.impl.OneTimePasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L109">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;otp-sha1&quot;, &quot;org.wildfly.security.password.impl.OneTimePasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L110">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;otp-sha256&quot;, &quot;org.wildfly.security.password.impl.OneTimePasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L111">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;otp-sha384&quot;, &quot;org.wildfly.security.password.impl.OneTimePasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L112">        putService(new Service(this, ALG_PARAMS_TYPE, &quot;otp-sha512&quot;, &quot;org.wildfly.security.password.impl.OneTimePasswordAlgorithmParametersSpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L113">        WildFlyElytronBaseProvider.putMakedAlgorithmParametersImplementations(this::putService, this);</span>
+<span class="fc" id="L114">    }</span>
+
+    private void putKeyStoreImplementations() {
+<span class="fc" id="L117">        final List&lt;String&gt; emptyList = Collections.emptyList();</span>
+<span class="fc" id="L118">        final Map&lt;String, String&gt; emptyMap = Collections.emptyMap();</span>
+
+<span class="fc" id="L120">        putService(new Service(this, &quot;KeyStore&quot;, &quot;PasswordFile&quot;, &quot;org.wildfly.security.keystore.PasswordKeyStoreSpi&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L121">    }</span>
+
+    private void putHttpAuthenticationMechanismImplementations() {
+<span class="fc" id="L124">        final List&lt;String&gt; emptyList = Collections.emptyList();</span>
+<span class="fc" id="L125">        final Map&lt;String, String&gt; emptyMap = Collections.emptyMap();</span>
+
+<span class="fc" id="L127">        putService(new ProviderService(this, HTTP_SERVER_FACTORY_TYPE, &quot;BASIC&quot;, &quot;org.wildfly.security.http.basic.BasicMechanismFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L128">        putService(new ProviderService(this, HTTP_SERVER_FACTORY_TYPE, &quot;CLIENT_CERT&quot;, &quot;org.wildfly.security.http.cert.ClientCertMechanismFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L129">        putService(new ProviderService(this, HTTP_SERVER_FACTORY_TYPE, &quot;DIGEST&quot;, &quot;org.wildfly.security.http.digest.DigestMechanismFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L130">        putService(new ProviderService(this, HTTP_SERVER_FACTORY_TYPE, &quot;DIGEST-SHA-256&quot;, &quot;org.wildfly.security.http.digest.DigestMechanismFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L131">        putService(new ProviderService(this, HTTP_SERVER_FACTORY_TYPE, &quot;DIGEST-SHA-512-256&quot;, &quot;org.wildfly.security.http.digest.DigestMechanismFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L132">        putService(new ProviderService(this, HTTP_SERVER_FACTORY_TYPE, &quot;EXTERNAL&quot;, &quot;org.wildfly.security.http.external.ExternalMechanismFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L133">        putService(new ProviderService(this, HTTP_SERVER_FACTORY_TYPE, &quot;FORM&quot;, &quot;org.wildfly.security.http.form.FormMechanismFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L134">        putService(new ProviderService(this, HTTP_SERVER_FACTORY_TYPE, &quot;SPNEGO&quot;, &quot;org.wildfly.security.http.spnego.SpnegoMechanismFactory&quot;, emptyList, emptyMap, true, true));</span>
+
+<span class="fc" id="L136">        putService(new ProviderService(this, HTTP_SERVER_FACTORY_TYPE, &quot;BEARER_TOKEN&quot;, &quot;org.wildfly.security.http.bearer.BearerMechanismFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L137">    }</span>
+
+    private void putPasswordImplementations() {
+<span class="fc" id="L140">        final List&lt;String&gt; emptyList = Collections.emptyList();</span>
+<span class="fc" id="L141">        final Map&lt;String, String&gt; emptyMap = Collections.emptyMap();</span>
+
+<span class="fc" id="L143">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;clear&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L144">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;crypt-md5&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L145">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;sun-crypt-md5&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L146">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;sun-crypt-md5-bare-salt&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L147">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;crypt-sha-256&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L148">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;crypt-sha-512&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L149">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;simple-digest-md2&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L150">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;simple-digest-md5&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L151">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;simple-digest-sha-1&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L152">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;simple-digest-sha-256&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L153">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;simple-digest-sha-384&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L154">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;simple-digest-sha-512&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L155">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;digest-md5&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L156">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;digest-sha&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L157">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;digest-sha-256&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L158">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;digest-sha-384&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L159">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;digest-sha-512&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L160">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;digest-sha-512-256&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L161">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;password-salt-digest-md5&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L162">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;password-salt-digest-sha-1&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L163">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;password-salt-digest-sha-256&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L164">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;password-salt-digest-sha-384&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L165">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;password-salt-digest-sha-512&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L166">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;salt-password-digest-md5&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L167">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;salt-password-digest-sha-1&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L168">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;salt-password-digest-sha-256&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L169">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;salt-password-digest-sha-384&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L170">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;salt-password-digest-sha-512&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L171">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;crypt-des&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L172">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;bsd-crypt-des&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L173">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;bcrypt&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L174">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;scram-sha-1&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L175">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;scram-sha-256&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L176">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;scram-sha-384&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L177">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;scram-sha-512&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L178">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;otp-md5&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L179">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;otp-sha1&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L180">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;otp-sha256&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L181">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;otp-sha384&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L182">        putService(new Service(this, PASSWORD_FACTORY_TYPE, &quot;otp-sha512&quot;, &quot;org.wildfly.security.password.impl.PasswordFactorySpiImpl&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L183">        WildFlyElytronBaseProvider.putMakedPasswordImplementations(this::putService, this);</span>
+<span class="fc" id="L184">    }</span>
+
+    private void putSaslMechanismImplementations() {
+<span class="fc" id="L187">        final List&lt;String&gt; emptyList = Collections.emptyList();</span>
+<span class="fc" id="L188">        final Map&lt;String, String&gt; emptyMap = Collections.emptyMap();</span>
+
+<span class="fc" id="L190">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;ANONYMOUS&quot;,  &quot;org.wildfly.security.sasl.anonymous.AnonymousServerFactory&quot;, emptyList, emptyMap, false, true));</span>
+<span class="fc" id="L191">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;DIGEST-SHA-512&quot;,  &quot;org.wildfly.security.sasl.digest.DigestServerFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L192">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;DIGEST-SHA-512-256&quot;,  &quot;org.wildfly.security.sasl.digest.DigestServerFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L193">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;DIGEST-SHA-256&quot;,  &quot;org.wildfly.security.sasl.digest.DigestServerFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L194">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;DIGEST-SHA-384&quot;,  &quot;org.wildfly.security.sasl.digest.DigestServerFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L195">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;DIGEST-SHA&quot;,  &quot;org.wildfly.security.sasl.digest.DigestServerFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L196">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;DIGEST-MD5&quot;,  &quot;org.wildfly.security.sasl.digest.DigestServerFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L197">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;9798-U-RSA-SHA1-ENC&quot;,  &quot;org.wildfly.security.sasl.entity.EntitySaslServerFactory&quot;, emptyList, emptyMap, false, true));</span>
+<span class="fc" id="L198">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;9798-M-RSA-SHA1-ENC&quot;,  &quot;org.wildfly.security.sasl.entity.EntitySaslServerFactory&quot;, emptyList, emptyMap, false, true));</span>
+<span class="fc" id="L199">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;9798-U-DSA-SHA1&quot;,  &quot;org.wildfly.security.sasl.entity.EntitySaslServerFactory&quot;, emptyList, emptyMap, false, true));</span>
+<span class="fc" id="L200">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;9798-M-DSA-SHA1&quot;,  &quot;org.wildfly.security.sasl.entity.EntitySaslServerFactory&quot;, emptyList, emptyMap, false, true));</span>
+<span class="fc" id="L201">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;9798-U-ECDSA-SHA1&quot;,  &quot;org.wildfly.security.sasl.entity.EntitySaslServerFactory&quot;, emptyList, emptyMap, false, true));</span>
+<span class="fc" id="L202">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;9798-M-ECDSA-SHA1&quot;,  &quot;org.wildfly.security.sasl.entity.EntitySaslServerFactory&quot;, emptyList, emptyMap, false, true));</span>
+<span class="fc" id="L203">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;EXTERNAL&quot;,  &quot;org.wildfly.security.sasl.external.ExternalSaslServerFactory&quot;, emptyList, emptyMap, false, true));</span>
+<span class="fc" id="L204">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;GS2-KRB5-PLUS&quot;,  &quot;org.wildfly.security.sasl.gs2.Gs2SaslServerFactory&quot;, emptyList, emptyMap, false, true));</span>
+<span class="fc" id="L205">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;GS2-KRB5&quot;,  &quot;org.wildfly.security.sasl.gs2.Gs2SaslServerFactory&quot;, emptyList, emptyMap, false, true));</span>
+
+<span class="fc" id="L207">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;GSSAPI&quot;,  &quot;org.wildfly.security.sasl.gssapi.GssapiServerFactory&quot;, emptyList, emptyMap, false, true));</span>
+<span class="fc" id="L208">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;JBOSS-LOCAL-USER&quot;,  &quot;org.wildfly.security.sasl.localuser.LocalUserServerFactory&quot;, emptyList, emptyMap, false, true));</span>
+<span class="fc" id="L209">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;OAUTHBEARER&quot;,  &quot;org.wildfly.security.sasl.oauth2.OAuth2SaslServerFactory&quot;, emptyList, emptyMap, false, true));</span>
+<span class="fc" id="L210">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;OTP&quot;,  &quot;org.wildfly.security.sasl.otp.OTPSaslServerFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L211">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;PLAIN&quot;,  &quot;org.wildfly.security.sasl.plain.PlainSaslServerFactory&quot;, emptyList, emptyMap, false, true));</span>
+
+<span class="fc" id="L213">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;SCRAM-SHA-512-PLUS&quot;,  &quot;org.wildfly.security.sasl.scram.ScramSaslServerFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L214">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;SCRAM-SHA-384-PLUS&quot;,  &quot;org.wildfly.security.sasl.scram.ScramSaslServerFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L215">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;SCRAM-SHA-256-PLUS&quot;,  &quot;org.wildfly.security.sasl.scram.ScramSaslServerFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L216">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;SCRAM-SHA-1-PLUS&quot;,  &quot;org.wildfly.security.sasl.scram.ScramSaslServerFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L217">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;SCRAM-SHA-512&quot;,  &quot;org.wildfly.security.sasl.scram.ScramSaslServerFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L218">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;SCRAM-SHA-384&quot;,  &quot;org.wildfly.security.sasl.scram.ScramSaslServerFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L219">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;SCRAM-SHA-256&quot;,  &quot;org.wildfly.security.sasl.scram.ScramSaslServerFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L220">        putService(new ProviderService(this, SASL_SERVER_FACTORY_TYPE, &quot;SCRAM-SHA-1&quot;,  &quot;org.wildfly.security.sasl.scram.ScramSaslServerFactory&quot;, emptyList, emptyMap, true, true));</span>
+
+<span class="fc" id="L222">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;ANONYMOUS&quot;,  &quot;org.wildfly.security.sasl.anonymous.AnonymousClientFactory&quot;, emptyList, emptyMap, false, true));</span>
+<span class="fc" id="L223">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;DIGEST-SHA-512&quot;,  &quot;org.wildfly.security.sasl.digest.DigestClientFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L224">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;DIGEST-SHA-512-256&quot;,  &quot;org.wildfly.security.sasl.digest.DigestClientFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L225">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;DIGEST-SHA-256&quot;,  &quot;org.wildfly.security.sasl.digest.DigestClientFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L226">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;DIGEST-SHA-384&quot;,  &quot;org.wildfly.security.sasl.digest.DigestClientFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L227">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;DIGEST-SHA&quot;,  &quot;org.wildfly.security.sasl.digest.DigestClientFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L228">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;DIGEST-MD5&quot;,  &quot;org.wildfly.security.sasl.digest.DigestClientFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L229">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;9798-U-RSA-SHA1-ENC&quot;,  &quot;org.wildfly.security.sasl.entity.EntitySaslClientFactory&quot;, emptyList, emptyMap, false, true));</span>
+<span class="fc" id="L230">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;9798-M-RSA-SHA1-ENC&quot;,  &quot;org.wildfly.security.sasl.entity.EntitySaslClientFactory&quot;, emptyList, emptyMap, false, true));</span>
+<span class="fc" id="L231">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;9798-U-DSA-SHA1&quot;,  &quot;org.wildfly.security.sasl.entity.EntitySaslClientFactory&quot;, emptyList, emptyMap, false, true));</span>
+<span class="fc" id="L232">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;9798-M-DSA-SHA1&quot;,  &quot;org.wildfly.security.sasl.entity.EntitySaslClientFactory&quot;, emptyList, emptyMap, false, true));</span>
+<span class="fc" id="L233">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;9798-U-ECDSA-SHA1&quot;,  &quot;org.wildfly.security.sasl.entity.EntitySaslClientFactory&quot;, emptyList, emptyMap, false, true));</span>
+<span class="fc" id="L234">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;9798-M-ECDSA-SHA1&quot;,  &quot;org.wildfly.security.sasl.entity.EntitySaslClientFactory&quot;, emptyList, emptyMap, false, true));</span>
+<span class="fc" id="L235">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;EXTERNAL&quot;,  &quot;org.wildfly.security.sasl.external.ExternalSaslClientFactory&quot;, emptyList, emptyMap, false, true));</span>
+<span class="fc" id="L236">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;GS2-KRB5-PLUS&quot;,  &quot;org.wildfly.security.sasl.gs2.Gs2SaslClientFactory&quot;, emptyList, emptyMap, false, true));</span>
+<span class="fc" id="L237">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;GS2-KRB5&quot;,  &quot;org.wildfly.security.sasl.gs2.Gs2SaslClientFactory&quot;, emptyList, emptyMap, false, true));</span>
+
+<span class="fc" id="L239">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;GSSAPI&quot;,  &quot;org.wildfly.security.sasl.gssapi.GssapiClientFactory&quot;, emptyList, emptyMap, false, true));</span>
+<span class="fc" id="L240">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;JBOSS-LOCAL-USER&quot;,  &quot;org.wildfly.security.sasl.localuser.LocalUserClientFactory&quot;, emptyList, emptyMap, false, true));</span>
+<span class="fc" id="L241">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;OAUTHBEARER&quot;,  &quot;org.wildfly.security.sasl.oauth2.OAuth2SaslClientFactory&quot;, emptyList, emptyMap, false, true));</span>
+<span class="fc" id="L242">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;OTP&quot;,  &quot;org.wildfly.security.sasl.otp.OTPSaslClientFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L243">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;PLAIN&quot;,  &quot;org.wildfly.security.sasl.plain.PlainSaslClientFactory&quot;, emptyList, emptyMap, false, true));</span>
+<span class="fc" id="L244">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;SCRAM-SHA-512-PLUS&quot;,  &quot;org.wildfly.security.sasl.scram.ScramSaslClientFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L245">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;SCRAM-SHA-384-PLUS&quot;,  &quot;org.wildfly.security.sasl.scram.ScramSaslClientFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L246">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;SCRAM-SHA-256-PLUS&quot;,  &quot;org.wildfly.security.sasl.scram.ScramSaslClientFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L247">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;SCRAM-SHA-1-PLUS&quot;,  &quot;org.wildfly.security.sasl.scram.ScramSaslClientFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L248">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;SCRAM-SHA-512&quot;,  &quot;org.wildfly.security.sasl.scram.ScramSaslClientFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L249">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;SCRAM-SHA-384&quot;,  &quot;org.wildfly.security.sasl.scram.ScramSaslClientFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L250">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;SCRAM-SHA-256&quot;,  &quot;org.wildfly.security.sasl.scram.ScramSaslClientFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L251">        putService(new ProviderService(this, SASL_CLIENT_FACTORY_TYPE, &quot;SCRAM-SHA-1&quot;,  &quot;org.wildfly.security.sasl.scram.ScramSaslClientFactory&quot;, emptyList, emptyMap, true, true));</span>
+<span class="fc" id="L252">    }</span>
+
+    private void putCredentialStoreProviderImplementations() {
+<span class="fc" id="L255">        final List&lt;String&gt; emptyList = Collections.emptyList();</span>
+<span class="fc" id="L256">        final Map&lt;String, String&gt; emptyMap = Collections.emptyMap();</span>
+<span class="fc" id="L257">        putService(new Service(this, &quot;CredentialStore&quot;, &quot;KeyStoreCredentialStore&quot;, &quot;org.wildfly.security.credential.store.impl.KeyStoreCredentialStore&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L258">        putService(new Service(this, &quot;CredentialStore&quot;, &quot;VaultCredentialStore&quot;, &quot;org.wildfly.security.credential.store.impl.VaultCredentialStore&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L259">        putService(new Service(this, &quot;CredentialStore&quot;, &quot;MapCredentialStore&quot;, &quot;org.wildfly.security.credential.store.impl.MapCredentialStore&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L260">        putService(new Service(this, &quot;CredentialStore&quot;, &quot;PropertiesCredentialStore&quot;, &quot;org.wildfly.security.credential.store.impl.PropertiesCredentialStore&quot;, emptyList, emptyMap));</span>
+<span class="fc" id="L261">    }</span>
+
+    class ProviderService extends Service {
+
+        private final boolean withProvider;
+        private final boolean reUsable;
+        private volatile Reference&lt;Class&lt;?&gt;&gt; implementationClassRef;
+        private volatile Reference&lt;Object&gt; instance;
+
+        ProviderService(Provider provider, String type, String algorithm, String className, List&lt;String&gt; aliases, Map&lt;String,String&gt; attributes) {
+<span class="nc" id="L271">            this(provider, type, algorithm, className, aliases, attributes, true, false);</span>
+<span class="nc" id="L272">        }</span>
+
+<span class="fc" id="L274">        ProviderService(Provider provider, String type, String algorithm, String className, List&lt;String&gt; aliases, Map&lt;String,String&gt; attributes, boolean withProvider,  boolean reUsable) {</span>
+<span class="fc" id="L275">            super(provider, type, algorithm, className, aliases, attributes);</span>
+<span class="fc" id="L276">            this.withProvider = withProvider;</span>
+<span class="fc" id="L277">            this.reUsable = reUsable;</span>
+<span class="fc" id="L278">        }</span>
+
+        @Override
+        public Object newInstance(Object constructorParameter) throws NoSuchAlgorithmException {
+<span class="nc bnc" id="L282" title="All 2 branches missed.">            if (reUsable) {</span>
+<span class="nc" id="L283">                Reference&lt;Object&gt; instance = this.instance;</span>
+                Object response;
+<span class="nc bnc" id="L285" title="All 4 branches missed.">                if (instance == null || (response = instance.get()) == null) {</span>
+<span class="nc" id="L286">                    synchronized(this) {</span>
+<span class="nc" id="L287">                        instance = this.instance;</span>
+<span class="nc bnc" id="L288" title="All 4 branches missed.">                        if (instance == null || (response = instance.get()) == null) {</span>
+<span class="nc bnc" id="L289" title="All 2 branches missed.">                            response = withProvider ? newInstance() : super.newInstance(constructorParameter);</span>
+<span class="nc" id="L290">                            this.instance = new SoftReference&lt;Object&gt;(response);</span>
+                        }
+<span class="nc" id="L292">                    }</span>
+                }
+
+<span class="nc" id="L295">                return response;</span>
+            }
+
+<span class="nc bnc" id="L298" title="All 2 branches missed.">            return withProvider ? newInstance() : super.newInstance(constructorParameter);</span>
+        }
+
+        private Object newInstance() throws NoSuchAlgorithmException {
+<span class="nc" id="L302">            Class&lt;?&gt; implementationClass = getImplementationClass();</span>
+
+            try {
+<span class="nc" id="L305">                Constructor&lt;?&gt; constructor = implementationClass.getConstructor(Provider.class);</span>
+<span class="nc" id="L306">                return constructor.newInstance(WildFlyElytronProvider.this);</span>
+<span class="nc" id="L307">            } catch (Exception e) {</span>
+<span class="nc" id="L308">                throw log.noSuchAlgorithmCreateService(getType(), getAlgorithm(), e);</span>
+            }
+        }
+
+        private Class&lt;?&gt; getImplementationClass() throws NoSuchAlgorithmException {
+<span class="nc" id="L313">            Reference&lt;Class&lt;?&gt;&gt; implementationClassRef = this.implementationClassRef;</span>
+<span class="nc bnc" id="L314" title="All 2 branches missed.">            Class&lt;?&gt; implementationClass = implementationClassRef != null ? implementationClassRef.get() : null;</span>
+<span class="nc bnc" id="L315" title="All 2 branches missed.">            if (implementationClass == null) {</span>
+<span class="nc" id="L316">                ClassLoader classLoader = WildFlyElytronProvider.class.getClassLoader();</span>
+                try {
+<span class="nc" id="L318">                    implementationClass = Class.forName(getClassName(), false, classLoader);</span>
+<span class="nc" id="L319">                } catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L320">                    throw log.noSuchAlgorithmCreateService(getType(), getAlgorithm(), e);</span>
+<span class="nc" id="L321">                }</span>
+<span class="nc" id="L322">                this.implementationClassRef = new WeakReference&lt;&gt;(implementationClass);</span>
+            }
+
+<span class="nc" id="L325">            return implementationClass;</span>
+        }
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

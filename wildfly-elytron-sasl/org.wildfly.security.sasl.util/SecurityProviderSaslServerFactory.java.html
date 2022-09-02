@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SecurityProviderSaslServerFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.util</a> &gt; <span class="el_source">SecurityProviderSaslServerFactory.java</span></div><h1>SecurityProviderSaslServerFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.util;
+
+import static org.wildfly.security.provider.util.ProviderUtil.INSTALLED_PROVIDERS;
+
+import java.security.InvalidParameterException;
+import java.security.NoSuchAlgorithmException;
+import java.security.Provider;
+import java.security.Provider.Service;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.BiPredicate;
+import java.util.function.Supplier;
+
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.sasl.SaslServer;
+import javax.security.sasl.SaslServerFactory;
+import javax.security.sasl.SaslException;
+
+import static org.wildfly.security.sasl._private.ElytronMessages.log;
+
+/**
+ * A {@link SaslServerFactory} which uses the currently installed security providers to acquire a delegate
+ * {@code SaslServerFactory}.  The provider service instances may or may not be cached.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class SecurityProviderSaslServerFactory implements SaslServerFactory {
+
+<span class="nc" id="L50">    private static final String SERVICE_TYPE = SaslServerFactory.class.getSimpleName();</span>
+
+    private final Supplier&lt;Provider[]&gt; providerSupplier;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param providerSupplier the provider supplier
+     */
+<span class="nc" id="L59">    public SecurityProviderSaslServerFactory(final Supplier&lt;Provider[]&gt; providerSupplier) {</span>
+<span class="nc" id="L60">        this.providerSupplier = providerSupplier;</span>
+<span class="nc" id="L61">    }</span>
+
+    /**
+     * Construct a new instance.  The currently installed system providers are used.
+     */
+    public SecurityProviderSaslServerFactory() {
+<span class="nc" id="L67">        this(INSTALLED_PROVIDERS);</span>
+<span class="nc" id="L68">    }</span>
+
+    @Override
+    public SaslServer createSaslServer(final String mechanism, final String protocol, final String serverName, final Map&lt;String, ?&gt; props, final CallbackHandler cbh) throws SaslException {
+<span class="nc" id="L72">        final BiPredicate&lt;String, Provider&gt; mechFilter = SaslFactories.getProviderFilterPredicate(props);</span>
+        SaslServer saslServer;
+<span class="nc bnc" id="L74" title="All 2 branches missed.">        for (Provider currentProvider : providerSupplier.get()) {</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">            if (currentProvider == null) {</span>
+<span class="nc" id="L76">                continue;</span>
+            }
+<span class="nc bnc" id="L78" title="All 2 branches missed.">            if (mechFilter.test(mechanism, currentProvider)) {</span>
+<span class="nc" id="L79">                Set&lt;Service&gt; services = currentProvider.getServices();</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">                if (services != null) {</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">                    for (Provider.Service service : services) {</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">                        if (SERVICE_TYPE.equals(service.getType())) {</span>
+                            try {
+<span class="nc" id="L84">                                saslServer = ((SaslServerFactory) service.newInstance(null)).createSaslServer(mechanism,</span>
+                                        protocol, serverName, props, cbh);
+<span class="nc bnc" id="L86" title="All 2 branches missed.">                                if (saslServer != null) {</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">                                    if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L88">                                        log.tracef(&quot;Creating SaslServer [%s] for mechanism [%s] and protocol [%s]&quot;, saslServer, mechanism, protocol);</span>
+                                    }
+<span class="nc" id="L90">                                    return saslServer;</span>
+                                }
+<span class="nc" id="L92">                            } catch (NoSuchAlgorithmException | ClassCastException | InvalidParameterException e) {</span>
+<span class="nc" id="L93">                                log.debug(&quot;Unable to create instance of SaslServerFactory&quot;, e);</span>
+<span class="nc" id="L94">                            }</span>
+                        }
+<span class="nc" id="L96">                    }</span>
+                }
+            }
+        }
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L101">            log.tracef(&quot;No %s provided by provider supplier in %s: %s&quot;, SERVICE_TYPE, getClass().getSimpleName(), Arrays.toString(providerSupplier.get()));</span>
+        }
+<span class="nc" id="L103">        return null;</span>
+    }
+
+    @Override
+    public String[] getMechanismNames(final Map&lt;String, ?&gt; props) {
+<span class="nc" id="L108">        final BiPredicate&lt;String, Provider&gt; mechFilter = SaslFactories.getProviderFilterPredicate(props);</span>
+<span class="nc" id="L109">        final Set&lt;String&gt; names = new LinkedHashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        for (Provider currentProvider : providerSupplier.get()) {</span>
+<span class="nc" id="L111">            Set&lt;Service&gt; services = currentProvider.getServices();</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">            if (services != null) {</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">                for (Service service : services) {</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">                    if (SERVICE_TYPE.equals(service.getType())) {</span>
+                        try {
+<span class="nc" id="L116">                            final String[] mechanismNames = ((SaslServerFactory) service.newInstance(null)).getMechanismNames(props);</span>
+<span class="nc" id="L117">                            Collections.addAll(names, SaslFactories.filterMechanismsByProvider(mechanismNames, 0, 0, currentProvider, mechFilter));</span>
+<span class="nc" id="L118">                        } catch (NoSuchAlgorithmException | ClassCastException | InvalidParameterException e) {</span>
+<span class="nc" id="L119">                            log.debug(&quot;Unable to create instance&quot;, e);</span>
+<span class="nc" id="L120">                        }</span>
+                    }
+<span class="nc" id="L122">                }</span>
+            }
+        }
+<span class="nc bnc" id="L125" title="All 4 branches missed.">        if (names.size() == 0 &amp;&amp; log.isTraceEnabled()) {</span>
+<span class="nc" id="L126">            log.tracef(&quot;No %s provided by provider supplier in %s: %s&quot;, SERVICE_TYPE, getClass().getSimpleName(), Arrays.toString(providerSupplier.get()));</span>
+        }
+<span class="nc" id="L128">        return names.toArray(new String[names.size()]);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

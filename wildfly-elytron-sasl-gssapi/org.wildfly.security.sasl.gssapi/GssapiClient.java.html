@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>GssapiClient.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl-gssapi</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.gssapi</a> &gt; <span class="el_source">GssapiClient.java</span></div><h1>GssapiClient.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.gssapi;
+
+import static org.wildfly.security.mechanism._private.ElytronMessages.saslGssapi;
+import static org.wildfly.security.mechanism.gssapi.GSSCredentialSecurityFactory.KERBEROS_V5;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
+import java.util.Map;
+
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.sasl.Sasl;
+import javax.security.sasl.SaslClient;
+import javax.security.sasl.SaslException;
+
+import org.ietf.jgss.GSSContext;
+import org.ietf.jgss.GSSCredential;
+import org.ietf.jgss.GSSException;
+import org.ietf.jgss.GSSManager;
+import org.ietf.jgss.GSSName;
+import org.ietf.jgss.MessageProp;
+import org.wildfly.common.Assert;
+import org.wildfly.security.auth.callback.CredentialCallback;
+import org.wildfly.security.credential.GSSKerberosCredential;
+import org.wildfly.security.manager.action.SetContextClassLoaderAction;
+import org.wildfly.security.manager.action.SetContextClassLoaderFromClassAction;
+import org.wildfly.security.sasl.WildFlySasl;
+import org.wildfly.security.sasl.util.SaslMechanismInformation;
+
+/**
+ * SaslClient for the GSSAPI mechanism as defined by RFC 4752
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+<span class="nc bnc" id="L56" title="All 2 branches missed.">final class GssapiClient extends AbstractGssapiMechanism implements SaslClient {</span>
+
+    private static final int INITIAL_CHALLENGE_STATE = 1;
+    private static final int CHALLENGE_RESPONSE_STATE = 2;
+    private static final int SECURITY_LAYER_NEGOTIATION_STATE = 3;
+
+    private final String authorizationId;
+
+    GssapiClient(final String protocol, final String serverName, final Map&lt;String, ?&gt; props,
+            final CallbackHandler callbackHandler, final String authorizationId) throws SaslException {
+<span class="nc" id="L66">        super(SaslMechanismInformation.Names.GSSAPI, protocol, serverName, props, callbackHandler);</span>
+
+<span class="nc" id="L68">        this.authorizationId = authorizationId;</span>
+
+        // Initialise our GSSContext
+<span class="nc" id="L71">        GSSManager manager = GSSManager.getInstance();</span>
+
+<span class="nc" id="L73">        String acceptorNameString = protocol + &quot;@&quot; + serverName;</span>
+<span class="nc" id="L74">        saslGssapi.tracef(&quot;Acceptor Name '%s'&quot;, acceptorNameString);</span>
+        final GSSName acceptorName;
+        try {
+            // The client can use other name types but this should be added to the config.
+<span class="nc" id="L78">            acceptorName = manager.createName(acceptorNameString, GSSName.NT_HOSTBASED_SERVICE, KERBEROS_V5);</span>
+<span class="nc" id="L79">        } catch (GSSException e) {</span>
+<span class="nc" id="L80">            throw saslGssapi.mechUnableToCreateNameForAcceptor(e).toSaslException();</span>
+<span class="nc" id="L81">        }</span>
+
+        // Pull the credential if we have it.
+<span class="nc" id="L84">        GSSCredential credential = null;</span>
+
+<span class="nc" id="L86">        Object credObj = props.get(Sasl.CREDENTIALS);</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        if (credObj instanceof GSSCredential) {</span>
+<span class="nc" id="L88">            saslGssapi.trace(&quot;Using GSSCredential supplied in properties.&quot;);</span>
+<span class="nc" id="L89">            credential = (GSSCredential) credObj;</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">        } else if (credObj instanceof GSSKerberosCredential) {</span>
+<span class="nc" id="L91">            saslGssapi.trace(&quot;Using GSSCredential supplied in properties.&quot;);</span>
+<span class="nc" id="L92">            credential = ((GSSKerberosCredential) credObj).getGssCredential();</span>
+        }
+
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        if (credential == null) {</span>
+<span class="nc" id="L96">            CredentialCallback callback = new CredentialCallback(GSSKerberosCredential.class);</span>
+
+            try {
+<span class="nc" id="L99">                tryHandleCallbacks(callback);</span>
+
+<span class="nc" id="L101">                GSSKerberosCredential kerberosCredential = callback.getCredential(GSSKerberosCredential.class);</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">                if (kerberosCredential != null) {</span>
+<span class="nc" id="L103">                    saslGssapi.tracef(&quot;GSSCredential obtained from CredentialCallback.&quot;);</span>
+<span class="nc" id="L104">                    credential = kerberosCredential.getGssCredential();</span>
+                } else {
+<span class="nc" id="L106">                    saslGssapi.trace(&quot;No GSSCredential obtained from CredentialCallback.&quot;);</span>
+                }
+<span class="nc" id="L108">            } catch (UnsupportedCallbackException e) {</span>
+<span class="nc" id="L109">                saslGssapi.trace(&quot;CallbackHandler does not support CredentialCallback&quot;, e);</span>
+<span class="nc" id="L110">            }</span>
+        }
+
+        final GSSContext gssContext;
+        try {
+<span class="nc" id="L115">            gssContext = manager.createContext(acceptorName, KERBEROS_V5, credential, GSSContext.INDEFINITE_LIFETIME);</span>
+<span class="nc" id="L116">        } catch (GSSException e) {</span>
+<span class="nc" id="L117">            throw saslGssapi.mechUnableToCreateGssContext(e).toSaslException();</span>
+<span class="nc" id="L118">        }</span>
+
+        try {
+            // JDK only sets this if a credential was supplied, we should support a config override.
+            // i.e. we may have a credential because it was delegated to us - doesn't mean we want
+            // to delegate it further - at same point we may have a Subject on ACC and still want to delegate.
+<span class="nc bnc" id="L124" title="All 2 branches missed.">            boolean delegate = credential != null;</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">            if (props.containsKey(WildFlySasl.GSSAPI_DELEGATE_CREDENTIAL)) {</span>
+<span class="nc" id="L126">                delegate = Boolean.parseBoolean((String) props.get(WildFlySasl.GSSAPI_DELEGATE_CREDENTIAL));</span>
+            }
+<span class="nc" id="L128">            saslGssapi.tracef(&quot;Delegating credential = %b&quot;, delegate);</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">            if (delegate) {</span>
+<span class="nc" id="L130">                gssContext.requestCredDeleg(true);</span>
+            }
+
+            // The client must pass the integ_req_flag of true.
+<span class="nc" id="L134">            gssContext.requestInteg(true);</span>
+            // This was requested so that integrity protection can be used to negotiate the security layer,
+            // further integrity protection will be based on the negotiated security layer.
+
+            // requestMutualAuth if: -
+            // 1 - The client requests it.
+            // 2 - The client will be requesting a security layer. Will interpret as may be requesting as
+            // client and server could agree auth only.
+<span class="nc" id="L142">            boolean serverAuth = false;</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">            if (props.containsKey(Sasl.SERVER_AUTH)) {</span>
+<span class="nc" id="L144">                serverAuth = Boolean.parseBoolean((String) props.get(Sasl.SERVER_AUTH));</span>
+            }
+
+<span class="nc" id="L147">            boolean mayRequireSecurityLayer = mayRequireSecurityLater(orderedQops);</span>
+<span class="nc bnc" id="L148" title="All 4 branches missed.">            boolean requestMutualAuth = serverAuth || mayRequireSecurityLayer;</span>
+<span class="nc" id="L149">            saslGssapi.tracef(&quot;Setting requering mutual authentication to %b&quot;, requestMutualAuth);</span>
+<span class="nc" id="L150">            gssContext.requestMutualAuth(requestMutualAuth);</span>
+
+            // Request sequence detection if a security layer could be requested.
+<span class="nc bnc" id="L153" title="All 2 branches missed.">            if (mayRequireSecurityLayer) {</span>
+<span class="nc" id="L154">                saslGssapi.trace(&quot;Requesting sequence detection.&quot;);</span>
+<span class="nc" id="L155">                gssContext.requestSequenceDet(true);</span>
+            }
+
+            // Need to set this is we may want confidentiality, integrity is always requested.
+<span class="nc bnc" id="L159" title="All 2 branches missed.">            for (QOP current : orderedQops) {</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">                if (current == QOP.AUTH_CONF) {</span>
+<span class="nc" id="L161">                    saslGssapi.trace(&quot;Requesting confidentiality&quot;);</span>
+<span class="nc" id="L162">                    gssContext.requestConf(true);</span>
+<span class="nc" id="L163">                    break;</span>
+                }
+            }
+
+<span class="nc" id="L167">        } catch (GSSException e) {</span>
+<span class="nc" id="L168">            throw saslGssapi.mechUnableToSetGssContextRequestFlags(e).toSaslException();</span>
+<span class="nc" id="L169">        }</span>
+
+        // Channel Binding Is Not Supported
+
+<span class="nc" id="L173">        this.gssContext = gssContext;</span>
+<span class="nc" id="L174">    }</span>
+
+    private boolean mayRequireSecurityLater(final QOP[] preferredQop) {
+<span class="nc bnc" id="L177" title="All 2 branches missed.">        for (QOP current : preferredQop) {</span>
+<span class="nc bnc" id="L178" title="All 4 branches missed.">            if (current == QOP.AUTH_INT || current == QOP.AUTH_CONF) {</span>
+<span class="nc" id="L179">                return true;</span>
+            }
+        }
+<span class="nc" id="L182">        return false;</span>
+    }
+
+    private QOP findAgreeableQop(final byte securityLayer) throws SaslException {
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        for (QOP current : orderedQops) {</span>
+<span class="nc bnc" id="L187" title="All 4 branches missed.">            if (current.includedBy(securityLayer) &amp;&amp; isCompatibleWithGssContext(current)) {</span>
+<span class="nc" id="L188">                return current;</span>
+            }
+        }
+
+<span class="nc" id="L192">        throw saslGssapi.mechInsufficientQopsAvailable().toSaslException();</span>
+    }
+
+    private boolean isCompatibleWithGssContext(final QOP qop) {
+<span class="nc bnc" id="L196" title="All 3 branches missed.">        switch (qop) {</span>
+            case AUTH_INT:
+<span class="nc" id="L198">                return gssContext.getIntegState();</span>
+            case AUTH_CONF:
+<span class="nc bnc" id="L200" title="All 4 branches missed.">                return gssContext.getIntegState() &amp;&amp; gssContext.getConfState();</span>
+            default:
+<span class="nc" id="L202">                return true;</span>
+        }
+    }
+
+    @Override
+    public void init() {
+<span class="nc" id="L208">        setNegotiationState(INITIAL_CHALLENGE_STATE);</span>
+<span class="nc" id="L209">    }</span>
+
+    @Override
+    public boolean hasInitialResponse() {
+<span class="nc" id="L213">        return true;</span>
+    }
+
+    @Override
+    public byte[] evaluateChallenge(byte[] challenge) throws SaslException {
+<span class="nc" id="L218">        return evaluateMessage(challenge);</span>
+    }
+
+    @Override
+    protected byte[] evaluateMessage(int state, final byte[] message) throws SaslException {
+<span class="nc bnc" id="L223" title="All 4 branches missed.">        switch (state) {</span>
+            case INITIAL_CHALLENGE_STATE:
+                // GSSAPI is a client first mechanism, this state both verifies that requirement is met and
+                // provides the first token from the client
+<span class="nc bnc" id="L227" title="All 4 branches missed.">                assert gssContext.isEstablished() == false;</span>
+<span class="nc bnc" id="L228" title="All 2 branches missed.">                if (message.length &gt; 0) {</span>
+<span class="nc" id="L229">                    throw saslGssapi.mechInitialChallengeMustBeEmpty().toSaslException();</span>
+                }
+
+                try {
+<span class="nc" id="L233">                    byte[] response = initSecContext(gssContext, NO_BYTES, 0, 0);</span>
+<span class="nc bnc" id="L234" title="All 2 branches missed.">                    if (gssContext.isEstablished()) {</span>
+<span class="nc" id="L235">                        saslGssapi.trace(&quot;GSSContext established, transitioning to negotiate security layer.&quot;);</span>
+<span class="nc" id="L236">                        setNegotiationState(SECURITY_LAYER_NEGOTIATION_STATE);</span>
+                    } else {
+<span class="nc" id="L238">                        saslGssapi.trace(&quot;GSSContext not established, expecting subsequent exchanges.&quot;);</span>
+<span class="nc" id="L239">                        setNegotiationState(CHALLENGE_RESPONSE_STATE);</span>
+                    }
+
+<span class="nc" id="L242">                    return response;</span>
+<span class="nc" id="L243">                } catch (GSSException e) {</span>
+<span class="nc" id="L244">                    throw saslGssapi.mechUnableToCreateResponseToken(e).toSaslException();</span>
+                }
+            case CHALLENGE_RESPONSE_STATE:
+                // This state is to handle the subsequent exchange of tokens up until the point the
+                // GSSContext is established
+<span class="nc bnc" id="L249" title="All 4 branches missed.">                assert gssContext.isEstablished() == false;</span>
+
+                try {
+<span class="nc" id="L252">                    byte[] response = initSecContext(gssContext, message, 0, message.length);</span>
+
+<span class="nc bnc" id="L254" title="All 2 branches missed.">                    if (gssContext.isEstablished()) {</span>
+<span class="nc" id="L255">                        saslGssapi.trace(&quot;GSSContext established, transitioning to negotiate security layer.&quot;);</span>
+<span class="nc" id="L256">                        setNegotiationState(SECURITY_LAYER_NEGOTIATION_STATE);</span>
+<span class="nc bnc" id="L257" title="All 2 branches missed.">                        if (response == null) response = NO_BYTES;</span>
+                    } else {
+<span class="nc" id="L259">                        saslGssapi.trace(&quot;GSSContext not established, expecting subsequent exchanges.&quot;);</span>
+                    }
+<span class="nc" id="L261">                    return response;</span>
+<span class="nc" id="L262">                } catch (GSSException e) {</span>
+<span class="nc" id="L263">                    throw saslGssapi.mechUnableToHandleResponseFromServer(e).toSaslException();</span>
+                }
+            case SECURITY_LAYER_NEGOTIATION_STATE:
+<span class="nc bnc" id="L266" title="All 4 branches missed.">                assert gssContext.isEstablished();</span>
+
+<span class="nc" id="L268">                MessageProp msgProp = new MessageProp(0, false);</span>
+                try {
+<span class="nc" id="L270">                    byte[] unwrapped = gssContext.unwrap(message, 0, message.length, msgProp);</span>
+<span class="nc bnc" id="L271" title="All 2 branches missed.">                    if (unwrapped.length != 4) {</span>
+<span class="nc" id="L272">                        throw saslGssapi.mechBadLengthOfMessageForNegotiatingSecurityLayer().toSaslException();</span>
+                    }
+
+<span class="nc" id="L275">                    byte qopByte = unwrapped[0];</span>
+<span class="nc" id="L276">                    selectedQop = findAgreeableQop(qopByte);</span>
+<span class="nc" id="L277">                    maxBuffer = networkOrderBytesToInt(unwrapped, 1, 3);</span>
+<span class="nc" id="L278">                    saslGssapi.tracef(&quot;Selected QOP=%s, maxBuffer=%d&quot;, selectedQop, maxBuffer);</span>
+<span class="nc bnc" id="L279" title="All 6 branches missed.">                    if (relaxComplianceChecks == false &amp;&amp; maxBuffer &gt; 0 &amp;&amp; (qopByte &amp; QOP.AUTH_INT.getValue()) == 0</span>
+<span class="nc bnc" id="L280" title="All 2 branches missed.">                            &amp;&amp; (qopByte &amp; QOP.AUTH_CONF.getValue()) == 0) {</span>
+<span class="nc" id="L281">                        throw saslGssapi.mechReceivedMaxMessageSizeWhenNoSecurityLayer(maxBuffer).toSaslException();</span>
+                    }
+<span class="nc bnc" id="L283" title="All 2 branches missed.">                    maxBuffer = gssContext.getWrapSizeLimit(0, selectedQop == QOP.AUTH_CONF, maxBuffer);</span>
+
+<span class="nc" id="L285">                    ByteArrayOutputStream baos = new ByteArrayOutputStream();</span>
+<span class="nc" id="L286">                    baos.write(selectedQop.getValue());</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">                    if (selectedQop == QOP.AUTH) {</span>
+                        // No security layer selected to must set response to 000.
+<span class="nc" id="L289">                        baos.write(new byte[] { 0x00, 0x00, 0x00 });</span>
+                    } else {
+<span class="nc bnc" id="L291" title="All 2 branches missed.">                        actualMaxReceiveBuffer = configuredMaxReceiveBuffer!=0 ? configuredMaxReceiveBuffer : maxBuffer;</span>
+<span class="nc" id="L292">                        saslGssapi.tracef(&quot;Out max buffer %d&quot;, actualMaxReceiveBuffer);</span>
+<span class="nc" id="L293">                        baos.write(intToNetworkOrderBytes(actualMaxReceiveBuffer));</span>
+                    }
+
+<span class="nc bnc" id="L296" title="All 2 branches missed.">                    if (authorizationId != null) {</span>
+<span class="nc" id="L297">                        baos.write(authorizationId.getBytes(StandardCharsets.UTF_8));</span>
+                    }
+
+<span class="nc" id="L300">                    byte[] response = baos.toByteArray();</span>
+<span class="nc" id="L301">                    msgProp = new MessageProp(0, false);</span>
+<span class="nc" id="L302">                    response = gssContext.wrap(response, 0, response.length, msgProp);</span>
+
+<span class="nc bnc" id="L304" title="All 2 branches missed.">                    if (selectedQop != QOP.AUTH) {</span>
+<span class="nc" id="L305">                        saslGssapi.trace(&quot;Setting message wrapper.&quot;);</span>
+<span class="nc bnc" id="L306" title="All 2 branches missed.">                        setWrapper(new GssapiWrapper(selectedQop == QOP.AUTH_CONF));</span>
+                    }
+
+<span class="nc" id="L309">                    saslGssapi.trace(&quot;Negotiation Complete&quot;);</span>
+<span class="nc" id="L310">                    negotiationComplete();</span>
+<span class="nc" id="L311">                    return response;</span>
+<span class="nc" id="L312">                } catch (IOException e) {</span>
+<span class="nc" id="L313">                    throw saslGssapi.mechUnableToCreateResponseToken(e).toSaslException();</span>
+<span class="nc" id="L314">                } catch (GSSException e) {</span>
+<span class="nc" id="L315">                    throw saslGssapi.mechUnableToUnwrapSecurityLayerNegotiationMessage(e).toSaslException();</span>
+                }
+        }
+<span class="nc" id="L318">        throw Assert.impossibleSwitchCase(state);</span>
+    }
+
+    private static byte[] initSecContext(final GSSContext gssContext, final byte[] inputBuf, final int offset, final int len) throws GSSException {
+<span class="nc" id="L322">        final ClassLoader old = doPrivileged(new SetContextClassLoaderFromClassAction(GssapiClient.class));</span>
+        try {
+<span class="nc" id="L324">            return gssContext.initSecContext(inputBuf, offset, len);</span>
+        } finally {
+<span class="nc" id="L326">            doPrivileged(new SetContextClassLoaderAction(old));</span>
+        }
+    }
+
+    private static &lt;T&gt; T doPrivileged(final PrivilegedAction&lt;T&gt; action) {
+<span class="nc bnc" id="L331" title="All 2 branches missed.">        return System.getSecurityManager() != null ? AccessController.doPrivileged(action) : action.run();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

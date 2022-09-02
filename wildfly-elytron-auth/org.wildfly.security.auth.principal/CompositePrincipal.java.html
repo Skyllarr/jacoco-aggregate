@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CompositePrincipal.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.principal</a> &gt; <span class="el_source">CompositePrincipal.java</span></div><h1>CompositePrincipal.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.principal;
+
+import java.io.IOException;
+import java.io.InvalidObjectException;
+import java.io.ObjectInputStream;
+import java.io.Serializable;
+import java.security.Principal;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Iterator;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.util.ArrayIterator;
+
+/**
+ * A composite principal that consists of multiple elements of possibly disparate type.  This may be used to locate
+ * a unique principal in a realm which is backed by a database that uses a composite key; in this case, the constituent
+ * principals may be names or numbers, or a combination of both.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class CompositePrincipal implements Principal, Serializable, Iterable&lt;Principal&gt; {
+    private static final long serialVersionUID = - 2610733957848661774L;
+<span class="nc" id="L42">    private static final Principal[] NO_PRINCIPALS = new Principal[0];</span>
+
+    private final Principal[] p;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param principals the collection of principals to use (must not be {@code null})
+     */
+    public CompositePrincipal(Collection&lt;Principal&gt; principals) {
+<span class="nc" id="L52">        this(principals.toArray(NO_PRINCIPALS), false);</span>
+<span class="nc" id="L53">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param principals the principals to use (must not be {@code null})
+     */
+    public CompositePrincipal(Principal... principals) {
+<span class="nc" id="L61">        this(principals, true);</span>
+<span class="nc" id="L62">    }</span>
+
+<span class="nc" id="L64">    private CompositePrincipal(Principal[] principals, boolean clone) {</span>
+<span class="nc bnc" id="L65" title="All 4 branches missed.">        p = principals.length == 0 ? NO_PRINCIPALS : clone ? principals.clone() : principals;</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        for (int i = 0; i &lt; p.length; i++) {</span>
+<span class="nc" id="L67">            Assert.checkNotNullArrayParam(&quot;principals&quot;, i, p[i]);</span>
+        }
+<span class="nc" id="L69">    }</span>
+
+    /**
+     * Get the principal name.
+     *
+     * @return the principal name, which is a string containing all of the nested principals
+     */
+    public String getName() {
+<span class="nc" id="L77">        return Arrays.toString(p);</span>
+    }
+
+    /**
+     * Determine whether this composite principal contains the given nested principal.
+     *
+     * @param principal the nested principal (must not be {@code null})
+     * @return {@code true} if this principal contains the nested principal, {@code false} otherwise
+     */
+    public boolean contains(final Principal principal) {
+<span class="nc" id="L87">        Assert.checkNotNullParam(&quot;principal&quot;, principal);</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">        for (Principal test : p) {</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">            if (test.equals(principal)) {</span>
+<span class="nc" id="L90">                return true;</span>
+            }
+        }
+<span class="nc" id="L93">        return false;</span>
+    }
+
+    /**
+     * Determine whether this composite principal contains the a nested principal of the given type class.
+     *
+     * @param type the nested principal type class (must not be {@code null})
+     * @return {@code true} if this principal contains a nested principal of the given type, {@code false} otherwise
+     */
+    public boolean contains(final Class&lt;? extends Principal&gt; type) {
+<span class="nc" id="L103">        Assert.checkNotNullParam(&quot;type&quot;, type);</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        for (Principal test : p) {</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">            if (type.isInstance(test)) {</span>
+<span class="nc" id="L106">                return true;</span>
+            }
+        }
+<span class="nc" id="L109">        return false;</span>
+    }
+
+    /**
+     * Get the number of nested principals.
+     *
+     * @return the number of nested principals
+     */
+    public int size() {
+<span class="nc" id="L118">        return p.length;</span>
+    }
+
+    /**
+     * Get the principal at the given index.
+     *
+     * @param idx the index
+     * @return the principal at the given index (not {@code null})
+     * @throws IndexOutOfBoundsException if the given index is less than zero or greater than or equal to {@link #size()}
+     */
+    public Principal get(int idx) {
+        try {
+<span class="nc" id="L130">            return p[idx];</span>
+<span class="nc" id="L131">        } catch (ArrayIndexOutOfBoundsException e) {</span>
+<span class="nc" id="L132">            throw new IndexOutOfBoundsException();</span>
+        }
+    }
+
+    /**
+     * Get the principal at the given index, if it is of the given type.
+     *
+     * @param idx the index
+     * @param type the principal type class (must not be {@code null})
+     * @param &lt;P&gt; the principal type
+     * @return the principal at the given index or {@code null} if that principal is not of the given type
+     * @throws IndexOutOfBoundsException if the given index is less than zero or greater than or equal to {@link #size()}
+     */
+    public &lt;P extends Principal&gt; P get(int idx, Class&lt;P&gt; type) {
+<span class="nc" id="L146">        Assert.checkNotNullParam(&quot;type&quot;, type);</span>
+<span class="nc" id="L147">        final Principal item = get(idx);</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">        return type.isInstance(item) ? type.cast(item) : null;</span>
+    }
+
+    /**
+     * Get the first principal with the given type, if any.
+     *
+     * @param type the principal type class (must not be {@code null})
+     * @param &lt;P&gt; the principal type
+     * @return the first principal with the given type, or {@code null} if none was found
+     * @throws IndexOutOfBoundsException if the given index is less than zero or greater than or equal to {@link #size()}
+     */
+    public &lt;P extends Principal&gt; P get(Class&lt;P&gt; type) {
+<span class="nc" id="L160">        Assert.checkNotNullParam(&quot;type&quot;, type);</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">        for (Principal item : p) {</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">            if (type.isInstance(item)) type.cast(item);</span>
+        }
+<span class="nc" id="L164">        return null;</span>
+    }
+
+    /**
+     * Get an iterator over this principal.
+     *
+     * @return an iterator over this principal (not {@code null})
+     */
+    public Iterator&lt;Principal&gt; iterator() {
+<span class="nc" id="L173">        return new ArrayIterator&lt;Principal&gt;(p);</span>
+    }
+
+    /**
+     * Determine whether this principal is equal to the given object.
+     *
+     * @param obj the object
+     * @return {@code true} if they are equal, {@code false} otherwise
+     */
+    public boolean equals(final Object obj) {
+<span class="nc bnc" id="L183" title="All 4 branches missed.">        return obj instanceof CompositePrincipal &amp;&amp; equals((CompositePrincipal) obj);</span>
+    }
+
+    /**
+     * Determine whether this principal is equal to the given object.
+     *
+     * @param obj the object
+     * @return {@code true} if they are equal, {@code false} otherwise
+     */
+    public boolean equals(final CompositePrincipal obj) {
+<span class="nc bnc" id="L193" title="All 6 branches missed.">        return obj == this || obj != null &amp;&amp; Arrays.deepEquals(p, obj.p);</span>
+    }
+
+    /**
+     * Get the hash code of this principal.
+     *
+     * @return the hash code of this principal
+     */
+    public int hashCode() {
+<span class="nc" id="L202">        return Arrays.deepHashCode(p);</span>
+    }
+
+    /**
+     * Get this principal as a string.
+     *
+     * @return this principal as a string (not {@code null})
+     */
+    public String toString() {
+<span class="nc" id="L211">        return getName();</span>
+    }
+
+    private void readObject(ObjectInputStream ois) throws IOException, ClassNotFoundException {
+<span class="nc" id="L215">        ois.defaultReadObject();</span>
+<span class="nc bnc" id="L216" title="All 2 branches missed.">        if (p == null) {</span>
+<span class="nc" id="L217">            throw new InvalidObjectException(&quot;Null principals array&quot;);</span>
+        }
+<span class="nc bnc" id="L219" title="All 2 branches missed.">        for (Principal principal : p) {</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">            if (principal == null) {</span>
+<span class="nc" id="L221">                throw new InvalidObjectException(&quot;Null principal array element&quot;);</span>
+            }
+        }
+<span class="nc" id="L224">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

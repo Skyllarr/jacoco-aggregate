@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CertificateAuthority.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-x500-cert-acme</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.x500.cert.acme</a> &gt; <span class="el_source">CertificateAuthority.java</span></div><h1>CertificateAuthority.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2019 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.x500.cert.acme;
+
+import org.wildfly.common.Assert;
+
+/**
+ * A class that represents an &lt;a href=&quot;https://tools.ietf.org/html/draft-ietf-acme-acme-18.txt&quot;&gt;Automatic Certificate
+ * Management Environment (ACME)&lt;/a&gt; certificate authority endpoint.
+ *
+ * @author &lt;a href=&quot;mailto:dvilkola@redhat.com&quot;&gt;Diana Vilkolakova&lt;/a&gt;
+ * @since 1.9.0
+ */
+public class CertificateAuthority {
+
+    private static final String DIRECTORY = &quot;directory&quot;;
+    private static final String LETS_ENCRYPT_STAGING_URL = &quot;https://acme-staging-v02.api.letsencrypt.org/&quot; + DIRECTORY;
+    private static final String LETS_ENCRYPT_URL = &quot;https://acme-v02.api.letsencrypt.org/&quot; + DIRECTORY;
+    private String name;
+    private String url;
+    private String stagingUrl;
+
+<span class="nc" id="L39">    public static final CertificateAuthority LETS_ENCRYPT = new CertificateAuthority(&quot;LetsEncrypt&quot;, LETS_ENCRYPT_URL, LETS_ENCRYPT_STAGING_URL);</span>
+
+<span class="nc" id="L41">    public CertificateAuthority(String name, String url, String stagingUrl) {</span>
+<span class="nc" id="L42">        this.name = name;</span>
+<span class="nc" id="L43">        this.url = url;</span>
+<span class="nc" id="L44">        this.stagingUrl = stagingUrl;</span>
+<span class="nc" id="L45">    }</span>
+
+    /**
+     * Get the default certificate authority endpoint.
+     *
+     * @return LETS_ENCRYPT certificate authority holding Let's Encrypt URLs
+     */
+    public static CertificateAuthority getDefault() {
+<span class="nc" id="L53">        return LETS_ENCRYPT;</span>
+    }
+
+    /**
+     * Get the name of certificate authority.
+     *
+     * @return name of the certificate authority
+     */
+    public String getName() {
+<span class="nc" id="L62">        return name;</span>
+    }
+
+    /**
+     * Get the certificate authority URL
+     *
+     * @return certificate authority URL
+     */
+    public String getUrl() {
+<span class="nc" id="L71">        return url;</span>
+    }
+
+    /**
+     * Get the certificate authority staging URL
+     *
+     * @return certificate authority staging URL
+     */
+    public String getStagingUrl() {
+<span class="nc" id="L80">        return stagingUrl;</span>
+    }
+
+    /**
+     * Set the name of certificate authority.
+     *
+     * @param name the name of certificate authority (must not be {@code null})
+     */
+    public void setName(String name) {
+<span class="nc" id="L89">        Assert.checkNotNullParam(&quot;name&quot;, name);</span>
+<span class="nc" id="L90">        this.name = name;</span>
+<span class="nc" id="L91">    }</span>
+
+    /**
+     * Set the URL of certificate authority.
+     *
+     * @param url URL of certificate authority (must not be {@code null})
+     */
+    public void setUrl(String url) {
+<span class="nc" id="L99">        Assert.checkNotNullParam(&quot;url&quot;, url);</span>
+<span class="nc" id="L100">        this.url = url;</span>
+<span class="nc" id="L101">    }</span>
+
+    /**
+     * Set the staging URL of certificate authority.
+     *
+     * @param stagingUrl staging URL of certificate authority
+     */
+    public void setStagingUrl(String stagingUrl) {
+<span class="nc" id="L109">        this.stagingUrl = stagingUrl;</span>
+<span class="nc" id="L110">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

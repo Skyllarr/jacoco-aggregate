@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages_$logger.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-x500</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.x500._private</a> &gt; <span class="el_source">ElytronMessages_$logger.java</span></div><h1>ElytronMessages_$logger.java</h1><pre class="source lang-java linenums">package org.wildfly.security.x500._private;
+
+import java.util.Locale;
+import java.io.Serializable;
+import javax.annotation.Generated;
+import org.jboss.logging.DelegatingBasicLogger;
+import org.wildfly.security.asn1.ASN1Exception;
+import org.jboss.logging.BasicLogger;
+import java.lang.Throwable;
+import org.jboss.logging.Logger;
+import java.util.Arrays;
+import java.lang.IllegalArgumentException;
+
+/**
+ * Warning this class consists of generated code.
+ */
+@Generated(value = &quot;org.jboss.logging.processor.generator.model.MessageLoggerImplementor&quot;, date = &quot;2022-09-02T20:20:05+0200&quot;)
+public class ElytronMessages_$logger extends DelegatingBasicLogger implements ElytronMessages, BasicLogger, Serializable {
+    private static final long serialVersionUID = 1L;
+<span class="fc" id="L20">    private static final String FQCN = ElytronMessages_$logger.class.getName();</span>
+    public ElytronMessages_$logger(final Logger log) {
+<span class="fc" id="L22">        super(log);</span>
+<span class="fc" id="L23">    }</span>
+<span class="fc" id="L24">    private static final Locale LOCALE = Locale.ROOT;</span>
+    protected Locale getLoggingLocale() {
+<span class="nc" id="L26">        return LOCALE;</span>
+    }
+    protected String unexpectedTrailingGarbageInX500principal$str() {
+<span class="nc" id="L29">        return &quot;ELY00006: Unexpected trailing garbage in X.500 principal&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException unexpectedTrailingGarbageInX500principal() {
+<span class="nc" id="L33">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), unexpectedTrailingGarbageInX500principal$str()));</span>
+<span class="nc" id="L34">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L35">        return result;</span>
+    }
+    private static void _copyStackTraceMinusOne(final Throwable e) {
+<span class="nc" id="L38">        final StackTraceElement[] st = e.getStackTrace();</span>
+<span class="nc" id="L39">        e.setStackTrace(Arrays.copyOfRange(st, 1, st.length));</span>
+<span class="nc" id="L40">    }</span>
+    protected String nonX509CertificateInCertificateArray$str() {
+<span class="nc" id="L42">        return &quot;ELY10025: Non-X.509 certificate found in certificate array&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException nonX509CertificateInCertificateArray() {
+<span class="nc" id="L46">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), nonX509CertificateInCertificateArray$str()));</span>
+<span class="nc" id="L47">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L48">        return result;</span>
+    }
+    protected String startingPublicKeyNotFoundInCertificateArray$str() {
+<span class="nc" id="L51">        return &quot;ELY10026: Starting public key not found in certificate array&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException startingPublicKeyNotFoundInCertificateArray() {
+<span class="nc" id="L55">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), startingPublicKeyNotFoundInCertificateArray$str()));</span>
+<span class="nc" id="L56">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L57">        return result;</span>
+    }
+    protected String incompleteCertificateArray$str() {
+<span class="nc" id="L60">        return &quot;ELY10027: Incomplete certificate array&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException incompleteCertificateArray() {
+<span class="nc" id="L64">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), incompleteCertificateArray$str()));</span>
+<span class="nc" id="L65">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L66">        return result;</span>
+    }
+    protected String unableToCreateCertificateChainFromCertificateMap$str() {
+<span class="nc" id="L69">        return &quot;ELY10028: Unable to create X.509 certificate chain from map of certificates&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException unableToCreateCertificateChainFromCertificateMap() {
+<span class="nc" id="L73">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), unableToCreateCertificateChainFromCertificateMap$str()));</span>
+<span class="nc" id="L74">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L75">        return result;</span>
+    }
+    protected String invalidValueForTrustedAuthorityType$str() {
+<span class="nc" id="L78">        return &quot;ELY05110: Invalid value for trusted authority type; expected a value between 0 and 4 (inclusive)&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidValueForTrustedAuthorityType() {
+<span class="nc" id="L82">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidValueForTrustedAuthorityType$str()));</span>
+<span class="nc" id="L83">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L84">        return result;</span>
+    }
+    protected String invalidValueForGeneralNameType$str() {
+<span class="nc" id="L87">        return &quot;ELY05111: Invalid value for a general name type; expected a value between 0 and 8 (inclusive)&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidValueForGeneralNameType() {
+<span class="nc" id="L91">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidValueForGeneralNameType$str()));</span>
+<span class="nc" id="L92">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L93">        return result;</span>
+    }
+    protected String asnInvalidGeneralNameForUriType$str() {
+<span class="nc" id="L96">        return &quot;ELY07006: Invalid general name for URI type&quot;;</span>
+    }
+    @Override
+    public final ASN1Exception asnInvalidGeneralNameForUriType(final Throwable cause) {
+<span class="nc" id="L100">        final ASN1Exception result = new ASN1Exception(String.format(getLoggingLocale(), asnInvalidGeneralNameForUriType$str()), cause);</span>
+<span class="nc" id="L101">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L102">        return result;</span>
+    }
+    protected String asnInvalidGeneralNameForIpAddressType$str() {
+<span class="nc" id="L105">        return &quot;ELY07007: Invalid general name for IP address type&quot;;</span>
+    }
+    @Override
+    public final ASN1Exception asnInvalidGeneralNameForIpAddressType() {
+<span class="nc" id="L109">        final ASN1Exception result = new ASN1Exception(String.format(getLoggingLocale(), asnInvalidGeneralNameForIpAddressType$str()));</span>
+<span class="nc" id="L110">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L111">        return result;</span>
+    }
+    protected String asnIpAddressGeneralNameCannotBeResolved$str() {
+<span class="nc" id="L114">        return &quot;ELY07008: IP address general name cannot be resolved&quot;;</span>
+    }
+    @Override
+    public final ASN1Exception asnIpAddressGeneralNameCannotBeResolved(final Throwable cause) {
+<span class="nc" id="L118">        final ASN1Exception result = new ASN1Exception(String.format(getLoggingLocale(), asnIpAddressGeneralNameCannotBeResolved$str()), cause);</span>
+<span class="nc" id="L119">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L120">        return result;</span>
+    }
+    protected String asnInvalidGeneralNameForUriTypeMissingScheme$str() {
+<span class="nc" id="L123">        return &quot;ELY07025: Invalid general name for URI type: missing scheme&quot;;</span>
+    }
+    @Override
+    public final ASN1Exception asnInvalidGeneralNameForUriTypeMissingScheme() {
+<span class="nc" id="L127">        final ASN1Exception result = new ASN1Exception(String.format(getLoggingLocale(), asnInvalidGeneralNameForUriTypeMissingScheme$str()));</span>
+<span class="nc" id="L128">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L129">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

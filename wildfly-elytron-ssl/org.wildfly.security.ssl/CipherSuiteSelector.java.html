@@ -1,0 +1,893 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CipherSuiteSelector.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-ssl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.ssl</a> &gt; <span class="el_source">CipherSuiteSelector.java</span></div><h1>CipherSuiteSelector.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.ssl;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.wildfly.common.iteration.CodePointIterator;
+
+/**
+ * An immutable filter for SSL/TLS cipher suites.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public abstract class CipherSuiteSelector {
+
+    final CipherSuiteSelector prev;
+
+<span class="fc" id="L42">    CipherSuiteSelector(final CipherSuiteSelector prev) {</span>
+<span class="fc" id="L43">        this.prev = prev;</span>
+<span class="fc" id="L44">    }</span>
+
+    /* -- predicates -- */
+
+<span class="fc" id="L48">    private static final CipherSuiteSelector EMPTY = new CipherSuiteSelector(null) {</span>
+        void applyFilter(final Set&lt;String&gt; enabled, final Map&lt;MechanismDatabase.Entry, String&gt; supported) {
+<span class="fc" id="L50">        }</span>
+
+        void toString(final StringBuilder b) {
+<span class="nc" id="L53">            b.append(&quot;(empty)&quot;);</span>
+<span class="nc" id="L54">        }</span>
+    };
+
+<span class="fc" id="L57">    private static final CipherSuiteSelector TLS13_EMPTY = new CipherSuiteSelector(null) {</span>
+        void applyFilter(final Set&lt;String&gt; enabled, final Map&lt;MechanismDatabase.Entry, String&gt; supported) {
+<span class="fc" id="L59">        }</span>
+
+        void toString(final StringBuilder b) {
+<span class="nc" id="L62">            b.append(&quot;(empty)&quot;);</span>
+<span class="nc" id="L63">        }</span>
+
+        MechanismDatabase getMechanismDatabase() {
+<span class="fc" id="L66">            return MechanismDatabase.getTLS13Instance();</span>
+        }
+    };
+
+    /**
+     * Get the basic empty SSL cipher suite selector.
+     *
+     * @return the empty selector
+     */
+    public static CipherSuiteSelector empty() {
+<span class="fc" id="L76">        return EMPTY;</span>
+    }
+
+    /**
+     * Get the basic empty SSL cipher suite selector.
+     *
+     * @param useTLS13 {@code true} if the TLSv1.3 mechanism database should be used by this selector and {@code false} otherwise
+     * @return the empty selector
+     */
+    public static CipherSuiteSelector empty(final boolean useTLS13) {
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        return useTLS13 ? TLS13_EMPTY : EMPTY;</span>
+    }
+
+    /**
+     * OpenSSL default cipher suites for TLSv1.3.
+     */
+    public static final String OPENSSL_DEFAULT_CIPHER_SUITE_NAMES = &quot;TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256&quot;;
+
+<span class="fc" id="L94">    static final CipherSuiteSelector OPENSSL_ALL = empty().add(CipherSuitePredicate.matchOpenSslAll());</span>
+<span class="fc" id="L95">    static final CipherSuiteSelector OPENSSL_DEFAULT = openSslAll().deleteFully(CipherSuitePredicate.matchOpenSslDefaultDeletes());</span>
+    // OpenSSL default cipher suites for TLSv1.3
+<span class="fc" id="L97">    static final CipherSuiteSelector OPENSSL_DEFAULT_CIPHER_SUITES = CipherSuiteSelector.fromNamesString(OPENSSL_DEFAULT_CIPHER_SUITE_NAMES);</span>
+<span class="fc" id="L98">    static final CipherSuiteSelector OPENSSL_COMBINED_DEFAULT = aggregate(OPENSSL_DEFAULT_CIPHER_SUITES, OPENSSL_DEFAULT);</span>
+
+    /**
+     * Get the cipher selector which OpenSSL defines as {@code DEFAULT}.
+     *
+     * @return the selector
+     * @see CipherSuitePredicate#matchOpenSslDefaultDeletes()
+     */
+    public static CipherSuiteSelector openSslDefault() {
+<span class="fc" id="L107">        return OPENSSL_DEFAULT;</span>
+    }
+
+    /**
+     * Get the cipher selector which OpenSSL defines as {@code ALL}.
+     *
+     * @return the selector
+     * @see CipherSuitePredicate#matchOpenSslAll()
+     */
+    public static CipherSuiteSelector openSslAll() {
+<span class="fc" id="L117">        return OPENSSL_ALL;</span>
+    }
+
+    /**
+     * Get the cipher selector which OpenSSL defines as the default cipher suites for TLSv1.3.
+     *
+     * @return the selector
+     */
+    public static CipherSuiteSelector openSslDefaultCipherSuites() {
+<span class="nc" id="L126">        return OPENSSL_DEFAULT_CIPHER_SUITES;</span>
+    }
+
+    /**
+     * Get the cipher selector which OpenSSL defines as {@code DEFAULT} combined with the
+     * cipher suites which OpenSSL defines as the default cipher suites for TLSv1.3.
+     *
+     * @return the selector
+     */
+    public static CipherSuiteSelector openSslCombinedDefault() {
+<span class="fc" id="L136">        return OPENSSL_COMBINED_DEFAULT;</span>
+    }
+
+
+
+    /* -- delete -- */
+
+    /**
+     * Permanently delete all cipher suites which are matched by the given predicate.  Matching ciphers cannot
+     * be re-added by a later rule (such rules will be ignored).
+     *
+     * @param predicate the predicate to match
+     * @return a new selector which includes the new rule
+     */
+    public CipherSuiteSelector deleteFully(final CipherSuitePredicate predicate) {
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        return predicate == null ? this : new FullyDeletingCipherSuiteSelector(this, predicate);</span>
+    }
+
+    /**
+     * A convenience method to permanently delete a cipher suite by name.  This is a shortcut for calling
+     * {@code deleteFully(Predicate.matchName(cipherSuiteName))}.  The cipher suite name must be a standard or OpenSSL-style
+     * mechanism name identifying a single mechanism.
+     *
+     * @param cipherSuiteName the cipher suite name
+     * @return a new selector which includes the new rule
+     */
+    public CipherSuiteSelector deleteFully(final String cipherSuiteName) {
+<span class="nc" id="L163">        return deleteFully(CipherSuitePredicate.matchName(cipherSuiteName));</span>
+    }
+
+    /* -- remove -- */
+
+    /**
+     * Remove all cipher suites which are matched by the given predicate.  Matching ciphers may be re-added by a later
+     * rule.
+     *
+     * @param predicate the predicate to match
+     * @return a new selector which includes the new rule
+     */
+    public CipherSuiteSelector remove(final CipherSuitePredicate predicate) {
+<span class="pc bpc" id="L176" title="1 of 4 branches missed.">        return predicate == null || predicate.isAlwaysFalse() ? this : new RemovingCipherSuiteSelector(this, predicate);</span>
+    }
+
+    /**
+     * A convenience method to remove a cipher suite by name.  This is a shortcut for calling
+     * {@code remove(Predicate.matchName(cipherSuiteName))}.  The cipher suite name must be a standard or OpenSSL-style
+     * mechanism name identifying a single mechanism.
+     *
+     * @param cipherSuiteName the cipher suite name
+     * @return a new selector which includes the new rule
+     */
+    public CipherSuiteSelector remove(final String cipherSuiteName) {
+<span class="nc" id="L188">        return remove(CipherSuitePredicate.matchName(cipherSuiteName));</span>
+    }
+
+    /* -- add -- */
+
+    /**
+     * Add all cipher suites which are matched by the given predicate.  The cipher suites are added in a reasonably
+     * logical order.  Any suites which are not supported by the underlying socket layer will not be added.
+     *
+     * @param predicate the predicate to match
+     * @return a new selector which includes the new rule
+     */
+    public CipherSuiteSelector add(final CipherSuitePredicate predicate) {
+<span class="pc bpc" id="L201" title="2 of 4 branches missed.">        return predicate == null || predicate.isAlwaysFalse() ? this : new AddingCipherSuiteSelector(this, predicate);</span>
+    }
+
+    /**
+     * A convenience method to add a cipher suite by name.  If the underlying socket layer does not support the named
+     * cipher suite, or if the cipher suite is invalid, it will not be added.  This is a shortcut for calling
+     * {@code add(Predicate.matchName(cipherSuiteName))}.  The cipher suite name must be a standard or OpenSSL-style
+     * mechanism name identifying a single mechanism.
+     *
+     * @param cipherSuiteName the cipher suite name
+     * @return a new selector which includes the new rule
+     */
+    public CipherSuiteSelector add(final String cipherSuiteName) {
+<span class="fc" id="L214">        return add(CipherSuitePredicate.matchName(cipherSuiteName));</span>
+    }
+
+    /* -- push to end -- */
+
+    /**
+     * Push all cipher suites which are matched by the given predicate to the end of the enabled ciphers list.  Only
+     * cipher suites which are already enabled will be moved; no cipher suites are added by this transformation.
+     *
+     * @param predicate the predicate to match
+     * @return a new selector which includes the new rule
+     */
+    public CipherSuiteSelector pushToEnd(final CipherSuitePredicate predicate) {
+<span class="pc bpc" id="L227" title="3 of 6 branches missed.">        return predicate == null || predicate.isAlwaysFalse() || predicate.isAlwaysTrue() ? this : new PushToEndCipherSuiteSelector(this, predicate);</span>
+    }
+
+    /**
+     * A convenience method to push a cipher suite by name to the end of the enabled ciphers list.  This is a shortcut
+     * for calling {@code pushToEnd(Predicate.matchName(cipherSuiteName))}.  In particular, no cipher suites are added
+     * by this transformation.  The cipher suite name must be a standard or OpenSSL-style mechanism name identifying a
+     * single mechanism.
+     *
+     * @param cipherSuiteName the cipher suite name
+     * @return a new selector which includes the new rule
+     */
+    public CipherSuiteSelector pushToEnd(final String cipherSuiteName) {
+<span class="nc" id="L240">        return pushToEnd(CipherSuitePredicate.matchName(cipherSuiteName));</span>
+    }
+
+    /**
+     * Sort all of the enabled ciphers by decreasing key length.  Only the ciphers which were added by previous rules
+     * will be sorted.
+     *
+     * @return a new selector which includes the sort
+     */
+    public CipherSuiteSelector sortByAlgorithmKeyLength() {
+<span class="fc" id="L250">        return new SortByAlgorithmKeyLengthCipherSuiteSelector(this);</span>
+    }
+
+    public final String toString() {
+<span class="nc" id="L254">        StringBuilder b = new StringBuilder();</span>
+<span class="nc" id="L255">        toString(b);</span>
+<span class="nc" id="L256">        return b.toString();</span>
+    }
+
+    abstract void toString(StringBuilder b);
+
+    /* -- selector implementation -- */
+
+    abstract void applyFilter(Set&lt;String&gt; enabled, Map&lt;MechanismDatabase.Entry, String&gt; supported);
+
+    private void doEvaluate(Set&lt;String&gt; enabled, Map&lt;MechanismDatabase.Entry, String&gt; supported) {
+<span class="fc bfc" id="L266" title="All 2 branches covered.">        if (prev != null) {</span>
+<span class="fc" id="L267">            prev.doEvaluate(enabled, supported);</span>
+        }
+<span class="fc" id="L269">        applyFilter(enabled, supported);</span>
+<span class="fc" id="L270">    }</span>
+
+    MechanismDatabase getMechanismDatabase() {
+<span class="fc bfc" id="L273" title="All 2 branches covered.">        if (prev != null) {</span>
+<span class="fc" id="L274">            return prev.getMechanismDatabase();</span>
+        }
+<span class="fc" id="L276">        return MechanismDatabase.getInstance();</span>
+    }
+
+    /**
+     * Evaluate this selector against the given list of JSSE supported mechanisms.
+     *
+     * @param supportedMechanisms the supported mechanisms
+     * @return the enabled mechanisms (not {@code null})
+     */
+    public String[] evaluate(String[] supportedMechanisms) {
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">        if (ElytronMessages.tls.isTraceEnabled()) {</span>
+<span class="nc" id="L287">            StringBuilder b = new StringBuilder(supportedMechanisms.length * 16);</span>
+<span class="nc" id="L288">            b.append(&quot;Evaluating filter \&quot;&quot;).append(this).append(&quot;\&quot; on supported mechanisms:&quot;);</span>
+<span class="nc bnc" id="L289" title="All 2 branches missed.">            for (String s : supportedMechanisms) {</span>
+<span class="nc" id="L290">                b.append(&quot;\n    &quot;).append(s);</span>
+            }
+<span class="nc" id="L292">            ElytronMessages.tls.trace(b);</span>
+        }
+<span class="fc" id="L294">        final MechanismDatabase database = getMechanismDatabase();</span>
+<span class="fc" id="L295">        final LinkedHashMap&lt;MechanismDatabase.Entry, String&gt; supportedMap = new LinkedHashMap&lt;&gt;(supportedMechanisms.length);</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">        for (String supportedMechanism : supportedMechanisms) {</span>
+<span class="fc" id="L297">            final MechanismDatabase.Entry entry = database.getCipherSuite(supportedMechanism);</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">            if (entry != null) {</span>
+<span class="fc" id="L299">                ElytronMessages.tls.tracef(&quot;Found supported mechanism %s&quot;, supportedMechanism);</span>
+<span class="fc" id="L300">                supportedMap.put(entry, supportedMechanism);</span>
+            } else {
+<span class="fc" id="L302">                ElytronMessages.tls.tracef(&quot;Dropping unknown mechanism %s&quot;, supportedMechanism);</span>
+            }
+        }
+<span class="fc" id="L305">        final LinkedHashSet&lt;String&gt; enabledSet = new LinkedHashSet&lt;String&gt;(supportedMap.size());</span>
+<span class="fc" id="L306">        doEvaluate(enabledSet, supportedMap);</span>
+<span class="fc" id="L307">        return enabledSet.toArray(new String[enabledSet.size()]);</span>
+    }
+
+    /**
+     * Create a cipher suite selector from the given OpenSSL-style cipher list string.  The rules of the string are as
+     * follows:
+     * &lt;ul&gt;
+     *     &lt;li&gt;Each item is separated from the other items by a colon (&quot;:&quot;), though for compatibility, commas (&quot;,&quot;) or
+     *          spaces (&quot; &quot;) are allowed delimiters as well.&lt;/li&gt;
+     *     &lt;li&gt;The items are evaluated in order from left to right.&lt;/li&gt;
+     *     &lt;li&gt;
+     *         Each item may consist of one of the following:
+     *         &lt;ul&gt;
+     *             &lt;li&gt;An OpenSSL-style cipher suite name like {@code DH-RSA-AES256-SHA256}, which adds the named cipher suite to the end of the list (if it is supported and not already present).&lt;/li&gt;
+     *             &lt;li&gt;A standard SSL/TLS cipher suite name like {@code TLS_DH_RSA_WITH_AES_256_CBC_SHA256}, which adds the named cipher suite to the end of the list (if it is supported and not already present).&lt;/li&gt;
+     *             &lt;li&gt;
+     *                 Any of the following special keywords:
+     *                 &lt;ul&gt;
+     *                     &lt;li&gt;{@code HIGH}, which matches all supported cipher suites with &quot;high&quot; encryption, presently defined
+     *                          as all cipher suites with key lengths larger than 128 bits, and some with key lengths
+     *                          of exactly 128 bits (see {@link SecurityLevel#HIGH}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code MEDIUM}, which matches all supported cipher suites with &quot;medium&quot; encryption, presently
+     *                          defined as some cipher suites with 128 bit keys (see {@link SecurityLevel#MEDIUM}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code LOW}, which matches all supported cipher suites with &quot;low&quot; encryption, presently defined
+     *                          as cipher suites which use 64- or 56-bit encryption but excluding export cipher suites
+     *                          (see {@link SecurityLevel#LOW}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code EXP} or {@code EXPORT}, which matches supported cipher suites using export algorithms, presently defined as
+     *                          cipher suites which include those that use 56- or 40-bit encryption algorithms (see
+     *                          {@link SecurityLevel#EXP40} and {@link SecurityLevel#EXP56})&lt;/li&gt;.
+     *                     &lt;li&gt;{@code EXPORT40}, which matches supported cipher suites using export algorithms with 40-bit encryption (see {@link SecurityLevel#EXP40}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code EXPORT56}, which matches supported cipher suites using export algorithms with 56-bit encryption (see {@link SecurityLevel#EXP56}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code eNULL} or {@code NULL}, which matches supported cipher suites without encryption (see {@link Encryption#NULL}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code aNULL}, which matches supported cipher suites without authentication (i.e. they are anonymous) (see {@link Authentication#NULL}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code kRSA}, which matches supported cipher suites using RSA key exchange (see {@link KeyAgreement#RSA}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code aRSA}, which matches supported cipher suites using RSA authentication (see {@link Authentication#RSA}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code RSA}, which matches supported cipher suites using either RSA key exchange or RSA authentication.&lt;/li&gt;
+     *                     &lt;li&gt;{@code kDHr}, which matches supported cipher suites using DH key agreement with DH certificates signed with a RSA key (see {@link KeyAgreement#DHr}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code kDHd}, which matches supported cipher suites using DH key agreement with DH certificates signed with a DSS key (see {@link KeyAgreement#DHd}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code kDH}, which matches any supported cipher suite using DH key agreement.&lt;/li&gt;
+     *                     &lt;li&gt;{@code kDHE} or {@code kEDH}, which matches supported cipher suites using ephemeral DH key agreement (including anonymous cipher suites; see {@link KeyAgreement#DHE}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code DHE} or {@code EDH}, which matches supported cipher suites using non-anonymous ephemeral DH key agreement.&lt;/li&gt;
+     *                     &lt;li&gt;{@code ADH}, which matches supported cipher suites using anonymous DH, not including anonymous elliptic curve suites.&lt;/li&gt;
+     *                     &lt;li&gt;{@code DH}, which matches any supported cipher suite using DH.&lt;/li&gt;
+     *                     &lt;li&gt;{@code kECDHr}, which matches supported cipher suites using fixed ECDH key agreement signed using RSA keys (see {@link KeyAgreement#ECDHr}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code kECDHe}, which matches supported cipher suites using fixed ECDH key agreement signed by ECDSA keys (see {@link KeyAgreement#ECDHe}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code kECDH}, which matches supported cipher suites using fixed ECDH key agreement.&lt;/li&gt;
+     *                     &lt;li&gt;{@code kEECDH} or {@code kECDHE}, which matches supported cipher suites using ephemeral ECDH key agreement (including anonymous cipher suites; see {@link KeyAgreement#ECDHE}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code ECDHE} or {@code EECDHE}, which matches supported cipher suites using authenticated (non-anonymous) ephemeral ECDH key agreement.&lt;/li&gt;
+     *                     &lt;li&gt;{@code AECDH}, which matches supported cipher suites using anonymous ephemeral ECDH key agreement.&lt;/li&gt;
+     *                     &lt;li&gt;{@code ECDH}, which matches all supported cipher suites using ECDH key agreement.&lt;/li&gt;
+     *                     &lt;li&gt;{@code aDSS} or {@code DSS}, which matches supported cipher suites using DSS authentication (see {@link Authentication#DSS}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code aDH}, which matches supported cipher suites using DH authentication (see {@link Authentication#DH}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code aECDH}, which matches supported cipher suites using ECDH authentication (see {@link Authentication#ECDH}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code aECDSA} or {@code ECDSA}, which matches supported cipher suites using ECDSA authentication (see {@link Authentication#ECDSA}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code kFZA}, which matches supported cipher suites using Fortezza key agreement (see {@link KeyAgreement#FZA}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code aFZA}, which matches supported cipher suites using Fortezza authentication (see {@link Authentication#FZA}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code eFZA}, which matches supported cipher suites using Fortezza encryption (see {@link Encryption#FZA}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code FZA}, which matches all supported cipher suites using any Fortezza algorithm.&lt;/li&gt;
+     *                     &lt;li&gt;{@code TLSv1.2}, which matches supported cipher suites defined in TLS v1.2 (see {@link Protocol#TLSv1_2}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code TLSv1}, which matches supported cipher suites defined in TLS v1 (see {@link Protocol#TLSv1}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code SSLv3}, which matches supported cipher suites defined in SSL v3.0 (see {@link Protocol#SSLv3}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code SSLv2}, which matches supported cipher suites defined in SSL v2.0 (see {@link Protocol#SSLv2}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code AES256}, which matches supported cipher suites using 256-bit AES (see {@link Encryption#AES256}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code AES128}, which matches supported cipher suites using 128-bit AES (see {@link Encryption#AES128}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code AES}, which matches all supported cipher suites using AES.&lt;/li&gt;
+     *                     &lt;li&gt;{@code AESGCM}, which matches supported cipher suites using AES in Galois Counter Mode (GCM) (see {@link Encryption#AES256GCM} and {@link Encryption#AES128GCM}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code CAMELLIA256}, which matches supported cipher suites using 256-bit Camellia encryption (see {@link Encryption#CAMELLIA256}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code CAMELLIA128}, which matches supported cipher suites using 128-bit Camellia encryption (see {@link Encryption#CAMELLIA128}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code CAMELLIA}, which matches all supported cipher suites using any Camellia encryption.&lt;/li&gt;
+     *                     &lt;li&gt;{@code 3DES}, which matches supported cipher suites using triple DES encryption (see {@link Encryption#_3DES}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code DES}, which matches supported cipher suites using plain DES encryption (see {@link Encryption#DES}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code RC4}, which matches supported cipher suites using RC4 encryption (see {@link Encryption#RC4}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code RC2}, which matches supported cipher suites using RC2 encryption (see {@link Encryption#RC2}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code IDEA}, which matches supported cipher suites using IDEA encryption (see {@link Encryption#IDEA}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code SEED}, which matches supported cipher suites using SEED encryption (see {@link Encryption#SEED}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code MD5}, which matches supported cipher suites using the MD5 digest algorithm (see {@link Digest#MD5}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code SHA1} or {@code SHA}, which matches supported cipher suites using the SHA-1 digest algorithm (see {@link Digest#SHA1}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code SHA256}, which matches supported cipher suites using the SHA-256 digest algorithm (see {@link Digest#SHA256}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code SHA384}, which matches supported cipher suites using the SHA-384 digest algorithm (see {@link Digest#SHA384}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code aGOST}, which matches supported cipher suites using GOST authentication.&lt;/li&gt;
+     *                     &lt;li&gt;{@code aGOST01}, which matches supported cipher suites using GOST R 34.10-2001 authentication (see {@link Authentication#GOST01}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code aGOST94}, which matches supported cipher suites using GOST R 34.10-94 authentication (see {@link Authentication#GOST94}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code kGOST}, which matches supported cipher suites using VKO 34.10 key exchange (see {@link KeyAgreement#GOST}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code GOST94}, which matches supported cipher suites using GOST R 34.11-94 based HMAC (see {@link Digest#GOST94}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code GOST89MAC}, which matches supported cipher suites using GOST 28147-89 based MAC (not HMAC) (see {@link Digest#GOST89MAC}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code kPSK}, which matches supported cipher suites using pre-shared keys key agreement (see {@link KeyAgreement#PSK}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code aPSK}, which matches supported cipher suites using pre-shared keys authentication (see {@link Authentication#PSK}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code PSK}, which matches supported cipher suites using pre-shared keys (see {@link Authentication#PSK} and {@link KeyAgreement#PSK}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code RSAPSK} or {@code kRSAPSK}, which matches supported cipher suites using RSA-based pre-shared keys (see {@link KeyAgreement#RSAPSK}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code kEDHPSK}, {@code kDHEPSK}, {@code EDHPSK} or {@code DHEPSK}, which matches supported cipher suites using ephemeral DH-based pre-shared keys (see {@link KeyAgreement#DHEPSK}).&lt;/li&gt;
+     *                     &lt;li&gt;{@code kEECDHPSK}, {@code EECDHPSK}, {@code kECDHEPSK} or {@code ECDHEPSK}, which matches supported cipher suites using ephemeral elliptic-curve DH-based pre-shared keys (see {@link KeyAgreement#ECDHEPSK}).&lt;/li&gt;
+     *                 &lt;/ul&gt;
+     *             &lt;/li&gt;
+     *             &lt;li&gt;More than one of any of the above keywords or cipher suite names joined by {@code +} symbols, which
+     *                  indicates that all of the items must be matched (i.e. a logical &quot;and&quot; operation).&lt;/li&gt;
+     *             &lt;li&gt;The special unary {@code !} operator followed by any of the above keywords or cipher
+     *                  names, which removes the matching cipher suite(s) from the enabled list and also deletes it from the
+     *                  supported list, preventing any matching cipher suites from being re-added by a later rule.&lt;/li&gt;
+     *             &lt;li&gt;The special unary {@code -} operator followed by any of the above keywords or cipher
+     *                  names, which removes the matching cipher suite(s) from the enabled list (though they may still
+     *                  be re-added).&lt;/li&gt;
+     *             &lt;li&gt;The special unary {@code +} operator followed by any of the above keywords or cipher
+     *                  names, which causes any of the matching cipher suite(s) to be moved to the end of the list
+     *                  of enabled cipher suites.&lt;/li&gt;
+     *             &lt;li&gt;The special {@code ALL} keyword, which includes all cipher suites (except for encryptionless
+     *                  suites; in other words, this keyword implies {@code -eNULL}).&lt;/li&gt;
+     *             &lt;li&gt;The special {@code COMPLEMENTOFALL} keyword, which is presently equivalent to {@code eNULL}.&lt;/li&gt;
+     *             &lt;li&gt;The special {@code DEFAULT} keyword, which is equivalent to {@code ALL:!EXPORT:!LOW:!aNULL:!eNULL:!SSLv2}.&lt;/li&gt;
+     *             &lt;li&gt;The special {@code COMPLEMENTOFDEFAULT} keyword, which presently includes any anonymous cipher
+     *                  suites (but excludes those without encryption, which must always be enabled manually).&lt;/li&gt;
+     *             &lt;li&gt;The special {@code @STRENGTH} keyword, which causes all the mechanisms enabled thus far to be
+     *                  automatically sorted by encryption algorithm key length in descending order.&lt;/li&gt;
+     *         &lt;/ul&gt;
+     *     &lt;/li&gt;
+     * &lt;/ul&gt;
+     *
+     * @param string the string to parse
+     * @return the parsed cipher suite selector
+     * @throws IllegalArgumentException if the given string is not valid
+     */
+    public static CipherSuiteSelector fromString(String string) throws IllegalArgumentException {
+<span class="fc" id="L428">        final CodePointIterator i = CodePointIterator.ofString(string);</span>
+<span class="fc" id="L429">        CipherSuiteSelector current = empty();</span>
+        CipherSuitePredicate predicate;
+        String name;
+        int cp;
+<span class="fc bfc" id="L433" title="All 2 branches covered.">        while (i.hasNext()) {</span>
+<span class="fc" id="L434">            cp = i.next();</span>
+<span class="pc bpc" id="L435" title="2 of 7 branches missed.">            switch (cp) {</span>
+                case '+': {
+<span class="fc" id="L437">                    current = parseMoveToEnd(current, i);</span>
+<span class="fc" id="L438">                    break;</span>
+                }
+                case '-': {
+<span class="fc" id="L441">                    current = parseRemove(current, i);</span>
+<span class="fc" id="L442">                    break;</span>
+                }
+                case '!': {
+<span class="fc" id="L445">                    current = parseDelete(current, i);</span>
+<span class="fc" id="L446">                    break;</span>
+                }
+                case '@': {
+<span class="fc" id="L449">                    current = parseSpecial(current, i);</span>
+<span class="fc" id="L450">                    break;</span>
+                }
+                case '=': {
+<span class="nc" id="L453">                    throw ElytronMessages.log.mechSelectorTokenNotAllowed(&quot;=&quot;, i.getIndex(), string);</span>
+                }
+                case ',':
+                case ':': {
+                    // skip empty
+<span class="nc" id="L458">                    break;</span>
+                }
+                default: {
+<span class="fc bfc" id="L461" title="All 2 branches covered.">                    if (Character.isWhitespace(cp)) {</span>
+                        // skip whitespace
+<span class="fc" id="L463">                        break;</span>
+                    }
+<span class="pc bpc" id="L465" title="1 of 2 branches missed.">                    if (Character.isLetterOrDigit(cp)) {</span>
+<span class="fc" id="L466">                        i.previous();</span>
+<span class="fc" id="L467">                        name = i.delimitedBy('+', ':', ',', ' ').drainToString();</span>
+<span class="fc" id="L468">                        predicate = parsePredicate(i, name);</span>
+<span class="fc bfc" id="L469" title="All 2 branches covered.">                        if (predicate != null) {</span>
+<span class="fc" id="L470">                            current = current.add(predicate);</span>
+                        } else {
+<span class="fc bfc" id="L472" title="All 5 branches covered.">                            switch (name) {</span>
+                                /* -- openssl special -- */
+<span class="fc" id="L474">                                case &quot;DEFAULT&quot;:             current = current.add(CipherSuitePredicate.matchOpenSslAll())</span>
+<span class="fc" id="L475">                                                                             .deleteFully(CipherSuitePredicate.matchOpenSslDefaultDeletes()); break;</span>
+<span class="fc" id="L476">                                case &quot;COMPLEMENTOFDEFAULT&quot;: current = current.add(CipherSuitePredicate.matchAnonDH()); break;</span>
+<span class="fc" id="L477">                                case &quot;ALL&quot;:                 current = current.add(CipherSuitePredicate.matchOpenSslAll()); break;</span>
+<span class="fc" id="L478">                                case &quot;COMPLEMENTOFALL&quot;:     current = current.add(CipherSuitePredicate.matchOpenSslComplementOfAll()); break;</span>
+                                // SUITEB not yet supported
+//                                case &quot;SUITEB128&quot;:           return null;
+//                                case &quot;SUITEB128ONLY&quot;:       return null;
+//                                case &quot;SUITEB192&quot;:           return null;
+                                default: {
+<span class="fc" id="L484">                                    throw ElytronMessages.log.mechSelectorUnknownToken(name, string);</span>
+                                }
+                            }
+                        }
+<span class="fc" id="L488">                        break;</span>
+                    }
+<span class="nc" id="L490">                    throw ElytronMessages.log.mechSelectorUnexpectedChar(cp, i.getIndex(), string);</span>
+                }
+            }
+            // current character should be : or EOS after parse* methods
+        }
+<span class="fc" id="L495">        return current;</span>
+    }
+
+    /**
+     * Create a cipher suite selector from the given OpenSSL-style TLSv1.3 cipher suites string. The format for this string
+     * is a simple colon (&quot;:&quot;) separated list of TLSv1.3 cipher suite names.
+     *
+     * @param names the string to parse
+     * @return the parsed cipher suite selector
+     * @throws IllegalArgumentException if the given string is not valid
+     */
+    public static CipherSuiteSelector fromNamesString(String names) throws IllegalArgumentException {
+<span class="fc" id="L507">        final CodePointIterator cpi = CodePointIterator.ofString(names);</span>
+<span class="fc" id="L508">        final CodePointIterator di = cpi.delimitedBy(':');</span>
+<span class="fc" id="L509">        CipherSuiteSelector current = empty(true);</span>
+<span class="fc bfc" id="L510" title="All 2 branches covered.">        while (cpi.hasNext()) {</span>
+<span class="fc bfc" id="L511" title="All 2 branches covered.">            if (di.hasNext()) {</span>
+<span class="fc" id="L512">                String name = di.drainToString();</span>
+<span class="fc" id="L513">                final MechanismDatabase database = MechanismDatabase.getTLS13Instance();</span>
+<span class="fc" id="L514">                MechanismDatabase.Entry entry = database.getCipherSuiteOpenSSLName(name);</span>
+<span class="fc bfc" id="L515" title="All 2 branches covered.">                if (entry == null) {</span>
+<span class="fc" id="L516">                    throw ElytronMessages.log.unknownCipherSuiteName(name, names);</span>
+                }
+<span class="fc" id="L518">                current = current.add(name);</span>
+<span class="fc" id="L519">            } else {</span>
+<span class="fc" id="L520">                cpi.next(); // skip the colon</span>
+            }
+        }
+<span class="fc" id="L523">        return current;</span>
+    }
+
+    /**
+     * Create an aggregate {@link CipherSuiteSelector}. Each cipher suite selector is executed in order.
+     *
+     * @param cipherSuiteSelector1 the first cipher suite selector
+     * @param cipherSuiteSelector2 the second cipher suite selector
+     * @return the aggregate cipher suite selector (not {@code null})
+     */
+    public static CipherSuiteSelector aggregate(final CipherSuiteSelector cipherSuiteSelector1, final CipherSuiteSelector cipherSuiteSelector2) {
+<span class="fc" id="L534">        return new CipherSuiteSelector(null) {</span>
+            void toString(StringBuilder b) {
+<span class="nc bnc" id="L536" title="All 4 branches missed.">                if (cipherSuiteSelector1 != null &amp;&amp; cipherSuiteSelector1 != EMPTY) {</span>
+<span class="nc" id="L537">                    cipherSuiteSelector1.toString(b);</span>
+                }
+<span class="nc bnc" id="L539" title="All 4 branches missed.">                if (cipherSuiteSelector2 != null &amp;&amp; cipherSuiteSelector2 != EMPTY) {</span>
+<span class="nc" id="L540">                    cipherSuiteSelector2.toString(b);</span>
+                }
+<span class="nc" id="L542">            }</span>
+
+            void applyFilter(Set&lt;String&gt; enabled, Map&lt;MechanismDatabase.Entry, String&gt; supported) {
+<span class="nc bnc" id="L545" title="All 2 branches missed.">                if (cipherSuiteSelector1 != null) {</span>
+<span class="nc" id="L546">                    cipherSuiteSelector1.applyFilter(enabled, supported);</span>
+                }
+<span class="nc bnc" id="L548" title="All 2 branches missed.">                if (cipherSuiteSelector2 != null) {</span>
+<span class="nc" id="L549">                    cipherSuiteSelector2.applyFilter(enabled, supported);</span>
+                }
+<span class="nc" id="L551">            }</span>
+
+            public String[] evaluate(String[] supportedMechanisms) {
+<span class="fc" id="L554">                ArrayList&lt;String&gt; enabledList = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L555" title="All 2 branches covered.">                if (cipherSuiteSelector1 != null) {</span>
+<span class="fc" id="L556">                    enabledList.addAll(Arrays.asList(cipherSuiteSelector1.evaluate(supportedMechanisms)));</span>
+                }
+<span class="pc bpc" id="L558" title="1 of 2 branches missed.">                if (cipherSuiteSelector2 != null) {</span>
+<span class="fc" id="L559">                    enabledList.addAll(Arrays.asList(cipherSuiteSelector2.evaluate(supportedMechanisms)));</span>
+                }
+<span class="fc" id="L561">                return enabledList.toArray(new String[enabledList.size()]);</span>
+            }
+        };
+    }
+
+    private static CipherSuiteSelector parseMoveToEnd(final CipherSuiteSelector current, final CodePointIterator i) {
+<span class="fc" id="L567">        return current.pushToEnd(parsePredicate(i));</span>
+    }
+
+    private static CipherSuiteSelector parseRemove(final CipherSuiteSelector current, final CodePointIterator i) {
+<span class="fc" id="L571">        return current.remove(parsePredicate(i));</span>
+    }
+
+    private static CipherSuiteSelector parseDelete(final CipherSuiteSelector current, final CodePointIterator i) {
+<span class="fc" id="L575">        return current.deleteFully(parsePredicate(i));</span>
+    }
+
+    private static CipherSuiteSelector parseSpecial(final CipherSuiteSelector current, final CodePointIterator i) {
+<span class="fc" id="L579">        String word = i.delimitedBy('=', ':').drainToString();</span>
+<span class="pc bpc" id="L580" title="1 of 2 branches missed.">        switch (word) {</span>
+            case &quot;STRENGTH&quot;: {
+<span class="pc bpc" id="L582" title="3 of 4 branches missed.">                if (i.hasNext() &amp;&amp; i.next() == '=') {</span>
+<span class="nc" id="L583">                    throw ElytronMessages.log.mechSelectorTokenNotAllowed(&quot;=&quot;, i.getIndex(), i.drainToString());</span>
+                }
+<span class="fc" id="L585">                return current.sortByAlgorithmKeyLength();</span>
+            }
+            default: {
+<span class="nc" id="L588">                throw ElytronMessages.log.mechSelectorUnknownToken(word, i.drainToString());</span>
+            }
+        }
+    }
+
+    private static CipherSuitePredicate parsePredicate(final CodePointIterator i) {
+<span class="fc" id="L594">        return parsePredicate(i, i.delimitedBy('+', ':', ',', ' ').drainToString());</span>
+    }
+
+    private static CipherSuitePredicate parsePredicate(final CodePointIterator i, final String word) {
+<span class="fc" id="L598">        CipherSuitePredicate item = getSimplePredicateByName(word);</span>
+<span class="fc bfc" id="L599" title="All 4 branches covered.">        if (i.hasNext() &amp;&amp; i.next() == '+') {</span>
+<span class="pc bpc" id="L600" title="1 of 2 branches missed.">            if (item == null) {</span>
+<span class="nc" id="L601">                throw ElytronMessages.log.mechSelectorTokenNotAllowed(&quot;+&quot;, i.getIndex(), i.drainToString());</span>
+            }
+<span class="fc" id="L603">            return parseAndPredicate(item, i);</span>
+        } else {
+<span class="fc" id="L605">            return item;</span>
+        }
+    }
+
+    private static CipherSuitePredicate parseAndPredicate(CipherSuitePredicate item, final CodePointIterator i) {
+<span class="fc" id="L610">        final ArrayList&lt;CipherSuitePredicate&gt; list = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L611">        list.add(item);</span>
+        do {
+<span class="fc" id="L613">            list.add(getSimplePredicateByName(i.delimitedBy('+', ':', ',', ' ').drainToString()));</span>
+<span class="pc bpc" id="L614" title="1 of 4 branches missed.">        } while (i.hasNext() &amp;&amp; i.next() == '+');</span>
+<span class="fc" id="L615">        return CipherSuitePredicate.matchAll(list.toArray(new CipherSuitePredicate[list.size()]));</span>
+    }
+
+    private static CipherSuitePredicate getSimplePredicateByName(final String word) {
+<span class="pc bpc" id="L619" title="63 of 71 branches missed.">        switch (word) {</span>
+            /* -- openssl standard -- */
+<span class="nc" id="L621">            case &quot;HIGH&quot;:        return CipherSuitePredicate.matchLevel(SecurityLevel.HIGH);</span>
+<span class="nc" id="L622">            case &quot;MEDIUM&quot;:      return CipherSuitePredicate.matchLevel(SecurityLevel.MEDIUM);</span>
+<span class="nc" id="L623">            case &quot;LOW&quot;:         return CipherSuitePredicate.matchLevel(SecurityLevel.LOW);</span>
+            case &quot;EXP&quot;:         // synonym
+<span class="nc" id="L625">            case &quot;EXPORT&quot;:      return CipherSuitePredicate.matchLevel(SecurityLevel.EXP40, SecurityLevel.EXP56);</span>
+<span class="nc" id="L626">            case &quot;EXPORT40&quot;:    return CipherSuitePredicate.matchLevel(SecurityLevel.EXP40);</span>
+<span class="nc" id="L627">            case &quot;EXPORT56&quot;:    return CipherSuitePredicate.matchLevel(SecurityLevel.EXP56);</span>
+            case &quot;NULL&quot;:        // synonym
+<span class="fc" id="L629">            case &quot;eNULL&quot;:       return CipherSuitePredicate.matchEncryption(Encryption.NULL);</span>
+<span class="fc" id="L630">            case &quot;aNULL&quot;:       return CipherSuitePredicate.matchAuthentication(Authentication.NULL);</span>
+<span class="fc" id="L631">            case &quot;kRSA&quot;:        return CipherSuitePredicate.matchKeyAgreement(KeyAgreement.RSA);</span>
+<span class="fc" id="L632">            case &quot;aRSA&quot;:        return CipherSuitePredicate.matchAuthentication(Authentication.RSA);</span>
+<span class="fc" id="L633">            case &quot;RSA&quot;:         return CipherSuitePredicate.matchAny(CipherSuitePredicate.matchKeyAgreement(KeyAgreement.RSA), CipherSuitePredicate.matchAuthentication(Authentication.RSA));</span>
+<span class="nc" id="L634">            case &quot;kDHr&quot;:        return CipherSuitePredicate.matchKeyAgreement(KeyAgreement.DHr);</span>
+<span class="nc" id="L635">            case &quot;kDHd&quot;:        return CipherSuitePredicate.matchKeyAgreement(KeyAgreement.DHd);</span>
+<span class="nc" id="L636">            case &quot;kDH&quot;:         return CipherSuitePredicate.matchKeyExchange(KeyAgreement.DHr, KeyAgreement.DHd);</span>
+            case &quot;kDHE&quot;:        // synonym
+<span class="nc" id="L638">            case &quot;kEDH&quot;:        return CipherSuitePredicate.matchKeyAgreement(KeyAgreement.DHE);</span>
+            case &quot;DHE&quot;:         // synonym
+<span class="nc" id="L640">            case &quot;EDH&quot;:         return CipherSuitePredicate.matchAll(CipherSuitePredicate.matchKeyAgreement(KeyAgreement.DHE), CipherSuitePredicate.matchNot(CipherSuitePredicate.matchAuthentication(Authentication.NULL)));</span>
+<span class="nc" id="L641">            case &quot;ADH&quot;:         return CipherSuitePredicate.matchAnonDH();</span>
+<span class="nc" id="L642">            case &quot;DH&quot;:          return CipherSuitePredicate.matchAll(CipherSuitePredicate.matchKeyExchange(KeyAgreement.DHE, KeyAgreement.DHd, KeyAgreement.DHr, KeyAgreement.ECDHe, KeyAgreement.ECDHr, KeyAgreement.ECDHE), CipherSuitePredicate.matchAuthentication(Authentication.DH, Authentication.ECDH, Authentication.NULL));</span>
+<span class="nc" id="L643">            case &quot;kECDHr&quot;:      return CipherSuitePredicate.matchKeyAgreement(KeyAgreement.ECDHr);</span>
+<span class="nc" id="L644">            case &quot;kECDHe&quot;:      return CipherSuitePredicate.matchKeyAgreement(KeyAgreement.ECDHe);</span>
+<span class="nc" id="L645">            case &quot;kECDH&quot;:       return CipherSuitePredicate.matchKeyExchange(KeyAgreement.ECDHe, KeyAgreement.ECDHr);</span>
+            case &quot;kEECDH&quot;:      // synonym
+<span class="nc" id="L647">            case &quot;kECDHE&quot;:      return CipherSuitePredicate.matchKeyAgreement(KeyAgreement.ECDHE);</span>
+            case &quot;ECDHE&quot;:       // synonym
+<span class="nc" id="L649">            case &quot;EECDHE&quot;:      return CipherSuitePredicate.matchAll(CipherSuitePredicate.matchKeyAgreement(KeyAgreement.ECDHE), CipherSuitePredicate.matchNot(CipherSuitePredicate.matchAuthentication(Authentication.NULL)));</span>
+<span class="nc" id="L650">            case &quot;AECDH&quot;:       return CipherSuitePredicate.matchAll(CipherSuitePredicate.matchKeyExchange(KeyAgreement.ECDHe, KeyAgreement.ECDHr, KeyAgreement.ECDHE), CipherSuitePredicate.matchAuthentication(Authentication.NULL));</span>
+<span class="nc" id="L651">            case &quot;ECDH&quot;:        return CipherSuitePredicate.matchKeyExchange(KeyAgreement.ECDHe, KeyAgreement.ECDHr, KeyAgreement.ECDHE);</span>
+            case &quot;DSS&quot;:         // synonym
+<span class="nc" id="L653">            case &quot;aDSS&quot;:        return CipherSuitePredicate.matchAuthentication(Authentication.DSS);</span>
+<span class="nc" id="L654">            case &quot;aDH&quot;:         return CipherSuitePredicate.matchAuthentication(Authentication.DH);</span>
+<span class="nc" id="L655">            case &quot;aECDH&quot;:       return CipherSuitePredicate.matchAuthentication(Authentication.ECDH);</span>
+            case &quot;ECDSA&quot;:       // synonym
+<span class="nc" id="L657">            case &quot;aECDSA&quot;:      return CipherSuitePredicate.matchAuthentication(Authentication.ECDSA);</span>
+<span class="nc" id="L658">            case &quot;kFZA&quot;:        return CipherSuitePredicate.matchKeyAgreement(KeyAgreement.FZA);</span>
+<span class="nc" id="L659">            case &quot;aFZA&quot;:        return CipherSuitePredicate.matchAuthentication(Authentication.FZA);</span>
+<span class="nc" id="L660">            case &quot;eFZA&quot;:        return CipherSuitePredicate.matchEncryption(Encryption.FZA);</span>
+<span class="nc" id="L661">            case &quot;FZA&quot;:         return CipherSuitePredicate.matchAny(CipherSuitePredicate.matchKeyAgreement(KeyAgreement.FZA), CipherSuitePredicate.matchAuthentication(Authentication.FZA), CipherSuitePredicate.matchEncryption(Encryption.FZA));</span>
+<span class="fc" id="L662">            case &quot;TLSv1.2&quot;:     return CipherSuitePredicate.matchProtocol(Protocol.TLSv1_2);</span>
+<span class="nc" id="L663">            case &quot;TLSv1&quot;:       return CipherSuitePredicate.matchProtocol(Protocol.TLSv1);</span>
+<span class="nc" id="L664">            case &quot;SSLv3&quot;:       return CipherSuitePredicate.matchProtocol(Protocol.SSLv3);</span>
+<span class="nc" id="L665">            case &quot;SSLv2&quot;:       return CipherSuitePredicate.matchProtocol(Protocol.SSLv2);</span>
+<span class="nc" id="L666">            case &quot;AES128&quot;:      return CipherSuitePredicate.matchEncryption(Encryption.AES128, Encryption.AES128GCM);</span>
+<span class="nc" id="L667">            case &quot;AES256&quot;:      return CipherSuitePredicate.matchEncryption(Encryption.AES256, Encryption.AES256GCM);</span>
+<span class="fc" id="L668">            case &quot;AES&quot;:         return CipherSuitePredicate.matchEncryption(Encryption.AES128, Encryption.AES128GCM, Encryption.AES256, Encryption.AES256GCM);</span>
+<span class="nc" id="L669">            case &quot;AESGCM&quot;:      return CipherSuitePredicate.matchEncryption(Encryption.AES128GCM, Encryption.AES256GCM);</span>
+<span class="nc" id="L670">            case &quot;ARIA&quot;:        return CipherSuitePredicate.matchEncryption(Encryption.ARIA128, Encryption.ARIA128GCM, Encryption.ARIA256, Encryption.ARIA256GCM);</span>
+<span class="nc" id="L671">            case &quot;ARIA128&quot;:     return CipherSuitePredicate.matchEncryption(Encryption.ARIA128, Encryption.ARIA128GCM);</span>
+<span class="nc" id="L672">            case &quot;ARIA256&quot;:     return CipherSuitePredicate.matchEncryption(Encryption.ARIA256, Encryption.ARIA256GCM);</span>
+<span class="nc" id="L673">            case &quot;ARIAGCM&quot;:     return CipherSuitePredicate.matchEncryption(Encryption.ARIA128GCM, Encryption.ARIA256GCM);</span>
+<span class="nc" id="L674">            case &quot;CAMELLIA128&quot;: return CipherSuitePredicate.matchEncryption(Encryption.CAMELLIA128);</span>
+<span class="nc" id="L675">            case &quot;CAMELLIA256&quot;: return CipherSuitePredicate.matchEncryption(Encryption.CAMELLIA256);</span>
+<span class="nc" id="L676">            case &quot;CAMELLIA&quot;:    return CipherSuitePredicate.matchEncryption(Encryption.CAMELLIA128, Encryption.CAMELLIA256);</span>
+<span class="nc" id="L677">            case &quot;3DES&quot;:        return CipherSuitePredicate.matchEncryption(Encryption._3DES);</span>
+<span class="nc" id="L678">            case &quot;DES&quot;:         return CipherSuitePredicate.matchEncryption(Encryption.DES);</span>
+<span class="nc" id="L679">            case &quot;RC4&quot;:         return CipherSuitePredicate.matchEncryption(Encryption.RC4);</span>
+<span class="nc" id="L680">            case &quot;RC2&quot;:         return CipherSuitePredicate.matchEncryption(Encryption.RC2);</span>
+<span class="nc" id="L681">            case &quot;IDEA&quot;:        return CipherSuitePredicate.matchEncryption(Encryption.IDEA);</span>
+<span class="nc" id="L682">            case &quot;SEED&quot;:        return CipherSuitePredicate.matchEncryption(Encryption.SEED);</span>
+<span class="nc" id="L683">            case &quot;MD5&quot;:         return CipherSuitePredicate.matchDigest(Digest.MD5);</span>
+            case &quot;SHA&quot;:         // synonym
+<span class="nc" id="L685">            case &quot;SHA1&quot;:        return CipherSuitePredicate.matchDigest(Digest.SHA1);</span>
+<span class="nc" id="L686">            case &quot;SHA256&quot;:      return CipherSuitePredicate.matchDigest(Digest.SHA256);</span>
+<span class="nc" id="L687">            case &quot;SHA384&quot;:      return CipherSuitePredicate.matchDigest(Digest.SHA384);</span>
+<span class="nc" id="L688">            case &quot;aGOST&quot;:       return CipherSuitePredicate.matchAuthentication(Authentication.GOST01, Authentication.GOST94);</span>
+<span class="nc" id="L689">            case &quot;aGOST01&quot;:     return CipherSuitePredicate.matchAuthentication(Authentication.GOST01);</span>
+<span class="nc" id="L690">            case &quot;aGOST94&quot;:     return CipherSuitePredicate.matchAuthentication(Authentication.GOST94);</span>
+<span class="nc" id="L691">            case &quot;kGOST&quot;:       return CipherSuitePredicate.matchKeyAgreement(KeyAgreement.GOST);</span>
+<span class="nc" id="L692">            case &quot;GOST94&quot;:      return CipherSuitePredicate.matchDigest(Digest.GOST94);</span>
+<span class="nc" id="L693">            case &quot;GOST89MAC&quot;:   return CipherSuitePredicate.matchDigest(Digest.GOST89MAC);</span>
+<span class="nc" id="L694">            case &quot;kPSK&quot;:        return CipherSuitePredicate.matchKeyAgreement(KeyAgreement.PSK);</span>
+<span class="nc" id="L695">            case &quot;aPSK&quot;:        return CipherSuitePredicate.matchAuthentication(Authentication.PSK);</span>
+<span class="nc" id="L696">            case &quot;PSK&quot;:         return CipherSuitePredicate.matchAny(CipherSuitePredicate.matchAuthentication(Authentication.PSK), CipherSuitePredicate.matchKeyAgreement(KeyAgreement.PSK));</span>
+            case &quot;kRSAPSK&quot;:     // synonym
+<span class="nc" id="L698">            case &quot;RSAPSK&quot;:      return CipherSuitePredicate.matchKeyAgreement(KeyAgreement.RSAPSK);</span>
+            case &quot;DHEPSK&quot;:      // synonym
+            case &quot;EDHPSK&quot;:      // synonym
+            case &quot;kDHEPSK&quot;:     // synonym
+<span class="nc" id="L702">            case &quot;kEDHPSK&quot;:     return CipherSuitePredicate.matchKeyAgreement(KeyAgreement.DHEPSK);</span>
+            case &quot;EECDHPSK&quot;:    // synonym
+            case &quot;kEECDHPSK&quot;:   // synonym
+            case &quot;ECDHEPSK&quot;:    // synonym
+<span class="nc" id="L706">            case &quot;kECDEHPSK&quot;:   return CipherSuitePredicate.matchKeyAgreement(KeyAgreement.ECDHEPSK);</span>
+
+            default: {
+<span class="fc" id="L709">                final MechanismDatabase database = MechanismDatabase.getInstance();</span>
+<span class="fc" id="L710">                MechanismDatabase.Entry entry = database.getCipherSuiteOpenSSLName(word);</span>
+<span class="fc bfc" id="L711" title="All 2 branches covered.">                if (entry == null) {</span>
+<span class="fc" id="L712">                    entry = database.getCipherSuite(word);</span>
+                }
+<span class="fc bfc" id="L714" title="All 2 branches covered.">                if (entry == null) {</span>
+<span class="fc" id="L715">                    return null;</span>
+                }
+<span class="fc" id="L717">                return CipherSuitePredicate.matchName(word);</span>
+            }
+        }
+    }
+
+    /* -- selector impls -- */
+
+    static final class AddingCipherSuiteSelector extends CipherSuiteSelector {
+        private final CipherSuitePredicate predicate;
+
+        AddingCipherSuiteSelector(final CipherSuiteSelector next, final CipherSuitePredicate predicate) {
+<span class="fc" id="L728">            super(next);</span>
+<span class="fc" id="L729">            this.predicate = predicate;</span>
+<span class="fc" id="L730">        }</span>
+
+        void applyFilter(final Set&lt;String&gt; enabled, final Map&lt;MechanismDatabase.Entry, String&gt; supported) {
+<span class="fc bfc" id="L733" title="All 2 branches covered.">            for (Map.Entry&lt;MechanismDatabase.Entry, String&gt; item : supported.entrySet()) {</span>
+<span class="fc" id="L734">                final MechanismDatabase.Entry entry = item.getKey();</span>
+<span class="fc bfc" id="L735" title="All 2 branches covered.">                if (predicate.test(entry)) {</span>
+<span class="fc bfc" id="L736" title="All 2 branches covered.">                    if (enabled.add(item.getValue())) {</span>
+<span class="fc" id="L737">                        ElytronMessages.tls.tracef(&quot;Adding cipher suite %s due to add rule&quot;, entry);</span>
+                    } else {
+<span class="fc" id="L739">                        ElytronMessages.tls.tracef(&quot;Would have added cipher suite %s due to add rule, but it was already added previously&quot;, entry);</span>
+                    }
+                }
+<span class="fc" id="L742">            }</span>
+<span class="fc" id="L743">        }</span>
+
+        void toString(final StringBuilder b) {
+<span class="nc bnc" id="L746" title="All 4 branches missed.">            if (prev != null &amp;&amp; prev != EMPTY) {</span>
+<span class="nc" id="L747">                prev.toString(b);</span>
+<span class="nc" id="L748">                b.append(&quot;, then &quot;);</span>
+            }
+<span class="nc" id="L750">            b.append(&quot;add &quot;);</span>
+<span class="nc" id="L751">            predicate.toString(b);</span>
+<span class="nc" id="L752">        }</span>
+    }
+
+    static final class RemovingCipherSuiteSelector extends CipherSuiteSelector {
+        private final CipherSuitePredicate predicate;
+
+        RemovingCipherSuiteSelector(final CipherSuiteSelector next, final CipherSuitePredicate predicate) {
+<span class="fc" id="L759">            super(next);</span>
+<span class="fc" id="L760">            this.predicate = predicate;</span>
+<span class="fc" id="L761">        }</span>
+
+        void applyFilter(final Set&lt;String&gt; enabled, final Map&lt;MechanismDatabase.Entry, String&gt; supported) {
+<span class="fc bfc" id="L764" title="All 2 branches covered.">            for (Map.Entry&lt;MechanismDatabase.Entry, String&gt; item : supported.entrySet()) {</span>
+<span class="fc" id="L765">                final MechanismDatabase.Entry entry = item.getKey();</span>
+<span class="fc bfc" id="L766" title="All 2 branches covered.">                if (predicate.test(entry)) {</span>
+<span class="fc bfc" id="L767" title="All 2 branches covered.">                    if (enabled.remove(item.getValue())) {</span>
+<span class="fc" id="L768">                        ElytronMessages.tls.tracef(&quot;Removing cipher suite %s due to remove rule&quot;, entry);</span>
+                    } else {
+<span class="fc" id="L770">                        ElytronMessages.tls.tracef(&quot;Would have removed cipher suite %s due to remove rule, but it already wasn't present&quot;, entry);</span>
+                    }
+                }
+<span class="fc" id="L773">            }</span>
+<span class="fc" id="L774">        }</span>
+
+        void toString(final StringBuilder b) {
+<span class="nc bnc" id="L777" title="All 4 branches missed.">            if (prev != null &amp;&amp; prev != EMPTY) {</span>
+<span class="nc" id="L778">                prev.toString(b);</span>
+<span class="nc" id="L779">                b.append(&quot;, then &quot;);</span>
+            }
+<span class="nc" id="L781">            b.append(&quot;remove &quot;);</span>
+<span class="nc" id="L782">            predicate.toString(b);</span>
+<span class="nc" id="L783">        }</span>
+    }
+
+    static final class FullyDeletingCipherSuiteSelector extends CipherSuiteSelector {
+        private final CipherSuitePredicate predicate;
+
+        FullyDeletingCipherSuiteSelector(final CipherSuiteSelector next, final CipherSuitePredicate predicate) {
+<span class="fc" id="L790">            super(next);</span>
+<span class="fc" id="L791">            this.predicate = predicate;</span>
+<span class="fc" id="L792">        }</span>
+
+        void applyFilter(final Set&lt;String&gt; enabled, final Map&lt;MechanismDatabase.Entry, String&gt; supported) {
+<span class="fc" id="L795">            Iterator&lt;Map.Entry&lt;MechanismDatabase.Entry, String&gt;&gt; iterator = supported.entrySet().iterator();</span>
+<span class="fc bfc" id="L796" title="All 2 branches covered.">            while (iterator.hasNext()) {</span>
+<span class="fc" id="L797">                final Map.Entry&lt;MechanismDatabase.Entry, String&gt; item = iterator.next();</span>
+<span class="fc" id="L798">                final MechanismDatabase.Entry entry = item.getKey();</span>
+<span class="fc bfc" id="L799" title="All 2 branches covered.">                if (predicate.test(entry)) {</span>
+<span class="fc" id="L800">                    iterator.remove();</span>
+<span class="fc" id="L801">                    enabled.remove(item.getValue());</span>
+<span class="fc" id="L802">                    ElytronMessages.tls.tracef(&quot;Fully removing cipher suite %s due to full remove rule&quot;, entry);</span>
+                }
+<span class="fc" id="L804">            }</span>
+<span class="fc" id="L805">        }</span>
+
+        void toString(final StringBuilder b) {
+<span class="nc bnc" id="L808" title="All 4 branches missed.">            if (prev != null &amp;&amp; prev != EMPTY) {</span>
+<span class="nc" id="L809">                prev.toString(b);</span>
+<span class="nc" id="L810">                b.append(&quot;, then &quot;);</span>
+            }
+<span class="nc" id="L812">            b.append(&quot;remove fully &quot;);</span>
+<span class="nc" id="L813">            predicate.toString(b);</span>
+<span class="nc" id="L814">        }</span>
+    }
+
+    static final class PushToEndCipherSuiteSelector extends CipherSuiteSelector {
+        private final CipherSuitePredicate predicate;
+
+        PushToEndCipherSuiteSelector(final CipherSuiteSelector next, final CipherSuitePredicate predicate) {
+<span class="fc" id="L821">            super(next);</span>
+<span class="fc" id="L822">            this.predicate = predicate;</span>
+<span class="fc" id="L823">        }</span>
+
+        void applyFilter(final Set&lt;String&gt; enabled, final Map&lt;MechanismDatabase.Entry, String&gt; supported) {
+<span class="fc" id="L826">            final MechanismDatabase database = MechanismDatabase.getInstance();</span>
+<span class="fc" id="L827">            final Iterator&lt;String&gt; iterator = enabled.iterator();</span>
+<span class="fc" id="L828">            List&lt;String&gt; pushed = null;</span>
+<span class="fc bfc" id="L829" title="All 2 branches covered.">            while (iterator.hasNext()) {</span>
+<span class="fc" id="L830">                final String name = iterator.next();</span>
+<span class="fc" id="L831">                final MechanismDatabase.Entry entry = database.getCipherSuite(name);</span>
+<span class="fc bfc" id="L832" title="All 2 branches covered.">                if (predicate.test(entry)) {</span>
+<span class="pc bpc" id="L833" title="1 of 2 branches missed.">                    if (pushed == null) pushed = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L834">                    pushed.add(name);</span>
+<span class="fc" id="L835">                    iterator.remove();</span>
+<span class="fc" id="L836">                    ElytronMessages.tls.tracef(&quot;Pushing cipher suite %s to end due to push rule&quot;, entry);</span>
+                }
+<span class="fc" id="L838">            }</span>
+<span class="pc bpc" id="L839" title="1 of 2 branches missed.">            if (pushed != null) {</span>
+                // add back in order
+<span class="fc" id="L841">                enabled.addAll(pushed);</span>
+            }
+<span class="fc" id="L843">        }</span>
+
+        void toString(final StringBuilder b) {
+<span class="nc bnc" id="L846" title="All 4 branches missed.">            if (prev != null &amp;&amp; prev != EMPTY) {</span>
+<span class="nc" id="L847">                prev.toString(b);</span>
+<span class="nc" id="L848">                b.append(&quot;, then &quot;);</span>
+            }
+<span class="nc" id="L850">            b.append(&quot;push to end &quot;);</span>
+<span class="nc" id="L851">            predicate.toString(b);</span>
+<span class="nc" id="L852">        }</span>
+    }
+
+    static final class SortByAlgorithmKeyLengthCipherSuiteSelector extends CipherSuiteSelector {
+
+        SortByAlgorithmKeyLengthCipherSuiteSelector(final CipherSuiteSelector prev) {
+<span class="fc" id="L858">            super(prev);</span>
+<span class="fc" id="L859">        }</span>
+
+        void applyFilter(final Set&lt;String&gt; enabled, final Map&lt;MechanismDatabase.Entry, String&gt; supported) {
+<span class="pc bpc" id="L862" title="1 of 2 branches missed.">            if (! enabled.isEmpty()) {</span>
+<span class="fc" id="L863">                final ArrayList&lt;String&gt; list = new ArrayList&lt;&gt;(enabled);</span>
+                // stable sort
+<span class="fc" id="L865">                Collections.sort(list, (o1, o2) -&gt; {</span>
+<span class="fc" id="L866">                    final MechanismDatabase database = MechanismDatabase.getInstance();</span>
+<span class="fc" id="L867">                    final MechanismDatabase.Entry e1 = database.getCipherSuite(o1);</span>
+<span class="fc" id="L868">                    final MechanismDatabase.Entry e2 = database.getCipherSuite(o2);</span>
+<span class="fc" id="L869">                    return Integer.signum(e2.getAlgorithmBits() - e1.getAlgorithmBits());</span>
+                });
+<span class="fc" id="L871">                enabled.clear();</span>
+<span class="fc" id="L872">                enabled.addAll(list);</span>
+<span class="pc bpc" id="L873" title="1 of 2 branches missed.">                if (ElytronMessages.tls.isTraceEnabled()) {</span>
+<span class="nc" id="L874">                    StringBuilder b = new StringBuilder(list.size() * 16);</span>
+<span class="nc" id="L875">                    b.append(&quot;Sorted ciphers by algorithm key length, result is:&quot;);</span>
+<span class="nc bnc" id="L876" title="All 2 branches missed.">                    for (String s : list) {</span>
+<span class="nc" id="L877">                        b.append(&quot;\n    &quot;).append(s);</span>
+<span class="nc" id="L878">                    }</span>
+<span class="nc" id="L879">                    ElytronMessages.tls.trace(b);</span>
+                }
+            }
+<span class="fc" id="L882">        }</span>
+
+        void toString(final StringBuilder b) {
+<span class="nc bnc" id="L885" title="All 4 branches missed.">            if (prev != null &amp;&amp; prev != EMPTY) {</span>
+<span class="nc" id="L886">                prev.toString(b);</span>
+<span class="nc" id="L887">                b.append(&quot;, then &quot;);</span>
+            }
+<span class="nc" id="L889">            b.append(&quot;sort by key length&quot;);</span>
+<span class="nc" id="L890">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

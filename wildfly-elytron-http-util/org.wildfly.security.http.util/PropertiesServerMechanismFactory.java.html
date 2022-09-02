@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PropertiesServerMechanismFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-util</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.util</a> &gt; <span class="el_source">PropertiesServerMechanismFactory.java</span></div><h1>PropertiesServerMechanismFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.http.util;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.security.auth.callback.CallbackHandler;
+
+import org.wildfly.security.http.HttpAuthenticationException;
+import org.wildfly.security.http.HttpServerAuthenticationMechanism;
+import org.wildfly.security.http.HttpServerAuthenticationMechanismFactory;
+
+/**
+ * A {@link HttpServerAuthenticationMechanismFactory} that adds a predefined set of properties to all calls to the delegate.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public final class PropertiesServerMechanismFactory implements HttpServerAuthenticationMechanismFactory {
+
+    private final HttpServerAuthenticationMechanismFactory delegate;
+    private final Map&lt;String, ?&gt; properties;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param delegate the {@link HttpServerAuthenticationMechanismFactory} calls are delegated to.
+     * @param properties the properties that should be added to any properties passed in overriding any duplicate keys.
+     */
+<span class="nc" id="L47">    public PropertiesServerMechanismFactory(final HttpServerAuthenticationMechanismFactory delegate, final Map&lt;String, ?&gt; properties) {</span>
+<span class="nc" id="L48">        this.delegate = checkNotNullParam(&quot;delegate&quot;, delegate);</span>
+<span class="nc" id="L49">        this.properties = new HashMap&lt;&gt;(checkNotNullParam(&quot;properties&quot;, properties));</span>
+<span class="nc" id="L50">    }</span>
+
+    /**
+     * Obtain the list of available mechanism names after merging the properties.
+     *
+     * @param properties the initial set of properties to pass to the delegate to obtain the mechanism names.
+     * @return the list of authentication mechanisms available form this factory.
+     * @see org.wildfly.security.http.HttpServerAuthenticationMechanismFactory#getMechanismNames(java.util.Map)
+     */
+    @Override
+    public String[] getMechanismNames(Map&lt;String, ?&gt; properties) {
+<span class="nc" id="L61">        return delegate.getMechanismNames(combine(properties, this.properties));</span>
+    }
+
+    /**
+     * Create an instance of the requested {@link HttpServerAuthenticationMechanismFactory}.
+     *
+     * @param mechanismName the name of the mechanism being requested.
+     * @param properties initial properties to be passed into the delegate factory.
+     * @param callbackHandler the {@link CallbackHandler} to use for verification.
+     * @return The newly created {@link HttpServerAuthenticationMechanismFactory}, or {@code null} if not availbale.
+     * @throws HttpAuthenticationException
+     * @see org.wildfly.security.http.HttpServerAuthenticationMechanismFactory#createAuthenticationMechanism(java.lang.String,
+     * java.util.Map, javax.security.auth.callback.CallbackHandler)
+     */
+    @Override
+    public HttpServerAuthenticationMechanism createAuthenticationMechanism(String mechanismName, Map&lt;String, ?&gt; properties, CallbackHandler callbackHandler) throws HttpAuthenticationException {
+<span class="nc" id="L77">        return delegate.createAuthenticationMechanism(mechanismName, combine(properties, this.properties), callbackHandler);</span>
+    }
+
+    private static Map&lt;String, ?&gt; combine(Map&lt;String, ?&gt; provided, Map&lt;String, ?&gt; configured) {
+<span class="nc" id="L81">        Map&lt;String, Object&gt; combined = new HashMap&lt;&gt;(provided);</span>
+<span class="nc" id="L82">        combined.putAll( configured);</span>
+
+<span class="nc" id="L84">        return combined;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

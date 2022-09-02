@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractGssapiMechanism.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl-gssapi</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.gssapi</a> &gt; <span class="el_source">AbstractGssapiMechanism.java</span></div><h1>AbstractGssapiMechanism.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.gssapi;
+
+import java.util.Collections;
+import java.util.Map;
+
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.sasl.Sasl;
+import javax.security.sasl.SaslException;
+
+import org.ietf.jgss.GSSContext;
+import org.ietf.jgss.GSSException;
+import org.ietf.jgss.MessageProp;
+import org.wildfly.common.Assert;
+import org.wildfly.security.sasl.WildFlySasl;
+import org.wildfly.security.sasl.util.AbstractSaslParticipant;
+import org.wildfly.security.sasl.util.SaslWrapper;
+
+import static org.wildfly.security.mechanism._private.ElytronMessages.saslGssapi;
+
+/**
+ * Base class for the SaslServer and SaslClient implementations implementing the GSSAPI mechanism as defined by RFC 4752
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+abstract class AbstractGssapiMechanism extends AbstractSaslParticipant {
+
+    private static final String AUTH = &quot;auth&quot;;
+    private static final String AUTH_INT = &quot;auth-int&quot;;
+    private static final String AUTH_CONF = &quot;auth-conf&quot;;
+    private static final byte NO_SECURITY_LAYER = (byte) 0x01;
+    private static final byte INTEGRITY_PROTECTION = (byte) 0x02;
+    private static final byte CONFIDENTIALITY_PROTECTION = (byte) 0x04;
+    protected static final int DEFAULT_MAX_BUFFER_SIZE = (int) 0xFFFFFF; // 3 bytes
+
+    protected GSSContext gssContext;
+    protected final int configuredMaxReceiveBuffer;
+    protected int actualMaxReceiveBuffer;
+    protected int maxBuffer;
+    protected final boolean relaxComplianceChecks;
+    protected final QOP[] orderedQops;
+    protected QOP selectedQop;
+
+    protected AbstractGssapiMechanism(String mechanismName, String protocol, String serverName, Map&lt;String, ?&gt; props,
+            final CallbackHandler callbackHandler) throws SaslException {
+<span class="fc" id="L63">        super(mechanismName, protocol, serverName, callbackHandler, saslGssapi);</span>
+<span class="fc" id="L64">        Assert.checkNotNullParam(&quot;callbackHandler&quot;, callbackHandler);</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        if (props == null) props = Collections.emptyMap();</span>
+
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (props.containsKey(Sasl.MAX_BUFFER)) {</span>
+<span class="nc" id="L68">            configuredMaxReceiveBuffer = Integer.parseInt((String) props.get(Sasl.MAX_BUFFER));</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">            if (configuredMaxReceiveBuffer &gt; DEFAULT_MAX_BUFFER_SIZE) {</span>
+<span class="nc" id="L70">                throw saslGssapi.mechReceiveBufferIsGreaterThanMaximum(configuredMaxReceiveBuffer, DEFAULT_MAX_BUFFER_SIZE).toSaslException();</span>
+            }
+        } else {
+<span class="fc" id="L73">            configuredMaxReceiveBuffer = DEFAULT_MAX_BUFFER_SIZE;</span>
+        }
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (props.containsKey(WildFlySasl.RELAX_COMPLIANCE)) {</span>
+<span class="nc" id="L76">            relaxComplianceChecks = Boolean.parseBoolean((String) props.get(WildFlySasl.RELAX_COMPLIANCE));</span>
+        } else {
+<span class="fc" id="L78">            relaxComplianceChecks = false;</span>
+        }
+<span class="fc" id="L80">        orderedQops = parsePreferredQop((String) props.get(Sasl.QOP));</span>
+
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if (saslGssapi.isTraceEnabled()) {</span>
+<span class="nc" id="L83">            saslGssapi.tracef(&quot;configuredMaxReceiveBuffer=%d&quot;, configuredMaxReceiveBuffer);</span>
+<span class="nc" id="L84">            saslGssapi.tracef(&quot;relaxComplianceChecks=%b&quot;, relaxComplianceChecks);</span>
+<span class="nc" id="L85">            StringBuilder sb = new StringBuilder();</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">            for (int i = 0; i &lt; orderedQops.length; i++) {</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">                if (i &gt; 0) {</span>
+<span class="nc" id="L88">                    sb.append(&quot;, &quot;);</span>
+                }
+<span class="nc" id="L90">                sb.append(orderedQops[i]);</span>
+            }
+
+<span class="nc" id="L93">            saslGssapi.tracef(&quot;QOP={%s}&quot;, sb.toString());</span>
+        }
+<span class="fc" id="L95">    }</span>
+
+    /**
+     * Converts bytes in network byte order to an integer starting from the specified offset.
+     *
+     * This method is implemented in the context of the GSSAPI mechanism, it is assumed that the size of the byte array is
+     * appropriate.
+     */
+    protected int networkOrderBytesToInt(final byte[] bytes, final int start, final int length) {
+<span class="fc" id="L104">        int result = 0;</span>
+
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        for (int i = start; i &lt; length + start; i++) {</span>
+<span class="fc" id="L107">            result &lt;&lt;= 8;</span>
+<span class="fc" id="L108">            result |= (int)bytes[i] &amp; 0xFF;</span>
+        }
+
+<span class="fc" id="L111">        return result;</span>
+    }
+
+    /**
+     * Obtain a 3 byte representation of an int, as an internal method it is assumed the maximum value of the int has already
+     * takine into account that it needs to fit into tree bytes,
+     */
+    protected byte[] intToNetworkOrderBytes(final int value) {
+<span class="fc" id="L119">        byte[] response = new byte[3];</span>
+<span class="fc" id="L120">        int workingValue = value;</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        for (int i = response.length - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L122">            response[i] = (byte) (workingValue &amp; 0xFF);</span>
+<span class="fc" id="L123">            workingValue &gt;&gt;&gt;= 8;</span>
+        }
+
+<span class="fc" id="L126">        return response;</span>
+    }
+
+    @Override
+    public void dispose() throws SaslException {
+        try {
+<span class="nc" id="L132">            saslGssapi.trace(&quot;dispose&quot;);</span>
+<span class="nc" id="L133">            gssContext.dispose();</span>
+<span class="nc" id="L134">        } catch (GSSException e) {</span>
+<span class="nc" id="L135">            throw saslGssapi.mechUnableToDisposeGssContext(e).toSaslException();</span>
+        } finally {
+<span class="nc" id="L137">            gssContext = null;</span>
+        }
+<span class="nc" id="L139">    }</span>
+
+    protected QOP[] parsePreferredQop(final String qop) throws SaslException {
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (qop != null) {</span>
+<span class="fc" id="L143">            String[] qopNames = qop.trim().split(&quot;\\s*,\\s*&quot;);</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">            if (qopNames.length &gt; 0) {</span>
+<span class="fc" id="L145">                QOP[] preferredQop = new QOP[qopNames.length];</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">                for (int i = 0; i &lt; qopNames.length; i++) {</span>
+<span class="fc" id="L147">                    QOP mapped = QOP.mapFromName(qopNames[i]);</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                    if (mapped == null) {</span>
+<span class="nc" id="L149">                        throw saslGssapi.mechUnexpectedQop(qopNames[i]).toSaslException();</span>
+                    }
+<span class="fc" id="L151">                    preferredQop[i] = mapped;</span>
+
+                }
+<span class="fc" id="L154">                return preferredQop;</span>
+            }
+
+        }
+
+<span class="fc" id="L159">        return new QOP[] { QOP.AUTH };</span>
+    }
+
+    @Override
+    public Object getNegotiatedProperty(String propName) {
+<span class="nc" id="L164">        assertComplete();</span>
+
+<span class="nc bnc" id="L166" title="All 4 branches missed.">        switch (propName) {</span>
+            case Sasl.QOP:
+<span class="nc" id="L168">                return selectedQop.getName();</span>
+            case Sasl.MAX_BUFFER:
+<span class="nc bnc" id="L170" title="All 2 branches missed.">                return Integer.toString(actualMaxReceiveBuffer != 0 ? actualMaxReceiveBuffer : configuredMaxReceiveBuffer);</span>
+            case Sasl.RAW_SEND_SIZE:
+<span class="nc" id="L172">                return Integer.toString(maxBuffer);</span>
+        }
+
+<span class="nc" id="L175">        return null;</span>
+    }
+
+<span class="fc" id="L178">    protected enum QOP {</span>
+
+<span class="fc" id="L180">        AUTH(AbstractGssapiMechanism.AUTH, NO_SECURITY_LAYER), AUTH_INT(AbstractGssapiMechanism.AUTH_INT, INTEGRITY_PROTECTION), AUTH_CONF(</span>
+                AbstractGssapiMechanism.AUTH_CONF, CONFIDENTIALITY_PROTECTION);
+
+        private final String name;
+        private final byte value;
+
+<span class="fc" id="L186">        private QOP(final String name, final byte value) {</span>
+<span class="fc" id="L187">            this.name = name;</span>
+<span class="fc" id="L188">            this.value = value;</span>
+<span class="fc" id="L189">        }</span>
+
+        public String getName() {
+<span class="nc" id="L192">            return name;</span>
+        }
+
+        public byte getValue() {
+<span class="nc" id="L196">            return value;</span>
+        }
+
+        public boolean includedBy(final byte securityLayer) {
+<span class="nc bnc" id="L200" title="All 2 branches missed.">            return (securityLayer &amp; value) == value;</span>
+        }
+
+        public static QOP mapFromValue(final byte value) {
+<span class="nc bnc" id="L204" title="All 4 branches missed.">            switch (value) {</span>
+                case NO_SECURITY_LAYER:
+<span class="nc" id="L206">                    return AUTH;</span>
+                case INTEGRITY_PROTECTION:
+<span class="nc" id="L208">                    return AUTH_INT;</span>
+                case CONFIDENTIALITY_PROTECTION:
+<span class="nc" id="L210">                    return AUTH_CONF;</span>
+                default:
+<span class="nc" id="L212">                    return null;</span>
+            }
+        }
+
+        public static QOP mapFromName(final String name) {
+<span class="pc bpc" id="L217" title="1 of 4 branches missed.">            switch (name) {</span>
+                case AbstractGssapiMechanism.AUTH:
+<span class="fc" id="L219">                    return AUTH;</span>
+                case AbstractGssapiMechanism.AUTH_INT:
+<span class="fc" id="L221">                    return AUTH_INT;</span>
+                case AbstractGssapiMechanism.AUTH_CONF:
+<span class="fc" id="L223">                    return AUTH_CONF;</span>
+                default:
+<span class="nc" id="L225">                    return null;</span>
+            }
+
+        }
+
+    }
+
+    protected class GssapiWrapper implements SaslWrapper {
+
+        private final boolean confidential;
+
+<span class="nc" id="L236">        protected GssapiWrapper(final boolean confidential) {</span>
+<span class="nc" id="L237">            this.confidential = confidential;</span>
+<span class="nc" id="L238">        }</span>
+
+        @Override
+        public byte[] wrap(byte[] outgoing, int offset, int len) throws SaslException {
+<span class="nc" id="L242">            MessageProp prop = new MessageProp(0, confidential);</span>
+            try {
+<span class="nc" id="L244">                byte[] response = gssContext.wrap(outgoing, offset, len, prop);</span>
+<span class="nc" id="L245">                saslGssapi.tracef(&quot;Wrapping message of length '%d' resulting message of length '%d'&quot;, len, response.length);</span>
+<span class="nc" id="L246">                return response;</span>
+<span class="nc" id="L247">            } catch (GSSException e) {</span>
+<span class="nc" id="L248">                throw saslGssapi.mechUnableToWrapMessage(e).toSaslException();</span>
+            }
+        }
+
+        @Override
+        public byte[] unwrap(byte[] incoming, int offset, int len) throws SaslException {
+<span class="nc" id="L254">            MessageProp prop = new MessageProp(0, confidential);</span>
+            try {
+<span class="nc" id="L256">                byte[] response = gssContext.unwrap(incoming, offset, len, prop);</span>
+<span class="nc" id="L257">                saslGssapi.tracef(&quot;Unwrapping message of length '%d' resulting message of length '%d'&quot;, len, response.length);</span>
+<span class="nc" id="L258">                return response;</span>
+<span class="nc" id="L259">            } catch (GSSException e) {</span>
+<span class="nc" id="L260">                throw saslGssapi.mechUnableToUnwrapMessage(e).toSaslException();</span>
+            }
+        }
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

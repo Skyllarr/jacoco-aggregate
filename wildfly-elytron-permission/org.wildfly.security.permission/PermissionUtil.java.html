@@ -1,0 +1,479 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PermissionUtil.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-permission</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.permission</a> &gt; <span class="el_source">PermissionUtil.java</span></div><h1>PermissionUtil.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.permission;
+
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.UndeclaredThrowableException;
+import java.security.AllPermission;
+import java.security.Permission;
+import java.security.PermissionCollection;
+import java.security.Permissions;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Enumeration;
+import java.util.Iterator;
+import java.util.function.BiConsumer;
+import java.util.function.BiPredicate;
+import java.util.function.Consumer;
+import java.util.function.IntFunction;
+import java.util.function.LongFunction;
+import java.util.function.Predicate;
+import java.util.function.ToIntFunction;
+import java.util.function.ToLongFunction;
+
+import org.wildfly.common.Assert;
+
+/**
+ * General permission utility methods and constants.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class PermissionUtil {
+
+    private PermissionUtil() {
+    }
+
+    /**
+     * A shared {@link AllPermission} instance.
+     */
+<span class="fc" id="L56">    public static final Permission ALL_PERMISSION = new AllPermission();</span>
+
+    /**
+     * A read-only permission collection which implies {@link AllPermission}.
+     */
+    public static final PermissionCollection ALL_PERMISSIONS;
+
+    /**
+     * A permission collection which is empty.
+     */
+    public static final PermissionCollection EMPTY_PERMISSION_COLLECTION;
+
+    /**
+     * An array with no permissions in it.
+     */
+<span class="fc" id="L71">    public static final Permission[] NO_PERMISSIONS = new Permission[0];</span>
+
+    static {
+<span class="fc" id="L74">        Permissions permissions = new Permissions();</span>
+<span class="fc" id="L75">        permissions.add(ALL_PERMISSION);</span>
+<span class="fc" id="L76">        permissions.setReadOnly();</span>
+<span class="fc" id="L77">        ALL_PERMISSIONS = permissions;</span>
+<span class="fc" id="L78">        permissions = new Permissions();</span>
+<span class="fc" id="L79">        permissions.setReadOnly();</span>
+<span class="fc" id="L80">        EMPTY_PERMISSION_COLLECTION = permissions;</span>
+<span class="fc" id="L81">    }</span>
+
+    /**
+     * Parse an actions string, using the given function to map action strings to bits.
+     *
+     * @param actionsString the actions string (must not be {@code null})
+     * @param function the mapping function (must not be {@code null})
+     * @return the union of all the action bits
+     * @throws IllegalArgumentException if {@code function} throws this exception (indicating an invalid action string)
+     */
+    public static int parseActions(String actionsString, ToIntFunction&lt;String&gt; function) throws IllegalArgumentException {
+<span class="nc" id="L92">        Assert.checkNotNullParam(&quot;actionsString&quot;, actionsString);</span>
+<span class="nc" id="L93">        Assert.checkNotNullParam(&quot;function&quot;, function);</span>
+<span class="nc" id="L94">        int actions = 0;</span>
+<span class="nc" id="L95">        int pos = 0;</span>
+<span class="nc" id="L96">        int idx = actionsString.indexOf(',');</span>
+        for (;;) {
+            String str;
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            if (idx == -1) {</span>
+<span class="nc" id="L100">                str = actionsString.substring(pos, actionsString.length()).trim();</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">                if (! str.isEmpty()) actions |= function.applyAsInt(str);</span>
+<span class="nc" id="L102">                return actions;</span>
+            } else {
+<span class="nc" id="L104">                str = actionsString.substring(pos, idx).trim();</span>
+<span class="nc" id="L105">                pos = idx + 1;</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">                if (! str.isEmpty()) actions |= function.applyAsInt(str);</span>
+<span class="nc" id="L107">                idx = actionsString.indexOf(',', pos);</span>
+            }
+<span class="nc" id="L109">        }</span>
+    }
+
+    /**
+     * Parse an actions string, using the given function to map action strings to bits.
+     *
+     * @param actionsString the actions string (must not be {@code null})
+     * @param function the mapping function (must not be {@code null})
+     * @return the union of all the action bits
+     * @throws IllegalArgumentException if {@code function} throws this exception (indicating an invalid action string)
+     */
+    public static long parseActions(String actionsString, ToLongFunction&lt;String&gt; function) throws IllegalArgumentException {
+<span class="nc" id="L121">        Assert.checkNotNullParam(&quot;actionsString&quot;, actionsString);</span>
+<span class="nc" id="L122">        Assert.checkNotNullParam(&quot;function&quot;, function);</span>
+<span class="nc" id="L123">        long actions = 0;</span>
+<span class="nc" id="L124">        int pos = 0;</span>
+<span class="nc" id="L125">        int idx = actionsString.indexOf(',');</span>
+        for (;;) {
+            String str;
+<span class="nc bnc" id="L128" title="All 2 branches missed.">            if (idx == -1) {</span>
+<span class="nc" id="L129">                str = actionsString.substring(pos, actionsString.length()).trim();</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">                if (! str.isEmpty()) actions |= function.applyAsLong(str);</span>
+<span class="nc" id="L131">                return actions;</span>
+            } else {
+<span class="nc" id="L133">                str = actionsString.substring(pos, idx).trim();</span>
+<span class="nc" id="L134">                pos = idx + 1;</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">                if (! str.isEmpty()) actions |= function.applyAsLong(str);</span>
+<span class="nc" id="L136">                idx = actionsString.indexOf(',', pos);</span>
+            }
+<span class="nc" id="L138">        }</span>
+    }
+
+    /**
+     * Deparse an action bit set, using the given function to map action bits to strings.  If the bits are all clear,
+     * the empty string {@code &quot;&quot;} is returned.
+     *
+     * @param actionBits the action bit set
+     * @param mappingFunction the mapping function (must not be {@code null})
+     * @return the actions string (not {@code null})
+     */
+    public static String toActionsString(int actionBits, IntFunction&lt;String&gt; mappingFunction) {
+<span class="nc" id="L150">        Assert.checkNotNullParam(&quot;mappingFunction&quot;, mappingFunction);</span>
+<span class="nc" id="L151">        final StringBuilder sb = new StringBuilder();</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">        if (actionBits == 0) return &quot;&quot;;</span>
+<span class="nc" id="L153">        int lb = Integer.highestOneBit(actionBits);</span>
+<span class="nc" id="L154">        sb.append(mappingFunction.apply(lb));</span>
+<span class="nc" id="L155">        actionBits &amp;= ~lb;</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">        while (actionBits != 0) {</span>
+<span class="nc" id="L157">            lb = Integer.highestOneBit(actionBits);</span>
+<span class="nc" id="L158">            sb.append(',').append(mappingFunction.apply(lb));</span>
+<span class="nc" id="L159">            actionBits &amp;= ~lb;</span>
+        }
+<span class="nc" id="L161">        return sb.toString();</span>
+    }
+
+    /**
+     * Deparse an action bit set, using the given function to map action bits to strings.  If the bits are all clear,
+     * the empty string {@code &quot;&quot;} is returned.
+     *
+     * @param actionBits the action bit set
+     * @param mappingFunction the mapping function (must not be {@code null})
+     * @return the actions string (not {@code null})
+     */
+    public static String toActionsString(long actionBits, LongFunction&lt;String&gt; mappingFunction) {
+<span class="nc" id="L173">        Assert.checkNotNullParam(&quot;mappingFunction&quot;, mappingFunction);</span>
+<span class="nc" id="L174">        final StringBuilder sb = new StringBuilder();</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">        if (actionBits == 0) return &quot;&quot;;</span>
+<span class="nc" id="L176">        long lb = Long.highestOneBit(actionBits);</span>
+<span class="nc" id="L177">        sb.append(mappingFunction.apply(lb));</span>
+<span class="nc" id="L178">        actionBits &amp;= ~lb;</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">        while (actionBits != 0) {</span>
+<span class="nc" id="L180">            lb = Long.highestOneBit(actionBits);</span>
+<span class="nc" id="L181">            sb.append(',').append(mappingFunction.apply(lb));</span>
+<span class="nc" id="L182">            actionBits &amp;= ~lb;</span>
+        }
+<span class="nc" id="L184">        return sb.toString();</span>
+    }
+
+    /**
+     * Create an iterable view over a permission collection.
+     *
+     * @param pc the permission collection (must not be {@code null})
+     * @return the iterable view (not {@code null})
+     */
+    public static Iterable&lt;Permission&gt; iterable(PermissionCollection pc) {
+<span class="nc" id="L194">        return () -&gt; {</span>
+<span class="nc" id="L195">            final Enumeration&lt;Permission&gt; elements = pc.elements();</span>
+<span class="nc" id="L196">            return new Iterator&lt;Permission&gt;() {</span>
+                public boolean hasNext() {
+<span class="nc" id="L198">                    return elements.hasMoreElements();</span>
+                }
+
+                public Permission next() {
+<span class="nc" id="L202">                    return elements.nextElement();</span>
+                }
+            };
+        };
+    }
+
+    /**
+     * Perform an action for each permission in the given collection.
+     *
+     * @param collection the collection (must not be {@code null})
+     * @param consumer the consumer to which each permission should be passed (must not be {@code null})
+     */
+    public static void forEachIn(PermissionCollection collection, Consumer&lt;Permission&gt; consumer) {
+<span class="nc" id="L215">        Assert.checkNotNullParam(&quot;collection&quot;, collection);</span>
+<span class="nc" id="L216">        Assert.checkNotNullParam(&quot;consumer&quot;, consumer);</span>
+<span class="nc" id="L217">        final Enumeration&lt;Permission&gt; elements = collection.elements();</span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">        while (elements.hasMoreElements()) {</span>
+<span class="nc" id="L219">            consumer.accept(elements.nextElement());</span>
+        }
+<span class="nc" id="L221">    }</span>
+
+    /**
+     * Perform an action for each permission in the given collection.
+     *
+     * @param collection the collection (must not be {@code null})
+     * @param parameter the parameter to pass to the consumer
+     * @param consumer the consumer to which each permission should be passed (must not be {@code null})
+     * @param &lt;P&gt; the type of the parameter
+     * @return the {@code parameter} that was passed in
+     */
+    public static &lt;P&gt; P forEachIn(PermissionCollection collection, BiConsumer&lt;P, Permission&gt; consumer, P parameter) {
+<span class="nc" id="L233">        Assert.checkNotNullParam(&quot;collection&quot;, collection);</span>
+<span class="nc" id="L234">        Assert.checkNotNullParam(&quot;consumer&quot;, consumer);</span>
+<span class="nc" id="L235">        final Enumeration&lt;Permission&gt; elements = collection.elements();</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">        while (elements.hasMoreElements()) {</span>
+<span class="nc" id="L237">            consumer.accept(parameter, elements.nextElement());</span>
+        }
+<span class="nc" id="L239">        return parameter;</span>
+    }
+
+    /**
+     * Run a test for each permission in the given collection.  If the predicate returns {@code false} for any element,
+     * {@code false} is returned; otherwise, {@code true} is returned.
+     *
+     * @param collection the collection (must not be {@code null})
+     * @param predicate the predicate to apply to each element (must not be {@code null})
+     * @return {@code true} if the predicate matched all the permissions in the collection, {@code false} otherwise
+     */
+    public static boolean forEachIn(PermissionCollection collection, Predicate&lt;Permission&gt; predicate) {
+<span class="nc" id="L251">        Assert.checkNotNullParam(&quot;collection&quot;, collection);</span>
+<span class="nc" id="L252">        Assert.checkNotNullParam(&quot;predicate&quot;, predicate);</span>
+<span class="nc" id="L253">        final Enumeration&lt;Permission&gt; elements = collection.elements();</span>
+<span class="nc bnc" id="L254" title="All 2 branches missed.">        while (elements.hasMoreElements()) {</span>
+<span class="nc bnc" id="L255" title="All 2 branches missed.">            if (! predicate.test(elements.nextElement())) {</span>
+<span class="nc" id="L256">                return false;</span>
+            }
+        }
+<span class="nc" id="L259">        return true;</span>
+    }
+
+    /**
+     * Run a test for each permission in the given collection.  If the predicate returns {@code false} for any element,
+     * {@code false} is returned; otherwise, {@code true} is returned.
+     *
+     * @param collection the collection (must not be {@code null})
+     * @param parameter the parameter to pass to the consumer
+     * @param predicate the predicate to apply to each element (must not be {@code null})
+     * @param &lt;P&gt; the type of the parameter
+     * @return {@code true} if the predicate matched all the permissions in the collection, {@code false} otherwise
+     */
+    public static &lt;P&gt; boolean forEachIn(PermissionCollection collection, BiPredicate&lt;P, Permission&gt; predicate, P parameter) {
+<span class="nc" id="L273">        Assert.checkNotNullParam(&quot;collection&quot;, collection);</span>
+<span class="nc" id="L274">        Assert.checkNotNullParam(&quot;predicate&quot;, predicate);</span>
+<span class="nc" id="L275">        final Enumeration&lt;Permission&gt; elements = collection.elements();</span>
+<span class="nc bnc" id="L276" title="All 2 branches missed.">        while (elements.hasMoreElements()) {</span>
+<span class="nc bnc" id="L277" title="All 2 branches missed.">            if (! predicate.test(parameter, elements.nextElement())) {</span>
+<span class="nc" id="L278">                return false;</span>
+            }
+        }
+<span class="nc" id="L281">        return true;</span>
+    }
+
+    /**
+     * Create a permission collection that is the union of two permission collections.  The permission
+     * collections must be read-only.
+     *
+     * @param pc1 the first permission collection (must not be {@code null})
+     * @param pc2 the second permission collection (must not be {@code null})
+     * @return a new permission collection that is the union of the two collections (not {@code null})
+     */
+    public static PermissionCollection union(PermissionCollection pc1, PermissionCollection pc2) {
+<span class="nc" id="L293">        Assert.checkNotNullParam(&quot;pc1&quot;, pc1);</span>
+<span class="nc" id="L294">        Assert.checkNotNullParam(&quot;pc2&quot;, pc2);</span>
+<span class="nc bnc" id="L295" title="All 4 branches missed.">        if (! pc1.isReadOnly() || ! pc2.isReadOnly()) {</span>
+<span class="nc" id="L296">            throw ElytronMessages.log.permissionCollectionMustBeReadOnly();</span>
+        }
+<span class="nc bnc" id="L298" title="All 4 branches missed.">        if (pc1.implies(ALL_PERMISSION) || pc2.implies(ALL_PERMISSION)) {</span>
+<span class="nc" id="L299">            return ALL_PERMISSIONS;</span>
+        } else {
+<span class="nc" id="L301">            return new UnionPermissionCollection(pc1, pc2);</span>
+        }
+    }
+
+    /**
+     * Create a permission collection that is the intersection of two permission collections.  The permission
+     * collections must be read-only.
+     *
+     * @param pc1 the first permission collection (must not be {@code null})
+     * @param pc2 the second permission collection (must not be {@code null})
+     * @return a new permission collection that is the intersection of the two collections (not {@code null})
+     */
+    public static PermissionCollection intersection(PermissionCollection pc1, PermissionCollection pc2) {
+<span class="nc" id="L314">        Assert.checkNotNullParam(&quot;pc1&quot;, pc1);</span>
+<span class="nc" id="L315">        Assert.checkNotNullParam(&quot;pc2&quot;, pc2);</span>
+<span class="nc bnc" id="L316" title="All 4 branches missed.">        if (! pc1.isReadOnly() || ! pc2.isReadOnly()) {</span>
+<span class="nc" id="L317">            throw ElytronMessages.log.permissionCollectionMustBeReadOnly();</span>
+        }
+<span class="nc bnc" id="L319" title="All 2 branches missed.">        if (pc1.implies(ALL_PERMISSION)) {</span>
+<span class="nc" id="L320">            return pc2;</span>
+<span class="nc bnc" id="L321" title="All 2 branches missed.">        } else if (pc2.implies(ALL_PERMISSION)) {</span>
+<span class="nc" id="L322">            return pc1;</span>
+        } else {
+<span class="nc" id="L324">            return new IntersectionPermissionCollection(pc1, pc2);</span>
+        }
+    }
+
+    /**
+     * Determine if one collection implies all the permissions in the other collection.
+     *
+     * @param collection the collection to check against (must not be {@code null})
+     * @param testCollection the collection whose permissions are to be tested (must not be {@code null})
+     * @return {@code true} if {@code collection} implies all of the permissions in {@code testCollection}, {@code false} otherwise
+     */
+    public static boolean impliesAll(PermissionCollection collection, PermissionCollection testCollection) {
+<span class="nc" id="L336">        return forEachIn(collection, PermissionCollection::implies, testCollection);</span>
+    }
+
+    /**
+     * Determine if two permission collections are equal, that is, each collection implies all of the permissions in the
+     * other collection.
+     *
+     * @param pc1 the first collection (must not be {@code null})
+     * @param pc2 the second collection (must not be {@code null})
+     * @return {@code true} if the collections imply one another, {@code false} otherwise
+     */
+    public static boolean equals(PermissionCollection pc1, PermissionCollection pc2) {
+<span class="nc bnc" id="L348" title="All 4 branches missed.">        return impliesAll(pc1, pc2) &amp;&amp; impliesAll(pc2, pc1);</span>
+    }
+
+    /**
+     * Add all of the permissions from the source collection to the target collection.
+     *
+     * @param target the target collection (must not be {@code null})
+     * @param source the source collection (must not be {@code null})
+     * @return the target collection (not {@code null})
+     */
+    public static PermissionCollection addAll(PermissionCollection target, PermissionCollection source) {
+<span class="nc" id="L359">        return forEachIn(source, PermissionCollection::add, target);</span>
+    }
+
+    /**
+     * Add all of the permissions from the source collection to the target collection.
+     *
+     * @param target the target collection (must not be {@code null})
+     * @param source the source collection (must not be {@code null})
+     * @return the target collection (not {@code null})
+     */
+    public static PermissionCollection addAll(PermissionCollection target, Collection&lt;Permission&gt; source) {
+<span class="fc" id="L370">        source.forEach(target::add);</span>
+<span class="fc" id="L371">        return target;</span>
+    }
+
+    /**
+     * Add a permission to a collection, returning the target collection.  If the permission is {@code null}, it is
+     * not added.
+     *
+     * @param target the target collection (must not be {@code null})
+     * @param source the permission to add
+     * @return the target collection (not {@code null})
+     */
+    public static PermissionCollection add(PermissionCollection target, Permission source) {
+<span class="nc" id="L383">        Assert.checkNotNullParam(&quot;target&quot;, target);</span>
+<span class="nc bnc" id="L384" title="All 2 branches missed.">        if (source != null) target.add(source);</span>
+<span class="nc" id="L385">        return target;</span>
+    }
+
+    /**
+     * Instantiate a permission with the given class name, permission name, and actions.
+     *
+     * @param classLoader the class loader to search in ({@code null} indicates the system class loader)
+     * @param className the name of the permission class to instantiate (must not be {@code null})
+     * @param name the permission name (may be {@code null} if allowed by the permission class)
+     * @param actions the permission actions (may be {@code null} if allowed by the permission class)
+     * @return the permission object (not {@code null})
+     * @throws InvalidPermissionClassException if the permission class does not exist or is not valid
+     * @throws ClassCastException if the class name does not refer to a subclass of {@link Permission}
+     */
+    public static Permission createPermission(final ClassLoader classLoader, final String className, final String name, final String actions) {
+<span class="nc" id="L400">        Assert.checkNotNullParam(&quot;className&quot;, className);</span>
+        final Class&lt;? extends Permission&gt; permissionClass;
+        try {
+<span class="nc" id="L403">            permissionClass = Class.forName(className, true, classLoader).asSubclass(Permission.class);</span>
+<span class="nc" id="L404">        } catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L405">            throw ElytronMessages.log.permissionClassMissing(className, e);</span>
+<span class="nc" id="L406">        }</span>
+<span class="nc" id="L407">        return createPermission(permissionClass, name, actions);</span>
+    }
+
+    /**
+     * Instantiate a permission with the given class, permission name, and actions.
+     *
+     * @param permissionClass the permission class to instantiate (must not be {@code null})
+     * @param name the permission name (may be {@code null} if allowed by the permission class)
+     * @param actions the permission actions (may be {@code null} if allowed by the permission class)
+     * @return the permission object (not {@code null})
+     * @throws InvalidPermissionClassException if the permission class does not exist or is not valid
+     */
+    public static Permission createPermission(final Class&lt;? extends Permission&gt; permissionClass, final String name, final String actions) {
+<span class="nc" id="L420">        Assert.checkNotNullParam(&quot;permissionClass&quot;, permissionClass);</span>
+<span class="nc" id="L421">        Constructor&lt;? extends Permission&gt; noArgs = null;</span>
+<span class="nc" id="L422">        Constructor&lt;? extends Permission&gt; oneArg = null;</span>
+<span class="nc" id="L423">        Constructor&lt;? extends Permission&gt; twoArg = null;</span>
+<span class="nc bnc" id="L424" title="All 2 branches missed.">        for (Constructor&lt;?&gt; raw : permissionClass.getConstructors()) {</span>
+            @SuppressWarnings(&quot;unchecked&quot;)
+<span class="nc" id="L426">            Constructor&lt;? extends Permission&gt; ctor = (Constructor&lt;? extends Permission&gt;) raw;</span>
+<span class="nc" id="L427">            final Class&lt;?&gt;[] parameterTypes = ctor.getParameterTypes();</span>
+<span class="nc bnc" id="L428" title="All 6 branches missed.">            if (parameterTypes.length == 2 &amp;&amp; parameterTypes[0] == String.class &amp;&amp; parameterTypes[1] == String.class) {</span>
+<span class="nc" id="L429">                twoArg = ctor;</span>
+<span class="nc bnc" id="L430" title="All 4 branches missed.">            } else if (parameterTypes.length == 1 &amp;&amp; parameterTypes[0] == String.class) {</span>
+<span class="nc" id="L431">                oneArg = ctor;</span>
+<span class="nc bnc" id="L432" title="All 2 branches missed.">            } else if (parameterTypes.length == 0) {</span>
+<span class="nc" id="L433">                noArgs = ctor;</span>
+            }
+        }
+        try {
+<span class="nc bnc" id="L437" title="All 2 branches missed.">            if (twoArg != null) {</span>
+<span class="nc" id="L438">                return twoArg.newInstance(name, actions);</span>
+<span class="nc bnc" id="L439" title="All 2 branches missed.">            } else if (oneArg != null) {</span>
+<span class="nc" id="L440">                return oneArg.newInstance(name);</span>
+<span class="nc bnc" id="L441" title="All 2 branches missed.">            } else if (noArgs != null) {</span>
+<span class="nc" id="L442">                return noArgs.newInstance();</span>
+            } else {
+<span class="nc" id="L444">                throw ElytronMessages.log.noPermissionConstructor(permissionClass.getName());</span>
+            }
+<span class="nc" id="L446">        } catch (IllegalAccessException e) {</span>
+<span class="nc" id="L447">            throw new IllegalAccessError(e.getMessage());</span>
+<span class="nc" id="L448">        } catch (InstantiationException e) {</span>
+<span class="nc" id="L449">            throw ElytronMessages.log.permissionInstantiation(permissionClass.getName(), e);</span>
+<span class="nc" id="L450">        } catch (InvocationTargetException e) {</span>
+            try {
+<span class="nc" id="L452">                throw e.getCause();</span>
+<span class="nc" id="L453">            } catch (Error | RuntimeException cause) {</span>
+<span class="nc" id="L454">                throw cause;</span>
+<span class="nc" id="L455">            } catch (Throwable cause) {</span>
+<span class="nc" id="L456">                throw new UndeclaredThrowableException(cause);</span>
+            }
+        }
+    }
+
+    /**
+     * Get a read-only collection of the given permissions.
+     *
+     * @param permissions the permissions to assign
+     * @return the read-only collection
+     */
+    public static PermissionCollection readOnlyCollectionOf(Permission... permissions) {
+<span class="fc" id="L468">        final int length = permissions.length;</span>
+<span class="pc bpc" id="L469" title="1 of 2 branches missed.">        if (length == 0) {</span>
+<span class="nc" id="L470">            return EMPTY_PERMISSION_COLLECTION;</span>
+        } else {
+<span class="fc" id="L472">            Permissions collection = new Permissions();</span>
+<span class="fc" id="L473">            addAll(collection, Arrays.asList(permissions));</span>
+<span class="fc" id="L474">            collection.setReadOnly();</span>
+<span class="fc" id="L475">            return collection;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

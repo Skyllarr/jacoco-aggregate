@@ -1,0 +1,322 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages_$logger.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-keystore</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.keystore</a> &gt; <span class="el_source">ElytronMessages_$logger.java</span></div><h1>ElytronMessages_$logger.java</h1><pre class="source lang-java linenums">package org.wildfly.security.keystore;
+
+import java.util.Locale;
+import java.lang.IllegalStateException;
+import java.io.Serializable;
+import javax.annotation.Generated;
+import org.jboss.logging.DelegatingBasicLogger;
+import java.lang.String;
+import java.security.KeyStoreException;
+import java.io.IOException;
+import java.security.NoSuchAlgorithmException;
+import org.jboss.logging.Logger;
+import java.security.InvalidKeyException;
+import java.lang.Exception;
+import java.security.UnrecoverableKeyException;
+import org.jboss.logging.BasicLogger;
+import java.io.EOFException;
+import java.lang.Throwable;
+import java.lang.Class;
+import java.util.Arrays;
+import java.lang.IllegalArgumentException;
+
+/**
+ * Warning this class consists of generated code.
+ */
+@Generated(value = &quot;org.jboss.logging.processor.generator.model.MessageLoggerImplementor&quot;, date = &quot;2022-09-02T20:20:14+0200&quot;)
+public class ElytronMessages_$logger extends DelegatingBasicLogger implements ElytronMessages, BasicLogger, Serializable {
+    private static final long serialVersionUID = 1L;
+<span class="fc" id="L29">    private static final String FQCN = ElytronMessages_$logger.class.getName();</span>
+    public ElytronMessages_$logger(final Logger log) {
+<span class="fc" id="L31">        super(log);</span>
+<span class="fc" id="L32">    }</span>
+<span class="fc" id="L33">    private static final Locale LOCALE = Locale.ROOT;</span>
+    protected Locale getLoggingLocale() {
+<span class="fc" id="L35">        return LOCALE;</span>
+    }
+    protected String invalidKeyStoreEntryPassword$str() {
+<span class="nc" id="L38">        return &quot;ELY02001: Invalid key store entry password for alias \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final UnrecoverableKeyException invalidKeyStoreEntryPassword(final String alias) {
+<span class="nc" id="L42">        final UnrecoverableKeyException result = new UnrecoverableKeyException(String.format(getLoggingLocale(), invalidKeyStoreEntryPassword$str(), alias));</span>
+<span class="nc" id="L43">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L44">        return result;</span>
+    }
+    private static void _copyStackTraceMinusOne(final Throwable e) {
+<span class="fc" id="L47">        final StackTraceElement[] st = e.getStackTrace();</span>
+<span class="fc" id="L48">        e.setStackTrace(Arrays.copyOfRange(st, 1, st.length));</span>
+<span class="fc" id="L49">    }</span>
+    protected String invalidKeyStoreEntryType$str() {
+<span class="nc" id="L51">        return &quot;ELY02002: Invalid key store entry type for alias \&quot;%s\&quot; (expected %s, got %s)&quot;;</span>
+    }
+    @Override
+    public final KeyStoreException invalidKeyStoreEntryType(final String alias, final Class&lt;?&gt; expectedClass, final Class&lt;?&gt; actualClass) {
+<span class="nc" id="L55">        final KeyStoreException result = new KeyStoreException(String.format(getLoggingLocale(), invalidKeyStoreEntryType$str(), alias, expectedClass, actualClass));</span>
+<span class="nc" id="L56">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L57">        return result;</span>
+    }
+    protected String keyCannotBeProtected$str() {
+<span class="nc" id="L60">        return &quot;ELY02003: Key store key for alias \&quot;%s\&quot; cannot be protected&quot;;</span>
+    }
+    @Override
+    public final KeyStoreException keyCannotBeProtected(final String alias) {
+<span class="nc" id="L64">        final KeyStoreException result = new KeyStoreException(String.format(getLoggingLocale(), keyCannotBeProtected$str(), alias));</span>
+<span class="nc" id="L65">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L66">        return result;</span>
+    }
+    protected String keyStoreFailedToTranslate$str() {
+<span class="nc" id="L69">        return &quot;ELY02004: Key store failed to translate password for alias \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final IOException keyStoreFailedToTranslate(final String alias, final Throwable cause) {
+<span class="nc" id="L73">        final IOException result = new IOException(String.format(getLoggingLocale(), keyStoreFailedToTranslate$str(), alias), cause);</span>
+<span class="nc" id="L74">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L75">        return result;</span>
+    }
+    protected String noAlgorithmForPassword$str() {
+<span class="nc" id="L78">        return &quot;ELY02005: Key store failed to identify a suitable algorithm for alias \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final NoSuchAlgorithmException noAlgorithmForPassword(final String alias) {
+<span class="nc" id="L82">        final NoSuchAlgorithmException result = new NoSuchAlgorithmException(String.format(getLoggingLocale(), noAlgorithmForPassword$str(), alias));</span>
+<span class="nc" id="L83">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L84">        return result;</span>
+    }
+    protected String unexpectedWhitespaceInPasswordFile$str() {
+<span class="nc" id="L87">        return &quot;ELY02006: Unexpected whitespace in password file&quot;;</span>
+    }
+    @Override
+    public final IOException unexpectedWhitespaceInPasswordFile() {
+<span class="nc" id="L91">        final IOException result = new IOException(String.format(getLoggingLocale(), unexpectedWhitespaceInPasswordFile$str()));</span>
+<span class="nc" id="L92">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L93">        return result;</span>
+    }
+    protected String unexpectedEof$str() {
+<span class="nc" id="L96">        return &quot;ELY02007: Unexpected end of file&quot;;</span>
+    }
+    @Override
+    public final EOFException unexpectedEof() {
+<span class="nc" id="L100">        final EOFException result = new EOFException(String.format(getLoggingLocale(), unexpectedEof$str()));</span>
+<span class="nc" id="L101">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L102">        return result;</span>
+    }
+    protected String reversibleLoadNotPossible$str() {
+<span class="nc" id="L105">        return &quot;ELY02008: A reversible load is not possible until the KeyStore has first been initialized&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException reversibleLoadNotPossible() {
+<span class="nc" id="L109">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), reversibleLoadNotPossible$str()));</span>
+<span class="nc" id="L110">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L111">        return result;</span>
+    }
+    protected String unableToCreateKeyStore$str() {
+<span class="nc" id="L114">        return &quot;ELY02009: Unable to create a new KeyStore instance&quot;;</span>
+    }
+    @Override
+    public final IOException unableToCreateKeyStore(final Exception cause) {
+<span class="nc" id="L118">        final IOException result = new IOException(String.format(getLoggingLocale(), unableToCreateKeyStore$str()), cause);</span>
+<span class="nc" id="L119">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L120">        return result;</span>
+    }
+    protected String emptyFilter$str() {
+<span class="nc" id="L123">        return &quot;ELY02012: An empty alias filter was supplied&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException emptyFilter() {
+<span class="nc" id="L127">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), emptyFilter$str()));</span>
+<span class="nc" id="L128">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L129">        return result;</span>
+    }
+    protected String missingPlusMinusAt$str() {
+<span class="nc" id="L132">        return &quot;ELY02013: Filter is missing '+' or '-' at offset %d&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException missingPlusMinusAt(final long position) {
+<span class="nc" id="L136">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), missingPlusMinusAt$str(), position));</span>
+<span class="nc" id="L137">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L138">        return result;</span>
+    }
+    protected String invalidFirstWord$str() {
+<span class="nc" id="L141">        return &quot;ELY02014: Invalid first word '%s', must be one of ALL/NONE&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidFirstWord(final String firstWord) {
+<span class="nc" id="L145">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidFirstWord$str(), firstWord));</span>
+<span class="nc" id="L146">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L147">        return result;</span>
+    }
+    protected String failedToObtainDirContext$str() {
+<span class="nc" id="L150">        return &quot;ELY02015: Failed to obtain DirContext&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException failedToObtainDirContext(final Throwable cause) {
+<span class="nc" id="L154">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), failedToObtainDirContext$str()), cause);</span>
+<span class="nc" id="L155">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L156">        return result;</span>
+    }
+    protected String failedToReturnDirContext$str() {
+<span class="nc" id="L159">        return &quot;ELY02016: Failed to return DirContext&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException failedToReturnDirContext(final Throwable cause) {
+<span class="nc" id="L163">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), failedToReturnDirContext$str()), cause);</span>
+<span class="nc" id="L164">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L165">        return result;</span>
+    }
+    protected String ldapKeyStoreFailedToObtainAlias$str() {
+<span class="nc" id="L168">        return &quot;ELY02017: LdapKeyStore failed to obtain alias [%s]&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException ldapKeyStoreFailedToObtainAlias(final String alias, final Throwable cause) {
+<span class="nc" id="L172">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), ldapKeyStoreFailedToObtainAlias$str(), alias), cause);</span>
+<span class="nc" id="L173">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L174">        return result;</span>
+    }
+    protected String ldapKeyStoreFailedToObtainCertificate$str() {
+<span class="nc" id="L177">        return &quot;ELY02018: LdapKeyStore failed to obtain certificate [%s]&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException ldapKeyStoreFailedToObtainCertificate(final String alias, final Throwable cause) {
+<span class="nc" id="L181">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), ldapKeyStoreFailedToObtainCertificate$str(), alias), cause);</span>
+<span class="nc" id="L182">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L183">        return result;</span>
+    }
+    protected String ldapKeyStoreFailedToObtainCertificateChain$str() {
+<span class="nc" id="L186">        return &quot;ELY02019: LdapKeyStore failed to obtain certificate chain [%s]&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException ldapKeyStoreFailedToObtainCertificateChain(final String alias, final Throwable cause) {
+<span class="nc" id="L190">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), ldapKeyStoreFailedToObtainCertificateChain$str(), alias), cause);</span>
+<span class="nc" id="L191">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L192">        return result;</span>
+    }
+    protected String ldapKeyStoreFailedToObtainKey$str() {
+<span class="nc" id="L195">        return &quot;ELY02020: LdapKeyStore failed to recover key of alias [%s]&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException ldapKeyStoreFailedToObtainKey(final String alias, final Throwable cause) {
+<span class="nc" id="L199">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), ldapKeyStoreFailedToObtainKey$str(), alias), cause);</span>
+<span class="nc" id="L200">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L201">        return result;</span>
+    }
+    protected String ldapKeyStoreFailedToObtainAliasByCertificate$str() {
+<span class="nc" id="L204">        return &quot;ELY02021: LdapKeyStore failed to obtain alias by certificate&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException ldapKeyStoreFailedToObtainAliasByCertificate(final Throwable cause) {
+<span class="nc" id="L208">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), ldapKeyStoreFailedToObtainAliasByCertificate$str()), cause);</span>
+<span class="nc" id="L209">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L210">        return result;</span>
+    }
+    protected String ldapKeyStoreFailedToRecoverKey$str() {
+<span class="nc" id="L213">        return &quot;ELY02022: LdapKeyStore failed to recover key of alias [%s]&quot;;</span>
+    }
+    @Override
+    public final UnrecoverableKeyException ldapKeyStoreFailedToRecoverKey(final String alias, final Throwable cause) {
+<span class="nc" id="L217">        final UnrecoverableKeyException result = new UnrecoverableKeyException(String.format(getLoggingLocale(), ldapKeyStoreFailedToRecoverKey$str(), alias));</span>
+<span class="nc" id="L218">        result.initCause(cause);</span>
+<span class="nc" id="L219">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L220">        return result;</span>
+    }
+    protected String ldapKeyStoreFailedToObtainCreationDate$str() {
+<span class="nc" id="L223">        return &quot;ELY02023: LdapKeyStore failed to obtain creation date of alias [%s]&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException ldapKeyStoreFailedToObtainCreationDate(final String alias, final Throwable cause) {
+<span class="nc" id="L227">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), ldapKeyStoreFailedToObtainCreationDate$str(), alias), cause);</span>
+<span class="nc" id="L228">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L229">        return result;</span>
+    }
+    protected String creationNotConfigured$str() {
+<span class="nc" id="L232">        return &quot;ELY02024: Alias [%s] does not exist in LdapKeyStore and not configured for creation&quot;;</span>
+    }
+    @Override
+    public final KeyStoreException creationNotConfigured(final String alias) {
+<span class="nc" id="L236">        final KeyStoreException result = new KeyStoreException(String.format(getLoggingLocale(), creationNotConfigured$str(), alias));</span>
+<span class="nc" id="L237">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L238">        return result;</span>
+    }
+    protected String ldapKeyStoreFailedToStore$str() {
+<span class="nc" id="L241">        return &quot;ELY02025: LdapKeyStore failed store alias [%s]&quot;;</span>
+    }
+    @Override
+    public final KeyStoreException ldapKeyStoreFailedToStore(final String alias, final Throwable cause) {
+<span class="nc" id="L245">        final KeyStoreException result = new KeyStoreException(String.format(getLoggingLocale(), ldapKeyStoreFailedToStore$str(), alias), cause);</span>
+<span class="nc" id="L246">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L247">        return result;</span>
+    }
+    protected String ldapKeyStoreFailedToSerializeCertificate$str() {
+<span class="nc" id="L250">        return &quot;ELY02026: LdapKeyStore failed to serialize certificate of alias [%s]&quot;;</span>
+    }
+    @Override
+    public final KeyStoreException ldapKeyStoreFailedToSerializeCertificate(final String alias, final Throwable cause) {
+<span class="nc" id="L254">        final KeyStoreException result = new KeyStoreException(String.format(getLoggingLocale(), ldapKeyStoreFailedToSerializeCertificate$str(), alias), cause);</span>
+<span class="nc" id="L255">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L256">        return result;</span>
+    }
+    protected String ldapKeyStoreFailedToSerializeKey$str() {
+<span class="nc" id="L259">        return &quot;ELY02027: LdapKeyStore failed to protect (pack into keystore) key of alias [%s]&quot;;</span>
+    }
+    @Override
+    public final KeyStoreException ldapKeyStoreFailedToSerializeKey(final String alias, final Throwable cause) {
+<span class="nc" id="L263">        final KeyStoreException result = new KeyStoreException(String.format(getLoggingLocale(), ldapKeyStoreFailedToSerializeKey$str(), alias), cause);</span>
+<span class="nc" id="L264">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L265">        return result;</span>
+    }
+    protected String ldapKeyStoreFailedToDelete$str() {
+<span class="nc" id="L268">        return &quot;ELY02028: LdapKeyStore failed to delete alias [%s]&quot;;</span>
+    }
+    @Override
+    public final KeyStoreException ldapKeyStoreFailedToDelete(final String alias, final Throwable cause) {
+<span class="nc" id="L272">        final KeyStoreException result = new KeyStoreException(String.format(getLoggingLocale(), ldapKeyStoreFailedToDelete$str(), alias), cause);</span>
+<span class="nc" id="L273">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L274">        return result;</span>
+    }
+    protected String ldapKeyStoreFailedToDeleteNonExisting$str() {
+<span class="nc" id="L277">        return &quot;ELY02029: LdapKeyStore failed to delete alias [%s] - alias not found&quot;;</span>
+    }
+    @Override
+    public final KeyStoreException ldapKeyStoreFailedToDeleteNonExisting(final String alias) {
+<span class="nc" id="L281">        final KeyStoreException result = new KeyStoreException(String.format(getLoggingLocale(), ldapKeyStoreFailedToDeleteNonExisting$str(), alias));</span>
+<span class="nc" id="L282">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L283">        return result;</span>
+    }
+    protected String ldapKeyStoreFailedToTestAliasExistence$str() {
+<span class="nc" id="L286">        return &quot;ELY02030: LdapKeyStore failed to test alias [%s] existence&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException ldapKeyStoreFailedToTestAliasExistence(final String alias, final Throwable cause) {
+<span class="nc" id="L290">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), ldapKeyStoreFailedToTestAliasExistence$str(), alias), cause);</span>
+<span class="nc" id="L291">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L292">        return result;</span>
+    }
+    protected String ldapKeyStoreFailedToIterateAliases$str() {
+<span class="nc" id="L295">        return &quot;ELY02031: LdapKeyStore failed to iterate aliases&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException ldapKeyStoreFailedToIterateAliases(final Throwable cause) {
+<span class="nc" id="L299">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), ldapKeyStoreFailedToIterateAliases$str()), cause);</span>
+<span class="nc" id="L300">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L301">        return result;</span>
+    }
+    protected String keyStoreTypeNotDetected$str() {
+<span class="fc" id="L304">        return &quot;ELY02035: KeyStore type could not be detected&quot;;</span>
+    }
+    @Override
+    public final KeyStoreException keyStoreTypeNotDetected() {
+<span class="fc" id="L308">        final KeyStoreException result = new KeyStoreException(String.format(getLoggingLocale(), keyStoreTypeNotDetected$str()));</span>
+<span class="fc" id="L309">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L310">        return result;</span>
+    }
+    protected String invalidKeyUnknownUnknownPasswordTypeOrAlgorithm$str() {
+<span class="nc" id="L313">        return &quot;ELY08027: Unknown password type or algorithm&quot;;</span>
+    }
+    @Override
+    public final InvalidKeyException invalidKeyUnknownUnknownPasswordTypeOrAlgorithm() {
+<span class="nc" id="L317">        final InvalidKeyException result = new InvalidKeyException(String.format(getLoggingLocale(), invalidKeyUnknownUnknownPasswordTypeOrAlgorithm$str()));</span>
+<span class="nc" id="L318">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L319">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

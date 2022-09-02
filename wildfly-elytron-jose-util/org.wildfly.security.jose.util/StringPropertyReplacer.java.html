@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>StringPropertyReplacer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-jose-util</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.jose.util</a> &gt; <span class="el_source">StringPropertyReplacer.java</span></div><h1>StringPropertyReplacer.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2020 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.jose.util;
+
+import java.io.File;
+import java.util.Properties;
+
+/**
+ * A utility class for replacing properties in strings.
+ *
+ * @author &lt;a href=&quot;mailto:jason@planet57.com&quot;&gt;Jason Dillon&lt;/a&gt;
+ * @author &lt;a href=&quot;Scott.Stark@jboss.org&quot;&gt;Scott Stark&lt;/a&gt;
+ * @author &lt;a href=&quot;claudio.vesco@previnet.it&quot;&gt;Claudio Vesco&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:adrian@jboss.com&quot;&gt;Adrian Brock&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:dimitris@jboss.org&quot;&gt;Dimitris Andreadis&lt;/a&gt;
+ */
+<span class="nc" id="L33">final class StringPropertyReplacer {</span>
+    /** New line string constant */
+<span class="nc" id="L35">    public static final String NEWLINE = System.getProperty(&quot;line.separator&quot;, &quot;\n&quot;);</span>
+
+    /** File separator value */
+<span class="nc" id="L38">    private static final String FILE_SEPARATOR = File.separator;</span>
+
+    /** Path separator value */
+<span class="nc" id="L41">    private static final String PATH_SEPARATOR = File.pathSeparator;</span>
+
+    /** File separator alias */
+    private static final String FILE_SEPARATOR_ALIAS = &quot;/&quot;;
+
+    /** Path separator alias */
+    private static final String PATH_SEPARATOR_ALIAS = &quot;:&quot;;
+
+    // States used in property parsing
+    private static final int NORMAL = 0;
+    private static final int SEEN_DOLLAR = 1;
+    private static final int IN_BRACKET = 2;
+
+    /**
+     * Go through the input string and replace any occurance of ${p} with
+     * the System.getProperty(p) value. If there is no such property p defined,
+     * then the ${p} reference will remain unchanged.
+     *
+     * If the property reference is of the form ${p:v} and there is no such property p,
+     * then the default value v will be returned.
+     *
+     * If the property reference is of the form ${p1,p2} or ${p1,p2:v} then
+     * the primary and the secondary properties will be tried in turn, before
+     * returning either the unchanged input, or the default value.
+     *
+     * The property ${/} is replaced with System.getProperty(&quot;file.separator&quot;)
+     * value and the property ${:} is replaced with System.getProperty(&quot;path.separator&quot;).
+     *
+     * @param string - the string with possible ${} references
+     * @return the input string with all property references replaced if any.
+     *    If there are no valid references the input string will be returned.
+     */
+    public static String replaceProperties(final String string) {
+<span class="nc" id="L74">        return replaceProperties(string, (Properties) null);</span>
+    }
+
+    /**
+     * Go through the input string and replace any occurance of ${p} with
+     * the props.getProperty(p) value. If there is no such property p defined,
+     * then the ${p} reference will remain unchanged.
+     *
+     * If the property reference is of the form ${p:v} and there is no such property p,
+     * then the default value v will be returned.
+     *
+     * If the property reference is of the form ${p1,p2} or ${p1,p2:v} then
+     * the primary and the secondary properties will be tried in turn, before
+     * returning either the unchanged input, or the default value.
+     *
+     * The property ${/} is replaced with System.getProperty(&quot;file.separator&quot;)
+     * value and the property ${:} is replaced with System.getProperty(&quot;path.separator&quot;).
+     *
+     * @param string - the string with possible ${} references
+     * @param props - the source for ${x} property ref values, null means use System.getProperty()
+     * @return the input string with all property references replaced if any.
+     *    If there are no valid references the input string will be returned.
+     */
+    public static String replaceProperties(final String string, final Properties props) {
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        if (props == null) {</span>
+<span class="nc" id="L99">            return replaceProperties(string, (PropertyResolver) null);</span>
+        }
+<span class="nc" id="L101">        return replaceProperties(string, new PropertyResolver() {</span>
+            @Override
+            public String resolve(String property) {
+<span class="nc" id="L104">                return props.getProperty(property);</span>
+            }
+        });
+    }
+
+    public static String replaceProperties(final String string, PropertyResolver resolver) {
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        if(string == null) {</span>
+<span class="nc" id="L111">            return null;</span>
+        }
+<span class="nc" id="L113">        final char[] chars = string.toCharArray();</span>
+<span class="nc" id="L114">        StringBuilder buffer = new StringBuilder();</span>
+<span class="nc" id="L115">        boolean properties = false;</span>
+<span class="nc" id="L116">        int state = NORMAL;</span>
+<span class="nc" id="L117">        int start = 0;</span>
+<span class="nc" id="L118">        int openBracketsCount = 0;</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">        for (int i = 0; i &lt; chars.length; ++i) {</span>
+<span class="nc" id="L120">            char c = chars[i];</span>
+
+            // Dollar sign outside brackets
+<span class="nc bnc" id="L123" title="All 4 branches missed.">            if (c == '$' &amp;&amp; state != IN_BRACKET)</span>
+<span class="nc" id="L124">                state = SEEN_DOLLAR;</span>
+
+                // Open bracket immediately after dollar
+<span class="nc bnc" id="L127" title="All 4 branches missed.">            else if (c == '{' &amp;&amp; state == SEEN_DOLLAR) {</span>
+<span class="nc" id="L128">                buffer.append(string.substring(start, i - 1));</span>
+<span class="nc" id="L129">                state = IN_BRACKET;</span>
+<span class="nc" id="L130">                start = i - 1;</span>
+<span class="nc" id="L131">                openBracketsCount = 1;</span>
+            }
+
+            // Seeing open bracket after we already saw some open bracket without corresponding closed bracket. This causes &quot;nested&quot; expressions. For example ${foo:${bar}}
+<span class="nc bnc" id="L135" title="All 4 branches missed.">            else if (c == '{' &amp;&amp; state == IN_BRACKET)</span>
+<span class="nc" id="L136">                openBracketsCount++;</span>
+
+                // No open bracket after dollar
+<span class="nc bnc" id="L139" title="All 2 branches missed.">            else if (state == SEEN_DOLLAR)</span>
+<span class="nc" id="L140">                state = NORMAL;</span>
+
+                // Seeing closed bracket, but we already saw more than one open bracket before. Hence &quot;nested&quot; expression is still not fully closed.
+                // For example expression ${foo:${bar}} is closed after the second closed bracket, not after the first closed bracket.
+<span class="nc bnc" id="L144" title="All 6 branches missed.">            else if (c == '}' &amp;&amp; state == IN_BRACKET &amp;&amp; openBracketsCount &gt; 1)</span>
+<span class="nc" id="L145">                openBracketsCount--;</span>
+
+                // Closed bracket after open bracket
+<span class="nc bnc" id="L148" title="All 4 branches missed.">            else if (c == '}' &amp;&amp; state == IN_BRACKET) {</span>
+                // No content
+<span class="nc bnc" id="L150" title="All 2 branches missed.">                if (start + 2 == i) {</span>
+<span class="nc" id="L151">                    buffer.append(&quot;${}&quot;); // REVIEW: Correct?</span>
+                }
+                else { // Collect the system property
+<span class="nc" id="L154">                    String value = null;</span>
+
+<span class="nc" id="L156">                    String key = string.substring(start + 2, i);</span>
+
+                    // check for alias
+<span class="nc bnc" id="L159" title="All 2 branches missed.">                    if (FILE_SEPARATOR_ALIAS.equals(key)) {</span>
+<span class="nc" id="L160">                        value = FILE_SEPARATOR;</span>
+                    }
+<span class="nc bnc" id="L162" title="All 2 branches missed.">                    else if (PATH_SEPARATOR_ALIAS.equals(key)) {</span>
+<span class="nc" id="L163">                        value = PATH_SEPARATOR;</span>
+                    }
+                    else {
+                        // check from the properties
+<span class="nc bnc" id="L167" title="All 2 branches missed.">                        if (resolver != null)</span>
+<span class="nc" id="L168">                            value = resolver.resolve(key);</span>
+                        else
+<span class="nc" id="L170">                            value = System.getProperty(key);</span>
+
+<span class="nc bnc" id="L172" title="All 2 branches missed.">                        if (value == null) {</span>
+                            // Check for a default value ${key:default}
+<span class="nc" id="L174">                            int colon = key.indexOf(':');</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">                            if (colon &gt; 0) {</span>
+<span class="nc" id="L176">                                String realKey = key.substring(0, colon);</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">                                if (resolver != null)</span>
+<span class="nc" id="L178">                                    value = resolver.resolve(realKey);</span>
+                                else
+<span class="nc" id="L180">                                    value = System.getProperty(realKey);</span>
+
+<span class="nc bnc" id="L182" title="All 2 branches missed.">                                if (value == null) {</span>
+                                    // Check for a composite key, &quot;key1,key2&quot;
+<span class="nc" id="L184">                                    value = resolveCompositeKey(realKey, resolver);</span>
+
+                                    // Not a composite key either, use the specified default
+<span class="nc bnc" id="L187" title="All 2 branches missed.">                                    if (value == null)</span>
+<span class="nc" id="L188">                                        value = key.substring(colon+1);</span>
+                                }
+<span class="nc" id="L190">                            }</span>
+                            else {
+                                // No default, check for a composite key, &quot;key1,key2&quot;
+<span class="nc" id="L193">                                value = resolveCompositeKey(key, resolver);</span>
+                            }
+                        }
+                    }
+
+<span class="nc bnc" id="L198" title="All 2 branches missed.">                    if (value != null) {</span>
+<span class="nc" id="L199">                        properties = true;</span>
+<span class="nc" id="L200">                        buffer.append(value);</span>
+                    }
+                    else {
+<span class="nc" id="L203">                        buffer.append(&quot;${&quot;);</span>
+<span class="nc" id="L204">                        buffer.append(key);</span>
+<span class="nc" id="L205">                        buffer.append('}');</span>
+                    }
+
+                }
+<span class="nc" id="L209">                start = i + 1;</span>
+<span class="nc" id="L210">                state = NORMAL;</span>
+            }
+        }
+
+        // No properties
+<span class="nc bnc" id="L215" title="All 2 branches missed.">        if (!properties)</span>
+<span class="nc" id="L216">            return string;</span>
+
+        // Collect the trailing characters
+<span class="nc bnc" id="L219" title="All 2 branches missed.">        if (start != chars.length)</span>
+<span class="nc" id="L220">            buffer.append(string.substring(start, chars.length));</span>
+
+<span class="nc bnc" id="L222" title="All 2 branches missed.">        if (buffer.indexOf(&quot;${&quot;) != -1) {</span>
+<span class="nc" id="L223">            return replaceProperties(buffer.toString(), resolver);</span>
+        }
+
+        // Done
+<span class="nc" id="L227">        return buffer.toString();</span>
+    }
+
+    /**
+     * Try to resolve a &quot;key&quot; from the provided properties by
+     * checking if it is actually a &quot;key1,key2&quot;, in which case
+     * try first &quot;key1&quot;, then &quot;key2&quot;. If all fails, return null.
+     *
+     * It also accepts &quot;key1,&quot; and &quot;,key2&quot;.
+     *
+     * @param key the key to resolve
+     * @param props the properties to use
+     * @return the resolved key or null
+     */
+    private static String resolveCompositeKey(String key, final Properties props) {
+<span class="nc bnc" id="L242" title="All 2 branches missed.">        if (props == null) {</span>
+<span class="nc" id="L243">            return resolveCompositeKey(key, (PropertyResolver) null);</span>
+        }
+<span class="nc" id="L245">        return resolveCompositeKey(key, new PropertyResolver() {</span>
+            @Override
+            public String resolve(String property) {
+<span class="nc" id="L248">                return props.getProperty(property);</span>
+            }
+        });
+    }
+
+    private static String resolveCompositeKey(String key, PropertyResolver resolver) {
+<span class="nc" id="L254">        String value = null;</span>
+
+        // Look for the comma
+<span class="nc" id="L257">        int comma = key.indexOf(',');</span>
+<span class="nc bnc" id="L258" title="All 2 branches missed.">        if (comma &gt; -1) {</span>
+            // If we have a first part, try resolve it
+<span class="nc bnc" id="L260" title="All 2 branches missed.">            if (comma &gt; 0) {</span>
+                // Check the first part
+<span class="nc" id="L262">                String key1 = key.substring(0, comma);</span>
+<span class="nc bnc" id="L263" title="All 2 branches missed.">                if (resolver != null)</span>
+<span class="nc" id="L264">                    value = resolver.resolve(key1);</span>
+                else
+<span class="nc" id="L266">                    value = System.getProperty(key1);</span>
+            }
+            // Check the second part, if there is one and first lookup failed
+<span class="nc bnc" id="L269" title="All 4 branches missed.">            if (value == null &amp;&amp; comma &lt; key.length() - 1) {</span>
+<span class="nc" id="L270">                String key2 = key.substring(comma + 1);</span>
+<span class="nc bnc" id="L271" title="All 2 branches missed.">                if (resolver != null)</span>
+<span class="nc" id="L272">                    value = resolver.resolve(key2);</span>
+                else
+<span class="nc" id="L274">                    value = System.getProperty(key2);</span>
+            }
+        }
+        // Return whatever we've found or null
+<span class="nc" id="L278">        return value;</span>
+    }
+
+    public interface PropertyResolver {
+        String resolve(String property);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

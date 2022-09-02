@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BearerTokenRequestAuthenticator.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-oidc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.oidc</a> &gt; <span class="el_source">BearerTokenRequestAuthenticator.java</span></div><h1>BearerTokenRequestAuthenticator.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2022 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.http.oidc;
+
+import static org.wildfly.security.http.HttpConstants.BEARER_TOKEN_PATTERN;
+import static org.wildfly.security.http.HttpConstants.ERROR;
+import static org.wildfly.security.http.HttpConstants.ERROR_DESCRIPTION;
+import static org.wildfly.security.http.HttpConstants.INVALID_TOKEN;
+import static org.wildfly.security.http.HttpConstants.REALM;
+import static org.wildfly.security.http.HttpConstants.STALE_TOKEN;
+import static org.wildfly.security.http.HttpConstants.WWW_AUTHENTICATE;
+import static org.wildfly.security.http.oidc.ElytronMessages.log;
+import static org.wildfly.security.http.oidc.Oidc.logToken;
+
+import java.security.cert.Certificate;
+import java.security.cert.X509Certificate;
+import java.util.List;
+import java.util.regex.Matcher;
+
+import org.apache.http.HttpStatus;
+import org.wildfly.security.http.HttpConstants;
+
+/**
+ * @author &lt;a href=&quot;mailto:bill@burkecentral.com&quot;&gt;Bill Burke&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+class BearerTokenRequestAuthenticator {
+    protected OidcHttpFacade facade;
+    protected OidcClientConfiguration oidcClientConfiguration;
+    protected AuthChallenge challenge;
+    protected String tokenString;
+    private AccessToken token;
+    private String surrogate;
+
+<span class="nc" id="L51">    public BearerTokenRequestAuthenticator(OidcHttpFacade facade, OidcClientConfiguration oidcClientConfiguration) {</span>
+<span class="nc" id="L52">        this.facade = facade;</span>
+<span class="nc" id="L53">        this.oidcClientConfiguration = oidcClientConfiguration;</span>
+<span class="nc" id="L54">    }</span>
+
+    public AuthChallenge getChallenge() {
+<span class="nc" id="L57">        return challenge;</span>
+    }
+
+    public String getTokenString() {
+<span class="nc" id="L61">        return tokenString;</span>
+    }
+
+    public AccessToken getToken() {
+<span class="nc" id="L65">        return token;</span>
+    }
+
+    public String getSurrogate() {
+<span class="nc" id="L69">        return surrogate;</span>
+    }
+
+    public Oidc.AuthOutcome authenticate() {
+<span class="nc" id="L73">        List&lt;String&gt; authorizationValues = facade.getRequest().getHeaders(HttpConstants.AUTHORIZATION);</span>
+<span class="nc bnc" id="L74" title="All 4 branches missed.">        if (authorizationValues == null || authorizationValues.isEmpty()) {</span>
+<span class="nc" id="L75">            challenge = challengeResponse(AuthenticationError.Reason.NO_BEARER_TOKEN, null, null);</span>
+<span class="nc" id="L76">            return Oidc.AuthOutcome.NOT_ATTEMPTED;</span>
+        }
+
+        Matcher matcher;
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        for (String authorizationValue : authorizationValues) {</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">            if ((matcher = BEARER_TOKEN_PATTERN.matcher(authorizationValue)).matches()) {</span>
+<span class="nc" id="L82">                tokenString = matcher.group(1);</span>
+<span class="nc" id="L83">                log.debugf(&quot;Found [%d] values in authorization header, selecting the first value for Bearer&quot;, (Integer) authorizationValues.size());</span>
+<span class="nc" id="L84">                break;</span>
+            }
+<span class="nc" id="L86">        }</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        if (tokenString == null) {</span>
+<span class="nc" id="L88">            challenge = challengeResponse(AuthenticationError.Reason.NO_BEARER_TOKEN, null, null);</span>
+<span class="nc" id="L89">            return Oidc.AuthOutcome.NOT_ATTEMPTED;</span>
+        }
+<span class="nc" id="L91">        return verifyToken(tokenString);</span>
+    }
+
+    protected Oidc.AuthOutcome verifyToken(final String tokenString) {
+<span class="nc" id="L95">        log.debug(&quot;Verifying access_token&quot;);</span>
+<span class="nc" id="L96">        logToken(&quot;\taccess_token&quot;, tokenString);</span>
+        try {
+<span class="nc" id="L98">            TokenValidator tokenValidator = TokenValidator.builder(oidcClientConfiguration).build();</span>
+<span class="nc" id="L99">            token = tokenValidator.parseAndVerifyToken(tokenString);</span>
+<span class="nc" id="L100">            log.debug(&quot;Token Verification succeeded!&quot;);</span>
+<span class="nc" id="L101">        } catch (OidcException e) {</span>
+<span class="nc" id="L102">            log.failedVerificationOfToken(e.getMessage());</span>
+<span class="nc" id="L103">            challenge = challengeResponse(AuthenticationError.Reason.INVALID_TOKEN, INVALID_TOKEN, e.getMessage());</span>
+<span class="nc" id="L104">            return Oidc.AuthOutcome.FAILED;</span>
+<span class="nc" id="L105">        }</span>
+
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        if (token.getIssuedAt() &lt; oidcClientConfiguration.getNotBefore()) {</span>
+<span class="nc" id="L108">            log.debug(&quot;Stale token&quot;);</span>
+<span class="nc" id="L109">            challenge = challengeResponse(AuthenticationError.Reason.STALE_TOKEN, INVALID_TOKEN, STALE_TOKEN);</span>
+<span class="nc" id="L110">            return Oidc.AuthOutcome.FAILED;</span>
+        }
+
+        // these are Keycloak-specific checks
+        boolean verifyCaller;
+<span class="nc bnc" id="L115" title="All 2 branches missed.">        if (oidcClientConfiguration.isUseResourceRoleMappings()) {</span>
+<span class="nc" id="L116">            verifyCaller = isVerifyCaller(token.getResourceAccessClaim(oidcClientConfiguration.getResourceName()));</span>
+        } else {
+<span class="nc" id="L118">            verifyCaller = isVerifyCaller(token.getRealmAccessClaim());</span>
+        }
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        if (verifyCaller) {</span>
+<span class="nc" id="L121">            List&lt;String&gt; trustedCerts = token.getTrustedCertsClaim();</span>
+<span class="nc bnc" id="L122" title="All 4 branches missed.">            if (trustedCerts == null || trustedCerts.isEmpty()) {</span>
+<span class="nc" id="L123">                log.noTrustedCertificatesInToken();</span>
+<span class="nc" id="L124">                challenge = clientCertChallenge();</span>
+<span class="nc" id="L125">                return Oidc.AuthOutcome.FAILED;</span>
+            }
+
+            // simply make sure mutual TLS auth took place
+<span class="nc" id="L129">            Certificate[] chain = facade.getCertificateChain();</span>
+<span class="nc bnc" id="L130" title="All 4 branches missed.">            if (chain == null || chain.length == 0) {</span>
+<span class="nc" id="L131">                log.noPeerCertificatesEstablishedOnConnection();</span>
+<span class="nc" id="L132">                challenge = clientCertChallenge();</span>
+<span class="nc" id="L133">                return Oidc.AuthOutcome.FAILED;</span>
+            }
+<span class="nc" id="L135">            surrogate = ((X509Certificate) chain[0]).getSubjectDN().getName();</span>
+        }
+
+<span class="nc" id="L138">        log.debug(&quot;Successfully authorized&quot;);</span>
+<span class="nc" id="L139">        return Oidc.AuthOutcome.AUTHENTICATED;</span>
+    }
+
+    private boolean isVerifyCaller(RealmAccessClaim accessClaim) {
+<span class="nc bnc" id="L143" title="All 4 branches missed.">        if (accessClaim != null &amp;&amp; accessClaim.getVerifyCaller() != null) {</span>
+<span class="nc" id="L144">            return accessClaim.getVerifyCaller().booleanValue();</span>
+        }
+<span class="nc" id="L146">        return false;</span>
+    }
+
+    protected AuthChallenge challengeResponse(final AuthenticationError.Reason reason, final String error, final String description) {
+<span class="nc" id="L150">        StringBuilder header = new StringBuilder(&quot;Bearer&quot;);</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (oidcClientConfiguration.getRealm() != null) {</span>
+<span class="nc" id="L152">            header.append(&quot; &quot;).append(REALM).append(&quot;=\&quot;&quot;).append(oidcClientConfiguration.getRealm()).append(&quot;\&quot;&quot;);</span>
+<span class="nc bnc" id="L153" title="All 4 branches missed.">            if (error != null || description != null) {</span>
+<span class="nc" id="L154">                header.append(&quot;,&quot;);</span>
+            }
+        }
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        if (error != null) {</span>
+<span class="nc" id="L158">            header.append(&quot; &quot;).append(ERROR).append(&quot;=\&quot;&quot;).append(error).append(&quot;\&quot;&quot;);</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">            if (description != null) {</span>
+<span class="nc" id="L160">                header.append(&quot;,&quot;);</span>
+            }
+        }
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        if (description != null) {</span>
+<span class="nc" id="L164">            header.append(&quot; &quot;).append(ERROR_DESCRIPTION).append(&quot;=\&quot;&quot;).append(description).append(&quot;\&quot;&quot;);</span>
+        }
+
+<span class="nc" id="L167">        final String challenge = header.toString();</span>
+<span class="nc" id="L168">        return new AuthChallenge() {</span>
+            @Override
+            public int getResponseCode() {
+<span class="nc" id="L171">                return HttpStatus.SC_UNAUTHORIZED;</span>
+            }
+
+            @Override
+            public boolean challenge(OidcHttpFacade facade) {
+<span class="nc" id="L176">                AuthenticationError error = new AuthenticationError(reason, description);</span>
+<span class="nc" id="L177">                facade.getRequest().setError(error);</span>
+<span class="nc" id="L178">                facade.getResponse().addHeader(WWW_AUTHENTICATE, challenge);</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">                if(oidcClientConfiguration.isDelegateBearerErrorResponseSending()){</span>
+<span class="nc" id="L180">                    facade.getResponse().setStatus(HttpStatus.SC_UNAUTHORIZED);</span>
+                }
+                else {
+<span class="nc" id="L183">                    facade.getResponse().sendError(HttpStatus.SC_UNAUTHORIZED);</span>
+                }
+<span class="nc" id="L185">                return true;</span>
+            }
+        };
+    }
+
+    protected AuthChallenge clientCertChallenge() {
+<span class="nc" id="L191">        return new AuthChallenge() {</span>
+            @Override
+            public int getResponseCode() {
+<span class="nc" id="L194">                return 0;</span>
+            }
+
+            @Override
+            public boolean challenge(OidcHttpFacade facade) {
+                // do the same thing as client cert auth
+<span class="nc" id="L200">                return false;</span>
+            }
+        };
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

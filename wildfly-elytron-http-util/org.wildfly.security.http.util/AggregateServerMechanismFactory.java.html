@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AggregateServerMechanismFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-util</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.util</a> &gt; <span class="el_source">AggregateServerMechanismFactory.java</span></div><h1>AggregateServerMechanismFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.http.util;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+import static org.wildfly.security.http.util.ElytronMessages.log;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Map;
+
+import javax.security.auth.callback.CallbackHandler;
+
+import org.wildfly.security.http.HttpAuthenticationException;
+import org.wildfly.security.http.HttpServerAuthenticationMechanism;
+import org.wildfly.security.http.HttpServerAuthenticationMechanismFactory;
+
+/**
+ * A {@link HttpServerAuthenticationMechanismFactory} that is an aggregation of other factories.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public final class AggregateServerMechanismFactory implements HttpServerAuthenticationMechanismFactory {
+
+    private final HttpServerAuthenticationMechanismFactory[] factories;
+
+    /**
+     * Construct an instance of {@code AggregateServerMechanismFactory} with an array of factories to aggregate.
+     *
+     * @param factories the array of factories to aggregate.
+     */
+<span class="nc" id="L48">    public AggregateServerMechanismFactory(HttpServerAuthenticationMechanismFactory... factories) {</span>
+<span class="nc" id="L49">        this.factories = checkNotNullParam(&quot;factories&quot;, factories);</span>
+<span class="nc" id="L50">    }</span>
+
+    /**
+     * @see org.wildfly.security.http.HttpServerAuthenticationMechanismFactory#getMechanismNames(java.util.Map)
+     */
+    @Override
+    public String[] getMechanismNames(Map&lt;String, ?&gt; properties) {
+<span class="nc" id="L57">        LinkedHashSet&lt;String&gt; names = new LinkedHashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">        for (HttpServerAuthenticationMechanismFactory current : factories) {</span>
+<span class="nc bnc" id="L59" title="All 2 branches missed.">            if (current != null) {</span>
+<span class="nc" id="L60">                Collections.addAll(names, current.getMechanismNames(properties));</span>
+            }
+        }
+<span class="nc bnc" id="L63" title="All 2 branches missed.">        if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L64">            log.tracef(&quot;%s provided by factories in %s: %s&quot;, HttpServerAuthenticationMechanismFactory.class.getSimpleName(), getClass().getSimpleName(), Arrays.toString(factories));</span>
+        }
+<span class="nc" id="L66">        return names.toArray(new String[names.size()]);</span>
+    }
+
+    /**
+     * @throws HttpAuthenticationException if there is a problem creating the mechanism instance.
+     * @see org.wildfly.security.http.HttpServerAuthenticationMechanismFactory#createAuthenticationMechanism(java.lang.String,
+     *      java.util.Map, javax.security.auth.callback.CallbackHandler)
+     */
+    @Override
+    public HttpServerAuthenticationMechanism createAuthenticationMechanism(String mechanismName, Map&lt;String, ?&gt; properties,
+            CallbackHandler callbackHandler) throws HttpAuthenticationException {
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        for (HttpServerAuthenticationMechanismFactory current : factories) {</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">            if (current != null) {</span>
+<span class="nc" id="L79">                HttpServerAuthenticationMechanism mechanism = current.createAuthenticationMechanism(mechanismName, properties,</span>
+                        callbackHandler);
+<span class="nc bnc" id="L81" title="All 2 branches missed.">                if (mechanism != null) {</span>
+<span class="nc" id="L82">                    return mechanism;</span>
+                }
+            }
+        }
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L87">            log.tracef(&quot;Mechanism %s not provided as %s is not provided by factories in %s: %s&quot;,</span>
+<span class="nc" id="L88">                    mechanismName, HttpServerAuthenticationMechanismFactory.class.getSimpleName(),</span>
+<span class="nc" id="L89">                    getClass().getSimpleName(), Arrays.toString(factories));</span>
+        }
+<span class="nc" id="L91">        return null;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

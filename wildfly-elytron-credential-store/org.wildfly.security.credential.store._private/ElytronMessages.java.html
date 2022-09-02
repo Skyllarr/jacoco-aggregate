@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-credential-store</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.credential.store._private</a> &gt; <span class="el_source">ElytronMessages.java</span></div><h1>ElytronMessages.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.credential.store._private;
+
+import static org.jboss.logging.Logger.Level.DEBUG;
+import static org.jboss.logging.Logger.Level.WARN;
+
+import java.io.IOException;
+import java.security.KeyStore;
+import java.util.List;
+
+import org.jboss.logging.BasicLogger;
+import org.jboss.logging.Logger;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.LogMessage;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageLogger;
+import org.jboss.logging.annotations.ValidIdRange;
+import org.jboss.logging.annotations.ValidIdRanges;
+import org.wildfly.security.credential.store.CredentialStoreException;
+import org.wildfly.security.credential.Credential;
+import org.wildfly.security.credential.store.CredentialStore;
+import org.wildfly.security.credential.store.UnsupportedCredentialTypeException;
+
+/**
+ * Log messages and exceptions for Elytron.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+@MessageLogger(projectCode = &quot;ELY&quot;, length = 5)
+@ValidIdRanges({
+    @ValidIdRange(min = 2009, max = 2009),
+    @ValidIdRange(min = 9500, max = 9528),
+    @ValidIdRange(min = 11006, max = 11006),
+    @ValidIdRange(min = 20000, max = 20999)
+})
+public interface ElytronMessages extends BasicLogger {
+
+<span class="fc" id="L56">    ElytronMessages log = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security&quot;);</span>
+
+    // Duplicated in wildfly-elytron-credential
+    @Message(id = 2009, value = &quot;Unable to create a new KeyStore instance&quot;)
+    IOException unableToCreateKeyStore(@Cause Exception cause);
+
+    @Message(id = 9500, value = &quot;External storage key under alias \&quot;%s\&quot; has to be a SecretKey&quot;)
+    CredentialStoreException wrongTypeOfExternalStorageKey(String keyAlias);
+
+    @Message(id = 9504, value = &quot;Cannot acquire a credential from the credential store&quot;)
+    CredentialStoreException cannotAcquireCredentialFromStore(@Cause Throwable cause);
+
+    @Message(id = 9505, value = &quot;Cannot perform operation '%s': Credential store is set non modifiable&quot;)
+    CredentialStoreException nonModifiableCredentialStore(String operation);
+
+    @Message(id = 9507, value = &quot;Invalid protection parameter given: %s&quot;)
+    CredentialStoreException invalidProtectionParameter(CredentialStore.ProtectionParameter protectionParameter);
+
+    @Message(id = 9508, value = &quot;Cannot write credential to store&quot;)
+    CredentialStoreException cannotWriteCredentialToStore(@Cause Throwable cause);
+
+    @Message(id = 9509, value = &quot;Unsupported credential type %s&quot;)
+    UnsupportedCredentialTypeException unsupportedCredentialType(Class&lt;?&gt; type);
+
+    @Message(id = 9510, value = &quot;Invalid credential store keystore entry %s: expected %s&quot;)
+    CredentialStoreException invalidCredentialStoreEntryType(Class&lt;? extends KeyStore.Entry&gt; entryType,
+            Class&lt;? extends KeyStore.Entry&gt; expectedType);
+
+    @Message(id = 9511, value = &quot;Unable to read credential %s from store&quot;)
+    CredentialStoreException unableToReadCredentialTypeFromStore(Class&lt;? extends Credential&gt; credentialType);
+
+    @Message(id = 9512, value = &quot;Unable to remove credential from store&quot;)
+    CredentialStoreException cannotRemoveCredentialFromStore(@Cause Throwable cause);
+
+    @Message(id = 9513, value = &quot;Unable to flush credential store to storage&quot;)
+    CredentialStoreException cannotFlushCredentialStore(@Cause Throwable cause);
+
+    @Message(id = 9514, value = &quot;Unable to initialize credential store&quot;)
+    CredentialStoreException cannotInitializeCredentialStore(@Cause Throwable cause);
+
+    @Message(id = 9515, value = &quot;Ignored unrecognized key store entry \&quot;%s\&quot;&quot;)
+    @LogMessage(level = DEBUG)
+    void logIgnoredUnrecognizedKeyStoreEntry(String alias);
+
+    @Message(id = 9516, value = &quot;Failed to read a credential entry from the key store&quot;)
+    @LogMessage(level = WARN)
+    void logFailedToReadKeyFromKeyStore(@Cause Throwable cause);
+
+    @Message(id = 9517, value = &quot;This credential store type requires a store-wide protection parameter&quot;)
+    CredentialStoreException protectionParameterRequired();
+
+    @Message(id = 9518, value = &quot;Automatic storage creation for the Credential Store is disabled \&quot;%s\&quot;&quot;)
+    CredentialStoreException automaticStorageCreationDisabled(String location);
+
+    @Message(id = 9519, value = &quot;Unexpected credential store external storage file version \&quot;%s\&quot;&quot;)
+    IOException unexpectedFileVersion(String version);
+
+    @Message(id = 9520, value = &quot;Unrecognized entry type \&quot;%s\&quot;&quot;)
+    IOException unrecognizedEntryType(String entryType);
+
+    @Message(id = 9521, value = &quot;Internal encryption problem while reading \&quot;%s\&quot;&quot;)
+    IOException internalEncryptionProblem(@Cause Exception e, String location);
+
+    @Message(id = 9522, value = &quot;\&quot;%s\&quot; is not a block based algorithm&quot;)
+    CredentialStoreException algorithmNotBlockBased(String algorithm);
+
+    @Message(id = 9523, value = &quot;Algorithm \&quot;%s\&quot; does not use an initialization vector (IV)&quot;)
+    CredentialStoreException algorithmNotIV(String algorithm);
+
+    @Message(id = 9524, value = &quot;The actual number of bytes read %d is different from the expected number of bytes %d to be read&quot;)
+    IOException readBytesMismatch(int actual, int expected);
+
+    @Message(id = 9525, value = &quot;location and externalPath initial attributes are the same. [location=%s, externalPath=%s]&quot;)
+    CredentialStoreException locationAndExternalPathAreIdentical(String location, String externalPath);
+
+    @Message(id = 9526, value = &quot;Unable to initialize credential store as attribute %s is unsupported in %s&quot;)
+    CredentialStoreException unsupportedAttribute(String attribute, List&lt;String&gt; validAttribute);
+
+    @Message(id = 9528, value = &quot;The externalPath attribute for key store type %s is missing.&quot;)
+    CredentialStoreException externalPathMissing(String keyStoreType);
+
+    @Message(id = 11006, value = &quot;External storage key under alias \&quot;%s\&quot; does not exist&quot;)
+    CredentialStoreException externalStorageKeyDoesNotExist(String keyAlias);
+
+    /*
+     * The error code 12000 had accidentally been used twice, to avoid ambiguity it has been replaced with 20000.
+     */
+
+    //@Message(id = 12000, value = &quot;The credential store file %s does not exist or cannot be accessed.&quot;)
+    //CredentialStoreException credentialStoreFileDoesNotExist(String fileLocation);
+
+    @Message(id = 20000, value = &quot;The credential store file %s does not exist or cannot be accessed.&quot;)
+    CredentialStoreException credentialStoreFileDoesNotExist(String fileLocation);
+
+    @Message(id = 20001, value = &quot;The credential store has not been initialised.&quot;)
+    CredentialStoreException storeNotInitialised();
+
+    @Message(id = 20002, value = &quot;The required initialisation attribute '%s' has not been specified.&quot;)
+    CredentialStoreException missingInitialisationAttribute(String attribute);
+
+    @Message(id = 20003, value = &quot;Invalid CredentialStore property '%s'.&quot;)
+    CredentialStoreException invalidCredentialStoreProperty(String data);
+
+    @Message(id = 20004, value = &quot;Can not load SecretKey for '%s'.&quot;)
+    CredentialStoreException canNotLoadSecretKey(String alias, @Cause Throwable cause);
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

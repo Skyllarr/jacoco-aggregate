@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronAuthenticator.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-client</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.util</a> &gt; <span class="el_source">ElytronAuthenticator.java</span></div><h1>ElytronAuthenticator.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.util;
+
+import static java.security.AccessController.doPrivileged;
+import static org.wildfly.security.auth.util.ElytronMessages2.log;
+
+import java.io.IOException;
+import java.net.Authenticator;
+import java.net.PasswordAuthentication;
+import java.net.URISyntaxException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
+
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.NameCallback;
+import javax.security.auth.callback.PasswordCallback;
+import javax.security.auth.callback.UnsupportedCallbackException;
+
+import org.wildfly.security.auth.callback.CredentialCallback;
+import org.wildfly.security.auth.client.AuthenticationConfiguration;
+import org.wildfly.security.auth.client.AuthenticationContext;
+import org.wildfly.security.auth.client.AuthenticationContextConfigurationClient;
+import org.wildfly.security.credential.PasswordCredential;
+import org.wildfly.security.password.PasswordFactory;
+import org.wildfly.security.password.TwoWayPassword;
+import org.wildfly.security.password.spec.ClearPasswordSpec;
+import org.wildfly.security.permission.ElytronPermission;
+
+/**
+ * An implementation of {@link Authenticator} which uses the current security context to perform the authentication.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+@Deprecated
+public final class ElytronAuthenticator extends Authenticator {
+
+<span class="nc" id="L56">    private static final AuthenticationContextConfigurationClient client = doPrivileged(AuthenticationContextConfigurationClient.ACTION);</span>
+<span class="nc" id="L57">    private static final ElytronPermission CREATE_AUTHENTICATOR_PERMISSION = new ElytronPermission(&quot;createAuthenticator&quot;);</span>
+
+    /**
+     * Construct a new instance.  Requires the {@code createAuthenticator} {@link ElytronPermission}.
+     */
+<span class="nc" id="L62">    public ElytronAuthenticator() {</span>
+<span class="nc" id="L63">        final SecurityManager sm = System.getSecurityManager();</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        if (sm != null) {</span>
+<span class="nc" id="L65">            sm.checkPermission(CREATE_AUTHENTICATOR_PERMISSION);</span>
+        }
+<span class="nc" id="L67">    }</span>
+
+    /**
+     * Get the password authentication for this authenticator, which uses the current local
+     * {@linkplain AuthenticationContext authentication context} to log in to the remote server.
+     *
+     * @return the authenticator
+     */
+    protected PasswordAuthentication getPasswordAuthentication() {
+<span class="nc" id="L76">        final AuthenticationContext context = AuthenticationContext.captureCurrent();</span>
+        final AuthenticationConfiguration authenticationConfiguration;
+        try {
+<span class="nc" id="L79">            authenticationConfiguration = client.getAuthenticationConfiguration(getRequestingURL().toURI(), context);</span>
+<span class="nc" id="L80">        } catch (URISyntaxException e) {</span>
+<span class="nc" id="L81">            log.tracef(&quot;URISyntaxException getting URI from the requesting URL [%s]:&quot;, getRequestingURL(), e);</span>
+<span class="nc" id="L82">            return null;</span>
+<span class="nc" id="L83">        }</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (authenticationConfiguration == null) return null;</span>
+<span class="nc" id="L85">        final CallbackHandler callbackHandler = client.getCallbackHandler(authenticationConfiguration);</span>
+<span class="nc" id="L86">        final NameCallback nameCallback = new NameCallback(getRequestingPrompt());</span>
+<span class="nc" id="L87">        final CredentialCallback credentialCallback = new CredentialCallback(PasswordCredential.class);</span>
+
+<span class="nc" id="L89">        char[] password = null;</span>
+        try {
+<span class="nc" id="L91">            callbackHandler.handle(new Callback[] { nameCallback, credentialCallback });</span>
+<span class="nc" id="L92">            final TwoWayPassword twoWayPassword = credentialCallback.applyToCredential(PasswordCredential.class, c -&gt; c.getPassword().castAs(TwoWayPassword.class));</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">            if (twoWayPassword == null) {</span>
+<span class="nc" id="L94">                return null;</span>
+            }
+<span class="nc" id="L96">            final PasswordFactory factory = PasswordFactory.getInstance(twoWayPassword.getAlgorithm(), client.getProviderSupplier(authenticationConfiguration));</span>
+<span class="nc" id="L97">            password = factory.getKeySpec(factory.translate(twoWayPassword), ClearPasswordSpec.class).getEncodedPassword();</span>
+<span class="nc" id="L98">        } catch (UnsupportedCallbackException e) {</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            if (e.getCallback() == credentialCallback) {</span>
+                // try again with a password callback
+<span class="nc" id="L101">                final PasswordCallback passwordCallback = new PasswordCallback(&quot;Password&quot;, false);</span>
+                try {
+<span class="nc" id="L103">                    callbackHandler.handle(new Callback[] { nameCallback, passwordCallback });</span>
+<span class="nc" id="L104">                    password = passwordCallback.getPassword();</span>
+<span class="nc" id="L105">                } catch (IOException | UnsupportedCallbackException e1) {</span>
+<span class="nc" id="L106">                    log.trace(&quot;Error handling callback:&quot;, e1);</span>
+<span class="nc" id="L107">                    return null;</span>
+<span class="nc" id="L108">                }</span>
+            }
+<span class="nc" id="L110">        } catch (IOException e){</span>
+<span class="nc" id="L111">            log.trace(&quot;IOException handling callback:&quot;, e);</span>
+<span class="nc" id="L112">            return null;</span>
+<span class="nc" id="L113">        } catch (NoSuchAlgorithmException e) {</span>
+<span class="nc" id="L114">            log.trace(&quot;NoSuchAlgorithmException getting PasswordFactory:&quot;, e);</span>
+<span class="nc" id="L115">            return null;</span>
+<span class="nc" id="L116">        } catch (InvalidKeySpecException e){</span>
+<span class="nc" id="L117">            log.trace(&quot;InvalidKeySpecException getting ClearPasswordSpec:&quot;, e);</span>
+<span class="nc" id="L118">            return null;</span>
+<span class="nc" id="L119">        } catch (InvalidKeyException e) {</span>
+<span class="nc" id="L120">            log.trace(&quot;InvalidKeyException getting ClearPasswordSpec:&quot;, e);</span>
+<span class="nc" id="L121">            return null;</span>
+<span class="nc" id="L122">        }</span>
+<span class="nc" id="L123">        final String name = nameCallback.getName();</span>
+<span class="nc bnc" id="L124" title="All 4 branches missed.">        if (name == null || password == null) return null;</span>
+<span class="nc" id="L125">        return new PasswordAuthentication(name, password);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

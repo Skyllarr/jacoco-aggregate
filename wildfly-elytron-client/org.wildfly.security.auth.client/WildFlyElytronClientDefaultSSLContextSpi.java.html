@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>WildFlyElytronClientDefaultSSLContextSpi.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-client</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.client</a> &gt; <span class="el_source">WildFlyElytronClientDefaultSSLContextSpi.java</span></div><h1>WildFlyElytronClientDefaultSSLContextSpi.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2021 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.auth.client;
+
+import org.wildfly.client.config.ConfigXMLParseException;
+import org.wildfly.common.Assert;
+import org.wildfly.security.auth.client._private.ElytronMessages;
+
+import javax.net.ssl.KeyManager;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLContextSpi;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLServerSocketFactory;
+import javax.net.ssl.SSLSessionContext;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManager;
+import java.io.File;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.file.Paths;
+import java.security.AccessController;
+import java.security.GeneralSecurityException;
+import java.security.PrivilegedAction;
+import java.security.SecureRandom;
+
+/**
+ * SSLContextSpi that is used by WildFlyElytronClientDefaultSSLContextProvider
+ */
+public class WildFlyElytronClientDefaultSSLContextSpi extends SSLContextSpi {
+
+    private SSLContext configuredDefaultClientSSLContext;
+
+    /**
+     * SSLContextSpi used by WildFlyElytronClientDefaultSSLContextProvider that uses AuthenticationContext found on the classpath to retrieve default SSLContext.
+     */
+    public WildFlyElytronClientDefaultSSLContextSpi() throws GeneralSecurityException {
+<span class="nc" id="L52">        this(AuthenticationContext.captureCurrent());</span>
+<span class="nc" id="L53">    }</span>
+
+    /**
+     * SSLContextSpi used by WildFlyElytronClientDefaultSSLContextProvider that uses Elytron client configuration from provided path to retrieve default SSLContext.
+     *
+     * @param configPath path to the Elytron client configuration file
+     */
+    public WildFlyElytronClientDefaultSSLContextSpi(String configPath) throws GeneralSecurityException, ConfigXMLParseException {
+<span class="fc" id="L61">        this(ElytronXmlParser.parseAuthenticationClientConfiguration(configPathUrlToUri(configPath)).create());</span>
+<span class="fc" id="L62">    }</span>
+
+    /**
+     * SSLContextSpi used by WildFlyElytronClientDefaultSSLContextProvider that uses Elytron client configuration from provided authentication context.
+     *
+     * @param authenticationContext authentication context used to retrieve default SSLContext
+     */
+<span class="fc" id="L69">    public WildFlyElytronClientDefaultSSLContextSpi(AuthenticationContext authenticationContext) throws GeneralSecurityException {</span>
+<span class="fc" id="L70">        Assert.checkNotNullParam(&quot;authenticationContext&quot;, authenticationContext);</span>
+
+<span class="fc" id="L72">        AuthenticationContextConfigurationClient AUTH_CONTEXT_CLIENT = AccessController.doPrivileged((PrivilegedAction&lt;AuthenticationContextConfigurationClient&gt;) AuthenticationContextConfigurationClient::new);</span>
+<span class="fc" id="L73">        this.configuredDefaultClientSSLContext = AUTH_CONTEXT_CLIENT.getSSLContext(authenticationContext);</span>
+<span class="fc" id="L74">    }</span>
+
+    @Override
+    protected void engineInit(KeyManager[] keyManagers, TrustManager[] trustManagers, SecureRandom secureRandom) {
+        // ignore
+<span class="nc" id="L79">    }</span>
+
+    @Override
+    protected SSLSocketFactory engineGetSocketFactory() {
+<span class="fc" id="L83">        return this.configuredDefaultClientSSLContext.getSocketFactory();</span>
+    }
+
+    @Override
+    protected SSLServerSocketFactory engineGetServerSocketFactory() {
+<span class="nc" id="L88">        return this.configuredDefaultClientSSLContext.getServerSocketFactory();</span>
+    }
+
+    @Override
+    protected SSLEngine engineCreateSSLEngine() {
+<span class="fc" id="L93">        return this.configuredDefaultClientSSLContext.createSSLEngine();</span>
+    }
+
+    @Override
+    protected SSLEngine engineCreateSSLEngine(String s, int i) {
+<span class="nc" id="L98">        return this.configuredDefaultClientSSLContext.createSSLEngine(s, i);</span>
+    }
+
+    @Override
+    protected SSLSessionContext engineGetServerSessionContext() {
+<span class="nc" id="L103">        return this.configuredDefaultClientSSLContext.getServerSessionContext();</span>
+    }
+
+    @Override
+    protected SSLSessionContext engineGetClientSessionContext() {
+<span class="nc" id="L108">        return this.configuredDefaultClientSSLContext.getClientSessionContext();</span>
+    }
+
+    /**
+     * Source: A utility method taken from https://github.com/wildfly/wildfly-client-config/blob/master/src/main/java/org/wildfly/client/config/ClientConfiguration.java on March 2022
+     */
+    static URI configPathUrlToUri(String wildFlyConfig) {
+<span class="pc bpc" id="L115" title="1 of 4 branches missed.">        if (wildFlyConfig == null || wildFlyConfig.isEmpty()) {</span>
+<span class="fc" id="L116">            throw ElytronMessages.log.clientConfigurationFileNotValid();</span>
+        }
+<span class="pc bpc" id="L118" title="3 of 4 branches missed.">        if (File.separator.equals(&quot;\\&quot;) &amp;&amp; wildFlyConfig.contains(&quot;\\&quot;)) { // we are on the windows and path is for windows</span>
+<span class="nc" id="L119">            File f = new File(wildFlyConfig);</span>
+<span class="nc" id="L120">            return f.toPath().toUri();</span>
+        } else {
+            try {
+<span class="fc" id="L123">                URI uri = new URI(wildFlyConfig);</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">                if (!uri.isAbsolute()) { // URI does not include schema</span>
+<span class="pc bpc" id="L125" title="2 of 4 branches missed.">                    if (uri.getPath().charAt(0) != File.separatorChar &amp;&amp; uri.getPath().charAt(0) != '/') { // relative path</span>
+<span class="fc" id="L126">                        String userDir = System.getProperty(&quot;user.dir&quot;).replace(File.separatorChar, '/');</span>
+<span class="fc" id="L127">                        return Paths.get(userDir, uri.getPath()).toUri();</span>
+                    } else { // absolute path
+<span class="nc" id="L129">                        return Paths.get(uri.getPath()).toUri();</span>
+                    }
+                }
+<span class="nc" id="L132">                return uri;</span>
+<span class="nc" id="L133">            } catch (URISyntaxException e) {</span>
+                // no config file there
+<span class="nc" id="L135">                return null;</span>
+            }
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

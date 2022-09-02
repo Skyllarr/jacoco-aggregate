@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>StackInspector.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-security-manager</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.manager</a> &gt; <span class="el_source">StackInspector.java</span></div><h1>StackInspector.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2013 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.manager;
+
+import static java.lang.Math.max;
+import static java.lang.Math.min;
+import static java.lang.System.getSecurityManager;
+import static java.util.Arrays.copyOfRange;
+import static org.wildfly.security.manager.WildFlySecurityManagerPermission.getStackInspectorPermission;
+
+/**
+ * A utility class which is useful for inspecting the call stack.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class StackInspector {
+
+<span class="nc" id="L34">    private static final StackInspector INSTANCE = new StackInspector();</span>
+
+    private StackInspector() {
+    }
+
+    /**
+     * Get the singleton {@code StackInspector} instance.  The caller must have the {@code getStackInspector}
+     * {@link RuntimePermission}.
+     * If the security manager is enabled, requires {@code getStackInspector} {@link WildFlySecurityManagerPermission}.
+     *
+     * @return the singleton {@code StackInspector} instance
+     */
+    public static StackInspector getInstance() {
+<span class="nc" id="L47">        final SecurityManager securityManager = getSecurityManager();</span>
+<span class="nc bnc" id="L48" title="All 2 branches missed.">        if (securityManager instanceof WildFlySecurityManager) {</span>
+<span class="nc" id="L49">            securityManager.checkPermission(getStackInspectorPermission, INSTANCE.getCallerClass(1));</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">        } else if (securityManager != null) {</span>
+<span class="nc" id="L51">            securityManager.checkPermission(getStackInspectorPermission);</span>
+        }
+<span class="nc" id="L53">        return INSTANCE;</span>
+    }
+
+    /**
+     * Get the caller class.  The {@code skipFrames} argument specifies how many spots to go back
+     * on the call stack; 0 indicates the immediate caller.
+     *
+     * @param skipFrames the number of frames to skip over before the immediate caller
+     * @return the caller class
+     */
+    public Class&lt;?&gt; getCallerClass(int skipFrames) {
+<span class="nc" id="L64">        return WildFlySecurityManager.getCallerClass(max(0, skipFrames) + 1);</span>
+    }
+
+    /**
+     * Get all or a portion of the call stack.  The {@code numFrames} argument specifies how many frames should be
+     * returned.
+     *
+     * @param skipFrames the number of frames to skip; 0 will include the immediate caller at index 0
+     * @param numFrames the maximum number of frames to return
+     * @return the partial call stack
+     */
+    public Class&lt;?&gt;[] getCallStack(int skipFrames, int numFrames) {
+<span class="nc" id="L76">        final Class&lt;?&gt;[] stack = WildFlySecurityManager.getCallStack();</span>
+<span class="nc" id="L77">        final int from = max(0, skipFrames) + 2;</span>
+<span class="nc" id="L78">        return copyOfRange(stack, from, min(from + numFrames, stack.length));</span>
+    }
+
+    /**
+     * Get all or a portion of the call stack.  The {@code numFrames} argument specifies how many frames should be
+     * returned.
+     *
+     * @param skipFrames the number of frames to skip; 0 will include the immediate caller at index 0
+     * @return the partial call stack
+     */
+    public Class&lt;?&gt;[] getCallStack(int skipFrames) {
+<span class="nc" id="L89">        final Class&lt;?&gt;[] stack = WildFlySecurityManager.getCallStack();</span>
+<span class="nc" id="L90">        final int from = max(0, skipFrames) + 2;</span>
+<span class="nc" id="L91">        return copyOfRange(stack, from, stack.length);</span>
+    }
+
+    /**
+     * Get the call stack.
+     *
+     * @return the call stack
+     */
+    public Class&lt;?&gt;[] getCallStack() {
+<span class="nc" id="L100">        final Class&lt;?&gt;[] stack = WildFlySecurityManager.getCallStack();</span>
+<span class="nc" id="L101">        return copyOfRange(stack, 2, stack.length);</span>
+    }
+
+    /**
+     * Determine whether the call stack contains a given class.  Useful for assertions.
+     *
+     * @param clazz the class to test
+     * @return {@code true} if the call stack contains the class
+     */
+    public boolean callStackContains(Class&lt;?&gt; clazz) {
+<span class="nc" id="L111">        final Class&lt;?&gt;[] stack = WildFlySecurityManager.getCallStack();</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        for (int i = 2; i &lt; stack.length; i ++) {</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">            if (stack[i] == clazz) return true;</span>
+        }
+<span class="nc" id="L115">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

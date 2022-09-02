@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RealmMapper.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.server</a> &gt; <span class="el_source">RealmMapper.java</span></div><h1>RealmMapper.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source
+ * Copyright 2013 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.server;
+
+import java.security.Principal;
+import java.util.function.BiPredicate;
+import java.util.function.Predicate;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.evidence.Evidence;
+
+/**
+ * A realm mapper.  Examines authentication identity information and translates it into a realm name.  If the realm
+ * mapper does not recognize the authentication information, a default realm will be chosen.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+@FunctionalInterface
+public interface RealmMapper {
+
+    /**
+     * Get the realm mapping.  Return {@code null} if the default realm should be used.
+     *
+     * @param principal the authentication principal (or {@code null} if none is known for this authentication)
+     * @param evidence the authentication evidence (or {@code null} if none is known for this authentication)
+     * @return the realm, or {@code null} if no particular realm matches the authentication information
+     */
+    String getRealmMapping(Principal principal, Evidence evidence);
+
+    /**
+     * A realm mapper which always falls back to a default realm.
+     */
+<span class="fc" id="L49">    RealmMapper DEFAULT_REALM_MAPPER = single(null);</span>
+
+    /**
+     * Create a realm mapper that always maps to the given realm.
+     *
+     * @param realmName the realm name to return, or {@code null} if the default realm should be used
+     * @return the realm mapper returning {@code realmName}
+     */
+    static RealmMapper single(String realmName) {
+<span class="fc" id="L58">        return (principal, evidence) -&gt; realmName;</span>
+    }
+
+    /**
+     * Create a realm mapper that matches when the given predicate matches.
+     *
+     * @param matchRule the match rule (must not be {@code null})
+     * @param realmName the realm name to return, or {@code null} to return the default realm
+     * @return the realm mapper (not {@code null})
+     */
+    static RealmMapper matching(BiPredicate&lt;? super Principal, ? super Evidence&gt; matchRule, String realmName) {
+<span class="nc" id="L69">        Assert.checkNotNullParam(&quot;matchRule&quot;, matchRule);</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        return (p, e) -&gt; matchRule.test(p, e) ? realmName : null;</span>
+    }
+
+    /**
+     * Create a realm mapper that matches when the given predicate matches the principal.
+     *
+     * @param matchRule the match rule (must not be {@code null})
+     * @param realmName the realm name to return, or {@code null} to return the default realm
+     * @return the realm mapper (not {@code null})
+     */
+    static RealmMapper matchingPrincipal(Predicate&lt;? super Principal&gt; matchRule, String realmName) {
+<span class="nc" id="L81">        Assert.checkNotNullParam(&quot;matchRule&quot;, matchRule);</span>
+<span class="nc" id="L82">        return matching((p, e) -&gt; matchRule.test(p), realmName);</span>
+    }
+
+    /**
+     * Create a realm mapper that matches when the principal is of the given type.
+     *
+     * @param principalType the principal type class (must not be {@code null})
+     * @param realmName the realm name to return, or {@code null} to return the default realm
+     * @return the realm mapper (not {@code null})
+     */
+    static RealmMapper matchingPrincipalType(Class&lt;? extends Principal&gt; principalType, String realmName) {
+<span class="nc" id="L93">        Assert.checkNotNullParam(&quot;principalType&quot;, principalType);</span>
+<span class="nc" id="L94">        return matchingPrincipal(principalType::isInstance, realmName);</span>
+    }
+
+    /**
+     * Create a realm mapper that matches when the given predicate matches the evidence.
+     *
+     * @param matchRule the match rule (must not be {@code null})
+     * @param realmName the realm name to return, or {@code null} to return the default realm
+     * @return the realm mapper (not {@code null})
+     */
+    static RealmMapper matchingEvidence(Predicate&lt;? super Evidence&gt; matchRule, String realmName) {
+<span class="nc" id="L105">        Assert.checkNotNullParam(&quot;matchRule&quot;, matchRule);</span>
+<span class="nc" id="L106">        return matching((p, e) -&gt; matchRule.test(e), realmName);</span>
+    }
+
+    /**
+     * Create a realm mapper that matches when the evidence is of the given type.
+     *
+     * @param evidenceType the evidence type class (must not be {@code null})
+     * @param realmName the realm name to return, or {@code null} to return the default realm
+     * @return the realm mapper (not {@code null})
+     */
+    static RealmMapper matchingEvidenceType(Class&lt;? extends Evidence&gt; evidenceType, String realmName) {
+<span class="nc" id="L117">        Assert.checkNotNullParam(&quot;evidenceType&quot;, evidenceType);</span>
+<span class="nc" id="L118">        return matchingEvidence(evidenceType::isInstance, realmName);</span>
+    }
+
+    /**
+     * Create an aggregate realm mapping strategy.
+     *
+     * @param mapper1 the first mapper to try (must not be {@code null})
+     * @param mapper2 the second mapper to try (must not be {@code null})
+     * @return an aggregated mapper (not {@code null})
+     */
+    static RealmMapper aggregate(RealmMapper mapper1, RealmMapper mapper2) {
+<span class="nc" id="L129">        Assert.checkNotNullParam(&quot;mapper1&quot;, mapper1);</span>
+<span class="nc" id="L130">        Assert.checkNotNullParam(&quot;mapper2&quot;, mapper2);</span>
+<span class="nc" id="L131">        return (principal, evidence) -&gt; {</span>
+<span class="nc" id="L132">            String mapping = mapper1.getRealmMapping(principal, evidence);</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">            if (mapping == null) mapping = mapper2.getRealmMapping(principal, evidence);</span>
+<span class="nc" id="L134">            return mapping;</span>
+        };
+    }
+
+    /**
+     * Create an aggregate realm mapping strategy.
+     *
+     * @param mappers the mappers to try (must not be {@code null})
+     * @return an aggregated mapper (not {@code null})
+     */
+    static RealmMapper aggregate(RealmMapper... mappers) {
+<span class="nc" id="L145">        Assert.checkNotNullParam(&quot;mappers&quot;, mappers);</span>
+<span class="nc" id="L146">        return (principal, evidence) -&gt; {</span>
+<span class="nc bnc" id="L147" title="All 4 branches missed.">            for (RealmMapper mapper : mappers) if (mapper != null) {</span>
+<span class="nc" id="L148">                String mapping = mapper.getRealmMapping(principal, evidence);</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">                if (mapping != null) return mapping;</span>
+            }
+<span class="nc" id="L151">            return null;</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

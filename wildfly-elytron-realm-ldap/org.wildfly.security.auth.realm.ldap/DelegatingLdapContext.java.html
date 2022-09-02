@@ -1,0 +1,554 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DelegatingLdapContext.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-realm-ldap</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.realm.ldap</a> &gt; <span class="el_source">DelegatingLdapContext.java</span></div><h1>DelegatingLdapContext.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source
+ *
+ * Copyright 2016 Red Hat, Inc. and/or its affiliates.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.realm.ldap;
+
+import java.security.AccessController;
+import java.security.PrivilegedAction;
+import java.util.Hashtable;
+
+import javax.naming.Binding;
+import javax.naming.Context;
+import javax.naming.Name;
+import javax.naming.NameClassPair;
+import javax.naming.NameParser;
+import javax.naming.NamingEnumeration;
+import javax.naming.NamingException;
+import javax.naming.ReferralException;
+import javax.naming.directory.Attributes;
+import javax.naming.directory.DirContext;
+import javax.naming.directory.ModificationItem;
+import javax.naming.directory.SearchControls;
+import javax.naming.directory.SearchResult;
+import javax.naming.ldap.Control;
+import javax.naming.ldap.ExtendedRequest;
+import javax.naming.ldap.ExtendedResponse;
+import javax.naming.ldap.InitialLdapContext;
+import javax.naming.ldap.LdapContext;
+import javax.net.SocketFactory;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.manager.action.SetContextClassLoaderAction;
+
+/**
+ * Delegating {@link LdapContext} allowing redefine close and reconnect operations.
+ * Used by {@link SimpleDirContextFactoryBuilder} to ensure context returning instead of close.
+ *
+ * If the context is copied using {@link #newInstance(Control[])}, close handler will not used by the copy.
+ * On the other hand, reconnect handler will used by both of them.
+ *
+ * If non-Ldap context is obtained, LdapContext specific methods throws {@link UnsupportedOperationException}.
+ *
+ * @author &lt;a href=&quot;mailto:jkalina@redhat.com&quot;&gt;Jan Kalina&lt;/a&gt;
+ */
+class DelegatingLdapContext implements LdapContext {
+
+    private final DirContext delegating;
+    private final CloseHandler closeHandler;
+    private final SocketFactory socketFactory;
+
+    interface CloseHandler {
+        void handle(DirContext context) throws NamingException;
+    }
+
+<span class="nc" id="L69">    DelegatingLdapContext(DirContext delegating, CloseHandler closeHandler, SocketFactory socketFactory) throws NamingException {</span>
+<span class="nc" id="L70">        this.delegating = delegating;</span>
+<span class="nc" id="L71">        this.closeHandler = closeHandler;</span>
+<span class="nc" id="L72">        this.socketFactory = socketFactory;</span>
+<span class="nc" id="L73">    }</span>
+
+    // for needs of newInstance()
+<span class="nc" id="L76">    private DelegatingLdapContext(DirContext delegating, SocketFactory socketFactory) throws NamingException {</span>
+<span class="nc" id="L77">        this.delegating = delegating;</span>
+<span class="nc" id="L78">        this.closeHandler = null; // close handler should not be applied to copy</span>
+<span class="nc" id="L79">        this.socketFactory = socketFactory;</span>
+<span class="nc" id="L80">    }</span>
+
+    public LdapContext newInitialLdapContext(Hashtable&lt;?,?&gt; environment, Control[] connCtls) throws NamingException {
+<span class="nc" id="L83">        ClassLoader previous = setSocketFactory();</span>
+        try {
+<span class="nc" id="L85">            return new InitialLdapContext(environment, null);</span>
+        } finally {
+<span class="nc" id="L87">            unsetSocketFactory(previous);</span>
+        }
+    }
+
+    @Override
+    public void close() throws NamingException {
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        if (closeHandler == null) {</span>
+<span class="nc" id="L94">            delegating.close();</span>
+        } else {
+<span class="nc" id="L96">            closeHandler.handle(delegating);</span>
+        }
+<span class="nc" id="L98">    }</span>
+
+    // for needs of search()
+    private NamingEnumeration&lt;SearchResult&gt; wrap(NamingEnumeration&lt;SearchResult&gt; delegating) {
+<span class="nc" id="L102">        return new NamingEnumeration&lt;SearchResult&gt; () {</span>
+
+            @Override
+            public boolean hasMoreElements() {
+<span class="nc" id="L106">                ClassLoader previous = setSocketFactory();</span>
+                try {
+<span class="nc" id="L108">                    return delegating.hasMoreElements();</span>
+                } finally {
+<span class="nc" id="L110">                    unsetSocketFactory(previous);</span>
+                }
+            }
+
+            @Override
+            public SearchResult nextElement() {
+<span class="nc" id="L116">                ClassLoader previous = setSocketFactory();</span>
+                try {
+<span class="nc" id="L118">                    return delegating.nextElement();</span>
+                } finally {
+<span class="nc" id="L120">                    unsetSocketFactory(previous);</span>
+                }
+            }
+
+            @Override
+            public SearchResult next() throws NamingException {
+<span class="nc" id="L126">                ClassLoader previous = setSocketFactory();</span>
+                try {
+<span class="nc" id="L128">                    return delegating.next();</span>
+                } finally {
+<span class="nc" id="L130">                    unsetSocketFactory(previous);</span>
+                }
+            }
+
+            @Override
+            public boolean hasMore() throws NamingException {
+<span class="nc" id="L136">                ClassLoader previous = setSocketFactory();</span>
+                try {
+<span class="nc" id="L138">                    return delegating.hasMore();</span>
+                } finally {
+<span class="nc" id="L140">                    unsetSocketFactory(previous);</span>
+                }
+            }
+
+            @Override
+            public void close() throws NamingException {
+<span class="nc" id="L146">                delegating.close();</span>
+<span class="nc" id="L147">            }</span>
+        };
+    }
+
+    public DelegatingLdapContext wrapReferralContextObtaining(ReferralException e) throws NamingException {
+<span class="nc" id="L152">        ClassLoader previous = setSocketFactory();</span>
+        try {
+<span class="nc" id="L154">            return new DelegatingLdapContext((DirContext) e.getReferralContext(), socketFactory);</span>
+        } finally {
+<span class="nc" id="L156">            unsetSocketFactory(previous);</span>
+        }
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L162">        return super.toString() + &quot;-&gt;&quot; + delegating.toString();</span>
+    }
+
+    // LdapContext specific
+
+    @Override
+    public ExtendedResponse extendedOperation(ExtendedRequest request) throws NamingException {
+<span class="nc bnc" id="L169" title="All 2 branches missed.">        if ( ! (delegating instanceof LdapContext)) throw Assert.unsupported();</span>
+<span class="nc" id="L170">        return ((LdapContext) delegating).extendedOperation(request);</span>
+    }
+
+    @Override
+    public LdapContext newInstance(Control[] requestControls) throws NamingException {
+<span class="nc bnc" id="L175" title="All 2 branches missed.">        if ( ! (delegating instanceof LdapContext)) throw Assert.unsupported();</span>
+<span class="nc" id="L176">        LdapContext newContext = ((LdapContext) delegating).newInstance(requestControls);</span>
+<span class="nc" id="L177">        return new DelegatingLdapContext(newContext, socketFactory);</span>
+    }
+
+    @Override
+    public void reconnect(Control[] controls) throws NamingException {
+<span class="nc bnc" id="L182" title="All 2 branches missed.">        if ( ! (delegating instanceof LdapContext)) throw Assert.unsupported();</span>
+<span class="nc" id="L183">        ClassLoader previous = setSocketFactory();</span>
+        try {
+<span class="nc" id="L185">            ((LdapContext) delegating).reconnect(controls);</span>
+        } finally {
+<span class="nc" id="L187">            unsetSocketFactory(previous);</span>
+        }
+<span class="nc" id="L189">    }</span>
+
+    @Override
+    public Control[] getConnectControls() throws NamingException {
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        if ( ! (delegating instanceof LdapContext)) throw Assert.unsupported();</span>
+<span class="nc" id="L194">        return ((LdapContext) delegating).getConnectControls();</span>
+    }
+
+    @Override
+    public void setRequestControls(Control[] requestControls) throws NamingException {
+<span class="nc bnc" id="L199" title="All 2 branches missed.">        if ( ! (delegating instanceof LdapContext)) throw Assert.unsupported();</span>
+<span class="nc" id="L200">        ((LdapContext) delegating).setRequestControls(requestControls);</span>
+<span class="nc" id="L201">    }</span>
+
+    @Override
+    public Control[] getRequestControls() throws NamingException {
+<span class="nc bnc" id="L205" title="All 2 branches missed.">        if ( ! (delegating instanceof LdapContext)) throw Assert.unsupported();</span>
+<span class="nc" id="L206">        return ((LdapContext) delegating).getRequestControls();</span>
+    }
+
+    @Override
+    public Control[] getResponseControls() throws NamingException {
+<span class="nc bnc" id="L211" title="All 2 branches missed.">        if ( ! (delegating instanceof LdapContext)) throw Assert.unsupported();</span>
+<span class="nc" id="L212">        return ((LdapContext) delegating).getResponseControls();</span>
+    }
+
+    // DirContext methods delegates only
+
+    @Override
+    public void bind(String name, Object obj, Attributes attrs) throws NamingException {
+<span class="nc" id="L219">        delegating.bind(name, obj, attrs);</span>
+<span class="nc" id="L220">    }</span>
+
+    @Override
+    public Attributes getAttributes(Name name) throws NamingException {
+<span class="nc" id="L224">        return delegating.getAttributes(name);</span>
+    }
+
+    @Override
+    public Attributes getAttributes(String name) throws NamingException {
+<span class="nc" id="L229">        return delegating.getAttributes(name);</span>
+    }
+
+    @Override
+    public Attributes getAttributes(Name name, String[] attrIds) throws NamingException {
+<span class="nc" id="L234">        return delegating.getAttributes(name, attrIds);</span>
+    }
+
+    @Override
+    public Attributes getAttributes(String name, String[] attrIds) throws NamingException {
+<span class="nc" id="L239">        return delegating.getAttributes(name, attrIds);</span>
+    }
+
+    @Override
+    public void modifyAttributes(Name name, int mod_op, Attributes attrs) throws NamingException {
+<span class="nc" id="L244">        delegating.modifyAttributes(name, mod_op, attrs);</span>
+<span class="nc" id="L245">    }</span>
+
+    @Override
+    public void modifyAttributes(String name, int mod_op, Attributes attrs) throws NamingException {
+<span class="nc" id="L249">        delegating.modifyAttributes(name, mod_op, attrs);</span>
+<span class="nc" id="L250">    }</span>
+
+    @Override
+    public void modifyAttributes(Name name, ModificationItem[] mods) throws NamingException {
+<span class="nc" id="L254">        delegating.modifyAttributes(name, mods);</span>
+<span class="nc" id="L255">    }</span>
+
+    @Override
+    public void modifyAttributes(String name, ModificationItem[] mods) throws NamingException {
+<span class="nc" id="L259">        delegating.modifyAttributes(name, mods);</span>
+<span class="nc" id="L260">    }</span>
+
+    @Override
+    public void bind(Name name, Object obj, Attributes attrs) throws NamingException {
+<span class="nc" id="L264">        delegating.bind(name, obj, attrs);</span>
+<span class="nc" id="L265">    }</span>
+
+    @Override
+    public void rebind(Name name, Object obj, Attributes attrs) throws NamingException {
+<span class="nc" id="L269">        delegating.rebind(name, obj, attrs);</span>
+<span class="nc" id="L270">    }</span>
+
+    @Override
+    public void rebind(String name, Object obj, Attributes attrs) throws NamingException {
+<span class="nc" id="L274">        delegating.rebind(name, obj, attrs);</span>
+<span class="nc" id="L275">    }</span>
+
+    @Override
+    public DirContext createSubcontext(Name name, Attributes attrs) throws NamingException {
+<span class="nc" id="L279">        return delegating.createSubcontext(name, attrs);</span>
+    }
+
+    @Override
+    public DirContext createSubcontext(String name, Attributes attrs) throws NamingException {
+<span class="nc" id="L284">        return delegating.createSubcontext(name, attrs);</span>
+    }
+
+    @Override
+    public DirContext getSchema(Name name) throws NamingException {
+<span class="nc" id="L289">        return delegating.getSchema(name);</span>
+    }
+
+    @Override
+    public DirContext getSchema(String name) throws NamingException {
+<span class="nc" id="L294">        return delegating.getSchema(name);</span>
+    }
+
+    @Override
+    public DirContext getSchemaClassDefinition(Name name) throws NamingException {
+<span class="nc" id="L299">        return delegating.getSchemaClassDefinition(name);</span>
+    }
+
+    @Override
+    public DirContext getSchemaClassDefinition(String name) throws NamingException {
+<span class="nc" id="L304">        return delegating.getSchemaClassDefinition(name);</span>
+    }
+
+    @Override
+    public NamingEnumeration&lt;SearchResult&gt; search(Name name, Attributes matchingAttributes, String[] attributesToReturn) throws NamingException {
+<span class="nc" id="L309">        ClassLoader previous = setSocketFactory();</span>
+        try {
+<span class="nc" id="L311">            return wrap(delegating.search(name, matchingAttributes, attributesToReturn));</span>
+        } finally {
+<span class="nc" id="L313">            unsetSocketFactory(previous);</span>
+        }
+    }
+
+    @Override
+    public NamingEnumeration&lt;SearchResult&gt; search(String name, Attributes matchingAttributes, String[] attributesToReturn) throws NamingException {
+<span class="nc" id="L319">        ClassLoader previous = setSocketFactory();</span>
+        try {
+<span class="nc" id="L321">            return wrap(delegating.search(name, matchingAttributes, attributesToReturn));</span>
+        } finally {
+<span class="nc" id="L323">            unsetSocketFactory(previous);</span>
+        }
+    }
+
+    @Override
+    public NamingEnumeration&lt;SearchResult&gt; search(Name name, Attributes matchingAttributes) throws NamingException {
+<span class="nc" id="L329">        ClassLoader previous = setSocketFactory();</span>
+        try {
+<span class="nc" id="L331">            return wrap(delegating.search(name, matchingAttributes));</span>
+        } finally {
+<span class="nc" id="L333">            unsetSocketFactory(previous);</span>
+        }
+    }
+
+    @Override
+    public NamingEnumeration&lt;SearchResult&gt; search(String name, Attributes matchingAttributes) throws NamingException {
+<span class="nc" id="L339">        ClassLoader previous = setSocketFactory();</span>
+        try {
+<span class="nc" id="L341">            return wrap(delegating.search(name, matchingAttributes));</span>
+        } finally {
+<span class="nc" id="L343">            unsetSocketFactory(previous);</span>
+        }
+    }
+
+    @Override
+    public NamingEnumeration&lt;SearchResult&gt; search(Name name, String filter, SearchControls cons) throws NamingException {
+<span class="nc" id="L349">        ClassLoader previous = setSocketFactory();</span>
+        try{
+<span class="nc" id="L351">            return wrap(delegating.search(name, filter, cons));</span>
+        } finally {
+<span class="nc" id="L353">            unsetSocketFactory(previous);</span>
+        }
+    }
+
+    @Override
+    public NamingEnumeration&lt;SearchResult&gt; search(String name, String filter, SearchControls cons) throws NamingException {
+<span class="nc" id="L359">        ClassLoader previous = setSocketFactory();</span>
+        try {
+<span class="nc" id="L361">            return wrap(delegating.search(name, filter, cons));</span>
+        } finally {
+<span class="nc" id="L363">            unsetSocketFactory(previous);</span>
+        }
+    }
+
+    @Override
+    public NamingEnumeration&lt;SearchResult&gt; search(Name name, String filterExpr, Object[] filterArgs, SearchControls cons) throws NamingException {
+<span class="nc" id="L369">        ClassLoader previous = setSocketFactory();</span>
+        try {
+<span class="nc" id="L371">            return wrap(delegating.search(name, filterExpr, filterArgs, cons));</span>
+        } finally {
+<span class="nc" id="L373">            unsetSocketFactory(previous);</span>
+        }
+    }
+
+    @Override
+    public NamingEnumeration&lt;SearchResult&gt; search(String name, String filterExpr, Object[] filterArgs, SearchControls cons) throws NamingException {
+<span class="nc" id="L379">        ClassLoader previous = setSocketFactory();</span>
+        try {
+<span class="nc" id="L381">            return wrap(delegating.search(name, filterExpr, filterArgs, cons));</span>
+        } finally {
+<span class="nc" id="L383">            unsetSocketFactory(previous);</span>
+        }
+    }
+
+    @Override
+    public Object lookup(Name name) throws NamingException {
+<span class="nc" id="L389">        return delegating.lookup(name);</span>
+    }
+
+    @Override
+    public Object lookup(String name) throws NamingException {
+<span class="nc" id="L394">        return delegating.lookup(name);</span>
+    }
+
+    @Override
+    public void bind(Name name, Object obj) throws NamingException {
+<span class="nc" id="L399">        delegating.bind(name, obj);</span>
+<span class="nc" id="L400">    }</span>
+
+    @Override
+    public void bind(String name, Object obj) throws NamingException {
+<span class="nc" id="L404">        delegating.bind(name, obj);</span>
+<span class="nc" id="L405">    }</span>
+
+    @Override
+    public void rebind(Name name, Object obj) throws NamingException {
+<span class="nc" id="L409">        delegating.rebind(name, obj);</span>
+<span class="nc" id="L410">    }</span>
+
+    @Override
+    public void rebind(String name, Object obj) throws NamingException {
+<span class="nc" id="L414">        delegating.rebind(name, obj);</span>
+<span class="nc" id="L415">    }</span>
+
+    @Override
+    public void unbind(Name name) throws NamingException {
+<span class="nc" id="L419">        delegating.unbind(name);</span>
+<span class="nc" id="L420">    }</span>
+
+    @Override
+    public void unbind(String name) throws NamingException {
+<span class="nc" id="L424">        delegating.unbind(name);</span>
+<span class="nc" id="L425">    }</span>
+
+    @Override
+    public void rename(Name oldName, Name newName) throws NamingException {
+<span class="nc" id="L429">        delegating.rename(oldName, newName);</span>
+<span class="nc" id="L430">    }</span>
+
+    @Override
+    public void rename(String oldName, String newName) throws NamingException {
+<span class="nc" id="L434">        delegating.rename(oldName, newName);</span>
+<span class="nc" id="L435">    }</span>
+
+    @Override
+    public NamingEnumeration&lt;NameClassPair&gt; list(Name name) throws NamingException {
+<span class="nc" id="L439">        return delegating.list(name);</span>
+    }
+
+    @Override
+    public NamingEnumeration&lt;NameClassPair&gt; list(String name) throws NamingException {
+<span class="nc" id="L444">        return delegating.list(name);</span>
+    }
+
+    @Override
+    public NamingEnumeration&lt;Binding&gt; listBindings(Name name) throws NamingException {
+<span class="nc" id="L449">        return delegating.listBindings(name);</span>
+    }
+
+    @Override
+    public NamingEnumeration&lt;Binding&gt; listBindings(String name) throws NamingException {
+<span class="nc" id="L454">        return delegating.listBindings(name);</span>
+    }
+
+    @Override
+    public void destroySubcontext(Name name) throws NamingException {
+<span class="nc" id="L459">        delegating.destroySubcontext(name);</span>
+<span class="nc" id="L460">    }</span>
+
+    @Override
+    public void destroySubcontext(String name) throws NamingException {
+<span class="nc" id="L464">        delegating.destroySubcontext(name);</span>
+<span class="nc" id="L465">    }</span>
+
+    @Override
+    public Context createSubcontext(Name name) throws NamingException {
+<span class="nc" id="L469">        return delegating.createSubcontext(name);</span>
+    }
+
+    @Override
+    public Context createSubcontext(String name) throws NamingException {
+<span class="nc" id="L474">        return delegating.createSubcontext(name);</span>
+    }
+
+    @Override
+    public Object lookupLink(Name name) throws NamingException {
+<span class="nc" id="L479">        return delegating.lookupLink(name);</span>
+    }
+
+    @Override
+    public Object lookupLink(String name) throws NamingException {
+<span class="nc" id="L484">        return delegating.lookupLink(name);</span>
+    }
+
+    @Override
+    public NameParser getNameParser(Name name) throws NamingException {
+<span class="nc" id="L489">        return delegating.getNameParser(name);</span>
+    }
+
+    @Override
+    public NameParser getNameParser(String name) throws NamingException {
+<span class="nc" id="L494">        return delegating.getNameParser(name);</span>
+    }
+
+    @Override
+    public Name composeName(Name name, Name prefix) throws NamingException {
+<span class="nc" id="L499">        return delegating.composeName(name, prefix);</span>
+    }
+
+    @Override
+    public String composeName(String name, String prefix) throws NamingException {
+<span class="nc" id="L504">        return delegating.composeName(name, prefix);</span>
+    }
+
+    @Override
+    public Object addToEnvironment(String propName, Object propVal) throws NamingException {
+<span class="nc" id="L509">        return delegating.addToEnvironment(propName, propVal);</span>
+    }
+
+    @Override
+    public Object removeFromEnvironment(String propName) throws NamingException {
+<span class="nc" id="L514">        return delegating.removeFromEnvironment(propName);</span>
+    }
+
+    @Override
+    public Hashtable&lt;?, ?&gt; getEnvironment() throws NamingException {
+<span class="nc" id="L519">        return delegating.getEnvironment();</span>
+    }
+
+    @Override
+    public String getNameInNamespace() throws NamingException {
+<span class="nc" id="L524">        return delegating.getNameInNamespace();</span>
+    }
+
+    private ClassLoader setSocketFactory() {
+<span class="nc bnc" id="L528" title="All 2 branches missed.">        if (socketFactory != null) {</span>
+<span class="nc" id="L529">            ThreadLocalSSLSocketFactory.set(socketFactory);</span>
+<span class="nc" id="L530">            return setClassLoaderTo(getSocketFactoryClassLoader());</span>
+        }
+<span class="nc" id="L532">        return null;</span>
+    }
+
+    private void unsetSocketFactory(ClassLoader previous) {
+<span class="nc bnc" id="L536" title="All 2 branches missed.">        if (socketFactory != null) {</span>
+<span class="nc" id="L537">            ThreadLocalSSLSocketFactory.unset();</span>
+<span class="nc" id="L538">            setClassLoaderTo(previous);</span>
+        }
+<span class="nc" id="L540">    }</span>
+
+    private ClassLoader getSocketFactoryClassLoader() {
+<span class="nc" id="L543">        return ThreadLocalSSLSocketFactory.class.getClassLoader();</span>
+    }
+
+    private ClassLoader setClassLoaderTo(final ClassLoader targetClassLoader){
+<span class="nc" id="L547">        return doPrivileged(new SetContextClassLoaderAction(targetClassLoader));</span>
+    }
+
+    private static &lt;T&gt; T doPrivileged(final PrivilegedAction&lt;T&gt; action) {
+<span class="nc bnc" id="L551" title="All 2 branches missed.">        return System.getSecurityManager() != null ? AccessController.doPrivileged(action) : action.run();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

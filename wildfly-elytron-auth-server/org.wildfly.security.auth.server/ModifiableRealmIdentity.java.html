@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ModifiableRealmIdentity.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.server</a> &gt; <span class="el_source">ModifiableRealmIdentity.java</span></div><h1>ModifiableRealmIdentity.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.server;
+
+import java.security.Principal;
+import java.security.spec.AlgorithmParameterSpec;
+import java.util.Collection;
+import java.util.Collections;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.auth.server._private.ElytronMessages;
+import org.wildfly.security.auth.SupportLevel;
+import org.wildfly.security.authz.Attributes;
+import org.wildfly.security.credential.Credential;
+import org.wildfly.security.evidence.Evidence;
+
+/**
+ * A realm identity which is modifiable.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public interface ModifiableRealmIdentity extends RealmIdentity {
+
+    /**
+     * Delete this realm identity.  After this call, {@link #exists()} will return {@code false}.  If the identity
+     * does not exist, an exception is thrown.
+     *
+     * @throws RealmUnavailableException if deletion fails for some reason
+     */
+    void delete() throws RealmUnavailableException;
+
+    /**
+     * Create this realm identity.  After this call, {@link #exists()} will return {@code true} and the credentials
+     * and role sets will be empty.  If the identity already exists, an exception is thrown.
+     *
+     * @throws RealmUnavailableException if creation fails for some reason
+     */
+    void create() throws RealmUnavailableException;
+
+    /**
+     * Set the credentials of this identity.  If the identity does not exist, an exception is thrown.
+     * Any existing credential(s) are replaced/updated with the new value (in a possibly realm-specific manner).
+     *
+     * @param credentials the new credentials to set
+     * @throws RealmUnavailableException if updating the credentials fails for some reason
+     */
+    void setCredentials(Collection&lt;? extends Credential&gt; credentials) throws RealmUnavailableException;
+
+    default void updateCredential(Credential credential) throws RealmUnavailableException {
+        // todo: Need a way to just replace a single credential instead
+<span class="nc" id="L67">        setCredentials(Collections.singletonList(credential));</span>
+<span class="nc" id="L68">    }</span>
+
+    /**
+     * Modify the attributes collection of this identity.  If the identity does not exist, an exception is thrown.
+     *
+     * @param attributes the new attributes collection
+     * @throws RealmUnavailableException if updating the attributes collection fails for some reason
+     */
+    void setAttributes(Attributes attributes) throws RealmUnavailableException;
+
+    /**
+     * A modifiable identity for a non-existent user who cannot be created.
+     */
+<span class="fc" id="L81">    ModifiableRealmIdentity NON_EXISTENT = new ModifiableRealmIdentity() {</span>
+        @Override
+        public Principal getRealmIdentityPrincipal() {
+<span class="nc" id="L84">            return null;</span>
+        }
+
+        public SupportLevel getCredentialAcquireSupport(final Class&lt;? extends Credential&gt; credentialType, final String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc" id="L88">            Assert.checkNotNullParam(&quot;credentialType&quot;, credentialType);</span>
+<span class="nc" id="L89">            return SupportLevel.UNSUPPORTED;</span>
+        }
+
+        public SupportLevel getEvidenceVerifySupport(final Class&lt;? extends Evidence&gt; evidenceType, final String algorithmName) throws RealmUnavailableException {
+<span class="nc" id="L93">            Assert.checkNotNullParam(&quot;evidenceType&quot;, evidenceType);</span>
+<span class="nc" id="L94">            return SupportLevel.UNSUPPORTED;</span>
+        }
+
+        public &lt;C extends Credential&gt; C getCredential(final Class&lt;C&gt; credentialType) throws RealmUnavailableException {
+<span class="nc" id="L98">            Assert.checkNotNullParam(&quot;credentialType&quot;, credentialType);</span>
+<span class="nc" id="L99">            return null;</span>
+        }
+
+        public boolean verifyEvidence(final Evidence evidence) throws RealmUnavailableException {
+<span class="nc" id="L103">            Assert.checkNotNullParam(&quot;evidence&quot;, evidence);</span>
+<span class="nc" id="L104">            return false;</span>
+        }
+
+        public boolean exists() throws RealmUnavailableException {
+<span class="nc" id="L108">            return false;</span>
+        }
+
+        public void delete() throws RealmUnavailableException {
+            // no operation
+<span class="nc" id="L113">        }</span>
+
+        public void create() throws RealmUnavailableException {
+<span class="nc" id="L116">            throw ElytronMessages.log.unableToCreateIdentity();</span>
+        }
+
+        public void setCredentials(final Collection&lt;? extends Credential&gt; credentials) throws RealmUnavailableException {
+<span class="nc" id="L120">            throw ElytronMessages.log.noSuchIdentity();</span>
+        }
+
+        public void setAttributes(final Attributes attributes) throws RealmUnavailableException {
+<span class="nc" id="L124">            throw ElytronMessages.log.noSuchIdentity();</span>
+        }
+    };
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

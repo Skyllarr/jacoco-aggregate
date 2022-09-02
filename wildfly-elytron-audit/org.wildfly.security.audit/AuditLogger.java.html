@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AuditLogger.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-audit</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.audit</a> &gt; <span class="el_source">AuditLogger.java</span></div><h1>AuditLogger.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2017 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.audit;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+import static org.wildfly.security.audit.ElytronMessages.audit;
+
+import java.io.IOException;
+import java.util.function.Consumer;
+import java.util.function.Function;
+
+import org.wildfly.common.function.ExceptionBiConsumer;
+import org.wildfly.security.auth.server.event.SecurityEvent;
+
+/**
+ * The audit logger implementation.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public final class AuditLogger implements Consumer&lt;SecurityEvent&gt; {
+
+    private final ExceptionBiConsumer&lt;EventPriority, String, IOException&gt; auditEndpoint;
+    private final Function&lt;SecurityEvent, EventPriority&gt; priorityMapper;
+    private final Function&lt;SecurityEvent, String&gt; messageFormatter;
+
+<span class="nc" id="L41">    AuditLogger(Builder builder) {</span>
+<span class="nc" id="L42">        auditEndpoint = checkNotNullParam(&quot;auditEndpoint&quot;, builder.auditEndpoint);</span>
+<span class="nc" id="L43">        priorityMapper = checkNotNullParam(&quot;priorityMapper&quot;, builder.priorityMapper);</span>
+<span class="nc" id="L44">        messageFormatter = checkNotNullParam(&quot;messageFormatter&quot;, builder.messageFormatter);</span>
+<span class="nc" id="L45">    }</span>
+
+    /**
+     * Accept security event to be processed by audit endpoints.
+     *
+     * @param event security event to be processed
+     */
+    @Override
+    public void accept(SecurityEvent event) {
+        try {
+<span class="nc" id="L55">            EventPriority priority = priorityMapper.apply(event);</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">            if (priority == EventPriority.OFF)</span>
+<span class="nc" id="L57">                return;</span>
+
+<span class="nc" id="L59">            String formatted = messageFormatter.apply(event);</span>
+            try {
+<span class="nc" id="L61">                auditEndpoint.accept(priority, formatted);</span>
+<span class="nc" id="L62">            } catch (Throwable throwable) {</span>
+<span class="nc" id="L63">                audit.endpointUnavaiable(priority.toString(), formatted, throwable);</span>
+<span class="nc" id="L64">            }</span>
+<span class="nc" id="L65">        } catch (Throwable throwable) {</span>
+<span class="nc" id="L66">            audit.unableToAcceptEvent(throwable);</span>
+<span class="nc" id="L67">        }</span>
+<span class="nc" id="L68">    }</span>
+
+    /**
+     * Obtain a new {@link Builder} capable of building a {@link AuditLogger}.
+     *
+     * @return a new {@link Builder} capable of building a {@link AuditLogger}
+     */
+    public static Builder builder() {
+<span class="nc" id="L76">        return new Builder();</span>
+    }
+
+    /**
+     * A builder for audit logger instances.
+     */
+    public static class Builder {
+
+        private ExceptionBiConsumer&lt;EventPriority, String, IOException&gt; auditEndpoint;
+        private Function&lt;SecurityEvent, EventPriority&gt; priorityMapper;
+        private Function&lt;SecurityEvent, String&gt; messageFormatter;
+
+<span class="nc" id="L88">        Builder() {</span>
+<span class="nc" id="L89">        }</span>
+
+        /**
+         * Set the endpoint to receive the resulting audit messages.
+         *
+         * @param auditEndpoint the endpoint to receive the resulting audit messages.
+         * @return this builder.
+         */
+        public Builder setAuditEndpoint(ExceptionBiConsumer&lt;EventPriority, String, IOException&gt; auditEndpoint) {
+<span class="nc" id="L98">            this.auditEndpoint = checkNotNullParam(&quot;auditEndpoint&quot;, auditEndpoint);</span>
+
+<span class="nc" id="L100">            return this;</span>
+        }
+
+        /**
+         * Set the priority mapper to assign a priority to the messages.
+         *
+         * @param priorityMapper the priority mapper to assign a priority to the messages.
+         * @return this builder.
+         */
+        public Builder setPriorityMapper(Function&lt;SecurityEvent, EventPriority&gt; priorityMapper) {
+<span class="nc" id="L110">            this.priorityMapper = checkNotNullParam(&quot;priorityMapper&quot;, priorityMapper);</span>
+
+<span class="nc" id="L112">            return this;</span>
+        }
+
+        /**
+         * Set the message formatter to convert the messages to formatted Strings.
+         *
+         * @param messageFormatter the message formatter to convert the messages to formatted Strings.
+         * @return this builder.
+         */
+        public Builder setMessageFormatter(Function&lt;SecurityEvent, String&gt; messageFormatter) {
+<span class="nc" id="L122">            this.messageFormatter = checkNotNullParam(&quot;messageFormatter&quot;, messageFormatter);</span>
+
+<span class="nc" id="L124">            return this;</span>
+        }
+
+        /**
+         * Construct a new audit logger instance.
+         *
+         * @return the built audit logger.
+         */
+        public Consumer&lt;SecurityEvent&gt; build() {
+<span class="nc" id="L133">            return new AuditLogger(this);</span>
+        }
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

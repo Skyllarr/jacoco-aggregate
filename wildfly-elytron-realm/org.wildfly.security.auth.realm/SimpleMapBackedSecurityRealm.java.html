@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SimpleMapBackedSecurityRealm.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-realm</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.realm</a> &gt; <span class="el_source">SimpleMapBackedSecurityRealm.java</span></div><h1>SimpleMapBackedSecurityRealm.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.realm;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+import static org.wildfly.security.provider.util.ProviderUtil.INSTALLED_PROVIDERS;
+
+import java.security.Principal;
+import java.security.Provider;
+import java.security.spec.AlgorithmParameterSpec;
+import java.util.Collections;
+import java.util.Map;
+import java.util.function.Supplier;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.auth.principal.NamePrincipal;
+import org.wildfly.security.authz.Attributes;
+import org.wildfly.security.authz.AuthorizationIdentity;
+import org.wildfly.security.auth.server.RealmIdentity;
+import org.wildfly.security.auth.server.RealmUnavailableException;
+import org.wildfly.security.auth.server.SecurityRealm;
+import org.wildfly.security.auth.server.NameRewriter;
+import org.wildfly.security.auth.SupportLevel;
+import org.wildfly.security.credential.Credential;
+import org.wildfly.security.credential.PasswordCredential;
+import org.wildfly.security.evidence.Evidence;
+import org.wildfly.security.password.Password;
+
+import static org.wildfly.security.auth.realm.ElytronMessages.log;
+
+/**
+ * Simple map-backed security realm.  Uses an in-memory copy-on-write map methodology to map user names to
+ * entries.  Since this security realm implementation holds all names in memory, it may not be the best choice
+ * for very large security realms.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public class SimpleMapBackedSecurityRealm implements SecurityRealm {
+
+    private final Supplier&lt;Provider[]&gt; providers;
+    private final NameRewriter rewriter;
+<span class="fc" id="L59">    private volatile Map&lt;String, SimpleRealmEntry&gt; map = Collections.emptyMap();</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param rewriter the name rewriter to use (cannot be {@code null})
+     */
+    public SimpleMapBackedSecurityRealm(final NameRewriter rewriter) {
+<span class="fc" id="L67">        this(rewriter, INSTALLED_PROVIDERS);</span>
+<span class="fc" id="L68">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param rewriter the name rewriter to use (cannot be {@code null})
+     * @param providers a supplier of providers for use by this realm (cannot be {@code null})
+     */
+<span class="fc" id="L76">    public SimpleMapBackedSecurityRealm(final NameRewriter rewriter, final Supplier&lt;Provider[]&gt; providers) {</span>
+<span class="fc" id="L77">        this.rewriter = checkNotNullParam(&quot;rewriter&quot;, rewriter);</span>
+<span class="fc" id="L78">        this.providers = checkNotNullParam(&quot;provider&quot;, providers);</span>
+<span class="fc" id="L79">    }</span>
+
+    /**
+     * Construct a new instance.
+     */
+    public SimpleMapBackedSecurityRealm() {
+<span class="fc" id="L85">        this(NameRewriter.IDENTITY_REWRITER);</span>
+<span class="fc" id="L86">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param providers a supplier of providers for use by this realm (cannot be {@code null})
+     */
+    public SimpleMapBackedSecurityRealm(final Supplier&lt;Provider[]&gt; providers) {
+<span class="fc" id="L94">        this(NameRewriter.IDENTITY_REWRITER, providers);</span>
+<span class="fc" id="L95">    }</span>
+
+    /**
+     * Set the realm identity map.  Note that the entry map must &lt;b&gt;not&lt;/b&gt; be modified after calling this method.
+     * If it needs to be changed, pass in a new map that is a copy of the old map with the required changes.
+     *
+     * @param map the identity map where key is an identity name and value is an identity entry
+     */
+    public void setIdentityMap(final Map&lt;String, SimpleRealmEntry&gt; map) {
+<span class="fc" id="L104">        Assert.checkNotNullParam(&quot;map&quot;, map);</span>
+<span class="fc" id="L105">        this.map = map;</span>
+<span class="fc" id="L106">    }</span>
+
+    /**
+     * Set the realm identity map.  Note that the entry map must &lt;b&gt;not&lt;/b&gt; be modified after calling this method.
+     * If it needs to be changed, pass in a new map that is a copy of the old map with the required changes.
+     *
+     * @param map the identity map
+     * @deprecated Use {@link #setIdentityMap(Map)} instead.
+     */
+    @Deprecated
+    public void setPasswordMap(final Map&lt;String, SimpleRealmEntry&gt; map) {
+<span class="nc" id="L117">        setIdentityMap(map);</span>
+<span class="nc" id="L118">    }</span>
+
+    /**
+     * Set the realm identity map to contain a single entry.
+     *
+     * @param name the entry name
+     * @param password the password
+     * @param attributes the identity attributes
+     * @deprecated Use {@link #setIdentityMap(Map)} instead.
+     */
+    @Deprecated
+    public void setPasswordMap(final String name, final Password password, final Attributes attributes) {
+<span class="nc" id="L130">        setIdentityMap(Collections.singletonMap(name, new SimpleRealmEntry(</span>
+<span class="nc" id="L131">                Collections.singletonList(new PasswordCredential(password)),</span>
+                attributes
+        )));
+<span class="nc" id="L134">    }</span>
+
+    /**
+     * Set the realm identity map to contain a single entry.
+     *
+     * @param name the entry name
+     * @param password the password
+     * @deprecated Use {@link #setIdentityMap(Map)} instead.
+     */
+    @Deprecated
+    public void setPasswordMap(final String name, final Password password) {
+<span class="nc" id="L145">        setPasswordMap(name, password, Attributes.EMPTY);</span>
+<span class="nc" id="L146">    }</span>
+
+    @Override
+    public RealmIdentity getRealmIdentity(final Principal principal) {
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (! (principal instanceof NamePrincipal)) {</span>
+<span class="nc" id="L151">            return RealmIdentity.NON_EXISTENT;</span>
+        }
+<span class="fc" id="L153">        String name = rewriter.rewriteName(principal.getName());</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        if (name == null) {</span>
+<span class="nc" id="L155">            throw log.invalidName();</span>
+        }
+<span class="fc" id="L157">        return new SimpleMapRealmIdentity(name);</span>
+    }
+
+    @Override
+    public SupportLevel getCredentialAcquireSupport(final Class&lt;? extends Credential&gt; credentialType, final String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc" id="L162">        Assert.checkNotNullParam(&quot;credentialType&quot;, credentialType);</span>
+<span class="nc" id="L163">        return SupportLevel.POSSIBLY_SUPPORTED;</span>
+    }
+
+    @Override
+    public SupportLevel getEvidenceVerifySupport(final Class&lt;? extends Evidence&gt; evidenceType, final String algorithmName) throws RealmUnavailableException {
+<span class="nc" id="L168">        Assert.checkNotNullParam(&quot;evidenceType&quot;, evidenceType);</span>
+<span class="nc" id="L169">        return SupportLevel.POSSIBLY_SUPPORTED;</span>
+    }
+
+    private class SimpleMapRealmIdentity implements RealmIdentity {
+
+        private final String name;
+
+<span class="fc" id="L176">        SimpleMapRealmIdentity(final String name) {</span>
+<span class="fc" id="L177">            this.name = name;</span>
+<span class="fc" id="L178">        }</span>
+
+        public Principal getRealmIdentityPrincipal() {
+<span class="fc" id="L181">            return new NamePrincipal(name);</span>
+        }
+
+        @Override
+        public SupportLevel getCredentialAcquireSupport(final Class&lt;? extends Credential&gt; credentialType, final String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc" id="L186">            Assert.checkNotNullParam(&quot;credentialType&quot;, credentialType);</span>
+<span class="nc" id="L187">            final SimpleRealmEntry entry = map.get(name);</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">            if (entry == null) return SupportLevel.UNSUPPORTED;</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">            for (Credential credential : entry.getCredentials()) {</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">                if (credential.matches(credentialType, algorithmName, parameterSpec)) {</span>
+<span class="nc" id="L191">                    return SupportLevel.SUPPORTED;</span>
+                }
+<span class="nc" id="L193">            }</span>
+<span class="nc" id="L194">            return SupportLevel.UNSUPPORTED;</span>
+        }
+
+        @Override
+        public &lt;C extends Credential&gt; C getCredential(final Class&lt;C&gt; credentialType) throws RealmUnavailableException {
+<span class="nc" id="L199">            return getCredential(credentialType, null);</span>
+        }
+
+        @Override
+        public &lt;C extends Credential&gt; C getCredential(final Class&lt;C&gt; credentialType, final String algorithmName) throws RealmUnavailableException {
+<span class="nc" id="L204">            return getCredential(credentialType, algorithmName, null);</span>
+        }
+
+        @Override
+        public &lt;C extends Credential&gt; C getCredential(final Class&lt;C&gt; credentialType, final String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc" id="L209">            checkNotNullParam(&quot;credentialType&quot;, credentialType);</span>
+<span class="nc" id="L210">            final SimpleRealmEntry entry = map.get(name);</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">            if (entry == null) return null;</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">            for (Credential credential : entry.getCredentials()) {</span>
+<span class="nc bnc" id="L213" title="All 2 branches missed.">                if (credential.matches(credentialType, algorithmName, parameterSpec)) {</span>
+<span class="nc" id="L214">                    return credentialType.cast(credential.clone());</span>
+                }
+<span class="nc" id="L216">            }</span>
+<span class="nc" id="L217">            return null;</span>
+        }
+
+        @Override
+        public AuthorizationIdentity getAuthorizationIdentity() {
+<span class="fc" id="L222">            final SimpleRealmEntry entry = map.get(name);</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">            return entry == null ? AuthorizationIdentity.EMPTY : AuthorizationIdentity.basicIdentity(entry.getAttributes());</span>
+        }
+
+        @Override
+        public SupportLevel getEvidenceVerifySupport(final Class&lt;? extends Evidence&gt; evidenceType, final String algorithmName) throws RealmUnavailableException {
+<span class="nc" id="L228">            Assert.checkNotNullParam(&quot;evidenceType&quot;, evidenceType);</span>
+<span class="nc" id="L229">            SimpleRealmEntry entry = map.get(name);</span>
+<span class="nc bnc" id="L230" title="All 2 branches missed.">            if (entry == null) {</span>
+<span class="nc" id="L231">                return SupportLevel.UNSUPPORTED;</span>
+            }
+<span class="nc bnc" id="L233" title="All 2 branches missed.">            for (Credential credential : entry.getCredentials()) {</span>
+<span class="nc bnc" id="L234" title="All 2 branches missed.">                if (credential.canVerify(evidenceType, algorithmName)) {</span>
+<span class="nc" id="L235">                    return SupportLevel.SUPPORTED;</span>
+                }
+<span class="nc" id="L237">            }</span>
+<span class="nc" id="L238">            return SupportLevel.UNSUPPORTED;</span>
+        }
+
+        @Override
+        public boolean verifyEvidence(final Evidence evidence) throws RealmUnavailableException {
+<span class="fc" id="L243">            Assert.checkNotNullParam(&quot;evidence&quot;, evidence);</span>
+<span class="fc" id="L244">            SimpleRealmEntry entry = map.get(name);</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">            if (entry == null) {</span>
+<span class="nc" id="L246">                return false;</span>
+            }
+
+<span class="fc" id="L249">            log.tracef(&quot;Trying to authenticate %s using SimpleMapBackedSecurityRealm.&quot;, name);</span>
+
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">            for (Credential credential : entry.getCredentials()) {</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">                if (credential.canVerify(evidence)) {</span>
+<span class="fc" id="L253">                    return credential.verify(providers, evidence);</span>
+                }
+<span class="nc" id="L255">            }</span>
+<span class="nc" id="L256">            return false;</span>
+        }
+
+        @Override
+        public boolean exists() throws RealmUnavailableException {
+<span class="fc" id="L261">            return map.containsKey(name);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

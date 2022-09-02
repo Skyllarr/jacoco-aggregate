@@ -1,0 +1,465 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronAuthConfigFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-jaspi</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.jaspi</a> &gt; <span class="el_source">ElytronAuthConfigFactory.java</span></div><h1>ElytronAuthConfigFactory.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2018 Red Hat, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.jaspi;
+
+import static java.lang.System.getSecurityManager;
+import static org.wildfly.common.Assert.checkNotNullParam;
+import static org.wildfly.security.auth.jaspi._private.ElytronMessages.log;
+
+import java.lang.reflect.Constructor;
+import java.security.AccessController;
+import java.security.SecurityPermission;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.UUID;
+
+import javax.security.auth.message.config.AuthConfigFactory;
+import javax.security.auth.message.config.AuthConfigProvider;
+import javax.security.auth.message.config.RegistrationListener;
+
+import org.wildfly.security.manager.action.GetContextClassLoaderAction;
+
+/**
+ * The WildFly Elytron implementation of {@link AuthConfigFactory}.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+<span class="fc" id="L46">public class ElytronAuthConfigFactory extends AuthConfigFactory {</span>
+
+<span class="fc" id="L48">    private final Map&lt;LayerContextKey, Registration&gt; layerContextRegistration = new HashMap&lt;&gt;();</span>
+
+    /**
+     * @see javax.security.auth.message.config.AuthConfigFactory#getConfigProvider(java.lang.String, java.lang.String, javax.security.auth.message.config.RegistrationListener)
+     */
+    @Override
+    public AuthConfigProvider getConfigProvider(String layer, String appContext, RegistrationListener listener) {
+        // TODO - This is the most time sensitive method, it is called per request.
+        // We may want to look at replacing the entire Map on updates so this method can query the
+        // current version without locking.
+
+<span class="fc" id="L59">        synchronized(layerContextRegistration) {</span>
+<span class="fc" id="L60">            LayerContextKey fullKey = new LayerContextKey(layer, appContext);</span>
+<span class="fc" id="L61">            Registration registration = layerContextRegistration.get(fullKey);</span>
+            // Step 1 - Exact Match
+<span class="fc bfc" id="L63" title="All 2 branches covered.">            if (registration != null) {</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">                if (listener != null) {</span>
+<span class="fc" id="L65">                    registration.addListener(listener);</span>
+                }
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">                if (registration.activeRegistration()) {</span>
+<span class="fc" id="L68">                    return registration.authConfigProvider;</span>
+                }
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            } else if (listener != null) {</span>
+                // null registration but we have a listener.
+<span class="fc" id="L72">                Registration listenerRegistration = new Registration(layer, appContext);</span>
+<span class="fc" id="L73">                listenerRegistration.addListener(listener);</span>
+<span class="fc" id="L74">                layerContextRegistration.put(fullKey, listenerRegistration);</span>
+            }
+
+            // Step 2 - appContext only
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            if (layer != null) {</span>
+<span class="fc" id="L79">                registration = layerContextRegistration.get(new LayerContextKey(null, appContext));</span>
+<span class="pc bpc" id="L80" title="1 of 4 branches missed.">                if (registration != null &amp;&amp; registration.activeRegistration()) {</span>
+<span class="fc" id="L81">                    return registration.authConfigProvider;</span>
+                }
+            }
+
+            // Step 3 - layer only
+<span class="fc bfc" id="L86" title="All 2 branches covered.">            if (appContext != null) {</span>
+<span class="fc" id="L87">                registration = layerContextRegistration.get(new LayerContextKey(layer, null));</span>
+<span class="pc bpc" id="L88" title="1 of 4 branches missed.">                if (registration != null &amp;&amp; registration.activeRegistration()) {</span>
+<span class="fc" id="L89">                    return registration.authConfigProvider;</span>
+                }
+            }
+
+            // Step 4 - No appContext or layer
+<span class="fc bfc" id="L94" title="All 4 branches covered.">            if (layer != null &amp;&amp; appContext != null) {</span>
+<span class="fc" id="L95">                registration = layerContextRegistration.get(new LayerContextKey(null, null));</span>
+<span class="pc bpc" id="L96" title="1 of 4 branches missed.">                if (registration != null &amp;&amp; registration.activeRegistration()) {</span>
+<span class="fc" id="L97">                    return registration.authConfigProvider;</span>
+                }
+            }
+<span class="fc" id="L100">        }</span>
+
+<span class="fc" id="L102">        return null;</span>
+    }
+
+    boolean matchesRegistration(final String layer, final String appContext) {
+<span class="nc" id="L106">        synchronized (layerContextRegistration) {</span>
+            // Step 1 - Exact Match
+<span class="nc" id="L108">            Registration registration = layerContextRegistration.get(new LayerContextKey(layer, appContext));</span>
+<span class="nc bnc" id="L109" title="All 4 branches missed.">            if (registration != null &amp;&amp; registration.activeRegistration()) {</span>
+<span class="nc" id="L110">                return true;</span>
+            }
+            // Step 2 - appContext only
+<span class="nc" id="L113">            registration = layerContextRegistration.get(new LayerContextKey(null, appContext));</span>
+<span class="nc bnc" id="L114" title="All 4 branches missed.">            if (registration != null &amp;&amp; registration.activeRegistration()) {</span>
+<span class="nc" id="L115">                return true;</span>
+            }
+            // Step 3 - layer only
+<span class="nc" id="L118">            registration = layerContextRegistration.get(new LayerContextKey(layer, null));</span>
+<span class="nc bnc" id="L119" title="All 4 branches missed.">            if (registration != null &amp;&amp; registration.activeRegistration()) {</span>
+<span class="nc" id="L120">                return true;</span>
+            }
+            // Step 4 - No appContext or layer
+<span class="nc" id="L123">            registration = layerContextRegistration.get(new LayerContextKey(null, null));</span>
+<span class="nc bnc" id="L124" title="All 4 branches missed.">            if (registration != null &amp;&amp; registration.activeRegistration()) {</span>
+<span class="nc" id="L125">                return true;</span>
+            }
+<span class="nc" id="L127">        }</span>
+
+<span class="nc" id="L129">        return false;</span>
+    }
+
+    /**
+     * @see javax.security.auth.message.config.AuthConfigFactory#registerConfigProvider(javax.security.auth.message.config.AuthConfigProvider, java.lang.String, java.lang.String, java.lang.String)
+     */
+    @Override
+    public String registerConfigProvider(AuthConfigProvider provider, String layer, String appContext, String description) {
+<span class="fc" id="L137">        checkPermission(providerRegistrationSecurityPermission);</span>
+
+<span class="fc" id="L139">        return registerConfigProvider(provider, layer, appContext, description, false);</span>
+    }
+
+    /**
+     * @see javax.security.auth.message.config.AuthConfigFactory#registerConfigProvider(java.lang.String, java.util.Map, java.lang.String, java.lang.String, java.lang.String)
+     */
+    @Override
+    public String registerConfigProvider(String className, Map properties, String layer, String appContext, String description) {
+        // TODO [ELY-1548] We should support persisting to configuration changes made by calling this method.
+<span class="fc" id="L148">        checkPermission(providerRegistrationSecurityPermission);</span>
+
+<span class="fc" id="L150">        AuthConfigProvider authConfigProvider = null;</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        if (className != null) {</span>
+<span class="fc" id="L152">            ClassLoader classLoader = identifyClassLoader();</span>
+            try {
+<span class="fc" id="L154">                Class&lt;AuthConfigProvider&gt; providerClass = (Class&lt;AuthConfigProvider&gt;) classLoader.loadClass(className);</span>
+<span class="fc" id="L155">                Constructor&lt;AuthConfigProvider&gt; constructor = providerClass.getConstructor(Map.class, AuthConfigFactory.class);</span>
+<span class="fc" id="L156">                authConfigProvider = constructor.newInstance(properties, null);</span>
+<span class="nc" id="L157">            } catch (Exception e) {</span>
+<span class="nc" id="L158">                throw log.unableToConstructProvider(className, e);</span>
+<span class="fc" id="L159">            }</span>
+        }
+
+<span class="fc" id="L162">        return registerConfigProvider(authConfigProvider, layer, appContext, description, true);</span>
+    }
+
+    /*
+     * We may actually want to be calling this method when in the application server environment as we would want to say the
+     * managed configuration is persistent but at the same time want to pass in a real instance.
+     */
+
+    String registerConfigProvider(AuthConfigProvider provider, String layer, String appContext, String description, boolean persistent) {
+<span class="fc" id="L171">        Registration registration = null;</span>
+        List&lt;RegistrationListener&gt; existingListeners;
+<span class="fc" id="L173">        synchronized(layerContextRegistration) {</span>
+<span class="fc" id="L174">            LayerContextKey key = new LayerContextKey(layer, appContext);</span>
+<span class="fc" id="L175">            registration = layerContextRegistration.get(key);</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">            if (registration == null) {</span>
+<span class="fc" id="L177">                registration = new Registration(layer, appContext);</span>
+<span class="fc" id="L178">                layerContextRegistration.put(key, registration);</span>
+<span class="fc" id="L179">                existingListeners = Collections.emptyList();</span>
+            } else {
+<span class="fc" id="L181">                existingListeners = registration.clearListeners();</span>
+            }
+
+<span class="fc" id="L184">            registration.setDescription(description);</span>
+<span class="fc" id="L185">            registration.setPersistent(persistent);</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">            registration.setAuthConfigProvider(provider, provider == null);</span>
+<span class="fc" id="L187">        }</span>
+
+        // Handle notify outside the synchronized block in case they want to re-register.
+<span class="fc bfc" id="L190" title="All 2 branches covered.">        for (RegistrationListener current : existingListeners) {</span>
+<span class="fc" id="L191">            current.notify(layer, appContext);</span>
+<span class="fc" id="L192">        }</span>
+
+<span class="fc" id="L194">        return registration.getRegistrationId();</span>
+    }
+
+    /**
+     * @see javax.security.auth.message.config.AuthConfigFactory#removeRegistration(java.lang.String)
+     */
+    @Override
+    public boolean removeRegistration(String registrationId) {
+<span class="fc" id="L202">        checkPermission(providerRegistrationSecurityPermission);</span>
+
+<span class="fc" id="L204">        String layer = null;</span>
+<span class="fc" id="L205">        String appContext = null;</span>
+<span class="fc" id="L206">        boolean removed = false;</span>
+<span class="fc" id="L207">        List&lt;RegistrationListener&gt; existingListeners = null;</span>
+<span class="fc" id="L208">        synchronized(layerContextRegistration) {</span>
+<span class="fc" id="L209">            Iterator&lt;Entry&lt;LayerContextKey, Registration&gt;&gt; registrationIterator = layerContextRegistration.entrySet().iterator();</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">            while (registrationIterator.hasNext()) {</span>
+<span class="fc" id="L211">                Entry&lt;LayerContextKey, Registration&gt; entry = registrationIterator.next();</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">                if (entry.getValue().getRegistrationId().equals(registrationId)) {</span>
+<span class="fc" id="L213">                    existingListeners = entry.getValue().clearListeners();</span>
+<span class="fc" id="L214">                    layer = entry.getKey().messageLayer;</span>
+<span class="fc" id="L215">                    appContext = entry.getKey().appContext;</span>
+<span class="fc" id="L216">                    registrationIterator.remove();</span>
+<span class="fc" id="L217">                    removed = true;</span>
+<span class="fc" id="L218">                    break;</span>
+                }
+<span class="fc" id="L220">            }</span>
+<span class="fc" id="L221">        }</span>
+
+        // Handle notify outside the synchronized block in case they want to re-register.
+<span class="pc bpc" id="L224" title="1 of 4 branches missed.">        if (existingListeners != null &amp;&amp; !existingListeners.isEmpty()) {</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">            for (RegistrationListener current : existingListeners) {</span>
+<span class="fc" id="L226">                current.notify(layer, appContext);</span>
+<span class="fc" id="L227">            }</span>
+        }
+
+<span class="fc" id="L230">        return removed;</span>
+    }
+
+    /**
+     * @see javax.security.auth.message.config.AuthConfigFactory#detachListener(javax.security.auth.message.config.RegistrationListener, java.lang.String, java.lang.String)
+     */
+    @Override
+    public String[] detachListener(RegistrationListener listener, String layer, String appContext) {
+<span class="fc" id="L238">        checkNotNullParam(&quot;listener&quot;, listener);</span>
+<span class="fc" id="L239">        checkPermission(providerRegistrationSecurityPermission);</span>
+<span class="fc" id="L240">        List&lt;String&gt; registrationIDs = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L241">        synchronized (layerContextRegistration) {</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">            for (Registration current : layerContextRegistration.values()) {</span>
+<span class="pc bpc" id="L243" title="2 of 8 branches missed.">                if ((layer == null || layer.equals(current.messageLayer)) &amp;&amp; (appContext == null || appContext.equals(current.appContext))) {</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">                    if (current.removeListener(listener)) {</span>
+<span class="fc" id="L245">                        registrationIDs.add(current.getRegistrationId());</span>
+                    }
+                }
+<span class="fc" id="L248">            }</span>
+<span class="fc" id="L249">        }</span>
+
+<span class="fc" id="L251">        return registrationIDs.toArray(new String[registrationIDs.size()]);</span>
+    }
+
+    /**
+     * @see javax.security.auth.message.config.AuthConfigFactory#getRegistrationContext(java.lang.String)
+     */
+    @Override
+    public RegistrationContext getRegistrationContext(String registrationID) {
+<span class="fc" id="L259">        synchronized (layerContextRegistration) {</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">            for (Registration current : layerContextRegistration.values()) {</span>
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">                if (current.getRegistrationId().equals(registrationID)) {</span>
+<span class="fc" id="L262">                    return current.toRegistrationContext();</span>
+                }
+<span class="nc" id="L264">            }</span>
+<span class="nc" id="L265">        }</span>
+
+<span class="nc" id="L267">        return null;</span>
+    }
+
+    /**
+     * @see javax.security.auth.message.config.AuthConfigFactory#getRegistrationIDs(javax.security.auth.message.config.AuthConfigProvider)
+     */
+    @Override
+    public String[] getRegistrationIDs(AuthConfigProvider provider) {
+<span class="nc" id="L275">        List&lt;String&gt; registrationIDs = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L276">        synchronized (layerContextRegistration) {</span>
+<span class="nc bnc" id="L277" title="All 2 branches missed.">            if (provider != null) {</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">                for (Registration current : layerContextRegistration.values()) {</span>
+<span class="nc bnc" id="L279" title="All 2 branches missed.">                    if (provider.equals(current.authConfigProvider)) {</span>
+<span class="nc" id="L280">                        registrationIDs.add(current.registrationId);</span>
+                    }
+<span class="nc" id="L282">                }</span>
+            } else {
+<span class="nc bnc" id="L284" title="All 2 branches missed.">                for (Registration current : layerContextRegistration.values()) {</span>
+<span class="nc bnc" id="L285" title="All 2 branches missed.">                    if (current.activeRegistration()) {</span>
+                        // The registration may exist just to hold listeners.
+<span class="nc" id="L287">                        registrationIDs.add(current.registrationId);</span>
+                    }
+<span class="nc" id="L289">                }</span>
+            }
+
+<span class="nc" id="L292">        }</span>
+
+<span class="nc" id="L294">        return registrationIDs.toArray(new String[registrationIDs.size()]);</span>
+    }
+
+    /**
+     * @see javax.security.auth.message.config.AuthConfigFactory#refresh()
+     */
+    @Override
+    public void refresh() {
+        // [ELY-1538] Dynamic loading not presently supported, once supported refresh will reload the configuration.
+<span class="nc" id="L303">        checkPermission(providerRegistrationSecurityPermission);</span>
+<span class="nc" id="L304">    }</span>
+
+    private static void checkPermission(final SecurityPermission securityPermission) {
+<span class="fc" id="L307">        SecurityManager securityManager = getSecurityManager();</span>
+<span class="pc bpc" id="L308" title="1 of 2 branches missed.">        if (securityManager != null) {</span>
+<span class="nc" id="L309">            securityManager.checkPermission(securityPermission);</span>
+        }
+<span class="fc" id="L311">    }</span>
+
+    private static ClassLoader identifyClassLoader() {
+<span class="pc bpc" id="L314" title="1 of 2 branches missed.">        ClassLoader classLoader = getSecurityManager() != null</span>
+<span class="nc" id="L315">                ? AccessController.doPrivileged(GetContextClassLoaderAction.getInstance())</span>
+<span class="fc" id="L316">                : GetContextClassLoaderAction.getInstance().run();</span>
+
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">        return classLoader != null ? classLoader : ClassLoader.getSystemClassLoader();</span>
+    }
+
+    static class Registration {
+<span class="fc" id="L322">        final String registrationId = UUID.randomUUID().toString();</span>
+
+        private boolean nullProvider;
+        private AuthConfigProvider authConfigProvider;
+<span class="fc" id="L326">        private List&lt;RegistrationListener&gt; registrationListeners = new ArrayList&lt;&gt;();</span>
+
+        private final String appContext;
+        private final String messageLayer;
+        private String description;
+        private boolean persistent;
+
+<span class="fc" id="L333">        Registration(final String messageLayer, final String appContext) {</span>
+<span class="fc" id="L334">            this.messageLayer = messageLayer;</span>
+<span class="fc" id="L335">            this.appContext = appContext;</span>
+<span class="fc" id="L336">        }</span>
+
+        String getRegistrationId() {
+<span class="fc" id="L339">            return registrationId;</span>
+        }
+
+        void setDescription(final String description) {
+<span class="fc" id="L343">            this.description = description;</span>
+<span class="fc" id="L344">        }</span>
+
+        void setPersistent(final boolean persistent) {
+<span class="fc" id="L347">            this.persistent = persistent;</span>
+<span class="fc" id="L348">        }</span>
+
+        void setAuthConfigProvider(final AuthConfigProvider authConfigProvider, final boolean nullProvider) {
+<span class="fc" id="L351">            this.authConfigProvider = authConfigProvider;</span>
+<span class="pc bpc" id="L352" title="1 of 2 branches missed.">            this.nullProvider = authConfigProvider == null ? nullProvider : false;</span>
+<span class="fc" id="L353">        }</span>
+
+        AuthConfigProvider getAuthConfigProvider() {
+<span class="nc" id="L356">            return authConfigProvider;</span>
+        }
+
+        boolean isNullProvider() {
+<span class="nc" id="L360">            return nullProvider;</span>
+        }
+
+        /*
+         * RegistrationListener Manipulation
+         */
+
+        void addListener(final RegistrationListener registrationListener) {
+<span class="fc" id="L368">            this.registrationListeners.add(registrationListener);</span>
+<span class="fc" id="L369">        }</span>
+
+        boolean removeListener(final RegistrationListener registrationListener) {
+<span class="fc" id="L372">            return registrationListeners.remove(registrationListener);</span>
+        }
+
+        List&lt;RegistrationListener&gt; clearListeners() {
+<span class="fc" id="L376">            List&lt;RegistrationListener&gt; currentListeners = this.registrationListeners;</span>
+<span class="fc" id="L377">            this.registrationListeners = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L379">            return currentListeners;</span>
+        }
+
+        boolean activeRegistration() {
+<span class="pc bpc" id="L383" title="3 of 4 branches missed.">            return authConfigProvider != null || nullProvider;</span>
+        }
+
+        RegistrationContext toRegistrationContext() {
+            // We return a new instance to avoid state changes being detected by stale references.
+<span class="pc bpc" id="L388" title="1 of 2 branches missed.">            return activeRegistration() ? new ElytronRegistrationContext(messageLayer, appContext, description, persistent) : null;</span>
+        }
+
+    }
+
+    static class ElytronRegistrationContext implements RegistrationContext {
+
+        private final String appContext;
+        private final String messageLayer;
+        private final  String description;
+        private final boolean persistent;
+
+<span class="fc" id="L400">        ElytronRegistrationContext(final String messageLayer, final String appContext, final String description, final boolean persistent) {</span>
+<span class="fc" id="L401">            this.messageLayer = messageLayer;</span>
+<span class="fc" id="L402">            this.appContext = appContext;</span>
+<span class="fc" id="L403">            this.description = description;</span>
+<span class="fc" id="L404">            this.persistent = persistent;</span>
+<span class="fc" id="L405">        }</span>
+
+        @Override
+        public String getMessageLayer() {
+<span class="fc" id="L409">            return messageLayer;</span>
+        }
+
+        @Override
+        public String getAppContext() {
+<span class="fc" id="L414">            return appContext;</span>
+        }
+
+        @Override
+        public String getDescription() {
+<span class="fc" id="L419">            return description;</span>
+        }
+
+        @Override
+        public boolean isPersistent() {
+<span class="nc" id="L424">            return persistent;</span>
+        }
+
+    }
+
+    /*
+     * The down side of a key like this is we end up with per-request object allocation to be garbage collected, the up side
+     * however is we can accurately differentiate null values from the String 'null'.
+     */
+
+    static final class LayerContextKey {
+        private final String messageLayer;
+        private final String appContext;
+        private final int hash;
+
+<span class="fc" id="L439">        LayerContextKey(final String messageLayer, final String appContext) {</span>
+<span class="fc" id="L440">            this.messageLayer = messageLayer;</span>
+<span class="fc" id="L441">            this.appContext = appContext;</span>
+
+<span class="fc bfc" id="L443" title="All 2 branches covered.">            this.hash = (messageLayer != null ? messageLayer.hashCode() : 7)</span>
+<span class="fc bfc" id="L444" title="All 2 branches covered.">                    * (appContext != null ? appContext.hashCode() : 13);</span>
+<span class="fc" id="L445">        }</span>
+
+        @Override
+        public boolean equals(Object other) {
+<span class="pc bpc" id="L449" title="1 of 2 branches missed.">            return other instanceof LayerContextKey ? equals((LayerContextKey) other) : false;</span>
+        }
+
+        boolean equals(LayerContextKey other) {
+<span class="pc bpc" id="L453" title="2 of 8 branches missed.">            return (messageLayer != null ? messageLayer.equals(other.messageLayer) : other.messageLayer == null) &amp;&amp;</span>
+<span class="pc bpc" id="L454" title="2 of 4 branches missed.">                    (appContext != null ? appContext.equals(other.appContext) : other.appContext == null);</span>
+        }
+
+        @Override
+        public int hashCode() {
+<span class="fc" id="L459">            return hash;</span>
+        }
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

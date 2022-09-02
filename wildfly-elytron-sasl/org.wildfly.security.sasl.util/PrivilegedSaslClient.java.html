@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PrivilegedSaslClient.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.util</a> &gt; <span class="el_source">PrivilegedSaslClient.java</span></div><h1>PrivilegedSaslClient.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.util;
+
+import static java.security.AccessController.doPrivileged;
+
+import java.lang.reflect.UndeclaredThrowableException;
+import java.security.AccessControlContext;
+import java.security.AccessController;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
+
+import javax.security.sasl.SaslClient;
+import javax.security.sasl.SaslException;
+
+import org.wildfly.common.Assert;
+
+/**
+ * A {@code SaslClient} which evaluates challenges and wrap/unwrap requests in an privileged context.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class PrivilegedSaslClient extends AbstractDelegatingSaslClient implements SaslWrapper {
+    private final AccessControlContext accessControlContext;
+
+    PrivilegedSaslClient(final SaslClient delegate, final AccessControlContext accessControlContext) {
+<span class="nc" id="L43">        super(delegate);</span>
+<span class="nc" id="L44">        Assert.checkNotNullParam(&quot;delegate&quot;, delegate);</span>
+<span class="nc" id="L45">        Assert.checkNotNullParam(&quot;accessControlContext&quot;, accessControlContext);</span>
+<span class="nc" id="L46">        this.accessControlContext = accessControlContext;</span>
+<span class="nc" id="L47">    }</span>
+
+    public PrivilegedSaslClient(final SaslClient delegate) {
+<span class="nc" id="L50">        this(delegate, AccessController.getContext());</span>
+<span class="nc" id="L51">    }</span>
+
+    public byte[] evaluateChallenge(final byte[] challenge) throws SaslException {
+        try {
+<span class="nc" id="L55">            return doPrivileged((PrivilegedExceptionAction&lt;byte[]&gt;) () -&gt; delegate.evaluateChallenge(challenge), accessControlContext);</span>
+<span class="nc" id="L56">        } catch (PrivilegedActionException pae) {</span>
+            try {
+<span class="nc" id="L58">                throw pae.getCause();</span>
+<span class="nc" id="L59">            } catch (SaslException | RuntimeException | Error e) {</span>
+<span class="nc" id="L60">                throw e;</span>
+<span class="nc" id="L61">            } catch (Throwable throwable) {</span>
+<span class="nc" id="L62">                throw new UndeclaredThrowableException(throwable);</span>
+            }
+        }
+    }
+
+    public byte[] unwrap(final byte[] incoming, final int offset, final int len) throws SaslException {
+        try {
+<span class="nc" id="L69">            return doPrivileged((PrivilegedExceptionAction&lt;byte[]&gt;) () -&gt; delegate.unwrap(incoming, offset, len), accessControlContext);</span>
+<span class="nc" id="L70">        } catch (PrivilegedActionException pae) {</span>
+            try {
+<span class="nc" id="L72">                throw pae.getCause();</span>
+<span class="nc" id="L73">            } catch (SaslException | RuntimeException | Error e) {</span>
+<span class="nc" id="L74">                throw e;</span>
+<span class="nc" id="L75">            } catch (Throwable throwable) {</span>
+<span class="nc" id="L76">                throw new UndeclaredThrowableException(throwable);</span>
+            }
+        }
+    }
+
+    public byte[] wrap(final byte[] outgoing, final int offset, final int len) throws SaslException {
+        try {
+<span class="nc" id="L83">            return doPrivileged((PrivilegedExceptionAction&lt;byte[]&gt;) () -&gt; delegate.wrap(outgoing, offset, len), accessControlContext);</span>
+<span class="nc" id="L84">        } catch (PrivilegedActionException pae) {</span>
+            try {
+<span class="nc" id="L86">                throw pae.getCause();</span>
+<span class="nc" id="L87">            } catch (SaslException | RuntimeException | Error e) {</span>
+<span class="nc" id="L88">                throw e;</span>
+<span class="nc" id="L89">            } catch (Throwable throwable) {</span>
+<span class="nc" id="L90">                throw new UndeclaredThrowableException(throwable);</span>
+            }
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

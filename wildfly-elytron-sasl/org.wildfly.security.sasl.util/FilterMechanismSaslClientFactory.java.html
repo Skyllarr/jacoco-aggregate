@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FilterMechanismSaslClientFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.util</a> &gt; <span class="el_source">FilterMechanismSaslClientFactory.java</span></div><h1>FilterMechanismSaslClientFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.util;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.function.Predicate;
+
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.sasl.SaslClient;
+import javax.security.sasl.SaslClientFactory;
+import javax.security.sasl.SaslException;
+
+import org.wildfly.common.Assert;
+import org.wildfly.common.math.HashMath;
+
+/**
+ * A {@link SaslClientFactory} which filters available mechanisms (either inclusively or exclusively) from a delegate
+ * {@code SaslClientFactory}.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class FilterMechanismSaslClientFactory extends AbstractDelegatingSaslClientFactory {
+    private final Predicate&lt;String&gt; predicate;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param delegate the factory to delegate to
+     * @param predicate the mechanism name predicate
+     */
+    public FilterMechanismSaslClientFactory(final SaslClientFactory delegate, final Predicate&lt;String&gt; predicate) {
+<span class="nc" id="L52">        super(delegate);</span>
+<span class="nc" id="L53">        Assert.checkNotNullParam(&quot;predicate&quot;, predicate);</span>
+<span class="nc" id="L54">        this.predicate = predicate;</span>
+<span class="nc" id="L55">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param delegate the factory to delegate to
+     * @param include {@code true} to only include the given mechanisms, {@code false} to exclude them
+     * @param mechanisms the mechanisms to include or exclude
+     */
+    public FilterMechanismSaslClientFactory(final SaslClientFactory delegate, boolean include, String... mechanisms) {
+<span class="nc" id="L65">        super(delegate);</span>
+<span class="nc" id="L66">        Assert.checkNotNullParam(&quot;mechanisms&quot;, mechanisms);</span>
+<span class="nc" id="L67">        final HashSet&lt;String&gt; set = new HashSet&lt;String&gt;(mechanisms.length);</span>
+<span class="nc" id="L68">        Collections.addAll(set, mechanisms);</span>
+<span class="nc" id="L69">        Predicate&lt;String&gt; predicate = set::contains;</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        this.predicate = include ? predicate : predicate.negate();</span>
+<span class="nc" id="L71">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param delegate the factory to delegate to
+     * @param include {@code true} to only include the given mechanisms, {@code false} to exclude them
+     * @param mechanisms the mechanisms to include or exclude
+     */
+    public FilterMechanismSaslClientFactory(final SaslClientFactory delegate, boolean include, Collection&lt;String&gt; mechanisms) {
+<span class="nc" id="L81">        super(delegate);</span>
+<span class="nc" id="L82">        Assert.checkNotNullParam(&quot;mechanisms&quot;, mechanisms);</span>
+<span class="nc" id="L83">        final HashSet&lt;String&gt; set = new HashSet&lt;String&gt;(mechanisms);</span>
+<span class="nc" id="L84">        Predicate&lt;String&gt; predicate = set::contains;</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        this.predicate = include ? predicate : predicate.negate();</span>
+<span class="nc" id="L86">    }</span>
+
+    public SaslClient createSaslClient(final String[] mechanisms, final String authorizationId, final String protocol, final String serverName, final Map&lt;String, ?&gt; props, final CallbackHandler cbh) throws SaslException {
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        for (String mechanism : mechanisms) {</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">            if (! predicate.test(mechanism)) {</span>
+                // make a copy and remove the unsupported mechanisms
+<span class="nc" id="L92">                final ArrayList&lt;String&gt; list = new ArrayList&lt;&gt;(mechanisms.length - 1);</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">                for (String m2 : mechanisms) {</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">                    if (predicate.test(m2)) {</span>
+<span class="nc" id="L95">                        list.add(m2);</span>
+                    }
+                }
+<span class="nc bnc" id="L98" title="All 2 branches missed.">                if (list.size() == 0) { return null; }</span>
+<span class="nc" id="L99">                return delegate.createSaslClient(list.toArray(new String[list.size()]), authorizationId, protocol, serverName, props, cbh);</span>
+            }
+        }
+<span class="nc" id="L102">        return delegate.createSaslClient(mechanisms, authorizationId, protocol, serverName, props, cbh);</span>
+    }
+
+    public String[] getMechanismNames(final Map&lt;String, ?&gt; props) {
+<span class="nc" id="L106">        final String[] names = delegate.getMechanismNames(props);</span>
+<span class="nc" id="L107">        final ArrayList&lt;String&gt; list = new ArrayList&lt;&gt;(names.length);</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        for (String name : names) {</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">            if (predicate.test(name)) {</span>
+<span class="nc" id="L110">                list.add(name);</span>
+            }
+        }
+<span class="nc" id="L113">        return list.toArray(new String[list.size()]);</span>
+    }
+
+    @SuppressWarnings(&quot;checkstyle:equalshashcode&quot;)
+    public boolean equals(final Object other) {
+<span class="nc bnc" id="L118" title="All 4 branches missed.">        return other instanceof FilterMechanismSaslClientFactory &amp;&amp; equals((FilterMechanismSaslClientFactory) other);</span>
+    }
+
+    @SuppressWarnings(&quot;checkstyle:equalshashcode&quot;)
+    public boolean equals(final AbstractDelegatingSaslClientFactory other) {
+<span class="nc bnc" id="L123" title="All 4 branches missed.">        return other instanceof FilterMechanismSaslClientFactory &amp;&amp; equals((FilterMechanismSaslClientFactory) other);</span>
+    }
+
+    @SuppressWarnings(&quot;checkstyle:equalshashcode&quot;)
+    public boolean equals(final FilterMechanismSaslClientFactory other) {
+<span class="nc bnc" id="L128" title="All 4 branches missed.">        return super.equals(other) &amp;&amp; predicate.equals(other.predicate);</span>
+    }
+
+    protected int calculateHashCode() {
+<span class="nc" id="L132">        return HashMath.multiHashOrdered(HashMath.multiHashOrdered(super.calculateHashCode(), getClass().hashCode()), predicate.hashCode());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

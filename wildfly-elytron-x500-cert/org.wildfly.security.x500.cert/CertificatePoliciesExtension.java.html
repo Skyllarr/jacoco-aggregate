@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CertificatePoliciesExtension.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-x500-cert</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.x500.cert</a> &gt; <span class="el_source">CertificatePoliciesExtension.java</span></div><h1>CertificatePoliciesExtension.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.x500.cert;
+
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.asn1.ASN1Encodable;
+import org.wildfly.security.asn1.ASN1Encoder;
+import org.wildfly.security.x500.X500;
+
+/**
+ * The certificate policies extension as defined by &lt;a href=&quot;https://tools.ietf.org/html/rfc5280#section-4.2.1.4&quot;&gt;RFC 5280 § 4.2.1.4&lt;/a&gt;.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class CertificatePoliciesExtension extends X509CertificateExtension {
+
+    private final List&lt;PolicyInformation&gt; policyInformationList;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param critical {@code true} to mark this extension as critical, {@code false} otherwise
+     * @param policyInformationList the policy information list (must not be {@code null})
+     */
+    public CertificatePoliciesExtension(final boolean critical, final List&lt;PolicyInformation&gt; policyInformationList) {
+<span class="nc" id="L46">        super(critical);</span>
+<span class="nc" id="L47">        Assert.checkNotNullParam(&quot;policyInformationList&quot;, policyInformationList);</span>
+<span class="nc" id="L48">        this.policyInformationList = policyInformationList;</span>
+<span class="nc" id="L49">    }</span>
+
+    public String getId() {
+<span class="nc" id="L52">        return X500.OID_CE_CERTIFICATE_POLICIES;</span>
+    }
+
+    public void encodeTo(final ASN1Encoder encoder) {
+<span class="nc" id="L56">        encoder.startSequence();</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        for (PolicyInformation policy : policyInformationList) {</span>
+<span class="nc" id="L58">            policy.encodeTo(encoder);</span>
+<span class="nc" id="L59">        }</span>
+<span class="nc" id="L60">        encoder.endSequence();</span>
+<span class="nc" id="L61">    }</span>
+
+    /**
+     * Policy information for the certificate policies extension.
+     */
+    public static final class PolicyInformation implements ASN1Encodable {
+        private final String policyIdentifier;
+        private final List&lt;PolicyQualifier&gt; policyQualifiers;
+
+        /**
+         * Construct a new instance.
+         *
+         * @param policyIdentifier the policy identifier OID (must not be {@code null})
+         */
+<span class="nc" id="L75">        public PolicyInformation(final String policyIdentifier) {</span>
+<span class="nc" id="L76">            Assert.checkNotNullParam(&quot;policyIdentifier&quot;, policyIdentifier);</span>
+<span class="nc" id="L77">            this.policyIdentifier = policyIdentifier;</span>
+<span class="nc" id="L78">            policyQualifiers = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L79">        }</span>
+
+        public void encodeTo(final ASN1Encoder encoder) {
+<span class="nc" id="L82">            encoder.startSequence();</span>
+<span class="nc" id="L83">            encoder.encodeObjectIdentifier(policyIdentifier);</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">            if (! policyQualifiers.isEmpty()) {</span>
+<span class="nc" id="L85">                encoder.startSequence();</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">                for (PolicyQualifier policyQualifier : policyQualifiers) {</span>
+<span class="nc" id="L87">                    policyQualifier.encodeTo(encoder);</span>
+<span class="nc" id="L88">                }</span>
+<span class="nc" id="L89">                encoder.endSequence();</span>
+            }
+<span class="nc" id="L91">            encoder.endSequence();</span>
+<span class="nc" id="L92">        }</span>
+    }
+
+    /**
+     * A qualifier for a policy information entry.
+     */
+    public static final class PolicyQualifier implements ASN1Encodable {
+        private final String policyQualifierId;
+        private final ASN1Encodable body;
+
+        /**
+         * Construct a new instance.
+         *
+         * @param policyQualifierId the policy qualifier OID (must not be {@code null})
+         * @param body the body of the policy extension (must not be {@code null})
+         */
+<span class="nc" id="L108">        public PolicyQualifier(final String policyQualifierId, final ASN1Encodable body) {</span>
+<span class="nc" id="L109">            Assert.checkNotNullParam(&quot;policyQualifierId&quot;, policyQualifierId);</span>
+<span class="nc" id="L110">            Assert.checkNotNullParam(&quot;body&quot;, body);</span>
+<span class="nc" id="L111">            this.policyQualifierId = policyQualifierId;</span>
+<span class="nc" id="L112">            this.body = body;</span>
+<span class="nc" id="L113">        }</span>
+
+        public void encodeTo(final ASN1Encoder encoder) {
+<span class="nc" id="L116">            encoder.startSequence();</span>
+<span class="nc" id="L117">            encoder.encodeObjectIdentifier(policyQualifierId);</span>
+<span class="nc" id="L118">            body.encodeTo(encoder);</span>
+<span class="nc" id="L119">            encoder.endSequence();</span>
+<span class="nc" id="L120">        }</span>
+
+        /**
+         * Construct a UserNotice policy qualifier.
+         *
+         * @param organizationText the organization text, or {@code null} to skip the NoticeReference section
+         * @param noticeNumbers the notice numbers (only used if organization text is given)
+         * @param explicitText explicit text for the notice, or {@code null} to skip the DisplayText section
+         * @return the constructed policy qualifier
+         */
+        public static PolicyQualifier userNoticeQualifier(String organizationText, BigInteger[] noticeNumbers, String explicitText) {
+<span class="nc" id="L131">            return new PolicyQualifier(X500.OID_QT_UNOTICE, encoder -&gt; {</span>
+<span class="nc" id="L132">                encoder.startSequence(); // userNotice</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">                if (organizationText != null) {</span>
+<span class="nc" id="L134">                    encoder.startSequence(); // noticeRef</span>
+<span class="nc" id="L135">                    encoder.encodeUTF8String(organizationText);</span>
+<span class="nc" id="L136">                    encoder.startSequence(); // noticeNumbers</span>
+<span class="nc bnc" id="L137" title="All 4 branches missed.">                    if (noticeNumbers != null) for (BigInteger noticeNumber : noticeNumbers) {</span>
+<span class="nc" id="L138">                        encoder.encodeInteger(noticeNumber);</span>
+                    }
+<span class="nc" id="L140">                    encoder.endSequence(); // noticeNumbers</span>
+<span class="nc" id="L141">                    encoder.endSequence(); // noticeRef</span>
+                }
+<span class="nc bnc" id="L143" title="All 2 branches missed.">                if (explicitText != null) {</span>
+<span class="nc" id="L144">                    encoder.encodeUTF8String(explicitText);</span>
+                }
+<span class="nc" id="L146">                encoder.endSequence(); // UserNotice</span>
+<span class="nc" id="L147">            });</span>
+        }
+
+        /**
+         * Construct a CPS policy qualifier.
+         *
+         * @param uri the CPS URI (must not be {@code null})
+         * @return the constructed policy qualifier
+         */
+        public static PolicyQualifier cpsQualifier(String uri) {
+<span class="nc" id="L157">            return new PolicyQualifier(X500.OID_QT_CPS, encoder -&gt; encoder.encodeIA5String(uri));</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Gs2.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl-gs2</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.gs2</a> &gt; <span class="el_source">Gs2.java</span></div><h1>Gs2.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.gs2;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+
+import org.ietf.jgss.GSSException;
+import org.ietf.jgss.GSSManager;
+import org.ietf.jgss.Oid;
+import org.wildfly.common.bytes.ByteStringBuilder;
+import org.wildfly.common.codec.Base32Alphabet;
+import org.wildfly.common.iteration.ByteIterator;
+import org.wildfly.security.mechanism.gssapi.GSSCredentialSecurityFactory;
+
+
+/**
+ * Constants and utility methods for the GS2 mechanism family.
+ *
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+<span class="nc" id="L39">public final class Gs2 {</span>
+
+    public static final String GS2_PREFIX = &quot;GS2-&quot;;
+    public static final String PLUS_SUFFIX = &quot;-PLUS&quot;;
+
+    // Non-OID-derived mechanism names
+    public static final String GS2_KRB5 = &quot;GS2-KRB5&quot;;
+    public static final String GS2_KRB5_PLUS = &quot;GS2-KRB5-PLUS&quot;;
+
+    // SPNEGO must not be used as a GS2 mechanism
+    public static final String SPNEGO = &quot;SPNEGO&quot;;
+    public static final String SPNEGO_PLUS = &quot;SPNEGO-PLUS&quot;;
+
+    /**
+     * Get the SASL mechanism name that corresponds to the given GSS-API mechanism object identifier.
+     *
+     * @param mechanismOid the object identifier for the GSS-API mechanism
+     * @param plus {@code true} if the PLUS-variant of the SASL mechanism name should be returned and
+     * {@code false} otherwise
+     * @return the SASL mechanism name that corresponds to the given object identifier
+     * @throws GSSException if the given object identifier cannot be mapped to a SASL name
+     */
+    public static String getSaslNameForMechanism(Oid mechanismOid, boolean plus) throws GSSException {
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        if (mechanismOid == null) {</span>
+<span class="nc" id="L63">            throw new GSSException(GSSException.BAD_MECH);</span>
+        }
+
+        // Non-OID-derived SASL mechanism names
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        if (mechanismOid.equals(GSSCredentialSecurityFactory.KERBEROS_V5)) {</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">            if (plus) {</span>
+<span class="nc" id="L69">                return GS2_KRB5_PLUS;</span>
+            } else {
+<span class="nc" id="L71">                return GS2_KRB5;</span>
+            }
+        }
+<span class="nc bnc" id="L74" title="All 2 branches missed.">        if (mechanismOid.equals(GSSCredentialSecurityFactory.SPNEGO)) {</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">            if (plus) {</span>
+<span class="nc" id="L76">                return SPNEGO_PLUS;</span>
+            } else {
+<span class="nc" id="L78">                return SPNEGO;</span>
+            }
+        }
+
+        // The SASL mechanism name is the concatenation of the string &quot;GS2-&quot; and the Base32 encoding of
+        // the first 55 bits of the binary SHA-1 hash string computed over the ASN.1 DER encoding of the
+        // GSS-API mechanism's OID
+<span class="nc" id="L85">        ByteStringBuilder name = new ByteStringBuilder();</span>
+<span class="nc" id="L86">        name.append(GS2_PREFIX);</span>
+        MessageDigest messageDigest;
+        try {
+<span class="nc" id="L89">            messageDigest = MessageDigest.getInstance(&quot;SHA-1&quot;);</span>
+<span class="nc" id="L90">        } catch (NoSuchAlgorithmException e) {</span>
+<span class="nc" id="L91">            throw new GSSException(GSSException.FAILURE);</span>
+<span class="nc" id="L92">        }</span>
+<span class="nc" id="L93">        messageDigest.update(mechanismOid.getDER());</span>
+<span class="nc" id="L94">        byte[] digest = messageDigest.digest();</span>
+<span class="nc" id="L95">        digest[6] &amp;= 0xfe;</span>
+<span class="nc" id="L96">        String encoded = ByteIterator.ofBytes(digest, 0, 7).base32Encode(Base32Alphabet.STANDARD, false).drainToString();</span>
+<span class="nc" id="L97">        name.append(encoded.substring(0, encoded.length() - 1));</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        if (plus) {</span>
+<span class="nc" id="L99">            name.append(PLUS_SUFFIX);</span>
+        }
+<span class="nc" id="L101">        return new String(name.toArray(), StandardCharsets.UTF_8);</span>
+    }
+
+    /**
+     * Get the SASL mechanism name that corresponds to the given GSS-API mechanism object identifier.
+     *
+     * @param mechanismOid the object identifier for the GSS-API mechanism
+     * @return the non-PLUS SASL mechanism name that corresponds to the given object identifier
+     * @throws GSSException if the given object identifier cannot be mapped to a SASL name
+     */
+    public static String getSaslNameForMechanism(Oid mechanismOid) throws GSSException {
+<span class="nc" id="L112">        return getSaslNameForMechanism(mechanismOid, false);</span>
+    }
+
+    /**
+     * Get the GSS-API mechanism object identifier that corresponds to the given SASL mechanism name.
+     *
+     * @param saslMechanismName the SASL mechanism name
+     * @return the object identifier for the GSS-API mechanism that corresponds to the given SASL
+     * mechanism name
+     * @throws GSSException if the given SASL name cannot be mapped to an object identifier
+     */
+    public static Oid getMechanismForSaslName(GSSManager gssManager, String saslMechanismName) throws GSSException {
+<span class="nc" id="L124">        int plusSuffixIndex = saslMechanismName.indexOf(PLUS_SUFFIX);</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">        if (plusSuffixIndex != -1) {</span>
+<span class="nc" id="L126">            saslMechanismName = saslMechanismName.substring(0, plusSuffixIndex);</span>
+        }
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        if (saslMechanismName.equals(GS2_KRB5)) {</span>
+<span class="nc" id="L129">            return GSSCredentialSecurityFactory.KERBEROS_V5;</span>
+        }
+<span class="nc bnc" id="L131" title="All 2 branches missed.">        if (saslMechanismName.equals(SPNEGO)) {</span>
+<span class="nc" id="L132">            return GSSCredentialSecurityFactory.SPNEGO;</span>
+        }
+<span class="nc" id="L134">        Oid[] mechanisms = gssManager.getMechs();</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">        if (mechanisms == null) {</span>
+<span class="nc" id="L136">            throw new GSSException(GSSException.BAD_MECH);</span>
+        }
+<span class="nc bnc" id="L138" title="All 2 branches missed.">        for (Oid mechanism : mechanisms) {</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">            if (getSaslNameForMechanism(mechanism).equals(saslMechanismName)) {</span>
+<span class="nc" id="L140">                return mechanism;</span>
+            }
+        }
+<span class="nc" id="L143">        throw new GSSException(GSSException.BAD_MECH);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

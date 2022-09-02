@@ -1,0 +1,480 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SSLUtils.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-ssl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.ssl</a> &gt; <span class="el_source">SSLUtils.java</span></div><h1>SSLUtils.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.ssl;
+
+import java.net.IDN;
+import java.security.KeyStore;
+import java.security.NoSuchAlgorithmException;
+import java.security.Provider;
+import java.security.Provider.Service;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+
+import javax.net.ssl.SNIHostName;
+import javax.net.ssl.SNIMatcher;
+import javax.net.ssl.SNIServerName;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.StandardConstants;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.OneTimeSecurityFactory;
+import org.wildfly.security.SecurityFactory;
+import org.wildfly.security.auth.server.SecurityIdentity;
+
+import static org.wildfly.security.ssl.ElytronMessages.log;
+
+/**
+ * SSL factories and utilities.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class SSLUtils {
+
+<span class="fc" id="L64">    private static final String[] NO_STRINGS = new String[0];</span>
+
+    private SSLUtils() {}
+
+<span class="fc" id="L68">    private static final String SERVICE_TYPE = SSLContext.class.getSimpleName();</span>
+
+    /**
+     * The key used to store the authenticated {@link SecurityIdentity} onto the {@link SSLSession}.
+     */
+    public static final String SSL_SESSION_IDENTITY_KEY = &quot;org.wildfly.security.ssl.identity&quot;;
+
+    /**
+     * Create an SSL context factory which locates the best context by searching the preferred providers in order using
+     * the rules established in the given protocol selector.  If there are no matches, a factory is returned which
+     *
+     * @param protocolSelector the protocol selector
+     * @param providerSupplier the provider supplier
+     * @return the SSL context factory
+     */
+    public static SecurityFactory&lt;SSLContext&gt; createSslContextFactory(ProtocolSelector protocolSelector, Supplier&lt;Provider[]&gt; providerSupplier) {
+<span class="nc" id="L84">        return createSslContextFactory(protocolSelector, providerSupplier, null);</span>
+    }
+
+    /**
+     * Create an SSL context factory which locates the best context by searching the preferred providers in order using
+     * the rules established in the given protocol selector.  If there are no matches, a factory is returned which
+     *
+     * @param protocolSelector the protocol selector
+     * @param providerSupplier the provider supplier
+     * @param providerName the provider name to select, or {@code null} to allow any
+     * @return the SSL context factory
+     */
+    public static SecurityFactory&lt;SSLContext&gt; createSslContextFactory(ProtocolSelector protocolSelector, Supplier&lt;Provider[]&gt; providerSupplier, String providerName) {
+<span class="fc" id="L97">        final Map&lt;String, List&lt;Provider&gt;&gt; preferredProviderByAlgorithm = new HashMap&lt;&gt;();</span>
+
+        // compile all the providers that support SSLContext.
+
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        for (Provider provider : providerSupplier.get()) {</span>
+            // if a provider name was given, filter by it
+<span class="pc bpc" id="L103" title="3 of 4 branches missed.">            if (providerName != null &amp;&amp; ! providerName.equals(provider.getName())) {</span>
+<span class="nc" id="L104">                continue;</span>
+            }
+<span class="fc" id="L106">            Set&lt;Service&gt; services = provider.getServices();</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">            if (services != null) {</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">                for (Provider.Service service : services) {</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">                    if (SERVICE_TYPE.equals(service.getType())) {</span>
+<span class="fc" id="L110">                        String protocolName = service.getAlgorithm();</span>
+<span class="fc" id="L111">                        List&lt;Provider&gt; providerList = preferredProviderByAlgorithm.computeIfAbsent(protocolName.toUpperCase(Locale.ENGLISH), s -&gt; new ArrayList&lt;&gt;());</span>
+<span class="fc" id="L112">                        providerList.add(provider);</span>
+
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">                        if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L115">                            log.tracef(&quot;Provider %s was added for algorithm %s&quot;, provider, protocolName.toUpperCase(Locale.ENGLISH));</span>
+                        }
+                    }
+<span class="fc" id="L118">                }</span>
+            }
+        }
+
+        // now return a factory that will return the best match is can create.
+<span class="fc" id="L123">        final String[] supportedProtocols = protocolSelector.evaluate(preferredProviderByAlgorithm.keySet().toArray(NO_STRINGS));</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L125">            log.tracef(&quot;Supported protocols are: %s&quot;, Arrays.toString(supportedProtocols));</span>
+        }
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (supportedProtocols.length &gt; 0) {</span>
+<span class="fc" id="L128">            return () -&gt; {</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">                for (String protocol : supportedProtocols) {</span>
+<span class="fc" id="L130">                    List&lt;Provider&gt; providerList = preferredProviderByAlgorithm.getOrDefault(protocol.toUpperCase(Locale.ENGLISH), Collections.emptyList());</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">                    if (log.isTraceEnabled()) {</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">                        if (providerList.isEmpty()) {</span>
+<span class="nc" id="L133">                            log.tracef(&quot;No providers are available for protocol %s&quot;, protocol);</span>
+                        }
+                    }
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">                    for (Provider provider : providerList) {</span>
+                        try {
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">                            if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L139">                                log.tracef(&quot;Attempting to get an SSLContext instance using protocol %s and provider %s&quot;, protocol, provider);</span>
+                            }
+<span class="fc" id="L141">                            return SSLContext.getInstance(protocol, provider);</span>
+<span class="nc" id="L142">                        } catch (NoSuchAlgorithmException ignored) {</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">                            if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L144">                                log.tracef(ignored, &quot;Provider %s has no such protocol %s&quot;, provider, protocol);</span>
+                            }
+                        }
+<span class="nc" id="L147">                    }</span>
+                }
+
+<span class="nc bnc" id="L150" title="All 2 branches missed.">                if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L151">                    log.tracef(&quot;No %s provided by providers in %s: %s&quot;, SERVICE_TYPE, SSLUtils.class.getSimpleName(), Arrays.toString(providerSupplier.get()));</span>
+                }
+
+<span class="nc" id="L154">                throw ElytronMessages.log.noSslContextProvided(SERVICE_TYPE);</span>
+            };
+        }
+
+<span class="nc bnc" id="L158" title="All 2 branches missed.">        if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L159">            log.tracef(&quot;No %s provided by providers in %s: %s&quot;, SERVICE_TYPE, SSLUtils.class.getSimpleName(), Arrays.toString(providerSupplier.get()));</span>
+        }
+
+<span class="nc" id="L162">        return SSLUtils::throwIt;</span>
+    }
+
+    private static SSLContext throwIt() throws NoSuchAlgorithmException {
+<span class="nc" id="L166">        throw ElytronMessages.log.noSslContextProvided(SERVICE_TYPE);</span>
+    }
+
+    /**
+     * Create a simple security factory for SSL contexts.
+     *
+     * @param protocol the protocol name
+     * @param provider the provider to use
+     * @return the SSL context factory
+     */
+    public static SecurityFactory&lt;SSLContext&gt; createSimpleSslContextFactory(String protocol, Provider provider) {
+<span class="nc" id="L177">        return () -&gt; SSLContext.getInstance(protocol, provider);</span>
+    }
+
+    /**
+     * Create a configured SSL context from an outside SSL context.
+     *
+     * @param original the original SSL context
+     * @param sslConfigurator the SSL configurator
+     * @return the configured SSL context
+     */
+    public static SSLContext createConfiguredSslContext(SSLContext original, final SSLConfigurator sslConfigurator) {
+<span class="nc" id="L188">        return createConfiguredSslContext(original, sslConfigurator, true);</span>
+    }
+
+    /**
+     * Create a configured SSL context from an outside SSL context.
+     *
+     * @param original the original SSL context
+     * @param sslConfigurator the SSL configurator
+     * @param wrap should the resulting SSLEngine, SSLSocket, and SSLServerSocket instances be wrapped using the configurator.
+     * @return the configured SSL context
+     */
+    public static SSLContext createConfiguredSslContext(SSLContext original, final SSLConfigurator sslConfigurator, final boolean wrap) {
+<span class="nc" id="L200">        return new DelegatingSSLContext(new ConfiguredSSLContextSpi(original, sslConfigurator, wrap));</span>
+    }
+
+    /**
+     * Create a configured SSL context factory from an outside SSL context.  The returned factory will create new instances
+     * for every call, so it might be necessary to wrap with a {@link OneTimeSecurityFactory} instance.
+     *
+     * @param originalFactory the original SSL context factory
+     * @param sslConfigurator the SSL configurator
+     * @return the configured SSL context
+     */
+    public static SecurityFactory&lt;SSLContext&gt; createConfiguredSslContextFactory(SecurityFactory&lt;SSLContext&gt; originalFactory, final SSLConfigurator sslConfigurator) {
+<span class="nc" id="L212">        return () -&gt; createConfiguredSslContext(originalFactory.create(), sslConfigurator);</span>
+    }
+
+<span class="fc" id="L215">    private static final SecurityFactory&lt;X509TrustManager&gt; DEFAULT_TRUST_MANAGER_SECURITY_FACTORY = new OneTimeSecurityFactory&lt;&gt;(() -&gt; {</span>
+<span class="fc" id="L216">        final TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());</span>
+<span class="fc" id="L217">        trustManagerFactory.init((KeyStore) null);</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">        for (TrustManager trustManager : trustManagerFactory.getTrustManagers()) {</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">            if (trustManager instanceof X509TrustManager) {</span>
+<span class="fc" id="L220">                return (X509TrustManager) trustManager;</span>
+            }
+        }
+<span class="nc" id="L223">        throw ElytronMessages.log.noDefaultTrustManager();</span>
+    });
+
+    /**
+     * Get the platform's default X.509 trust manager security factory.  The factory caches the instance.
+     *
+     * @return the security factory for the default trust manager
+     */
+    public static SecurityFactory&lt;X509TrustManager&gt; getDefaultX509TrustManagerSecurityFactory() {
+<span class="fc" id="L232">        return DEFAULT_TRUST_MANAGER_SECURITY_FACTORY;</span>
+    }
+
+    /**
+     * Get a server SSL engine which dispatches to the appropriate SSL context based on the information in the
+     * SSL greeting.
+     *
+     * @param selector the context selector to use (cannot be {@code null})
+     * @return the SSL engine (not {@code null})
+     */
+    public static SSLEngine createSelectingSSLEngine(SSLContextSelector selector) {
+<span class="nc" id="L243">        Assert.checkNotNullParam(&quot;selector&quot;, selector);</span>
+<span class="nc" id="L244">        return new SelectingServerSSLEngine(selector);</span>
+    }
+
+    /**
+     * Get a server SSL engine which dispatches to the appropriate SSL context based on the information in the
+     * SSL greeting.
+     *
+     * @param selector the context selector to use (cannot be {@code null})
+     * @param host the advisory host name
+     * @param port the advisory port number
+     * @return the SSL engine (not {@code null})
+     */
+    public static SSLEngine createSelectingSSLEngine(SSLContextSelector selector, String host, int port) {
+<span class="nc" id="L257">        Assert.checkNotNullParam(&quot;selector&quot;, selector);</span>
+<span class="nc" id="L258">        return new SelectingServerSSLEngine(selector, host, port);</span>
+    }
+
+    /**
+     * Create an {@code SNIMatcher} which matches SNI host names that satisfy the given predicate.
+     *
+     * @param predicate the predicate (must not be {@code null})
+     * @return the SNI matcher (not {@code null})
+     */
+    public static SNIMatcher createHostNamePredicateSNIMatcher(Predicate&lt;SNIHostName&gt; predicate) {
+<span class="nc" id="L268">        Assert.checkNotNullParam(&quot;predicate&quot;, predicate);</span>
+<span class="nc" id="L269">        return new SNIMatcher(StandardConstants.SNI_HOST_NAME) {</span>
+            public boolean matches(final SNIServerName sniServerName) {
+<span class="nc bnc" id="L271" title="All 4 branches missed.">                return sniServerName instanceof SNIHostName &amp;&amp; predicate.test((SNIHostName) sniServerName);</span>
+            }
+        };
+    }
+
+    /**
+     * Create an {@code SNIMatcher} which matches SNI host name strings that satisfy the given predicate.
+     *
+     * @param predicate the predicate (must not be {@code null})
+     * @return the SNI matcher (not {@code null})
+     * @see IDN
+     */
+    public static SNIMatcher createHostNameStringPredicateSNIMatcher(Predicate&lt;String&gt; predicate) {
+<span class="nc" id="L284">        Assert.checkNotNullParam(&quot;predicate&quot;, predicate);</span>
+<span class="nc" id="L285">        return new SNIMatcher(StandardConstants.SNI_HOST_NAME) {</span>
+            public boolean matches(final SNIServerName sniServerName) {
+<span class="nc bnc" id="L287" title="All 4 branches missed.">                return sniServerName instanceof SNIHostName &amp;&amp; predicate.test(((SNIHostName) sniServerName).getAsciiName());</span>
+            }
+        };
+    }
+
+    /**
+     * Create an {@code SNIMatcher} which matches SNI host names that are equal to the given (ASCII) string.
+     *
+     * @param string the host name string (must not be {@code null})
+     * @return the SNI matcher (not {@code null})
+     * @see IDN
+     */
+    public static SNIMatcher createHostNameStringSNIMatcher(String string) {
+<span class="nc" id="L300">        Assert.checkNotNullParam(&quot;string&quot;, string);</span>
+<span class="nc" id="L301">        return createHostNameStringPredicateSNIMatcher(string::equals);</span>
+    }
+
+    /**
+     * Create an {@code SNIMatcher} which matches SNI host name strings which end with the given suffix.
+     *
+     * @param suffix the suffix to match (must not be {@code null} or empty)
+     * @return the SNI matcher (not {@code null})
+     */
+    public static SNIMatcher createHostNameSuffixSNIMatcher(String suffix) {
+<span class="nc" id="L311">        Assert.checkNotNullParam(&quot;suffix&quot;, suffix);</span>
+<span class="nc" id="L312">        Assert.checkNotEmptyParam(&quot;suffix&quot;, suffix);</span>
+<span class="nc bnc" id="L313" title="All 2 branches missed.">        final String finalSuffix = suffix.startsWith(&quot;.&quot;) ? suffix : &quot;.&quot; + suffix;</span>
+<span class="nc" id="L314">        return createHostNameStringPredicateSNIMatcher(n -&gt; n.endsWith(finalSuffix));</span>
+    }
+
+    /**
+     * Get a factory which produces SSL engines which dispatch to the appropriate SSL context based on the information
+     * in the SSL greeting.
+     *
+     * @param selector the context selector to use (cannot be {@code null})
+     * @return the SSL engine factory (not {@code null})
+     */
+    public static SecurityFactory&lt;SSLEngine&gt; createDispatchingSSLEngineFactory(SSLContextSelector selector) {
+<span class="nc" id="L325">        Assert.checkNotNullParam(&quot;selector&quot;, selector);</span>
+<span class="nc" id="L326">        return () -&gt; new SelectingServerSSLEngine(selector);</span>
+    }
+
+    /**
+     * Get the value of the given key from the SSL session, or a default value if the key is not set.
+     *
+     * @param sslSession the SSL session (must not be {@code null})
+     * @param key the key to retrieve (must not be {@code null})
+     * @param defaultValue the value to return if the key is not present
+     * @return the session value or the default value
+     */
+    public static Object getOrDefault(SSLSession sslSession, String key, Object defaultValue) {
+<span class="nc" id="L338">        Assert.checkNotNullParam(&quot;sslSession&quot;, sslSession);</span>
+<span class="nc" id="L339">        Assert.checkNotNullParam(&quot;key&quot;, key);</span>
+<span class="nc" id="L340">        final Object value = sslSession.getValue(key);</span>
+<span class="nc bnc" id="L341" title="All 2 branches missed.">        return value != null ? value : defaultValue;</span>
+    }
+
+    /**
+     * Put a value on the session if the value is not yet set.  This method is atomic with respect to other methods
+     * on this class.
+     *
+     * @param sslSession the SSL session (must not be {@code null})
+     * @param key the key to retrieve (must not be {@code null})
+     * @param newValue the value to set (must not be {@code null})
+     * @return the existing value, or {@code null} if the value was successfully set
+     */
+    public static Object putSessionValueIfAbsent(SSLSession sslSession, String key, Object newValue) {
+<span class="nc" id="L354">        Assert.checkNotNullParam(&quot;sslSession&quot;, sslSession);</span>
+<span class="nc" id="L355">        Assert.checkNotNullParam(&quot;key&quot;, key);</span>
+<span class="nc" id="L356">        Assert.checkNotNullParam(&quot;newValue&quot;, newValue);</span>
+<span class="nc" id="L357">        synchronized (sslSession) {</span>
+<span class="nc" id="L358">            final Object existing = sslSession.getValue(key);</span>
+<span class="nc bnc" id="L359" title="All 2 branches missed.">            if (existing == null) {</span>
+<span class="nc" id="L360">                sslSession.putValue(key, newValue);</span>
+<span class="nc" id="L361">                return null;</span>
+            } else {
+<span class="nc" id="L363">                return existing;</span>
+            }
+        }
+    }
+
+    /**
+     * Remove and return a value on the session.  This method is atomic with respect to other methods on this class.
+     *
+     * @param sslSession the SSL session (must not be {@code null})
+     * @param key the key to retrieve (must not be {@code null})
+     * @return the existing value, or {@code null} if no such value was set
+     */
+    public static Object removeSessionValue(SSLSession sslSession, String key) {
+<span class="nc" id="L376">        Assert.checkNotNullParam(&quot;sslSession&quot;, sslSession);</span>
+<span class="nc" id="L377">        Assert.checkNotNullParam(&quot;key&quot;, key);</span>
+<span class="nc" id="L378">        synchronized (sslSession) {</span>
+<span class="nc" id="L379">            final Object existing = sslSession.getValue(key);</span>
+<span class="nc" id="L380">            sslSession.removeValue(key);</span>
+<span class="nc" id="L381">            return existing;</span>
+        }
+    }
+
+    /**
+     * Remove the given key-value pair on the session.  This method is atomic with respect to other methods on this class.
+     *
+     * @param sslSession the SSL session (must not be {@code null})
+     * @param key the key to remove (must not be {@code null})
+     * @param value the value to remove (must not be {@code null})
+     * @return {@code true} if the key/value pair was removed, {@code false} if the key was not present or the value was not equal to the given value
+     */
+    public static boolean removeSessionValue(SSLSession sslSession, String key, Object value) {
+<span class="nc" id="L394">        Assert.checkNotNullParam(&quot;sslSession&quot;, sslSession);</span>
+<span class="nc" id="L395">        Assert.checkNotNullParam(&quot;key&quot;, key);</span>
+<span class="nc" id="L396">        Assert.checkNotNullParam(&quot;value&quot;, value);</span>
+<span class="nc" id="L397">        synchronized (sslSession) {</span>
+<span class="nc" id="L398">            final Object existing = sslSession.getValue(key);</span>
+<span class="nc bnc" id="L399" title="All 2 branches missed.">            if (Objects.equals(existing, value)) {</span>
+<span class="nc" id="L400">                sslSession.removeValue(key);</span>
+<span class="nc" id="L401">                return true;</span>
+            } else {
+<span class="nc" id="L403">                return false;</span>
+            }
+        }
+    }
+
+    /**
+     * Replace the given key's value with a new value.  If there is no value for the given key, no action is performed.
+     * This method is atomic with respect to other methods on this class.
+     *
+     * @param sslSession the SSL session (must not be {@code null})
+     * @param key the key to retrieve (must not be {@code null})
+     * @param newValue the value to set (must not be {@code null})
+     * @return the existing value, or {@code null} if the value was not set
+     */
+    public static Object replaceSessionValue(SSLSession sslSession, String key, Object newValue) {
+<span class="nc" id="L418">        Assert.checkNotNullParam(&quot;sslSession&quot;, sslSession);</span>
+<span class="nc" id="L419">        Assert.checkNotNullParam(&quot;key&quot;, key);</span>
+<span class="nc" id="L420">        Assert.checkNotNullParam(&quot;newValue&quot;, newValue);</span>
+<span class="nc" id="L421">        synchronized (sslSession) {</span>
+<span class="nc" id="L422">            final Object existing = sslSession.getValue(key);</span>
+<span class="nc bnc" id="L423" title="All 2 branches missed.">            if (existing != null) sslSession.putValue(key, newValue);</span>
+<span class="nc" id="L424">            return existing;</span>
+        }
+    }
+
+    /**
+     * Replace the given key's value with a new value if (and only if) it is mapped to the given existing value.
+     * This method is atomic with respect to other methods on this class.
+     *
+     * @param sslSession the SSL session (must not be {@code null})
+     * @param key the key to retrieve (must not be {@code null})
+     * @param oldValue the value to match (must not be {@code null})
+     * @param newValue the value to set (must not be {@code null})
+     * @return {@code true} if the value was matched and replaced, or {@code false} if the value did not match and no action was taken
+     */
+    public static boolean replaceSessionValue(SSLSession sslSession, String key, Object oldValue, Object newValue) {
+<span class="nc" id="L439">        Assert.checkNotNullParam(&quot;sslSession&quot;, sslSession);</span>
+<span class="nc" id="L440">        Assert.checkNotNullParam(&quot;key&quot;, key);</span>
+<span class="nc" id="L441">        Assert.checkNotNullParam(&quot;oldValue&quot;, oldValue);</span>
+<span class="nc" id="L442">        Assert.checkNotNullParam(&quot;newValue&quot;, newValue);</span>
+<span class="nc" id="L443">        synchronized (sslSession) {</span>
+<span class="nc" id="L444">            final Object existing = sslSession.getValue(key);</span>
+<span class="nc bnc" id="L445" title="All 2 branches missed.">            if (Objects.equals(existing, oldValue)) {</span>
+<span class="nc" id="L446">                sslSession.putValue(key, newValue);</span>
+<span class="nc" id="L447">                return true;</span>
+            } else {
+<span class="nc" id="L449">                return false;</span>
+            }
+        }
+    }
+
+    /**
+     * Get or compute the value for the given key, storing the computed value (if one is generated).  The function
+     * must not generate a {@code null} value or an unspecified exception will result.
+     *
+     * @param sslSession the SSL session (must not be {@code null})
+     * @param key the key to retrieve (must not be {@code null})
+     * @param mappingFunction the function to apply to acquire the value (must not be {@code null})
+     * @return the stored or new value (not {@code null})
+     */
+    public static &lt;R&gt; R computeIfAbsent(SSLSession sslSession, String key, Function&lt;String, R&gt; mappingFunction) {
+<span class="nc" id="L464">        Assert.checkNotNullParam(&quot;sslSession&quot;, sslSession);</span>
+<span class="nc" id="L465">        Assert.checkNotNullParam(&quot;key&quot;, key);</span>
+<span class="nc" id="L466">        Assert.checkNotNullParam(&quot;mappingFunction&quot;, mappingFunction);</span>
+<span class="nc" id="L467">        synchronized (sslSession) {</span>
+<span class="nc" id="L468">            final R existing = (R) sslSession.getValue(key);</span>
+<span class="nc bnc" id="L469" title="All 2 branches missed.">            if (existing == null) {</span>
+<span class="nc" id="L470">                R newValue = mappingFunction.apply(key);</span>
+<span class="nc" id="L471">                Assert.assertNotNull(newValue);</span>
+<span class="nc" id="L472">                sslSession.putValue(key, newValue);</span>
+<span class="nc" id="L473">                return newValue;</span>
+            } else {
+<span class="nc" id="L475">                return existing;</span>
+            }
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

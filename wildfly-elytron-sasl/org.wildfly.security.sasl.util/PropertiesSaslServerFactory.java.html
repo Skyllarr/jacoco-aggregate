@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PropertiesSaslServerFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.util</a> &gt; <span class="el_source">PropertiesSaslServerFactory.java</span></div><h1>PropertiesSaslServerFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.sasl.util;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.sasl.SaslException;
+import javax.security.sasl.SaslServer;
+import javax.security.sasl.SaslServerFactory;
+
+/**
+ * A SaslServerFactory allowing the user to add properties
+ *
+ * @author Kabir Khan
+ */
+public class PropertiesSaslServerFactory extends AbstractDelegatingSaslServerFactory {
+
+    private final Map&lt;String, ?&gt; properties;
+
+    /**
+     * Constructor
+     * @param delegate the underlying SaslServerFactory
+     * @param properties the properties
+     */
+    public PropertiesSaslServerFactory(SaslServerFactory delegate, Map&lt;String, ?&gt; properties) {
+<span class="nc" id="L45">        super(delegate);</span>
+<span class="nc" id="L46">        this.properties = new HashMap&lt;&gt;(checkNotNullParam(&quot;properties&quot;, properties));</span>
+<span class="nc" id="L47">    }</span>
+
+    @Override
+    public String[] getMechanismNames(Map&lt;String, ?&gt; props) {
+<span class="nc" id="L51">        return delegate.getMechanismNames(combine(props, properties));</span>
+    }
+
+    @Override
+    public SaslServer createSaslServer(String mechanism, String protocol, String serverName, Map&lt;String, ?&gt; props, CallbackHandler cbh) throws SaslException {
+<span class="nc" id="L56">        return delegate.createSaslServer(mechanism, protocol, serverName, combine(props, properties), cbh);</span>
+    }
+
+    private static Map&lt;String, ?&gt; combine(Map&lt;String, ?&gt; provided, Map&lt;String, ?&gt; configured) {
+<span class="nc" id="L60">        Map&lt;String, Object&gt; combined = new HashMap&lt;&gt;(provided);</span>
+<span class="nc" id="L61">        combined.putAll( configured);</span>
+
+<span class="nc" id="L63">        return combined;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

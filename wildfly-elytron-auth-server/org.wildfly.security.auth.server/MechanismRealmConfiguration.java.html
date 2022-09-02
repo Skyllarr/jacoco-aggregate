@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MechanismRealmConfiguration.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.server</a> &gt; <span class="el_source">MechanismRealmConfiguration.java</span></div><h1>MechanismRealmConfiguration.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.server;
+
+import java.security.Principal;
+import java.util.function.Function;
+
+import org.wildfly.common.Assert;
+
+/**
+ * A configuration for a single mechanism realm.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class MechanismRealmConfiguration {
+    private final String realmName;
+    private final Function&lt;Principal, Principal&gt; preRealmRewriter;
+    private final Function&lt;Principal, Principal&gt; postRealmRewriter;
+    private final Function&lt;Principal, Principal&gt; finalRewriter;
+    private final RealmMapper realmMapper;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param realmName the name of this realm (may not be {@code null})
+     * @param preRealmRewriter the pre-realm rewriter to apply (may not be {@code null})
+     * @param postRealmRewriter the post-realm rewriter to apply (may not be {@code null})
+     * @param finalRewriter the final rewriter to apply (may not be {@code null})
+     * @param realmMapper the realm mapper to use
+     */
+<span class="fc" id="L47">    MechanismRealmConfiguration(final String realmName, final Function&lt;Principal, Principal&gt; preRealmRewriter, final Function&lt;Principal, Principal&gt; postRealmRewriter, final Function&lt;Principal, Principal&gt; finalRewriter, final RealmMapper realmMapper) {</span>
+<span class="fc" id="L48">        this.realmName = realmName;</span>
+<span class="fc" id="L49">        this.preRealmRewriter = preRealmRewriter;</span>
+<span class="fc" id="L50">        this.postRealmRewriter = postRealmRewriter;</span>
+<span class="fc" id="L51">        this.finalRewriter = finalRewriter;</span>
+<span class="fc" id="L52">        this.realmMapper = realmMapper;</span>
+<span class="fc" id="L53">    }</span>
+
+    /**
+     * Get the mechanism realm name.
+     *
+     * @return the mechanism realm name (not {@code null})
+     */
+    public String getRealmName() {
+<span class="nc" id="L61">        return realmName;</span>
+    }
+
+    /**
+     * Get the pre-realm rewriter for this mechanism realm.
+     *
+     * @return the pre-realm rewriter for this mechanism realm (not {@code null})
+     */
+    public Function&lt;Principal, Principal&gt; getPreRealmRewriter() {
+<span class="fc" id="L70">        return preRealmRewriter;</span>
+    }
+
+    /**
+     * Get the post-realm rewriter for this mechanism realm.
+     *
+     * @return the post-realm rewriter for this mechanism realm (not {@code null})
+     */
+    public Function&lt;Principal, Principal&gt; getPostRealmRewriter() {
+<span class="fc" id="L79">        return postRealmRewriter;</span>
+    }
+
+    /**
+     * Get the final rewriter for this mechanism realm.
+     *
+     * @return the final rewriter for this mechanism realm (not {@code null})
+     */
+    public Function&lt;Principal, Principal&gt; getFinalRewriter() {
+<span class="fc" id="L88">        return finalRewriter;</span>
+    }
+
+    /**
+     * Get the realm mapper for this mechanism realm.
+     *
+     * @return the realm mapper for this mechanism realm, or {@code null} to use the default
+     */
+    public RealmMapper getRealmMapper() {
+<span class="fc" id="L97">        return realmMapper;</span>
+    }
+
+    /**
+     * A realm configuration for no particular realm, which does no additional rewriting.
+     */
+<span class="fc" id="L103">    public static final MechanismRealmConfiguration NO_REALM = new MechanismRealmConfiguration(&quot;none&quot;, Function.identity(), Function.identity(), Function.identity(), null);</span>
+
+    /**
+     * Obtain a new {@link Builder} capable of building a {@link MechanismRealmConfiguration}.
+     *
+     * @return a new {@link Builder} capable of building a {@link MechanismRealmConfiguration}.
+     */
+    public static Builder builder() {
+<span class="nc" id="L111">        return new Builder();</span>
+    }
+
+    /**
+     * A builder for mechanism realm configuration.
+     */
+    public static final class Builder {
+        private String realmName;
+<span class="nc" id="L119">        private Function&lt;Principal, Principal&gt; preRealmRewriter = Function.identity();</span>
+<span class="nc" id="L120">        private Function&lt;Principal, Principal&gt; postRealmRewriter = Function.identity();</span>
+<span class="nc" id="L121">        private Function&lt;Principal, Principal&gt; finalRewriter = Function.identity();</span>
+        private RealmMapper realmMapper;
+
+        /**
+         * Construct a new instance.
+         */
+<span class="nc" id="L127">        Builder() {</span>
+<span class="nc" id="L128">        }</span>
+
+        /**
+         * Sets a name of the realm to be presented by the mechanism.
+         * @param realmName a name of the realm to be presented by the mechanism
+         * @return this builder
+         */
+        public Builder setRealmName(final String realmName) {
+<span class="nc" id="L136">            this.realmName = realmName;</span>
+
+<span class="nc" id="L138">            return this;</span>
+        }
+
+        /**
+         * Set a principal transformer to apply before the realm is selected.
+         *
+         * @param preRealmRewriter a principal transformer to apply before the realm is selected
+         * @return this builder
+         */
+        public Builder setPreRealmRewriter(final Function&lt;Principal, Principal&gt; preRealmRewriter) {
+<span class="nc" id="L148">            Assert.checkNotNullParam(&quot;preRealmRewriter&quot;, preRealmRewriter);</span>
+<span class="nc" id="L149">            this.preRealmRewriter = preRealmRewriter;</span>
+
+<span class="nc" id="L151">            return this;</span>
+        }
+
+        /**
+         * Set a principal transformer to apply after the realm is selected.  Any previously set credential source will be overwritten.
+         *
+         * @param postRealmRewriter a principal transformer to apply after the realm is selected
+         * @return this builder
+         */
+        public Builder setPostRealmRewriter(final Function&lt;Principal, Principal&gt; postRealmRewriter) {
+<span class="nc" id="L161">            Assert.checkNotNullParam(&quot;postRealmRewriter&quot;, postRealmRewriter);</span>
+<span class="nc" id="L162">            this.postRealmRewriter = postRealmRewriter;</span>
+
+<span class="nc" id="L164">            return this;</span>
+        }
+
+        /**
+         * Set a final principal transformer to apply for this mechanism realm.  Any previously set credential source will be overwritten.
+         *
+         * @param finalRewriter a final principal transformer to apply for this mechanism realm
+         * @return this builder
+         */
+        public Builder setFinalRewriter(final Function&lt;Principal, Principal&gt; finalRewriter) {
+<span class="nc" id="L174">            Assert.checkNotNullParam(&quot;finalRewriter&quot;, finalRewriter);</span>
+<span class="nc" id="L175">            this.finalRewriter = finalRewriter;</span>
+
+<span class="nc" id="L177">            return this;</span>
+        }
+
+        /**
+         * Sets a realm mapper to be used by the mechanism.  Any previously set credential source will be overwritten.
+         *
+         * @param realmMapper a realm mapper to be used by the mechanism
+         * @return this builder
+         */
+        public Builder setRealmMapper(final RealmMapper realmMapper) {
+<span class="nc" id="L187">            this.realmMapper = realmMapper;</span>
+<span class="nc" id="L188">            return this;</span>
+        }
+
+        /**
+         * Build a new instance.
+         *
+         * @return a new instance
+         */
+        public MechanismRealmConfiguration build() {
+<span class="nc" id="L197">            Assert.checkNotNullParam(&quot;realmName&quot;, realmName);</span>
+<span class="nc" id="L198">            return new MechanismRealmConfiguration(realmName, preRealmRewriter, postRealmRewriter, finalRewriter, realmMapper);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

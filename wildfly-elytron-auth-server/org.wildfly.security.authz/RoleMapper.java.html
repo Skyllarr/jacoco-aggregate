@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RoleMapper.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.authz</a> &gt; <span class="el_source">RoleMapper.java</span></div><h1>RoleMapper.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source
+ *
+ * Copyright 2013 Red Hat, Inc. and/or its affiliates.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.authz;
+
+import org.wildfly.common.Assert;
+
+/**
+ * A role mapper is responsible for mapping roles based on their raw form.
+ * &lt;p&gt;
+ * Roles are basically represented as {@link String} values, where these values are their names. Role mapping allows to transform roles
+ * from their raw form (eg.: just like they were loaded from a identity store such as a database or LDAP server) in a more consistent
+ * form.
+ *
+ * @author &lt;a href=&quot;mailto:psilva@redhat.com&quot;&gt;Pedro Igor&lt;/a&gt;
+ */
+@FunctionalInterface
+public interface RoleMapper {
+
+    /**
+     * Returns a set of strings representing the roles mapped from the given roles in their raw form.
+     *
+     * @param rolesToMap the roles in their raw form to apply mapping
+     * @return the mapped role set
+     */
+    Roles mapRoles(Roles rolesToMap);
+
+    /**
+     * A default implementation that does nothing but return the given roles.
+     */
+<span class="fc" id="L45">    RoleMapper IDENTITY_ROLE_MAPPER = rolesToMap -&gt; rolesToMap;</span>
+
+    /**
+     * Create a role mapper which is the intersection (logical &quot;and&quot;) of the results of this and the given role mapper.
+     *
+     * @param other the other role mapper
+     * @return the intersection role mapper
+     */
+    default RoleMapper and(RoleMapper other) {
+<span class="nc" id="L54">        Assert.checkNotNullParam(&quot;other&quot;, other);</span>
+<span class="nc" id="L55">        return rolesToMap -&gt; mapRoles(rolesToMap).and(other.mapRoles(rolesToMap));</span>
+    }
+
+    /**
+     * Create a role mapper which is the union (logical &quot;or&quot;) of the results of this and the given role mapper.
+     *
+     * @param other the other role mapper
+     * @return the union role mapper
+     */
+    default RoleMapper or(RoleMapper other) {
+<span class="nc" id="L65">        Assert.checkNotNullParam(&quot;other&quot;, other);</span>
+<span class="nc" id="L66">        return rolesToMap -&gt; mapRoles(rolesToMap).or(other.mapRoles(rolesToMap));</span>
+    }
+
+    /**
+     * Create a role mapper which is the symmetric difference (or disjunction, or logical &quot;xor&quot;) of the results of this
+     * and the given role mapper.
+     *
+     * @param other the other role mapper
+     * @return the difference role mapper
+     */
+    default RoleMapper xor(RoleMapper other) {
+<span class="nc" id="L77">        Assert.checkNotNullParam(&quot;other&quot;, other);</span>
+<span class="nc" id="L78">        return rolesToMap -&gt; mapRoles(rolesToMap).xor(other.mapRoles(rolesToMap));</span>
+    }
+
+    /**
+     * Create a role mapper which contains all the roles mapped by this mapper, minus the roles mapped by the given
+     * role mapper.
+     *
+     * @param other the other role mapper
+     * @return the difference role mapper
+     */
+    default RoleMapper minus(RoleMapper other) {
+<span class="nc" id="L89">        Assert.checkNotNullParam(&quot;other&quot;, other);</span>
+<span class="nc" id="L90">        return rolesToMap -&gt; mapRoles(rolesToMap).minus(other.mapRoles(rolesToMap));</span>
+    }
+
+    /**
+     * Create an aggregate role mapper.  Each role mapper is applied in order.
+     *
+     * @param mapper1 the first role mapper to apply (must not be {@code null})
+     * @param mapper2 the second role mapper to apply (must not be {@code null})
+     * @return the aggregate role mapper (not {@code null})
+     */
+    static RoleMapper aggregate(RoleMapper mapper1, RoleMapper mapper2) {
+<span class="nc" id="L101">        Assert.checkNotNullParam(&quot;mapper1&quot;, mapper1);</span>
+<span class="nc" id="L102">        Assert.checkNotNullParam(&quot;mapper2&quot;, mapper2);</span>
+<span class="nc" id="L103">        return rolesToMap -&gt; mapper2.mapRoles(mapper1.mapRoles(rolesToMap));</span>
+    }
+
+    /**
+     * Create an aggregate role mapper.  Each role mapper is applied in order.
+     *
+     * @param mappers the role mappers to apply (most not be {@code null} or contain {@code null} elements)
+     * @return the aggregate role mapper (not {@code null})
+     */
+    static RoleMapper aggregate(RoleMapper... mappers) {
+<span class="nc" id="L113">        Assert.checkNotNullParam(&quot;mappers&quot;, mappers);</span>
+<span class="nc" id="L114">        final RoleMapper[] clone = mappers.clone();</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">        for (int i = 0; i &lt; clone.length; i++) {</span>
+<span class="nc" id="L116">            Assert.checkNotNullArrayParam(&quot;mappers&quot;, i, clone[i]);</span>
+        }
+<span class="nc" id="L118">        return rolesToMap -&gt; {</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">            for (RoleMapper r : clone) rolesToMap = r.mapRoles(rolesToMap);</span>
+<span class="nc" id="L120">            return rolesToMap;</span>
+        };
+    }
+
+    /**
+     * Create a role mapper that always returns the same set of roles regardless of the input.
+     *
+     * @param roles the set of roles to always be returned (must not be {@code null})
+     * @return the constant role mapper (not {@code null})
+     */
+    static RoleMapper constant(Roles roles) {
+<span class="fc" id="L131">        Assert.checkNotNullParam(&quot;roles&quot;, roles);</span>
+<span class="fc" id="L132">        return rolesToMap -&gt; roles;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

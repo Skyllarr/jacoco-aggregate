@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ByNamePermissionCollection.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-permission</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.permission</a> &gt; <span class="el_source">ByNamePermissionCollection.java</span></div><h1>ByNamePermissionCollection.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.permission;
+
+import java.security.Permission;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.Iterator;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * A permission collection for actionless permissions which are organized by name.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class ByNamePermissionCollection extends AbstractPermissionCollection {
+<span class="fc" id="L35">    private final ConcurrentHashMap&lt;String, Permission&gt; byName = new ConcurrentHashMap&lt;&gt;();</span>
+    private volatile Permission all;
+
+    /**
+     * The source permission used to construct this collection.
+     *
+     * @param sourcePermission the source permission (must not be {@code null})
+     */
+    public ByNamePermissionCollection(final AbstractPermission&lt;?&gt; sourcePermission) {
+<span class="fc" id="L44">        super(sourcePermission);</span>
+<span class="fc" id="L45">    }</span>
+
+    public int size() {
+<span class="nc bnc" id="L48" title="All 2 branches missed.">        return all != null ? 1 : byName.size();</span>
+    }
+
+    public Iterator&lt;Permission&gt; iterator() {
+<span class="nc" id="L52">        return getIterablePermissions().iterator();</span>
+    }
+
+    public Enumeration&lt;Permission&gt; elements() {
+<span class="nc" id="L56">        return Collections.enumeration(getIterablePermissions());</span>
+    }
+
+    private Collection&lt;Permission&gt; getIterablePermissions() {
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        return all != null ? Collections.singleton(all) : Arrays.asList(byName.values().toArray(PermissionUtil.NO_PERMISSIONS));</span>
+    }
+
+    protected void doAdd(final AbstractPermission&lt;?&gt; permission) {
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (permission.getName().equals(&quot;*&quot;)) {</span>
+<span class="fc" id="L65">            all = permission;</span>
+<span class="fc" id="L66">            byName.clear();</span>
+        } else {
+<span class="nc" id="L68">            byName.putIfAbsent(permission.getName(), permission);</span>
+        }
+<span class="fc" id="L70">    }</span>
+
+    public boolean implies(final Permission permission) {
+<span class="pc bpc" id="L73" title="2 of 4 branches missed.">        if (permission == null || getSourcePermission().getClass() != permission.getClass()) {</span>
+<span class="nc" id="L74">            return false;</span>
+        }
+<span class="fc" id="L76">        final Permission all = this.all;</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (all != null) {</span>
+<span class="fc" id="L78">            return all.implies(permission);</span>
+        }
+<span class="nc" id="L80">        final Permission ourPermission = byName.get(permission.getName());</span>
+<span class="nc bnc" id="L81" title="All 4 branches missed.">        return ourPermission != null &amp;&amp; ourPermission.implies(permission);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

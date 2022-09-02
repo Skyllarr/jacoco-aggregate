@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>JsonSecurityEventFormatter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-audit</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.audit</a> &gt; <span class="el_source">JsonSecurityEventFormatter.java</span></div><h1>JsonSecurityEventFormatter.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2017 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.audit;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+
+import java.security.Permission;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
+import java.util.function.Supplier;
+
+import javax.json.JsonObjectBuilder;
+import javax.json.spi.JsonProvider;
+
+import org.wildfly.security.auth.server.SecurityIdentity;
+import org.wildfly.security.auth.server.event.SecurityAuthenticationFailedEvent;
+import org.wildfly.security.auth.server.event.SecurityDefiniteOutcomeEvent;
+import org.wildfly.security.auth.server.event.SecurityEvent;
+import org.wildfly.security.auth.server.event.SecurityEventVisitor;
+import org.wildfly.security.auth.server.event.SecurityPermissionCheckEvent;
+import org.wildfly.security.auth.server.event.SecurityRealmUnavailableEvent;
+import org.wildfly.security.auth.server.event.SyslogAuditEvent;
+
+/**
+ * A formatter for security events that converts events into JSON strings.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public class JsonSecurityEventFormatter extends SecurityEventVisitor&lt;Void, String&gt; {
+
+    private final Supplier&lt;DateTimeFormatter&gt; dateTimeFormatterSupplier;
+
+    private final JsonProvider jsonProvider;
+
+<span class="nc" id="L51">    JsonSecurityEventFormatter(Builder builder) {</span>
+<span class="nc" id="L52">        this.dateTimeFormatterSupplier = builder.dateTimeFormatterSupplier;</span>
+<span class="nc" id="L53">        this.jsonProvider = JsonProvider.provider();</span>
+<span class="nc" id="L54">    }</span>
+
+    @Override
+    public String handleUnknownEvent(SecurityEvent event, Void param) {
+<span class="nc" id="L58">        checkNotNullParam(&quot;event&quot;, event);</span>
+<span class="nc" id="L59">        JsonObjectBuilder objectBuilder = jsonProvider.createObjectBuilder();</span>
+<span class="nc" id="L60">        handleUnknownEvent(event, objectBuilder);</span>
+<span class="nc" id="L61">        return objectBuilder.build().toString();</span>
+    }
+
+    private void handleUnknownEvent(SecurityEvent event, JsonObjectBuilder objectBuilder) {
+<span class="nc" id="L65">        DateTimeFormatter dateFormat = dateTimeFormatterSupplier.get();</span>
+
+<span class="nc" id="L67">        objectBuilder.add(&quot;event&quot;, event.getClass().getSimpleName());</span>
+<span class="nc" id="L68">        objectBuilder.add(&quot;event-time&quot;, dateFormat.format(event.getInstant()));</span>
+
+<span class="nc" id="L70">        JsonObjectBuilder securityIdentityBuilder = jsonProvider.createObjectBuilder();</span>
+<span class="nc" id="L71">        SecurityIdentity securityIdentity = event.getSecurityIdentity();</span>
+<span class="nc" id="L72">        securityIdentityBuilder.add(&quot;name&quot;, securityIdentity.getPrincipal().getName());</span>
+<span class="nc" id="L73">        securityIdentityBuilder.add(&quot;creation-time&quot;, dateFormat.format(securityIdentity.getCreationTime()));</span>
+
+<span class="nc" id="L75">        objectBuilder.add(&quot;security-identity&quot;, securityIdentityBuilder);</span>
+<span class="nc" id="L76">    }</span>
+
+    @Override
+    public String handleDefiniteOutcomeEvent(SecurityDefiniteOutcomeEvent event, Void param) {
+<span class="nc" id="L80">        checkNotNullParam(&quot;event&quot;, event);</span>
+<span class="nc" id="L81">        JsonObjectBuilder objectBuilder = jsonProvider.createObjectBuilder();</span>
+<span class="nc" id="L82">        handleDefiniteOutcomeEvent(event, objectBuilder);</span>
+<span class="nc" id="L83">        return objectBuilder.build().toString();</span>
+    }
+
+    private void handleDefiniteOutcomeEvent(SecurityDefiniteOutcomeEvent event, JsonObjectBuilder objectBuilder) {
+<span class="nc" id="L87">        handleUnknownEvent(event, objectBuilder);</span>
+<span class="nc" id="L88">        objectBuilder.add(&quot;success&quot;, event.isSuccessful());</span>
+<span class="nc" id="L89">    }</span>
+
+    @Override
+    public String handleAuthenticationFailedEvent(SecurityAuthenticationFailedEvent event, Void param) {
+<span class="nc" id="L93">        checkNotNullParam(&quot;event&quot;, event);</span>
+<span class="nc" id="L94">        JsonObjectBuilder objectBuilder = jsonProvider.createObjectBuilder();</span>
+<span class="nc" id="L95">        handleAuthenticationFailedEvent(event, objectBuilder);</span>
+<span class="nc" id="L96">        return objectBuilder.build().toString();</span>
+    }
+
+    private void handleAuthenticationFailedEvent(SecurityAuthenticationFailedEvent event, JsonObjectBuilder objectBuilder) {
+<span class="nc" id="L100">        handleDefiniteOutcomeEvent(event, objectBuilder);</span>
+<span class="nc bnc" id="L101" title="All 4 branches missed.">        if (event.getPrincipal() != null &amp;&amp; event.getPrincipal().toString() != null) {</span>
+<span class="nc" id="L102">            objectBuilder.add(&quot;principal&quot;, event.getPrincipal().toString());</span>
+        } else {
+<span class="nc" id="L104">            objectBuilder.addNull(&quot;principal&quot;);</span>
+        }
+<span class="nc" id="L106">    }</span>
+
+    @Override
+    public String handlePermissionCheckEvent(SecurityPermissionCheckEvent event, Void param) {
+<span class="nc" id="L110">        checkNotNullParam(&quot;event&quot;, event);</span>
+<span class="nc" id="L111">        JsonObjectBuilder objectBuilder = jsonProvider.createObjectBuilder();</span>
+<span class="nc" id="L112">        handlePermissionCheckEvent(event, objectBuilder);</span>
+<span class="nc" id="L113">        return objectBuilder.build().toString();</span>
+    }
+
+    private void handlePermissionCheckEvent(SecurityPermissionCheckEvent event, JsonObjectBuilder objectBuilder) {
+<span class="nc" id="L117">        handleDefiniteOutcomeEvent(event, objectBuilder);</span>
+
+<span class="nc" id="L119">        Permission permission = event.getPermission();</span>
+<span class="nc" id="L120">        JsonObjectBuilder permissionBuilder = jsonProvider.createObjectBuilder();</span>
+<span class="nc" id="L121">        permissionBuilder.add(&quot;type&quot;, permission.getClass().getName());</span>
+<span class="nc" id="L122">        permissionBuilder.add(&quot;actions&quot;, permission.getActions());</span>
+<span class="nc" id="L123">        permissionBuilder.add(&quot;name&quot;, permission.getName());</span>
+
+<span class="nc" id="L125">        objectBuilder.add(&quot;permission&quot;, permissionBuilder);</span>
+<span class="nc" id="L126">    }</span>
+
+    @Override
+    public String handleSyslogAuditEvent(SyslogAuditEvent event, Void param) {
+<span class="nc" id="L130">        checkNotNullParam(&quot;event&quot;, event);</span>
+<span class="nc" id="L131">        JsonObjectBuilder objectBuilder = jsonProvider.createObjectBuilder();</span>
+<span class="nc" id="L132">        handleSyslogAuditEvent(event, objectBuilder);</span>
+<span class="nc" id="L133">        return objectBuilder.build().toString();</span>
+    }
+
+    private void handleSyslogAuditEvent(SyslogAuditEvent event, JsonObjectBuilder objectBuilder) {
+<span class="nc" id="L137">        handleUnknownEvent(event, objectBuilder);</span>
+<span class="nc" id="L138">        objectBuilder.add(&quot;syslog-format&quot;, event.getFormat().toString());</span>
+<span class="nc" id="L139">    }</span>
+
+    @Override
+    public String handleRealmUnavailableEvent(SecurityRealmUnavailableEvent event, Void param) {
+<span class="nc" id="L143">        checkNotNullParam(&quot;event&quot;, event);</span>
+<span class="nc" id="L144">        JsonObjectBuilder objectBuilder = jsonProvider.createObjectBuilder();</span>
+<span class="nc" id="L145">        handleRealmUnavailableEvent(event, objectBuilder);</span>
+<span class="nc" id="L146">        return objectBuilder.build().toString();</span>
+    }
+
+    private void handleRealmUnavailableEvent(SecurityRealmUnavailableEvent event, JsonObjectBuilder objectBuilder) {
+<span class="nc" id="L150">        handleUnknownEvent(event, objectBuilder);</span>
+<span class="nc" id="L151">        objectBuilder.add(&quot;realm-name&quot;, event.getRealmName());</span>
+<span class="nc" id="L152">    }</span>
+
+    /**
+     * Obtain a new {@link Builder} capable of building a {@link JsonSecurityEventFormatter}.
+     *
+     * @return a new {@link Builder} capable of building a {@link JsonSecurityEventFormatter}
+     */
+    public static Builder builder() {
+<span class="nc" id="L160">        return new Builder();</span>
+    }
+
+    /**
+     * A builder for JSON security event formatter.
+     */
+    public static class Builder {
+
+<span class="nc" id="L168">        private Supplier&lt;DateTimeFormatter&gt; dateTimeFormatterSupplier = () -&gt; DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT).withZone(ZoneId.systemDefault());</span>
+
+<span class="nc" id="L170">        Builder() {</span>
+<span class="nc" id="L171">        }</span>
+
+        /**
+         * Set a supplier of formatter to format any dates in the resulting output.
+         * The supplied {@link DateTimeFormatter} has to have a time zone configured.
+         *
+         * @param dateTimeFormatterSupplier a supplier of formatter to format dates in the resulting output
+         * @return this builder
+         */
+        public Builder setDateTimeFormatterSupplier(Supplier&lt;DateTimeFormatter&gt; dateTimeFormatterSupplier) {
+<span class="nc" id="L181">            this.dateTimeFormatterSupplier = checkNotNullParam(&quot;dateTimeFormatterSupplier&quot;, dateTimeFormatterSupplier);</span>
+<span class="nc" id="L182">            return this;</span>
+        }
+
+        /**
+         * Build a new {@link SecurityEventVisitor} which will convert events into JSON formatted strings.
+         * &lt;p&gt;
+         * Once built the Builder can continue to be configured to create additional instances.
+         *
+         * @return a new {@link SecurityEventVisitor} which will convert events into JSON formatted strings
+         */
+        public SecurityEventVisitor&lt;?, String&gt; build() {
+<span class="nc" id="L193">            return new JsonSecurityEventFormatter(this);</span>
+        }
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

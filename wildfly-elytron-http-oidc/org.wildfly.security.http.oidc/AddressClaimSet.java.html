@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AddressClaimSet.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-oidc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.oidc</a> &gt; <span class="el_source">AddressClaimSet.java</span></div><h1>AddressClaimSet.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2021 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.http.oidc;
+
+import java.util.Map;
+
+import org.wildfly.common.Assert;
+
+/**
+ * Representation of an address claim as per &lt;a href=&quot;https://openid.net/specs/openid-connect-core-1_0.html&quot;&gt;OpenID Connect Core 1.0&lt;/a&gt;.
+ *
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+public class AddressClaimSet {
+    public static final String FORMATTED = &quot;formatted&quot;;
+    public static final String STREET_ADDRESS = &quot;street_address&quot;;
+    public static final String LOCALITY = &quot;locality&quot;;
+    public static final String REGION = &quot;region&quot;;
+    public static final String POSTAL_CODE = &quot;postal_code&quot;;
+    public static final String COUNTRY = &quot;country&quot;;
+
+    private final Map&lt;String, String&gt; addressClaimSet;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param addressClaimSet the address claim set for this instance (may not be {@code null})
+     */
+<span class="nc" id="L45">    public AddressClaimSet(Map&lt;String, String&gt; addressClaimSet) {</span>
+<span class="nc" id="L46">        Assert.checkNotNullParam(&quot;addressClaimSet&quot;, addressClaimSet);</span>
+<span class="nc" id="L47">        this.addressClaimSet = addressClaimSet;</span>
+<span class="nc" id="L48">    }</span>
+
+    public String getFormattedAddress() {
+<span class="nc" id="L51">        return addressClaimSet.get(FORMATTED);</span>
+    }
+
+    public String getStreetAddress() {
+<span class="nc" id="L55">        return addressClaimSet.get(STREET_ADDRESS);</span>
+    }
+
+    public String getLocality() {
+<span class="nc" id="L59">        return addressClaimSet.get(LOCALITY);</span>
+    }
+
+    public String getRegion() {
+<span class="nc" id="L63">        return addressClaimSet.get(REGION);</span>
+    }
+
+    public String getPostalCode() {
+<span class="nc" id="L67">        return addressClaimSet.get(POSTAL_CODE);</span>
+    }
+
+    public String getCountry() {
+<span class="nc" id="L71">        return addressClaimSet.get(COUNTRY);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

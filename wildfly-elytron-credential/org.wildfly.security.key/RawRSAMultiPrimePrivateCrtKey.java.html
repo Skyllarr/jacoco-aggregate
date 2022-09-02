@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RawRSAMultiPrimePrivateCrtKey.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-credential</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.key</a> &gt; <span class="el_source">RawRSAMultiPrimePrivateCrtKey.java</span></div><h1>RawRSAMultiPrimePrivateCrtKey.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.key;
+
+import java.math.BigInteger;
+import java.security.Key;
+import java.security.interfaces.RSAMultiPrimePrivateCrtKey;
+import java.security.spec.RSAOtherPrimeInfo;
+import java.util.Arrays;
+import java.util.Objects;
+
+/**
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+class RawRSAMultiPrimePrivateCrtKey extends RawRSAPrivateKey implements RSAMultiPrimePrivateCrtKey {
+    private static final long serialVersionUID = 6636285660549509254L;
+
+    private final BigInteger publicExponent;
+    private final BigInteger primeP;
+    private final BigInteger primeQ;
+    private final BigInteger primeExponentP;
+    private final BigInteger primeExponentQ;
+    private final BigInteger crtCoefficient;
+    private final RSAOtherPrimeInfo[] otherPrimeInfo;
+
+    RawRSAMultiPrimePrivateCrtKey(final RSAMultiPrimePrivateCrtKey original) {
+<span class="nc" id="L43">        super(original);</span>
+<span class="nc" id="L44">        publicExponent = original.getPublicExponent();</span>
+<span class="nc" id="L45">        primeP = original.getPrimeP();</span>
+<span class="nc" id="L46">        primeQ = original.getPrimeQ();</span>
+<span class="nc" id="L47">        primeExponentP = original.getPrimeExponentP();</span>
+<span class="nc" id="L48">        primeExponentQ = original.getPrimeExponentQ();</span>
+<span class="nc" id="L49">        crtCoefficient = original.getCrtCoefficient();</span>
+<span class="nc" id="L50">        final RSAOtherPrimeInfo[] otherPrimeInfo = original.getOtherPrimeInfo();</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        this.otherPrimeInfo = otherPrimeInfo == null ? null : otherPrimeInfo.clone();</span>
+<span class="nc" id="L52">    }</span>
+
+    RawRSAMultiPrimePrivateCrtKey(final Key original) {
+<span class="nc" id="L55">        this((RSAMultiPrimePrivateCrtKey) original);</span>
+<span class="nc" id="L56">    }</span>
+
+    public BigInteger getPublicExponent() {
+<span class="nc" id="L59">        return publicExponent;</span>
+    }
+
+    public BigInteger getPrimeP() {
+<span class="nc" id="L63">        return primeP;</span>
+    }
+
+    public BigInteger getPrimeQ() {
+<span class="nc" id="L67">        return primeQ;</span>
+    }
+
+    public BigInteger getPrimeExponentP() {
+<span class="nc" id="L71">        return primeExponentP;</span>
+    }
+
+    public BigInteger getPrimeExponentQ() {
+<span class="nc" id="L75">        return primeExponentQ;</span>
+    }
+
+    public BigInteger getCrtCoefficient() {
+<span class="nc" id="L79">        return crtCoefficient;</span>
+    }
+
+    public RSAOtherPrimeInfo[] getOtherPrimeInfo() {
+<span class="nc" id="L83">        final RSAOtherPrimeInfo[] otherPrimeInfo = this.otherPrimeInfo;</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        return otherPrimeInfo == null ? null : otherPrimeInfo.clone();</span>
+    }
+
+    boolean isEqual(final Key key) {
+<span class="nc bnc" id="L88" title="All 4 branches missed.">        return key instanceof RSAMultiPrimePrivateCrtKey &amp;&amp; isEqual((RSAMultiPrimePrivateCrtKey) key);</span>
+    }
+
+    boolean isEqual(final RSAMultiPrimePrivateCrtKey key) {
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        return super.isEqual(key)</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">            &amp;&amp; Objects.equals(publicExponent, key.getPublicExponent())</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">            &amp;&amp; Objects.equals(primeP, key.getPrimeP())</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">            &amp;&amp; Objects.equals(primeQ, key.getPrimeQ())</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">            &amp;&amp; Objects.equals(primeExponentP, key.getPrimeExponentP())</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">            &amp;&amp; Objects.equals(primeExponentQ, key.getPrimeExponentQ())</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            &amp;&amp; Objects.equals(crtCoefficient, key.getCrtCoefficient())</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            &amp;&amp; Arrays.deepEquals(otherPrimeInfo, key.getOtherPrimeInfo());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

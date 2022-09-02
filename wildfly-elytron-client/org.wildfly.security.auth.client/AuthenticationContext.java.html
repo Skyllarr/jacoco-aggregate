@@ -1,0 +1,377 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AuthenticationContext.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-client</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.client</a> &gt; <span class="el_source">AuthenticationContext.java</span></div><h1>AuthenticationContext.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2013 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.client;
+
+import static java.security.AccessController.doPrivileged;
+
+import java.net.URI;
+import java.security.PrivilegedAction;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
+import java.util.function.ObjIntConsumer;
+import java.util.function.Supplier;
+
+import javax.net.ssl.SSLContext;
+
+import org.wildfly.common.context.ContextManager;
+import org.wildfly.common.context.Contextual;
+import org.wildfly.common.function.ExceptionObjIntConsumer;
+import org.wildfly.common.function.ExceptionSupplier;
+import org.wildfly.security.ParametricPrivilegedAction;
+import org.wildfly.security.ParametricPrivilegedExceptionAction;
+import org.wildfly.security.SecurityFactory;
+import org.wildfly.security.Version;
+
+/**
+ * A set of rules and authentication configurations to use with a client for establishing a connection.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class AuthenticationContext implements Contextual&lt;AuthenticationContext&gt; {
+
+<span class="fc" id="L48">    private static final ContextManager&lt;AuthenticationContext&gt; CONTEXT_MANAGER = new ContextManager&lt;AuthenticationContext&gt;(AuthenticationContext.class);</span>
+
+<span class="fc" id="L50">    private static final Supplier&lt;AuthenticationContext&gt; SUPPLIER = doPrivileged((PrivilegedAction&lt;Supplier&lt;AuthenticationContext&gt;&gt;) CONTEXT_MANAGER::getPrivilegedSupplier);</span>
+
+    static {
+<span class="fc" id="L53">        Version.getVersion();</span>
+<span class="fc" id="L54">        CONTEXT_MANAGER.setGlobalDefaultSupplier(() -&gt; DefaultAuthenticationContextProvider.DEFAULT);</span>
+    }
+
+    final RuleNode&lt;AuthenticationConfiguration&gt; authRules;
+    final RuleNode&lt;SecurityFactory&lt;SSLContext&gt;&gt; sslRules;
+
+<span class="fc" id="L60">    static final AuthenticationContext EMPTY = new AuthenticationContext();</span>
+
+    private AuthenticationContext() {
+<span class="fc" id="L63">        this(null, null);</span>
+<span class="fc" id="L64">    }</span>
+
+<span class="fc" id="L66">    AuthenticationContext(final RuleNode&lt;AuthenticationConfiguration&gt; authRules, final RuleNode&lt;SecurityFactory&lt;SSLContext&gt;&gt; sslRules) {</span>
+<span class="fc" id="L67">        this.authRules = authRules;</span>
+<span class="fc" id="L68">        this.sslRules = sslRules;</span>
+<span class="fc" id="L69">    }</span>
+
+    /**
+     * Get a new, empty authentication context.
+     *
+     * @return the new authentication context
+     */
+    public static AuthenticationContext empty() {
+<span class="fc" id="L77">        return EMPTY;</span>
+    }
+
+    /**
+     * Get the current thread's captured authentication context.
+     *
+     * @return the current thread's captured authentication context
+     */
+    public static AuthenticationContext captureCurrent() {
+<span class="fc" id="L86">        return SUPPLIER.get();</span>
+    }
+
+    private static &lt;T&gt; RuleNode&lt;T&gt; with(RuleNode&lt;T&gt; node, MatchRule rule, T item) {
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        return node == null ? new RuleNode&lt;T&gt;(null, rule, item) : node.with(rule, item);</span>
+    }
+
+    private static &lt;T&gt; RuleNode&lt;T&gt; with(RuleNode&lt;T&gt; node, MatchRule rule, T item, int idx) {
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        return node == null ? new RuleNode&lt;T&gt;(null, rule, item) : node.with(rule, item, idx);</span>
+    }
+
+    private static &lt;T&gt; RuleNode&lt;T&gt; replacing(RuleNode&lt;T&gt; node, MatchRule rule, T item, int idx) {
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        return node == null ? new RuleNode&lt;T&gt;(null, rule, item) : node.replacing(rule, item, idx);</span>
+    }
+
+    private static &lt;T&gt; RuleNode&lt;T&gt; withAll(RuleNode&lt;T&gt; node, RuleNode&lt;T&gt; otherNode) {
+<span class="pc bpc" id="L102" title="1 of 4 branches missed.">        return node == null ? otherNode : otherNode == null ? node : node.withAll(otherNode);</span>
+    }
+
+    private static &lt;T&gt; RuleNode&lt;T&gt; withAll(RuleNode&lt;T&gt; node, RuleNode&lt;T&gt; otherNode, int idx) {
+<span class="nc bnc" id="L106" title="All 4 branches missed.">        return node == null ? otherNode : otherNode == null ? node : node.withAll(otherNode, idx);</span>
+    }
+
+    private static &lt;T&gt; RuleNode&lt;T&gt; without(RuleNode&lt;T&gt; node, int idx) {
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        return node == null ? null : node.without(idx);</span>
+    }
+
+    /**
+     * Get a new authentication context which is the same as this one, but which includes the given rule and configuration at
+     * the end of its list.
+     *
+     * @param rule the rule to match
+     * @param configuration the configuration to select when the rule matches
+     * @return the combined authentication context
+     */
+    public AuthenticationContext with(MatchRule rule, AuthenticationConfiguration configuration) {
+<span class="pc bpc" id="L122" title="2 of 4 branches missed.">        if (configuration == null || rule == null) return this;</span>
+<span class="fc" id="L123">        return new AuthenticationContext(with(authRules, rule, configuration), sslRules);</span>
+    }
+
+    /**
+     * Get a new authentication context which is the same as this one, but which includes the given rule and SSL context at
+     * the end of its SSL context list.
+     *
+     * @param rule the rule to match
+     * @param sslContext the SSL context to select when the rule matches
+     * @return the combined authentication context
+     */
+    public AuthenticationContext withSsl(MatchRule rule, SecurityFactory&lt;SSLContext&gt; sslContext) {
+<span class="pc bpc" id="L135" title="2 of 4 branches missed.">        if (sslContext == null || rule == null) return this;</span>
+<span class="fc" id="L136">        return new AuthenticationContext(authRules, with(sslRules, rule, sslContext));</span>
+    }
+
+    /**
+     * Get a new authentication context which is the same as this one, but which includes the rules, configurations
+     * and SSL contexts of the given context at the end of its list.
+     *
+     * @param other the other authentication context
+     * @return the combined authentication context
+     */
+    public AuthenticationContext with(AuthenticationContext other) {
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        if (other == null) return this;</span>
+<span class="fc" id="L148">        return new AuthenticationContext(withAll(authRules, other.authRules), withAll(sslRules, other.sslRules));</span>
+    }
+
+    /**
+     * Get a new authentication context which is the same as this one, but which includes the given rule and configuration
+     * inserted at the position of its list indicated by the {@code idx} parameter.
+     *
+     * @param idx the index at which insertion should be done
+     * @param rule the rule to match
+     * @param configuration the configuration to select when the rule matches
+     * @return the combined authentication context
+     * @throws IndexOutOfBoundsException if the index is out of bounds
+     */
+    public AuthenticationContext with(int idx, MatchRule rule, AuthenticationConfiguration configuration) throws IndexOutOfBoundsException {
+<span class="pc bpc" id="L162" title="2 of 4 branches missed.">        if (configuration == null || rule == null) return this;</span>
+<span class="fc" id="L163">        return new AuthenticationContext(with(authRules, rule, configuration, idx), sslRules);</span>
+    }
+
+    /**
+     * Get a new authentication context which is the same as this one, but which includes the given rule and SSL context
+     * inserted at the position of its list indicated by the {@code idx} parameter.
+     *
+     * @param idx the index at which insertion should be done
+     * @param rule the rule to match
+     * @param sslContext the SSL context to select when the rule matches
+     * @return the combined authentication context
+     * @throws IndexOutOfBoundsException if the index is out of bounds
+     */
+    public AuthenticationContext withSsl(int idx, MatchRule rule, SecurityFactory&lt;SSLContext&gt; sslContext) throws IndexOutOfBoundsException {
+<span class="pc bpc" id="L177" title="2 of 4 branches missed.">        if (sslContext == null || rule == null) return this;</span>
+<span class="fc" id="L178">        return new AuthenticationContext(authRules, with(sslRules, rule, sslContext, idx));</span>
+    }
+
+    /**
+     * Get a new authentication context which is the same as this one, but which replaces the rule and configuration at the given
+     * index with the given rule and configuration.
+     *
+     * @param idx the index at which insertion should be done
+     * @param rule the rule to match
+     * @param configuration the configuration to select when the rule matches
+     * @return the combined authentication context
+     * @throws IndexOutOfBoundsException if the index is out of bounds
+     */
+    public AuthenticationContext replacing(int idx, MatchRule rule, AuthenticationConfiguration configuration) throws IndexOutOfBoundsException {
+<span class="pc bpc" id="L192" title="2 of 4 branches missed.">        if (configuration == null || rule == null) return this;</span>
+<span class="fc" id="L193">        return new AuthenticationContext(replacing(authRules, rule, configuration, idx), sslRules);</span>
+    }
+
+    /**
+     * Get a new authentication context which is the same as this one, but which replaces the rule and SSL context at the given
+     * index with the given rule and SSL context.
+     *
+     * @param idx the index at which insertion should be done
+     * @param rule the rule to match
+     * @param sslContext the SSL context to select when the rule matches
+     * @return the combined authentication context
+     * @throws IndexOutOfBoundsException if the index is out of bounds
+     */
+    public AuthenticationContext replacingSslContext(int idx, MatchRule rule, SecurityFactory&lt;SSLContext&gt; sslContext) throws IndexOutOfBoundsException {
+<span class="pc bpc" id="L207" title="2 of 4 branches missed.">        if (sslContext == null || rule == null) return this;</span>
+<span class="fc" id="L208">        return new AuthenticationContext(authRules, replacing(sslRules, rule, sslContext, idx));</span>
+    }
+
+    /**
+     * Get a new authentication context which is the same as this one, but without the rule and configuration at the index
+     * indicated by the {@code idx} parameter.
+     *
+     * @param idx the index at which removal should be done
+     * @return the modified authentication context
+     * @throws IndexOutOfBoundsException if the index is out of bounds
+     */
+    public AuthenticationContext without(int idx) throws IndexOutOfBoundsException {
+<span class="fc" id="L220">        return new AuthenticationContext(without(authRules, idx), sslRules);</span>
+    }
+
+    /**
+     * Get a new authentication context which is the same as this one, but without the rule and configuration at the index
+     * indicated by the {@code idx} parameter.
+     *
+     * @param idx the index at which removal should be done
+     * @return the modified authentication context
+     * @throws IndexOutOfBoundsException if the index is out of bounds
+     */
+    public AuthenticationContext withoutSsl(int idx) throws IndexOutOfBoundsException {
+<span class="fc" id="L232">        return new AuthenticationContext(authRules, without(sslRules, idx));</span>
+    }
+
+    RuleNode&lt;AuthenticationConfiguration&gt; authRuleMatching(URI uri, String abstractType, String abstractTypeAuthority) {
+<span class="fc" id="L236">        RuleNode&lt;AuthenticationConfiguration&gt; node = this.authRules;</span>
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">        while (node != null) {</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">            if (node.getRule().matches(uri, abstractType, abstractTypeAuthority)) return node;</span>
+<span class="fc" id="L239">            node = node.getNext();</span>
+        }
+<span class="nc" id="L241">        return null;</span>
+    }
+
+    RuleNode&lt;SecurityFactory&lt;SSLContext&gt;&gt; sslRuleMatching(URI uri, String abstractType, String abstractTypeAuthority) {
+<span class="fc" id="L245">        RuleNode&lt;SecurityFactory&lt;SSLContext&gt;&gt; node = this.sslRules;</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">        while (node != null) {</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">            if (uri == null) {</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">                if (node.getRule().equals(MatchRule.ALL)) {</span>
+<span class="fc" id="L249">                    return node;</span>
+                }
+<span class="fc" id="L251">                node = node.getNext();</span>
+            } else {
+<span class="fc bfc" id="L253" title="All 2 branches covered.">                if (node.getRule().matches(uri, abstractType, abstractTypeAuthority)) return node;</span>
+<span class="fc" id="L254">                node = node.getNext();</span>
+            }
+        }
+<span class="fc" id="L257">        return null;</span>
+    }
+
+    /**
+     * Run a privileged action with this authentication context associated for the duration of the task.
+     *
+     * @param action the action to run under association
+     * @param &lt;T&gt; the action return type
+     * @return the action return value
+     */
+    public &lt;T&gt; T run(PrivilegedAction&lt;T&gt; action) {
+<span class="nc" id="L268">        return runAction(action);</span>
+    }
+
+    /**
+     * Run a privileged action with this authentication context associated for the duration of the task.
+     *
+     * @param action the action to run under association
+     * @param &lt;T&gt; the action return type
+     * @return the action return value
+     * @throws PrivilegedActionException if the action throws an exception
+     */
+    public &lt;T&gt; T run(PrivilegedExceptionAction&lt;T&gt; action) throws PrivilegedActionException {
+<span class="nc" id="L280">        return runExceptionAction(action);</span>
+    }
+
+    /**
+     * Run a privileged action with this authentication context associated for the duration of the task.
+     *
+     * @param parameter the parameter to pass to the action
+     * @param action the action to run under association
+     * @param &lt;T&gt; the action return type
+     * @param &lt;P&gt; the action parameter type
+     * @return the action return value
+     */
+    public &lt;T, P&gt; T run(P parameter, ParametricPrivilegedAction&lt;T, P&gt; action) {
+<span class="nc" id="L293">        return runFunction(action, parameter);</span>
+    }
+
+    /**
+     * Run a privileged action with this authentication context associated for the duration of the task.
+     *
+     * @param parameter the parameter to pass to the action
+     * @param action the action to run under association
+     * @param &lt;T&gt; the action return type
+     * @param &lt;P&gt; the action parameter type
+     * @return the action return value
+     * @throws PrivilegedActionException if the action throws an exception
+     */
+    public &lt;T, P&gt; T run(P parameter, ParametricPrivilegedExceptionAction&lt;T, P&gt; action) throws PrivilegedActionException {
+        try {
+<span class="nc" id="L308">            return runExFunction(action, parameter);</span>
+<span class="nc" id="L309">        } catch (Exception e) {</span>
+<span class="nc" id="L310">            throw new PrivilegedActionException(e);</span>
+        }
+    }
+
+    /**
+     * Run a privileged action with this authentication context associated for the duration of the task.
+     *
+     * @param parameter1 the first parameter to pass to the action
+     * @param parameter2 the second parameter to pass to the action
+     * @param action the action to run
+     * @param &lt;T&gt; the action first parameter type
+     */
+    public &lt;T&gt; void runAsObjIntConsumer(ObjIntConsumer&lt;T&gt; action, T parameter1, int parameter2) {
+<span class="nc" id="L323">        runBiConsumer(action::accept, parameter1, parameter2);</span>
+<span class="nc" id="L324">    }</span>
+
+    /**
+     * Run a privileged action with this authentication context associated for the duration of the task.
+     *
+     * @param action the action to run
+     * @param &lt;T&gt; the action return type
+     * @return the action result (may be {@code null})
+     */
+    public &lt;T&gt; T runAsSupplier(Supplier&lt;T&gt; action) {
+<span class="nc" id="L334">        return runFunction(Supplier::get, action);</span>
+    }
+
+    /**
+     * Run a privileged action with this authentication context associated for the duration of the task.
+     *
+     * @param parameter1 the first parameter to pass to the action
+     * @param parameter2 the second parameter to pass to the action
+     * @param action the action to run
+     * @param &lt;T&gt; the action first parameter type
+     * @param &lt;E&gt; the action exception type
+     * @throws E if the action throws this exception
+     */
+    public &lt;T, E extends Exception&gt; void runAsObjIntConsumerEx(ExceptionObjIntConsumer&lt;T, E&gt; action, T parameter1, int parameter2) throws E {
+<span class="nc" id="L348">        runExBiConsumer(action::accept, parameter1, parameter2);</span>
+<span class="nc" id="L349">    }</span>
+
+    /**
+     * Run a privileged action with this authentication context associated for the duration of the task.
+     *
+     * @param action the action to run
+     * @param &lt;T&gt; the action return type
+     * @param &lt;E&gt; the action exception type
+     * @return the action result (may be {@code null})
+     * @throws E if the action throws this exception
+     */
+    public &lt;T, E extends Exception&gt; T runAsSupplierEx(ExceptionSupplier&lt;T, E&gt; action) throws E {
+<span class="nc" id="L361">        return runExFunction(ExceptionSupplier::get, action);</span>
+    }
+
+    public ContextManager&lt;AuthenticationContext&gt; getInstanceContextManager() {
+<span class="fc" id="L365">        return getContextManager();</span>
+    }
+
+    /**
+     * Get the context manager for authentication contexts.
+     *
+     * @return the context manager for authentication contexts (not {@code null})
+     */
+    public static ContextManager&lt;AuthenticationContext&gt; getContextManager() {
+<span class="fc" id="L374">        return CONTEXT_MANAGER;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

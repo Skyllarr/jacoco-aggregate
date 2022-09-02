@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Encryption.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-ssl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.ssl</a> &gt; <span class="el_source">Encryption.java</span></div><h1>Encryption.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.ssl;
+
+import static org.wildfly.security.ssl.ElytronMessages.log;
+
+import java.util.EnumSet;
+
+/**
+ * The encryption type for SSL/TLS cipher suite selection.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+<span class="fc" id="L30">public enum Encryption {</span>
+    /**
+     * No encryption.
+     */
+<span class="fc" id="L34">    NULL,</span>
+    /**
+     * AES encryption with 256-bit keys in Galois counter mode (GCM).
+     */
+<span class="fc" id="L38">    AES256GCM,</span>
+    /**
+     * AES encryption with 256-bit keys in CBC-MAC Mode (CCM).
+     */
+<span class="fc" id="L42">    AES256CCM,</span>
+    /**
+     * AES encryption with 256-bit keys in CBC-MAC Mode (CCM) with an 8-Octet Integrity Check Value.
+     */
+<span class="fc" id="L46">    AES256CCM8,</span>
+    /**
+     * AES encryption with 256-bit keys.
+     */
+<span class="fc" id="L50">    AES256,</span>
+    /**
+     * AES encryption with 128-bit keys in Galois counter mode (GCM).
+     */
+<span class="fc" id="L54">    AES128GCM,</span>
+    /**
+     * AES encryption with 128-bit keys in CBC-MAC Mode (CCM).
+     */
+<span class="fc" id="L58">    AES128CCM,</span>
+    /**
+     * AES encryption with 128-bit keys in CBC-MAC Mode (CCM) with an 8-Octet Integrity Check Value.
+     */
+<span class="fc" id="L62">    AES128CCM8,</span>
+    /**
+     * AES encryption with 128-bit keys.
+     */
+<span class="fc" id="L66">    AES128,</span>
+    /**
+     * Camellia encryption with 256-bit keys.
+     */
+<span class="fc" id="L70">    CAMELLIA256,</span>
+    /**
+     * Camellia encryption with 128-bit keys.
+     */
+<span class="fc" id="L74">    CAMELLIA128,</span>
+    /**
+     * Triple-DES encryption.
+     */
+<span class="fc" id="L78">    _3DES,</span>
+    /**
+     * Simple DES encryption.
+     */
+<span class="fc" id="L82">    DES,</span>
+    /**
+     * IDEA encryption.
+     */
+<span class="fc" id="L86">    IDEA,</span>
+    /**
+     * GOST 28147-89 encryption as defined in &lt;a href=&quot;https://tools.ietf.org/html/rfc5830&quot;&gt;RFC 5830&lt;/a&gt;.
+     */
+<span class="fc" id="L90">    GOST2814789CNT,</span>
+    /**
+     * SEED encryption.
+     */
+<span class="fc" id="L94">    SEED,</span>
+    /**
+     * Fortezza encryption.
+     */
+<span class="fc" id="L98">    FZA,</span>
+    /**
+     * RC4 encryption.
+     */
+<span class="fc" id="L102">    RC4,</span>
+    /**
+     * RC2 encryption.
+     */
+<span class="fc" id="L106">    RC2,</span>
+    /**
+     * ChaCha20 encryption.
+     */
+<span class="fc" id="L110">    CHACHA20,</span>
+    /**
+     * ARIA encryption with 256-bit keys in Galois counter mode (GCM).
+     */
+<span class="fc" id="L114">    ARIA256GCM,</span>
+    /**
+     * ARIA encryption with 256-bit keys.
+     */
+<span class="fc" id="L118">    ARIA256,</span>
+    /**
+     * ARIA encryption with 128-bit keys in Galois counter mode (GCM).
+     */
+<span class="fc" id="L122">    ARIA128GCM,</span>
+    /**
+     * ARIA encryption with 128-bit.
+     */
+<span class="fc" id="L126">    ARIA128</span>
+    ;
+
+    /**
+     * Legacy name for {@link #CHACHA20}.
+     *
+     * @deprecated Use {@link #CHACHA20} instead.
+     */
+    @Deprecated
+<span class="fc" id="L135">    public static final Encryption CHACHA20POLY1305 = CHACHA20;</span>
+
+<span class="fc" id="L137">    static final int fullSize = values().length;</span>
+
+    static Encryption forName(final String name) {
+<span class="pc bpc" id="L140" title="1 of 25 branches missed.">        switch (name) {</span>
+<span class="fc" id="L141">            case &quot;NULL&quot;: return NULL;</span>
+<span class="fc" id="L142">            case &quot;AES256GCM&quot;: return AES256GCM;</span>
+<span class="fc" id="L143">            case &quot;AES256CCM&quot;: return AES256CCM;</span>
+<span class="fc" id="L144">            case &quot;AES256CCM8&quot;: return AES256CCM8;</span>
+<span class="fc" id="L145">            case &quot;AES256&quot;: return AES256;</span>
+<span class="fc" id="L146">            case &quot;AES128GCM&quot;: return AES128GCM;</span>
+<span class="fc" id="L147">            case &quot;AES128CCM&quot;: return AES128CCM;</span>
+<span class="fc" id="L148">            case &quot;AES128CCM8&quot;: return AES128CCM8;</span>
+<span class="fc" id="L149">            case &quot;AES128&quot;: return AES128;</span>
+<span class="fc" id="L150">            case &quot;CAMELLIA256&quot;: return CAMELLIA256;</span>
+<span class="fc" id="L151">            case &quot;CAMELLIA128&quot;: return CAMELLIA128;</span>
+            case &quot;CHACHA20POLY1305&quot;: // fall through
+<span class="fc" id="L153">            case &quot;CHACHA20&quot;: return CHACHA20;</span>
+<span class="fc" id="L154">            case &quot;3DES&quot;: return _3DES;</span>
+<span class="fc" id="L155">            case &quot;DES&quot;: return DES;</span>
+<span class="fc" id="L156">            case &quot;IDEA&quot;: return IDEA;</span>
+<span class="fc" id="L157">            case &quot;GOST2814789CNT&quot;: return GOST2814789CNT;</span>
+<span class="fc" id="L158">            case &quot;SEED&quot;: return SEED;</span>
+<span class="fc" id="L159">            case &quot;FZA&quot;: return FZA;</span>
+<span class="fc" id="L160">            case &quot;RC4&quot;: return RC4;</span>
+<span class="fc" id="L161">            case &quot;RC2&quot;: return RC2;</span>
+<span class="fc" id="L162">            case &quot;ARIA256GCM&quot;: return ARIA256GCM;</span>
+<span class="fc" id="L163">            case &quot;ARIA256&quot;: return ARIA256;</span>
+<span class="fc" id="L164">            case &quot;ARIA128GCM&quot;: return ARIA128GCM;</span>
+<span class="fc" id="L165">            case &quot;ARIA128&quot;: return ARIA128;</span>
+<span class="nc" id="L166">            default: return null;</span>
+        }
+    }
+
+    static Encryption require(final String name) {
+<span class="nc" id="L171">        final Encryption encryption = forName(name);</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">        if (encryption == null) {</span>
+<span class="nc" id="L173">            throw log.unknownEncryptionName(name);</span>
+        }
+<span class="nc" id="L175">        return null;</span>
+    }
+
+    /**
+     * Determine whether the given set is &quot;full&quot; (meaning it contains all possible values).
+     *
+     * @param encryptions the set
+     * @return {@code true} if the set is full, {@code false} otherwise
+     */
+    public static boolean isFull(final EnumSet&lt;Encryption&gt; encryptions) {
+<span class="nc bnc" id="L185" title="All 4 branches missed.">        return encryptions != null &amp;&amp; encryptions.size() == fullSize;</span>
+    }
+
+    /**
+     * Determine whether this instance is equal to one of the given instances.
+     *
+     * @param value1 the first instance
+     * @param value2 the second instance
+     * @return {@code true} if one of the instances matches this one, {@code false} otherwise
+     */
+    public boolean in(final Encryption value1, final Encryption value2) {
+<span class="nc bnc" id="L196" title="All 4 branches missed.">        return this == value1 || this == value2;</span>
+    }
+
+    /**
+     * Determine whether this instance is equal to one of the given instances.
+     *
+     * @param value1 the first instance
+     * @param value2 the second instance
+     * @param value3 the third instance
+     * @return {@code true} if one of the instances matches this one, {@code false} otherwise
+     */
+    public boolean in(final Encryption value1, final Encryption value2, final Encryption value3) {
+<span class="nc bnc" id="L208" title="All 6 branches missed.">        return this == value1 || this == value2 || this == value3;</span>
+    }
+
+    /**
+     * Determine whether this instance is equal to one of the given instances.
+     *
+     * @param values the values to match against
+     * @return {@code true} if one of the instances matches this one, {@code false} otherwise
+     */
+    public boolean in(final Encryption... values) {
+<span class="nc bnc" id="L218" title="All 4 branches missed.">        if (values != null) for (Encryption value : values) {</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">            if (this == value) return true;</span>
+        }
+<span class="nc" id="L221">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PrivilegedServerMechanism.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-util</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.util</a> &gt; <span class="el_source">PrivilegedServerMechanism.java</span></div><h1>PrivilegedServerMechanism.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.http.util;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+
+import java.io.InputStream;
+import java.lang.reflect.UndeclaredThrowableException;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.security.AccessControlContext;
+import java.security.AccessController;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
+import java.security.cert.Certificate;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import javax.net.ssl.SSLSession;
+
+import org.wildfly.security.http.HttpAuthenticationException;
+import org.wildfly.security.http.HttpScope;
+import org.wildfly.security.http.HttpServerAuthenticationMechanism;
+import org.wildfly.security.http.HttpServerCookie;
+import org.wildfly.security.http.HttpServerMechanismsResponder;
+import org.wildfly.security.http.HttpServerRequest;
+import org.wildfly.security.http.HttpServerResponse;
+import org.wildfly.security.http.Scope;
+
+/**
+ * A {@link HttpServerAuthenticationMechanism} with a stored {@link AccessControlContext} that is used for all request
+ * processing calls.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+final class PrivilegedServerMechanism implements HttpServerAuthenticationMechanism {
+
+    private final HttpServerAuthenticationMechanism mechanism;
+    private final AccessControlContext accessControlContext;
+
+    /**
+     * Construct a new instance of {@code PrivilegedServerMechanism}.
+     *
+     * @param mechanism the mechanism to be wrapped.
+     * @param accessControlContext the {@link AccessControlContext} to use for calls to the wrapped mechanism.
+     */
+<span class="nc" id="L64">    PrivilegedServerMechanism(final HttpServerAuthenticationMechanism mechanism, final AccessControlContext accessControlContext) {</span>
+<span class="nc" id="L65">        this.mechanism = checkNotNullParam(&quot;mechanism&quot;, mechanism);</span>
+<span class="nc" id="L66">        this.accessControlContext = checkNotNullParam(&quot;accessControlContext&quot;, accessControlContext);</span>
+<span class="nc" id="L67">    }</span>
+
+
+    /**
+     * @see org.wildfly.security.http.HttpServerAuthenticationMechanism#getMechanismName()
+     */
+    @Override
+    public String getMechanismName() {
+<span class="nc" id="L75">        return mechanism.getMechanismName();</span>
+    }
+
+    /**
+     * @see org.wildfly.security.http.HttpServerAuthenticationMechanism#evaluateRequest(org.wildfly.security.http.HttpServerRequest)
+     */
+    @Override
+    public void evaluateRequest(final HttpServerRequest request) throws HttpAuthenticationException {
+        try {
+<span class="nc" id="L84">            AccessController.doPrivileged((PrivilegedExceptionAction&lt;Void&gt;) () -&gt; {</span>
+<span class="nc" id="L85">                mechanism.evaluateRequest(new HttpServerRequestWrapper(request));</span>
+<span class="nc" id="L86">                return null;</span>
+            }, accessControlContext);
+<span class="nc" id="L88">        } catch (PrivilegedActionException pae) {</span>
+            try {
+<span class="nc" id="L90">                throw pae.getCause();</span>
+<span class="nc" id="L91">            } catch (HttpAuthenticationException | RuntimeException | Error e) {</span>
+<span class="nc" id="L92">                throw e;</span>
+<span class="nc" id="L93">            } catch (Throwable throwable) {</span>
+<span class="nc" id="L94">                throw new UndeclaredThrowableException(throwable);</span>
+            }
+<span class="nc" id="L96">        }</span>
+<span class="nc" id="L97">    }</span>
+
+    @Override
+    public Object getNegotiatedProperty(String propertyName) {
+<span class="nc" id="L101">        return mechanism.getNegotiatedProperty(propertyName);</span>
+    }
+
+    @Override
+    public &lt;T&gt; T getNegotiationProperty(String propertyName, Class&lt;T&gt; type) {
+<span class="nc" id="L106">        return mechanism.getNegotiationProperty(propertyName, type);</span>
+    }
+
+
+    private HttpServerMechanismsResponder wrap(final HttpServerMechanismsResponder toWrap) {
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        return toWrap != null ? (HttpServerResponse r) -&gt;</span>
+            {
+                try {
+<span class="nc" id="L114">                    AccessController.doPrivileged((PrivilegedExceptionAction&lt;Void&gt;) () -&gt; {</span>
+<span class="nc" id="L115">                        toWrap.sendResponse(r);</span>
+<span class="nc" id="L116">                        return null;</span>
+                    }
+                    , accessControlContext);
+<span class="nc" id="L119">                } catch (PrivilegedActionException e) {</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">                    if (e.getCause() instanceof HttpAuthenticationException) {</span>
+<span class="nc" id="L121">                        throw (HttpAuthenticationException) e.getCause();</span>
+                    }
+<span class="nc" id="L123">                    throw new HttpAuthenticationException(e);</span>
+<span class="nc" id="L124">                }</span>
+<span class="nc" id="L125">            }</span>
+<span class="nc" id="L126">            : null;</span>
+    }
+
+    private class HttpServerRequestWrapper implements HttpServerRequest {
+
+        private final HttpServerRequest wrapped;
+
+<span class="nc" id="L133">        private HttpServerRequestWrapper(HttpServerRequest toWrap) {</span>
+<span class="nc" id="L134">            wrapped = toWrap;</span>
+<span class="nc" id="L135">        }</span>
+
+        @Override
+        public List&lt;String&gt; getRequestHeaderValues(String headerName) {
+<span class="nc" id="L139">            return wrapped.getRequestHeaderValues(headerName);</span>
+        }
+
+        @Override
+        public String getFirstRequestHeaderValue(String headerName) {
+<span class="nc" id="L144">            return wrapped.getFirstRequestHeaderValue(headerName);</span>
+        }
+
+        @Override
+        public SSLSession getSSLSession() {
+<span class="nc" id="L149">            return wrapped.getSSLSession();</span>
+        }
+
+        @Override
+        public Certificate[] getPeerCertificates() {
+<span class="nc" id="L154">            return wrapped.getPeerCertificates();</span>
+        }
+
+        @Override
+        public HttpScope getScope(Scope scope) {
+<span class="nc" id="L159">            return wrapped.getScope(scope);</span>
+        }
+
+        @Override
+        public Collection&lt;String&gt; getScopeIds(Scope scope) {
+<span class="nc" id="L164">            return wrapped.getScopeIds(scope);</span>
+        }
+
+        @Override
+        public HttpScope getScope(Scope scope, String id) {
+<span class="nc" id="L169">            return wrapped.getScope(scope, id);</span>
+        }
+
+        @Override
+        public void noAuthenticationInProgress(HttpServerMechanismsResponder responder) {
+<span class="nc" id="L174">            wrapped.noAuthenticationInProgress(wrap(responder));</span>
+<span class="nc" id="L175">        }</span>
+
+        @Override
+        public void authenticationInProgress(HttpServerMechanismsResponder responder) {
+<span class="nc" id="L179">            wrapped.authenticationInProgress(wrap(responder));</span>
+<span class="nc" id="L180">        }</span>
+
+        @Override
+        public void authenticationComplete(HttpServerMechanismsResponder responder) {
+<span class="nc" id="L184">            wrapped.authenticationComplete(wrap(responder));</span>
+<span class="nc" id="L185">        }</span>
+
+        @Override
+        public void authenticationComplete(HttpServerMechanismsResponder responder, Runnable logoutHandler) {
+<span class="nc" id="L189">            wrapped.authenticationComplete(responder, logoutHandler);</span>
+<span class="nc" id="L190">        }</span>
+
+        @Override
+        public void authenticationFailed(String message, HttpServerMechanismsResponder responder) {
+<span class="nc" id="L194">            wrapped.authenticationFailed(message, wrap(responder));</span>
+<span class="nc" id="L195">        }</span>
+
+        @Override
+        public void badRequest(HttpAuthenticationException failure, HttpServerMechanismsResponder responder) {
+<span class="nc" id="L199">            wrapped.badRequest(failure, wrap(responder));</span>
+<span class="nc" id="L200">        }</span>
+
+        @Override
+        public String getRequestMethod() {
+<span class="nc" id="L204">            return wrapped.getRequestMethod();</span>
+        }
+
+        @Override
+        public URI getRequestURI() {
+<span class="nc" id="L209">            return wrapped.getRequestURI();</span>
+        }
+
+        @Override
+        public String getRequestPath() {
+<span class="nc" id="L214">            return wrapped.getRequestPath();</span>
+        }
+
+        @Override
+        public Map&lt;String, List&lt;String&gt;&gt; getParameters() {
+<span class="nc" id="L219">            return wrapped.getParameters();</span>
+        }
+
+        @Override
+        public Set&lt;String&gt; getParameterNames() {
+<span class="nc" id="L224">            return wrapped.getParameterNames();</span>
+        }
+
+        @Override
+        public List&lt;String&gt; getParameterValues(String name) {
+<span class="nc" id="L229">            return wrapped.getParameterValues(name);</span>
+        }
+
+        @Override
+        public String getFirstParameterValue(String name) {
+<span class="nc" id="L234">            return wrapped.getFirstParameterValue(name);</span>
+        }
+
+        @Override
+        public List&lt;HttpServerCookie&gt; getCookies() {
+<span class="nc" id="L239">            return wrapped.getCookies();</span>
+        }
+
+        @Override
+        public InputStream getInputStream() {
+<span class="nc" id="L244">            return wrapped.getInputStream();</span>
+        }
+
+        @Override
+        public InetSocketAddress getSourceAddress() {
+<span class="nc" id="L249">            return wrapped.getSourceAddress();</span>
+        }
+
+        @Override
+        public boolean suspendRequest() {
+<span class="nc" id="L254">            return wrapped.suspendRequest();</span>
+        }
+
+        @Override
+        public boolean resumeRequest() {
+<span class="nc" id="L259">            return wrapped.resumeRequest();</span>
+        }
+
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

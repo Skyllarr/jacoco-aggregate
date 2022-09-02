@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OidcSecurityContext.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-oidc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.oidc</a> &gt; <span class="el_source">OidcSecurityContext.java</span></div><h1>OidcSecurityContext.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2021 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.http.oidc;
+
+import static org.wildfly.security.http.oidc.ElytronMessages.log;
+
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.Serializable;
+
+import org.jose4j.jwt.consumer.InvalidJwtException;
+import org.jose4j.jwt.consumer.JwtConsumerBuilder;
+
+/**
+ * Available in secured requests under HttpServletRequest.getAttribute().
+ * Also available in HttpSession.getAttribute under the classname of this class.
+ *
+ * @author &lt;a href=&quot;mailto:bill@burkecentral.com&quot;&gt;Bill Burke&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+public class OidcSecurityContext implements Serializable {
+    protected String tokenString;
+    protected String idTokenString;
+
+    // Don't store parsed tokens into HTTP session
+    protected transient AccessToken token;
+    protected transient IDToken idToken;
+
+<span class="fc" id="L45">    public OidcSecurityContext() {</span>
+<span class="fc" id="L46">    }</span>
+
+<span class="fc" id="L48">    public OidcSecurityContext(String tokenString, AccessToken token, String idTokenString, IDToken idToken) {</span>
+<span class="fc" id="L49">        this.tokenString = tokenString;</span>
+<span class="fc" id="L50">        this.token = token;</span>
+<span class="fc" id="L51">        this.idToken = idToken;</span>
+<span class="fc" id="L52">        this.idTokenString = idTokenString;</span>
+<span class="fc" id="L53">    }</span>
+
+    public AccessToken getToken() {
+<span class="fc" id="L56">        return token;</span>
+    }
+
+    public String getTokenString() {
+<span class="nc" id="L60">        return tokenString;</span>
+    }
+
+    public IDToken getIDToken() {
+<span class="nc" id="L64">        return idToken;</span>
+    }
+
+    public String getIDTokenString() {
+<span class="nc" id="L68">        return idTokenString;</span>
+    }
+
+    public String getRealm() {
+        // assumes that issuer contains realm name
+<span class="nc" id="L73">        return token.getIssuer().substring(token.getIssuer().lastIndexOf('/') + 1);</span>
+    }
+
+    private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
+<span class="nc" id="L77">        in.defaultReadObject();</span>
+        try {
+<span class="nc" id="L79">            token = new AccessToken(new JwtConsumerBuilder().setSkipSignatureVerification().setSkipAllValidators().build().processToClaims(tokenString));</span>
+<span class="nc" id="L80">            idToken = new IDToken(new JwtConsumerBuilder().setSkipSignatureVerification().setSkipAllValidators().build().processToClaims(idTokenString));</span>
+<span class="nc" id="L81">        } catch (InvalidJwtException e) {</span>
+<span class="nc" id="L82">            throw log.unableToParseToken();</span>
+<span class="nc" id="L83">        }</span>
+<span class="nc" id="L84">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>QueryBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-realm-jdbc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.realm.jdbc</a> &gt; <span class="el_source">QueryBuilder.java</span></div><h1>QueryBuilder.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source
+ *
+ * Copyright 2015 Red Hat, Inc. and/or its affiliates.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.auth.realm.jdbc;
+
+
+import org.wildfly.common.Assert;
+
+import javax.sql.DataSource;
+
+import java.security.Provider;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Supplier;
+
+/**
+ * A builder class with different configuration options to configure queries.
+ *
+ * @author &lt;a href=&quot;mailto:psilva@redhat.com&quot;&gt;Pedro Igor&lt;/a&gt;
+ */
+public class QueryBuilder extends JdbcSecurityRealmBuilder {
+
+    private final String sql;
+    private final JdbcSecurityRealmBuilder parent;
+<span class="fc" id="L40">    private List&lt;ColumnMapper&gt; mappers = new ArrayList&lt;&gt;();</span>
+    private DataSource dataSource;
+
+    /**
+     * Construct new instance.
+     *
+     * @param sql (must not be {@code null})
+     * @param parent (must not be {@code null})
+     *
+     */
+<span class="fc" id="L50">    QueryBuilder(String sql, JdbcSecurityRealmBuilder parent) {</span>
+<span class="fc" id="L51">        Assert.checkNotNullParam(&quot;sql&quot;, sql);</span>
+<span class="fc" id="L52">        Assert.checkNotNullParam(&quot;parent&quot;, parent);</span>
+
+<span class="fc" id="L54">        this.sql = sql;</span>
+<span class="fc" id="L55">        this.parent = parent;</span>
+<span class="fc" id="L56">    }</span>
+
+    /**
+     * Defines a mapper that will be applied to the query in order to map the returned columns to some internal representation.
+     *
+     * @param mapper the column mapper instance
+     * @return this builder
+     */
+    public QueryBuilder withMapper(ColumnMapper... mapper) {
+<span class="fc" id="L65">        this.mappers.addAll(Arrays.asList(mapper));</span>
+<span class="fc" id="L66">        return this;</span>
+    }
+
+    /**
+     * Defines the {@link DataSource} from where connections are obtained.
+     *
+     * @param dataSource the data source.
+     * @return this builder
+     */
+    public QueryBuilder from(DataSource dataSource) {
+<span class="fc" id="L76">        this.dataSource = dataSource;</span>
+<span class="fc" id="L77">        return this;</span>
+    }
+
+
+    @Override
+    public QueryBuilder principalQuery(String sql) {
+<span class="fc" id="L83">        return this.parent.principalQuery(sql);</span>
+    }
+
+    @Override
+    public JdbcSecurityRealmBuilder setProviders(Supplier&lt;Provider[]&gt; providers) {
+<span class="fc" id="L88">        return this.parent.setProviders(providers);</span>
+    }
+
+    @Override
+    public JdbcSecurityRealm build() {
+<span class="fc" id="L93">        return this.parent.build();</span>
+    }
+
+    QueryConfiguration buildQuery() {
+<span class="fc" id="L97">        return new QueryConfiguration(this.sql, this.dataSource, this.mappers);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

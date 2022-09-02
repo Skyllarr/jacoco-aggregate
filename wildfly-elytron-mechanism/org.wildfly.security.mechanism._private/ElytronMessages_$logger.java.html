@@ -1,0 +1,1427 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages_$logger.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-mechanism</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.mechanism._private</a> &gt; <span class="el_source">ElytronMessages_$logger.java</span></div><h1>ElytronMessages_$logger.java</h1><pre class="source lang-java linenums">package org.wildfly.security.mechanism._private;
+
+import java.util.Locale;
+import java.lang.IllegalStateException;
+import java.io.Serializable;
+import javax.annotation.Generated;
+import org.wildfly.security.mechanism.ScramServerException;
+import org.jboss.logging.DelegatingBasicLogger;
+import org.wildfly.security.http.HttpAuthenticationException;
+import org.wildfly.security.asn1.ASN1Exception;
+import java.lang.NumberFormatException;
+import java.lang.SecurityException;
+import java.lang.String;
+import org.jboss.logging.Logger;
+import org.wildfly.security.mechanism.ScramServerErrorCode;
+import java.lang.Exception;
+import java.lang.RuntimeException;
+import org.jboss.logging.BasicLogger;
+import java.lang.Throwable;
+import java.util.Arrays;
+import java.lang.IllegalArgumentException;
+import org.wildfly.security.mechanism.AuthenticationMechanismException;
+
+
+import static org.jboss.logging.Logger.Level.WARN;
+
+/**
+ * Warning this class consists of generated code.
+ */
+@Generated(value = &quot;org.jboss.logging.processor.generator.model.MessageLoggerImplementor&quot;, date = &quot;2022-09-02T20:21:36+0200&quot;)
+public class ElytronMessages_$logger extends DelegatingBasicLogger implements ElytronMessages, BasicLogger, Serializable {
+    private static final long serialVersionUID = 1L;
+<span class="fc" id="L33">    private static final String FQCN = ElytronMessages_$logger.class.getName();</span>
+    public ElytronMessages_$logger(final Logger log) {
+<span class="fc" id="L35">        super(log);</span>
+<span class="fc" id="L36">    }</span>
+<span class="fc" id="L37">    private static final Locale LOCALE = Locale.ROOT;</span>
+    protected Locale getLoggingLocale() {
+<span class="fc" id="L39">        return LOCALE;</span>
+    }
+    @Override
+    public final void credentialDestroyingFailed(final Throwable cause) {
+<span class="nc" id="L43">        super.log.logf(FQCN, WARN, cause, credentialDestroyingFailed$str());</span>
+<span class="nc" id="L44">    }</span>
+    protected String credentialDestroyingFailed$str() {
+<span class="nc" id="L46">        return &quot;ELY00007: Credential destroying failed&quot;;</span>
+    }
+    protected String authenticationFailedEvidenceVerification$str() {
+<span class="nc" id="L49">        return &quot;ELY01151: Evidence Verification Failed.&quot;;</span>
+    }
+    @Override
+    public final SecurityException authenticationFailedEvidenceVerification() {
+<span class="nc" id="L53">        final SecurityException result = new SecurityException(String.format(getLoggingLocale(), authenticationFailedEvidenceVerification$str()));</span>
+<span class="nc" id="L54">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L55">        return result;</span>
+    }
+    private static void _copyStackTraceMinusOne(final Throwable e) {
+<span class="fc" id="L58">        final StackTraceElement[] st = e.getStackTrace();</span>
+<span class="fc" id="L59">        e.setStackTrace(Arrays.copyOfRange(st, 1, st.length));</span>
+<span class="fc" id="L60">    }</span>
+    protected String mechMessageAfterComplete$str() {
+<span class="fc" id="L62">        return &quot;ELY05001: Authentication mechanism exchange received a message after authentication was already complete&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechMessageAfterComplete() {
+<span class="fc" id="L66">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechMessageAfterComplete$str()));</span>
+<span class="fc" id="L67">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L68">        return result;</span>
+    }
+    protected String mechUserNameContainsInvalidCharacter$str() {
+<span class="nc" id="L71">        return &quot;ELY05002: Authentication mechanism user name contains an invalid or disallowed character&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUserNameContainsInvalidCharacter() {
+<span class="nc" id="L75">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUserNameContainsInvalidCharacter$str()));</span>
+<span class="nc" id="L76">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L77">        return result;</span>
+    }
+    protected String mechAuthorizationFailed0$str() {
+<span class="nc" id="L80">        return &quot;ELY05004: Authentication mechanism authorization failed&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechAuthorizationFailed(final Throwable cause) {
+<span class="nc" id="L84">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechAuthorizationFailed0$str()), cause);</span>
+<span class="nc" id="L85">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L86">        return result;</span>
+    }
+    protected String mechAuthenticationNotComplete$str() {
+<span class="fc" id="L89">        return &quot;ELY05005: Authentication mechanism authentication is not yet complete&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException mechAuthenticationNotComplete() {
+<span class="fc" id="L93">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), mechAuthenticationNotComplete$str()));</span>
+<span class="fc" id="L94">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L95">        return result;</span>
+    }
+    protected String mechNoSecurityLayer$str() {
+<span class="fc" id="L98">        return &quot;ELY05006: Authentication mechanism does not support security layer (wrapping/unwrapping)&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException mechNoSecurityLayer() {
+<span class="fc" id="L102">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), mechNoSecurityLayer$str()));</span>
+<span class="fc" id="L103">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L104">        return result;</span>
+    }
+    protected String mechInvalidMessageReceived$str() {
+<span class="fc" id="L107">        return &quot;ELY05007: Invalid authentication mechanism negotiation message received&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechInvalidMessageReceived() {
+<span class="fc" id="L111">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechInvalidMessageReceived$str()));</span>
+<span class="fc" id="L112">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L113">        return result;</span>
+    }
+    protected String mechNoLoginNameGiven$str() {
+<span class="nc" id="L116">        return &quot;ELY05008: No authentication mechanism login name was given&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechNoLoginNameGiven() {
+<span class="nc" id="L120">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechNoLoginNameGiven$str()));</span>
+<span class="nc" id="L121">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L122">        return result;</span>
+    }
+    protected String mechNoPasswordGiven$str() {
+<span class="nc" id="L125">        return &quot;ELY05009: No authentication mechanism password was given&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechNoPasswordGiven() {
+<span class="nc" id="L129">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechNoPasswordGiven$str()));</span>
+<span class="nc" id="L130">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L131">        return result;</span>
+    }
+    protected String mechMalformedFields$str() {
+<span class="nc" id="L134">        return &quot;ELY05010: Authentication mechanism authentication failed due to one or more malformed fields&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechMalformedFields(final IllegalArgumentException ex) {
+<span class="nc" id="L138">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechMalformedFields$str()), ex);</span>
+<span class="nc" id="L139">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L140">        return result;</span>
+    }
+    protected String mechMessageTooLong$str() {
+<span class="nc" id="L143">        return &quot;ELY05011: Authentication mechanism message is too long&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechMessageTooLong() {
+<span class="nc" id="L147">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechMessageTooLong$str()));</span>
+<span class="nc" id="L148">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L149">        return result;</span>
+    }
+    protected String mechServerSideAuthenticationFailed$str() {
+<span class="nc" id="L152">        return &quot;ELY05012: Authentication mechanism server-side authentication failed&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechServerSideAuthenticationFailed(final Exception e) {
+<span class="nc" id="L156">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechServerSideAuthenticationFailed$str()), e);</span>
+<span class="nc" id="L157">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L158">        return result;</span>
+    }
+    protected String mechPasswordNotVerified$str() {
+<span class="nc" id="L161">        return &quot;ELY05013: Authentication mechanism password not verified&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechPasswordNotVerified() {
+<span class="nc" id="L165">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechPasswordNotVerified$str()));</span>
+<span class="nc" id="L166">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L167">        return result;</span>
+    }
+    protected String mechAuthorizationFailed2$str() {
+<span class="fc" id="L170">        return &quot;ELY05014: Authentication mechanism authorization failed: \&quot;%s\&quot; running as \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechAuthorizationFailed(final String userName, final String authorizationId) {
+<span class="fc" id="L174">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechAuthorizationFailed2$str(), userName, authorizationId));</span>
+<span class="fc" id="L175">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L176">        return result;</span>
+    }
+    protected String mechChannelBindingChanged$str() {
+<span class="nc" id="L179">        return &quot;ELY05018: Channel binding data changed&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechChannelBindingChanged() {
+<span class="nc" id="L183">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechChannelBindingChanged$str()));</span>
+<span class="nc" id="L184">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L185">        return result;</span>
+    }
+    protected String mechNoTokenGiven$str() {
+<span class="nc" id="L188">        return &quot;ELY05019: No token was given&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechNoTokenGiven() {
+<span class="nc" id="L192">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechNoTokenGiven$str()));</span>
+<span class="nc" id="L193">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L194">        return result;</span>
+    }
+    protected String mechInitialChallengeMustBeEmpty$str() {
+<span class="nc" id="L197">        return &quot;ELY05022: Initial challenge must be empty&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechInitialChallengeMustBeEmpty() {
+<span class="nc" id="L201">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechInitialChallengeMustBeEmpty$str()));</span>
+<span class="nc" id="L202">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L203">        return result;</span>
+    }
+    protected String mechUnableToSetChannelBinding$str() {
+<span class="nc" id="L206">        return &quot;ELY05023: Unable to set channel binding&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnableToSetChannelBinding(final Exception e) {
+<span class="nc" id="L210">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnableToSetChannelBinding$str()), e);</span>
+<span class="nc" id="L211">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L212">        return result;</span>
+    }
+    protected String mechFailedToDetermineChannelBindingStatus$str() {
+<span class="nc" id="L215">        return &quot;ELY05024: Failed to determine channel binding status&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechFailedToDetermineChannelBindingStatus(final Exception e) {
+<span class="nc" id="L219">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechFailedToDetermineChannelBindingStatus$str()), e);</span>
+<span class="nc" id="L220">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L221">        return result;</span>
+    }
+    protected String mechMutualAuthenticationNotEnabled$str() {
+<span class="nc" id="L224">        return &quot;ELY05025: Mutual authentication not enabled&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechMutualAuthenticationNotEnabled() {
+<span class="nc" id="L228">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechMutualAuthenticationNotEnabled$str()));</span>
+<span class="nc" id="L229">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L230">        return result;</span>
+    }
+    protected String mechMechanismToOidMappingFailed$str() {
+<span class="nc" id="L233">        return &quot;ELY05026: Unable to map SASL mechanism name to a GSS-API OID&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechMechanismToOidMappingFailed(final Exception e) {
+<span class="nc" id="L237">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechMechanismToOidMappingFailed$str()), e);</span>
+<span class="nc" id="L238">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L239">        return result;</span>
+    }
+    protected String mechUnableToDisposeGssContext$str() {
+<span class="nc" id="L242">        return &quot;ELY05027: Unable to dispose of GSSContext&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnableToDisposeGssContext(final Exception e) {
+<span class="nc" id="L246">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnableToDisposeGssContext$str()), e);</span>
+<span class="nc" id="L247">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L248">        return result;</span>
+    }
+    protected String mechUnableToCreateNameForAcceptor$str() {
+<span class="nc" id="L251">        return &quot;ELY05028: Unable to create name for acceptor&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnableToCreateNameForAcceptor(final Exception e) {
+<span class="nc" id="L255">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnableToCreateNameForAcceptor$str()), e);</span>
+<span class="nc" id="L256">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L257">        return result;</span>
+    }
+    protected String mechUnableToCreateGssContext$str() {
+<span class="nc" id="L260">        return &quot;ELY05029: Unable to create GSSContext&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnableToCreateGssContext(final Exception e) {
+<span class="nc" id="L264">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnableToCreateGssContext$str()), e);</span>
+<span class="nc" id="L265">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L266">        return result;</span>
+    }
+    protected String mechUnableToSetGssContextRequestFlags$str() {
+<span class="nc" id="L269">        return &quot;ELY05030: Unable to set GSSContext request flags&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnableToSetGssContextRequestFlags(final Exception e) {
+<span class="nc" id="L273">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnableToSetGssContextRequestFlags$str()), e);</span>
+<span class="nc" id="L274">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L275">        return result;</span>
+    }
+    protected String mechUnableToAcceptClientMessage$str() {
+<span class="nc" id="L278">        return &quot;ELY05031: Unable to accept SASL client message&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnableToAcceptClientMessage(final Exception e) {
+<span class="nc" id="L282">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnableToAcceptClientMessage$str()), e);</span>
+<span class="nc" id="L283">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L284">        return result;</span>
+    }
+    protected String mechGssApiMechanismMismatch$str() {
+<span class="nc" id="L287">        return &quot;ELY05032: GSS-API mechanism mismatch between SASL client and server&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechGssApiMechanismMismatch() {
+<span class="nc" id="L291">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechGssApiMechanismMismatch$str()));</span>
+<span class="nc" id="L292">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L293">        return result;</span>
+    }
+    protected String mechChannelBindingNotSupported$str() {
+<span class="nc" id="L296">        return &quot;ELY05033: Channel binding not supported for this SASL mechanism&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechChannelBindingNotSupported() {
+<span class="nc" id="L300">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechChannelBindingNotSupported$str()));</span>
+<span class="nc" id="L301">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L302">        return result;</span>
+    }
+    protected String mechChannelBindingTypeMismatch$str() {
+<span class="nc" id="L305">        return &quot;ELY05034: Channel binding type mismatch between SASL client and server&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechChannelBindingTypeMismatch() {
+<span class="nc" id="L309">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechChannelBindingTypeMismatch$str()));</span>
+<span class="nc" id="L310">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L311">        return result;</span>
+    }
+    protected String mechChannelBindingNotProvided$str() {
+<span class="nc" id="L314">        return &quot;ELY05035: Channel binding not provided by client&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechChannelBindingNotProvided() {
+<span class="nc" id="L318">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechChannelBindingNotProvided$str()));</span>
+<span class="nc" id="L319">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L320">        return result;</span>
+    }
+    protected String mechUnableToDeterminePeerName$str() {
+<span class="nc" id="L323">        return &quot;ELY05036: Unable to determine peer name&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnableToDeterminePeerName(final Exception e) {
+<span class="nc" id="L327">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnableToDeterminePeerName$str()), e);</span>
+<span class="nc" id="L328">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L329">        return result;</span>
+    }
+    protected String mechClientRefusesToInitiateAuthentication$str() {
+<span class="nc" id="L332">        return &quot;ELY05037: Authentication mechanism client refuses to initiate authentication&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechClientRefusesToInitiateAuthentication() {
+<span class="nc" id="L336">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechClientRefusesToInitiateAuthentication$str()));</span>
+<span class="nc" id="L337">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L338">        return result;</span>
+    }
+    protected String mechNoncesDoNotMatch$str() {
+<span class="nc" id="L341">        return &quot;ELY05038: Nonces do not match&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechNoncesDoNotMatch() {
+<span class="nc" id="L345">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechNoncesDoNotMatch$str()));</span>
+<span class="nc" id="L346">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L347">        return result;</span>
+    }
+    protected String invalidNonceLength$str() {
+<span class="nc" id="L350">        return &quot;ELY05039: Invalid length of nonce received&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException invalidNonceLength() {
+<span class="nc" id="L354">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), invalidNonceLength$str()));</span>
+<span class="nc" id="L355">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L356">        return result;</span>
+    }
+    protected String mechIterationCountIsTooLow$str() {
+<span class="nc" id="L359">        return &quot;ELY05040: Iteration count %d is below the minimum of %d&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechIterationCountIsTooLow(final int iterationCount, final int minimumIterationCount) {
+<span class="nc" id="L363">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechIterationCountIsTooLow$str(), iterationCount, minimumIterationCount));</span>
+<span class="nc" id="L364">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L365">        return result;</span>
+    }
+    protected String mechIterationCountIsTooHigh$str() {
+<span class="nc" id="L368">        return &quot;ELY05041: Iteration count %d is above the maximum of %d&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechIterationCountIsTooHigh(final int iterationCount, final int maximumIterationCount) {
+<span class="nc" id="L372">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechIterationCountIsTooHigh$str(), iterationCount, maximumIterationCount));</span>
+<span class="nc" id="L373">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L374">        return result;</span>
+    }
+    protected String mechInvalidServerMessage$str() {
+<span class="nc" id="L377">        return &quot;ELY05043: Invalid server message&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechInvalidServerMessage() {
+<span class="nc" id="L381">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechInvalidServerMessage$str()));</span>
+<span class="nc" id="L382">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L383">        return result;</span>
+    }
+    protected String mechInvalidServerMessageWithCause$str() {
+<span class="nc" id="L386">        return &quot;ELY05044: Invalid server message&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechInvalidServerMessageWithCause(final Throwable cause) {
+<span class="nc" id="L390">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechInvalidServerMessageWithCause$str()), cause);</span>
+<span class="nc" id="L391">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L392">        return result;</span>
+    }
+    protected String mechInvalidClientMessage$str() {
+<span class="nc" id="L395">        return &quot;ELY05045: Invalid client message&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechInvalidClientMessage() {
+<span class="nc" id="L399">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechInvalidClientMessage$str()));</span>
+<span class="nc" id="L400">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L401">        return result;</span>
+    }
+    protected String mechInvalidClientMessageWithCause$str() {
+<span class="nc" id="L404">        return &quot;ELY05046: Invalid client message&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechInvalidClientMessageWithCause(final Throwable cause) {
+<span class="nc" id="L408">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechInvalidClientMessageWithCause$str()), cause);</span>
+<span class="nc" id="L409">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L410">        return result;</span>
+    }
+    protected String mechUnmatchedMechanism$str() {
+<span class="nc" id="L413">        return &quot;ELY05047: [%s] Authentication mechanism message is for mismatched mechanism \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnmatchedMechanism(final String mechName, final String otherMechName) {
+<span class="nc" id="L417">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnmatchedMechanism$str(), mechName, otherMechName));</span>
+<span class="nc" id="L418">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L419">        return result;</span>
+    }
+    protected String mechServerAuthenticityCannotBeVerified$str() {
+<span class="nc" id="L422">        return &quot;ELY05049: Server authenticity cannot be verified&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechServerAuthenticityCannotBeVerified() {
+<span class="nc" id="L426">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechServerAuthenticityCannotBeVerified$str()));</span>
+<span class="nc" id="L427">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L428">        return result;</span>
+    }
+    protected String mechCallbackHandlerDoesNotSupportUserName$str() {
+<span class="nc" id="L431">        return &quot;ELY05050: Callback handler does not support user name&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechCallbackHandlerDoesNotSupportUserName(final Throwable cause) {
+<span class="nc" id="L435">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechCallbackHandlerDoesNotSupportUserName$str()), cause);</span>
+<span class="nc" id="L436">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L437">        return result;</span>
+    }
+    protected String mechCallbackHandlerDoesNotSupportCredentialAcquisition$str() {
+<span class="nc" id="L440">        return &quot;ELY05051: Callback handler does not support credential acquisition&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechCallbackHandlerDoesNotSupportCredentialAcquisition(final Throwable cause) {
+<span class="nc" id="L444">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechCallbackHandlerDoesNotSupportCredentialAcquisition$str()), cause);</span>
+<span class="nc" id="L445">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L446">        return result;</span>
+    }
+    protected String mechAuthorizationUnsupported$str() {
+<span class="nc" id="L449">        return &quot;ELY05052: Callback handler does not support authorization&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechAuthorizationUnsupported(final Throwable cause) {
+<span class="nc" id="L453">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechAuthorizationUnsupported$str()), cause);</span>
+<span class="nc" id="L454">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L455">        return result;</span>
+    }
+    protected String mechCallbackHandlerFailedForUnknownReason$str() {
+<span class="nc" id="L458">        return &quot;ELY05053: Callback handler failed for unknown reason&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechCallbackHandlerFailedForUnknownReason(final Throwable cause) {
+<span class="nc" id="L462">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechCallbackHandlerFailedForUnknownReason$str()), cause);</span>
+<span class="nc" id="L463">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L464">        return result;</span>
+    }
+    protected String mechAuthenticationRejectedInvalidProof$str() {
+<span class="nc" id="L467">        return &quot;ELY05055: Authentication rejected (invalid proof)&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechAuthenticationRejectedInvalidProof() {
+<span class="nc" id="L471">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechAuthenticationRejectedInvalidProof$str()));</span>
+<span class="nc" id="L472">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L473">        return result;</span>
+    }
+    protected String mechClientSentExtraMessage$str() {
+<span class="nc" id="L476">        return &quot;ELY05056: Client sent extra message&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechClientSentExtraMessage() {
+<span class="nc" id="L480">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechClientSentExtraMessage$str()));</span>
+<span class="nc" id="L481">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L482">        return result;</span>
+    }
+    protected String mechServerSentExtraMessage$str() {
+<span class="nc" id="L485">        return &quot;ELY05057: Server sent extra message&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechServerSentExtraMessage() {
+<span class="nc" id="L489">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechServerSentExtraMessage$str()));</span>
+<span class="nc" id="L490">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L491">        return result;</span>
+    }
+    protected String mechAuthenticationFailed$str() {
+<span class="nc" id="L494">        return &quot;ELY05058: Authentication failed&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechAuthenticationFailed() {
+<span class="nc" id="L498">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechAuthenticationFailed$str()));</span>
+<span class="nc" id="L499">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L500">        return result;</span>
+    }
+    protected String emptyNumber$str() {
+<span class="nc" id="L503">        return &quot;ELY05060: Empty number&quot;;</span>
+    }
+    @Override
+    public final NumberFormatException emptyNumber() {
+<span class="nc" id="L507">        final NumberFormatException result = new NumberFormatException(String.format(getLoggingLocale(), emptyNumber$str()));</span>
+<span class="nc" id="L508">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L509">        return result;</span>
+    }
+    protected String invalidNumericCharacter$str() {
+<span class="nc" id="L512">        return &quot;ELY05061: Invalid numeric character&quot;;</span>
+    }
+    @Override
+    public final NumberFormatException invalidNumericCharacter() {
+<span class="nc" id="L516">        final NumberFormatException result = new NumberFormatException(String.format(getLoggingLocale(), invalidNumericCharacter$str()));</span>
+<span class="nc" id="L517">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L518">        return result;</span>
+    }
+    protected String tooBigNumber$str() {
+<span class="nc" id="L521">        return &quot;ELY05062: Too big number&quot;;</span>
+    }
+    @Override
+    public final NumberFormatException tooBigNumber() {
+<span class="nc" id="L525">        final NumberFormatException result = new NumberFormatException(String.format(getLoggingLocale(), tooBigNumber$str()));</span>
+<span class="nc" id="L526">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L527">        return result;</span>
+    }
+    protected String mechCannotGetTwoWayPasswordChars$str() {
+<span class="nc" id="L530">        return &quot;ELY05063: Cannot get clear password from two way password&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechCannotGetTwoWayPasswordChars(final Throwable cause) {
+<span class="nc" id="L534">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechCannotGetTwoWayPasswordChars$str()), cause);</span>
+<span class="nc" id="L535">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L536">        return result;</span>
+    }
+    protected String mechMacAlgorithmNotSupported$str() {
+<span class="nc" id="L539">        return &quot;ELY05064: Hashing algorithm not supported&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechMacAlgorithmNotSupported(final Throwable cause) {
+<span class="nc" id="L543">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechMacAlgorithmNotSupported$str()), cause);</span>
+<span class="nc" id="L544">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L545">        return result;</span>
+    }
+    protected String mechKeywordCannotBeEmpty$str() {
+<span class="nc" id="L548">        return &quot;ELY05065: keyword cannot be empty&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechKeywordCannotBeEmpty() {
+<span class="nc" id="L552">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechKeywordCannotBeEmpty$str()));</span>
+<span class="nc" id="L553">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L554">        return result;</span>
+    }
+    protected String mechNoValueFoundForKeyword$str() {
+<span class="nc" id="L557">        return &quot;ELY05066: No value found for keyword: %s&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechNoValueFoundForKeyword(final String keyword) {
+<span class="nc" id="L561">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechNoValueFoundForKeyword$str(), keyword));</span>
+<span class="nc" id="L562">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L563">        return result;</span>
+    }
+    protected String mechKeywordNotFollowedByEqual$str() {
+<span class="nc" id="L566">        return &quot;ELY05067: '=' expected after keyword: %s&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechKeywordNotFollowedByEqual(final String keyword) {
+<span class="nc" id="L570">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechKeywordNotFollowedByEqual$str(), keyword));</span>
+<span class="nc" id="L571">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L572">        return result;</span>
+    }
+    protected String mechUnmatchedQuoteFoundForValue$str() {
+<span class="nc" id="L575">        return &quot;ELY05068: Unmatched quote found for value: %s&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnmatchedQuoteFoundForValue(final String value) {
+<span class="nc" id="L579">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnmatchedQuoteFoundForValue$str(), value));</span>
+<span class="nc" id="L580">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L581">        return result;</span>
+    }
+    protected String mechExpectingCommaOrLinearWhitespaceAfterQuoted$str() {
+<span class="nc" id="L584">        return &quot;ELY05069: Expecting comma or linear whitespace after quoted string: %s&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechExpectingCommaOrLinearWhitespaceAfterQuoted(final String value) {
+<span class="nc" id="L588">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechExpectingCommaOrLinearWhitespaceAfterQuoted$str(), value));</span>
+<span class="nc" id="L589">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L590">        return result;</span>
+    }
+    protected String mechMessageTypeMustEqual$str() {
+<span class="nc" id="L593">        return &quot;ELY05070: MessageType must equal to %d, but it is %d&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechMessageTypeMustEqual(final int expected, final int actual) {
+<span class="nc" id="L597">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechMessageTypeMustEqual$str(), expected, actual));</span>
+<span class="nc" id="L598">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L599">        return result;</span>
+    }
+    protected String mechBadSequenceNumberWhileUnwrapping$str() {
+<span class="nc" id="L602">        return &quot;ELY05071: Bad sequence number while unwrapping: expected %d, but %d received&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechBadSequenceNumberWhileUnwrapping(final int expected, final int actual) {
+<span class="nc" id="L606">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechBadSequenceNumberWhileUnwrapping$str(), expected, actual));</span>
+<span class="nc" id="L607">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L608">        return result;</span>
+    }
+    protected String mechProblemDuringCrypt$str() {
+<span class="nc" id="L611">        return &quot;ELY05072: Problem during crypt&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechProblemDuringCrypt(final Throwable cause) {
+<span class="nc" id="L615">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechProblemDuringCrypt$str()), cause);</span>
+<span class="nc" id="L616">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L617">        return result;</span>
+    }
+    protected String mechProblemDuringDecrypt$str() {
+<span class="nc" id="L620">        return &quot;ELY05073: Problem during decrypt&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechProblemDuringDecrypt(final Throwable cause) {
+<span class="nc" id="L624">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechProblemDuringDecrypt$str()), cause);</span>
+<span class="nc" id="L625">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L626">        return result;</span>
+    }
+    protected String mechUnknownCipher$str() {
+<span class="nc" id="L629">        return &quot;ELY05074: Unknown cipher \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnknownCipher(final String cipher) {
+<span class="nc" id="L633">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnknownCipher$str(), cipher));</span>
+<span class="nc" id="L634">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L635">        return result;</span>
+    }
+    protected String mechAuthorizationIdChanged$str() {
+<span class="nc" id="L638">        return &quot;ELY05075: Authorization ID changed unexpectedly&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechAuthorizationIdChanged() {
+<span class="nc" id="L642">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechAuthorizationIdChanged$str()));</span>
+<span class="nc" id="L643">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L644">        return result;</span>
+    }
+    protected String mechProblemGettingRequiredCipher$str() {
+<span class="nc" id="L647">        return &quot;ELY05076: Problem getting required cipher. Check your transformation mapper settings.&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechProblemGettingRequiredCipher(final Throwable cause) {
+<span class="nc" id="L651">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechProblemGettingRequiredCipher$str()), cause);</span>
+<span class="nc" id="L652">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L653">        return result;</span>
+    }
+    protected String mechNoCommonProtectionLayer$str() {
+<span class="nc" id="L656">        return &quot;ELY05077: No common protection layer between client and server&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechNoCommonProtectionLayer() {
+<span class="nc" id="L660">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechNoCommonProtectionLayer$str()));</span>
+<span class="nc" id="L661">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L662">        return result;</span>
+    }
+    protected String mechNoCommonCipher$str() {
+<span class="nc" id="L665">        return &quot;ELY05078: No common cipher between client and server&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechNoCommonCipher() {
+<span class="nc" id="L669">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechNoCommonCipher$str()));</span>
+<span class="nc" id="L670">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L671">        return result;</span>
+    }
+    protected String mechNoCiphersOfferedByServer$str() {
+<span class="nc" id="L674">        return &quot;ELY05079: No ciphers offered by server&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechNoCiphersOfferedByServer() {
+<span class="nc" id="L678">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechNoCiphersOfferedByServer$str()));</span>
+<span class="nc" id="L679">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L680">        return result;</span>
+    }
+    protected String mechNotProvidedUserName$str() {
+<span class="nc" id="L683">        return &quot;ELY05080: Callback handler not provided user name&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechNotProvidedUserName() {
+<span class="nc" id="L687">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechNotProvidedUserName$str()));</span>
+<span class="nc" id="L688">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L689">        return result;</span>
+    }
+    protected String mechMissingDirective$str() {
+<span class="nc" id="L692">        return &quot;ELY05083: Missing \&quot;%s\&quot; directive&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechMissingDirective(final String directive) {
+<span class="nc" id="L696">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechMissingDirective$str(), directive));</span>
+<span class="nc" id="L697">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L698">        return result;</span>
+    }
+    protected String mechNonceCountMustEqual$str() {
+<span class="nc" id="L701">        return &quot;ELY05084: nonce-count must equal to %d, but it is %d&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechNonceCountMustEqual(final int expected, final int actual) {
+<span class="nc" id="L705">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechNonceCountMustEqual$str(), expected, actual));</span>
+<span class="nc" id="L706">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L707">        return result;</span>
+    }
+    protected String mechUnsupportedCharset$str() {
+<span class="nc" id="L710">        return &quot;ELY05085: Server is set to not support %s charset&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnsupportedCharset(final String charset) {
+<span class="nc" id="L714">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnsupportedCharset$str(), charset));</span>
+<span class="nc" id="L715">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L716">        return result;</span>
+    }
+    protected String mechUnknownCharset$str() {
+<span class="nc" id="L719">        return &quot;ELY05086: Charset can be only \&quot;utf-8\&quot; or unspecified (to use ISO 8859-1)&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnknownCharset() {
+<span class="nc" id="L723">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnknownCharset$str()));</span>
+<span class="nc" id="L724">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L725">        return result;</span>
+    }
+    protected String mechDisallowedClientRealm$str() {
+<span class="nc" id="L728">        return &quot;ELY05087: Client selected realm not offered by server (%s)&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechDisallowedClientRealm(final String clientRealm) {
+<span class="nc" id="L732">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechDisallowedClientRealm$str(), clientRealm));</span>
+<span class="nc" id="L733">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L734">        return result;</span>
+    }
+    protected String mechMismatchedWrongDigestUri$str() {
+<span class="nc" id="L737">        return &quot;ELY05088: digest-uri \&quot;%s\&quot; not accepted&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechMismatchedWrongDigestUri(final String actual) {
+<span class="nc" id="L741">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechMismatchedWrongDigestUri$str(), actual));</span>
+<span class="nc" id="L742">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L743">        return result;</span>
+    }
+    protected String mechUnexpectedQop$str() {
+<span class="nc" id="L746">        return &quot;ELY05089: Unexpected qop value: \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnexpectedQop(final String qop) {
+<span class="nc" id="L750">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnexpectedQop$str(), qop));</span>
+<span class="nc" id="L751">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L752">        return result;</span>
+    }
+    protected String wrappingNotConfigured$str() {
+<span class="nc" id="L755">        return &quot;ELY05090: Wrapping is not configured&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException wrappingNotConfigured() {
+<span class="nc" id="L759">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), wrappingNotConfigured$str()));</span>
+<span class="nc" id="L760">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L761">        return result;</span>
+    }
+    protected String mechAuthenticationNameTooLong$str() {
+<span class="nc" id="L764">        return &quot;ELY05091: Authentication name string is too long&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechAuthenticationNameTooLong() {
+<span class="nc" id="L768">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechAuthenticationNameTooLong$str()));</span>
+<span class="nc" id="L769">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L770">        return result;</span>
+    }
+    protected String mechAuthenticationNameIsEmpty$str() {
+<span class="nc" id="L773">        return &quot;ELY05092: Authentication name is empty&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechAuthenticationNameIsEmpty() {
+<span class="nc" id="L777">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechAuthenticationNameIsEmpty$str()));</span>
+<span class="nc" id="L778">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L779">        return result;</span>
+    }
+    protected String mechAnonymousAuthorizationDenied$str() {
+<span class="nc" id="L782">        return &quot;ELY05093: Authorization for anonymous access is denied&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechAnonymousAuthorizationDenied() {
+<span class="nc" id="L786">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechAnonymousAuthorizationDenied$str()));</span>
+<span class="nc" id="L787">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L788">        return result;</span>
+    }
+    protected String requiredNegativePadding$str() {
+<span class="nc" id="L791">        return &quot;ELY05094: Required padded length (%d) is less than length of conversion result (%d)&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException requiredNegativePadding(final int totalLength, final int hexLength) {
+<span class="nc" id="L795">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), requiredNegativePadding$str(), totalLength, hexLength));</span>
+<span class="nc" id="L796">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L797">        return result;</span>
+    }
+    protected String mechInvalidKeyForDigestHMAC$str() {
+<span class="nc" id="L800">        return &quot;ELY05095: Invalid key provided for Digest HMAC computing&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechInvalidKeyForDigestHMAC() {
+<span class="nc" id="L804">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechInvalidKeyForDigestHMAC$str()));</span>
+<span class="nc" id="L805">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L806">        return result;</span>
+    }
+    protected String unableToDetermineSubjectName$str() {
+<span class="nc" id="L809">        return &quot;ELY05097: Unable to determine subject name from X.509 certificate&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException unableToDetermineSubjectName(final Throwable cause) {
+<span class="nc" id="L813">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), unableToDetermineSubjectName$str()), cause);</span>
+<span class="nc" id="L814">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L815">        return result;</span>
+    }
+    protected String mechUnableToVerifyClientSignature$str() {
+<span class="nc" id="L818">        return &quot;ELY05098: Unable to verify client signature&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnableToVerifyClientSignature(final Throwable cause) {
+<span class="nc" id="L822">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnableToVerifyClientSignature$str()), cause);</span>
+<span class="nc" id="L823">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L824">        return result;</span>
+    }
+    protected String mechUnableToVerifyServerSignature$str() {
+<span class="nc" id="L827">        return &quot;ELY05099: Unable to verify server signature&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnableToVerifyServerSignature(final Throwable cause) {
+<span class="nc" id="L831">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnableToVerifyServerSignature$str()), cause);</span>
+<span class="nc" id="L832">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L833">        return result;</span>
+    }
+    protected String mechCallbackHandlerNotProvidedServerCertificate$str() {
+<span class="nc" id="L836">        return &quot;ELY05101: Callback handler not provided server certificate&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechCallbackHandlerNotProvidedServerCertificate() {
+<span class="nc" id="L840">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechCallbackHandlerNotProvidedServerCertificate$str()));</span>
+<span class="nc" id="L841">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L842">        return result;</span>
+    }
+    protected String mechCallbackHandlerNotProvidedClientCertificate$str() {
+<span class="nc" id="L845">        return &quot;ELY05102: Callback handler not provided client certificate&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechCallbackHandlerNotProvidedClientCertificate() {
+<span class="nc" id="L849">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechCallbackHandlerNotProvidedClientCertificate$str()));</span>
+<span class="nc" id="L850">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L851">        return result;</span>
+    }
+    protected String mechServerIdentifierMismatch$str() {
+<span class="nc" id="L854">        return &quot;ELY05103: Server identifier mismatch&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechServerIdentifierMismatch() {
+<span class="nc" id="L858">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechServerIdentifierMismatch$str()));</span>
+<span class="nc" id="L859">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L860">        return result;</span>
+    }
+    protected String mechClientIdentifierMismatch$str() {
+<span class="nc" id="L863">        return &quot;ELY05104: Client identifier mismatch&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechClientIdentifierMismatch() {
+<span class="nc" id="L867">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechClientIdentifierMismatch$str()));</span>
+<span class="nc" id="L868">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L869">        return result;</span>
+    }
+    protected String mechUnableToDetermineClientName$str() {
+<span class="nc" id="L872">        return &quot;ELY05105: Unable to determine client name&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnableToDetermineClientName(final Throwable cause) {
+<span class="nc" id="L876">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnableToDetermineClientName$str()), cause);</span>
+<span class="nc" id="L877">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L878">        return result;</span>
+    }
+    protected String mechCallbackHandlerNotProvidedPrivateKey$str() {
+<span class="nc" id="L881">        return &quot;ELY05106: Callback handler not provided private key&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechCallbackHandlerNotProvidedPrivateKey() {
+<span class="nc" id="L885">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechCallbackHandlerNotProvidedPrivateKey$str()));</span>
+<span class="nc" id="L886">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L887">        return result;</span>
+    }
+    protected String mechUnableToCreateSignature$str() {
+<span class="nc" id="L890">        return &quot;ELY05107: Unable to create signature&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnableToCreateSignature(final Throwable cause) {
+<span class="nc" id="L894">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnableToCreateSignature$str()), cause);</span>
+<span class="nc" id="L895">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L896">        return result;</span>
+    }
+    protected String mechUnableToCreateResponseToken$str() {
+<span class="nc" id="L899">        return &quot;ELY05108: Unable to create response token&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnableToCreateResponseToken(final Throwable cause) {
+<span class="nc" id="L903">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnableToCreateResponseToken$str()), cause);</span>
+<span class="nc" id="L904">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L905">        return result;</span>
+    }
+    protected String mechUnableToCreateResponseTokenWithCause$str() {
+<span class="nc" id="L908">        return &quot;ELY05109: Unable to create response token&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnableToCreateResponseTokenWithCause(final Throwable cause) {
+<span class="nc" id="L912">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnableToCreateResponseTokenWithCause$str()), cause);</span>
+<span class="nc" id="L913">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L914">        return result;</span>
+    }
+    protected String mechGettingSupportedMechanismsFailed$str() {
+<span class="nc" id="L917">        return &quot;ELY05112: Getting authentication mechanisms supported by GSS-API failed&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechGettingSupportedMechanismsFailed(final Throwable cause) {
+<span class="nc" id="L921">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechGettingSupportedMechanismsFailed$str()), cause);</span>
+<span class="nc" id="L922">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L923">        return result;</span>
+    }
+    protected String unableToInitialiseOid$str() {
+<span class="nc" id="L926">        return &quot;ELY05113: Unable to initialize OID of Kerberos V5&quot;;</span>
+    }
+    @Override
+    public final RuntimeException unableToInitialiseOid(final Throwable cause) {
+<span class="nc" id="L930">        final RuntimeException result = new RuntimeException(String.format(getLoggingLocale(), unableToInitialiseOid$str()), cause);</span>
+<span class="nc" id="L931">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L932">        return result;</span>
+    }
+    protected String mechReceiveBufferIsGreaterThanMaximum$str() {
+<span class="nc" id="L935">        return &quot;ELY05114: Receive buffer requested '%d' is greater than supported maximum '%d'&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechReceiveBufferIsGreaterThanMaximum(final int requested, final int maximum) {
+<span class="nc" id="L939">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechReceiveBufferIsGreaterThanMaximum$str(), requested, maximum));</span>
+<span class="nc" id="L940">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L941">        return result;</span>
+    }
+    protected String mechUnableToWrapMessage$str() {
+<span class="nc" id="L944">        return &quot;ELY05115: Unable to wrap message&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnableToWrapMessage(final Throwable cause) {
+<span class="nc" id="L948">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnableToWrapMessage$str()), cause);</span>
+<span class="nc" id="L949">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L950">        return result;</span>
+    }
+    protected String mechUnableToUnwrapMessage$str() {
+<span class="nc" id="L953">        return &quot;ELY05116: Unable to unwrap message&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnableToUnwrapMessage(final Throwable cause) {
+<span class="nc" id="L957">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnableToUnwrapMessage$str()), cause);</span>
+<span class="nc" id="L958">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L959">        return result;</span>
+    }
+    protected String mechUnableToUnwrapSecurityLayerNegotiationMessage$str() {
+<span class="nc" id="L962">        return &quot;ELY05117: Unable to unwrap security layer negotiation message&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnableToUnwrapSecurityLayerNegotiationMessage(final Throwable cause) {
+<span class="nc" id="L966">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnableToUnwrapSecurityLayerNegotiationMessage$str()), cause);</span>
+<span class="nc" id="L967">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L968">        return result;</span>
+    }
+    protected String mechInvalidMessageOnUnwrapping$str() {
+<span class="nc" id="L971">        return &quot;ELY05118: Invalid message of length %d on unwrapping&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechInvalidMessageOnUnwrapping(final int length) {
+<span class="nc" id="L975">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechInvalidMessageOnUnwrapping$str(), length));</span>
+<span class="nc" id="L976">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L977">        return result;</span>
+    }
+    protected String mechNegotiatedMechanismWasNotKerberosV5$str() {
+<span class="nc" id="L980">        return &quot;ELY05119: Negotiated mechanism was not Kerberos V5&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechNegotiatedMechanismWasNotKerberosV5() {
+<span class="nc" id="L984">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechNegotiatedMechanismWasNotKerberosV5$str()));</span>
+<span class="nc" id="L985">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L986">        return result;</span>
+    }
+    protected String mechInsufficientQopsAvailable$str() {
+<span class="nc" id="L989">        return &quot;ELY05120: Insufficient levels of protection available for supported security layers&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechInsufficientQopsAvailable() {
+<span class="nc" id="L993">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechInsufficientQopsAvailable$str()));</span>
+<span class="nc" id="L994">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L995">        return result;</span>
+    }
+    protected String mechUnableToGenerateChallenge$str() {
+<span class="nc" id="L998">        return &quot;ELY05121: Unable to generate security layer challenge&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnableToGenerateChallenge(final Throwable cause) {
+<span class="nc" id="L1002">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnableToGenerateChallenge$str()), cause);</span>
+<span class="nc" id="L1003">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1004">        return result;</span>
+    }
+    protected String mechSelectedUnofferedQop$str() {
+<span class="nc" id="L1007">        return &quot;ELY05122: Client selected a security layer that was not offered by server&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechSelectedUnofferedQop() {
+<span class="nc" id="L1011">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechSelectedUnofferedQop$str()));</span>
+<span class="nc" id="L1012">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1013">        return result;</span>
+    }
+    protected String mechNoSecurityLayerButLengthReceived$str() {
+<span class="nc" id="L1016">        return &quot;ELY05123: No security layer selected but message length received&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechNoSecurityLayerButLengthReceived() {
+<span class="nc" id="L1020">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechNoSecurityLayerButLengthReceived$str()));</span>
+<span class="nc" id="L1021">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1022">        return result;</span>
+    }
+    protected String mechUnableToGetMaximumSizeOfMessage$str() {
+<span class="nc" id="L1025">        return &quot;ELY05124: Unable to get maximum size of message before wrap&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnableToGetMaximumSizeOfMessage(final Throwable cause) {
+<span class="nc" id="L1029">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnableToGetMaximumSizeOfMessage$str()), cause);</span>
+<span class="nc" id="L1030">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1031">        return result;</span>
+    }
+    protected String mechUnableToHandleResponseFromServer$str() {
+<span class="nc" id="L1034">        return &quot;ELY05125: Unable to handle response from server&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnableToHandleResponseFromServer(final Throwable cause) {
+<span class="nc" id="L1038">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnableToHandleResponseFromServer$str()), cause);</span>
+<span class="nc" id="L1039">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1040">        return result;</span>
+    }
+    protected String mechBadLengthOfMessageForNegotiatingSecurityLayer$str() {
+<span class="nc" id="L1043">        return &quot;ELY05126: Bad length of message for negotiating security layer&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechBadLengthOfMessageForNegotiatingSecurityLayer() {
+<span class="nc" id="L1047">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechBadLengthOfMessageForNegotiatingSecurityLayer$str()));</span>
+<span class="nc" id="L1048">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1049">        return result;</span>
+    }
+    protected String mechReceivedMaxMessageSizeWhenNoSecurityLayer$str() {
+<span class="nc" id="L1052">        return &quot;ELY05127: No security layer supported by server but maximum message size received: \&quot;%d\&quot;&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechReceivedMaxMessageSizeWhenNoSecurityLayer(final int length) {
+<span class="nc" id="L1056">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechReceivedMaxMessageSizeWhenNoSecurityLayer$str(), length));</span>
+<span class="nc" id="L1057">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1058">        return result;</span>
+    }
+    protected String mechFailedToReadChallengeFile$str() {
+<span class="nc" id="L1061">        return &quot;ELY05128: Failed to read challenge file&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechFailedToReadChallengeFile(final Throwable cause) {
+<span class="nc" id="L1065">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechFailedToReadChallengeFile$str()), cause);</span>
+<span class="nc" id="L1066">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1067">        return result;</span>
+    }
+    protected String mechFailedToCreateChallengeFile$str() {
+<span class="nc" id="L1070">        return &quot;ELY05129: Failed to create challenge file&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechFailedToCreateChallengeFile(final Throwable cause) {
+<span class="nc" id="L1074">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechFailedToCreateChallengeFile$str()), cause);</span>
+<span class="nc" id="L1075">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1076">        return result;</span>
+    }
+    protected String mechAuthorizationIdTooLong$str() {
+<span class="nc" id="L1079">        return &quot;ELY05150: Authentication mechanism authorization ID is too long&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechAuthorizationIdTooLong() {
+<span class="nc" id="L1083">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechAuthorizationIdTooLong$str()));</span>
+<span class="nc" id="L1084">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1085">        return result;</span>
+    }
+    protected String mechInvalidOTPAlgorithm$str() {
+<span class="nc" id="L1088">        return &quot;ELY05151: Invalid OTP algorithm \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechInvalidOTPAlgorithm(final String algorithm) {
+<span class="nc" id="L1092">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechInvalidOTPAlgorithm$str(), algorithm));</span>
+<span class="nc" id="L1093">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1094">        return result;</span>
+    }
+    protected String mechInvalidOTPResponseType$str() {
+<span class="nc" id="L1097">        return &quot;ELY05152: Invalid OTP response type&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechInvalidOTPResponseType() {
+<span class="nc" id="L1101">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechInvalidOTPResponseType$str()));</span>
+<span class="nc" id="L1102">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1103">        return result;</span>
+    }
+    protected String mechIncorrectParity$str() {
+<span class="nc" id="L1106">        return &quot;ELY05153: Incorrect parity in SASL client message&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechIncorrectParity() {
+<span class="nc" id="L1110">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechIncorrectParity$str()));</span>
+<span class="nc" id="L1111">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1112">        return result;</span>
+    }
+    protected String mechInvalidCharacterInSeed$str() {
+<span class="nc" id="L1115">        return &quot;ELY05154: Invalid character in seed&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechInvalidCharacterInSeed() {
+<span class="nc" id="L1119">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechInvalidCharacterInSeed$str()));</span>
+<span class="nc" id="L1120">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1121">        return result;</span>
+    }
+    protected String mechInvalidOTPSeed$str() {
+<span class="nc" id="L1124">        return &quot;ELY05155: Invalid OTP seed, must be between 1 and 16 characters long&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechInvalidOTPSeed() {
+<span class="nc" id="L1128">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechInvalidOTPSeed$str()));</span>
+<span class="nc" id="L1129">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1130">        return result;</span>
+    }
+    protected String mechInvalidOTPPassPhrase$str() {
+<span class="nc" id="L1133">        return &quot;ELY05156: Invalid OTP pass phrase, must be between 10 and 63 characters long&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechInvalidOTPPassPhrase() {
+<span class="nc" id="L1137">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechInvalidOTPPassPhrase$str()));</span>
+<span class="nc" id="L1138">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1139">        return result;</span>
+    }
+    protected String mechInvalidOTPSequenceNumber$str() {
+<span class="nc" id="L1142">        return &quot;ELY05157: Invalid OTP sequence number&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechInvalidOTPSequenceNumber() {
+<span class="nc" id="L1146">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechInvalidOTPSequenceNumber$str()));</span>
+<span class="nc" id="L1147">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1148">        return result;</span>
+    }
+    protected String mechInvalidOTP$str() {
+<span class="nc" id="L1151">        return &quot;ELY05158: Invalid OTP&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechInvalidOTP() {
+<span class="nc" id="L1155">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechInvalidOTP$str()));</span>
+<span class="nc" id="L1156">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1157">        return result;</span>
+    }
+    protected String mechOTPPassPhraseAndSeedMustNotMatch$str() {
+<span class="nc" id="L1160">        return &quot;ELY05159: OTP pass phrase and seed must not match&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechOTPPassPhraseAndSeedMustNotMatch() {
+<span class="nc" id="L1164">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechOTPPassPhraseAndSeedMustNotMatch$str()));</span>
+<span class="nc" id="L1165">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1166">        return result;</span>
+    }
+    protected String mechInvalidOTPAlternateDictionary$str() {
+<span class="nc" id="L1169">        return &quot;ELY05160: Invalid OTP alternate dictionary&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechInvalidOTPAlternateDictionary() {
+<span class="nc" id="L1173">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechInvalidOTPAlternateDictionary$str()));</span>
+<span class="nc" id="L1174">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1175">        return result;</span>
+    }
+    protected String mechUnableToRetrievePassword$str() {
+<span class="nc" id="L1178">        return &quot;ELY05161: Unable to retrieve password for \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnableToRetrievePassword(final String userName) {
+<span class="nc" id="L1182">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnableToRetrievePassword$str(), userName));</span>
+<span class="nc" id="L1183">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1184">        return result;</span>
+    }
+    protected String mechUnableToUpdatePassword$str() {
+<span class="nc" id="L1187">        return &quot;ELY05162: Unable to update password for \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnableToUpdatePassword(final String userName) {
+<span class="nc" id="L1191">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnableToUpdatePassword$str(), userName));</span>
+<span class="nc" id="L1192">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1193">        return result;</span>
+    }
+    protected String mechServerTimedOut$str() {
+<span class="nc" id="L1196">        return &quot;ELY05163: Authentication mechanism server timed out&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechServerTimedOut() {
+<span class="nc" id="L1200">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechServerTimedOut$str()));</span>
+<span class="nc" id="L1201">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1202">        return result;</span>
+    }
+    protected String mechUnableToObtainExclusiveAccess$str() {
+<span class="nc" id="L1205">        return &quot;ELY05164: Unable to obtain exclusive access for \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnableToObtainExclusiveAccess(final String userName) {
+<span class="nc" id="L1209">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnableToObtainExclusiveAccess$str(), userName));</span>
+<span class="nc" id="L1210">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1211">        return result;</span>
+    }
+    protected String mechOTPReinitializationFailed$str() {
+<span class="nc" id="L1214">        return &quot;ELY05165: OTP re-initialization failed&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechOTPReinitializationFailed(final Throwable cause) {
+<span class="nc" id="L1218">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechOTPReinitializationFailed$str()), cause);</span>
+<span class="nc" id="L1219">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1220">        return result;</span>
+    }
+    protected String scramServerRejectedAuthentication$str() {
+<span class="nc" id="L1223">        return &quot;ELY05166: Server rejected authentication&quot;;</span>
+    }
+    @Override
+    public final ScramServerException scramServerRejectedAuthentication(final ScramServerErrorCode errorCode) {
+<span class="nc" id="L1227">        final ScramServerException result = new ScramServerException(String.format(getLoggingLocale(), scramServerRejectedAuthentication$str()), errorCode);</span>
+<span class="nc" id="L1228">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1229">        return result;</span>
+    }
+    protected String mechInvalidOTPPasswordFormatType$str() {
+<span class="nc" id="L1232">        return &quot;ELY05167: Invalid OTP password format type&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechInvalidOTPPasswordFormatType() {
+<span class="nc" id="L1236">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechInvalidOTPPasswordFormatType$str()));</span>
+<span class="nc" id="L1237">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1238">        return result;</span>
+    }
+    protected String mechUnsupportedAlgorithm$str() {
+<span class="nc" id="L1241">        return &quot;ELY05168: Unsupported algorithm selected \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnsupportedAlgorithm(final String algorithm) {
+<span class="nc" id="L1245">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnsupportedAlgorithm$str(), algorithm));</span>
+<span class="nc" id="L1246">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1247">        return result;</span>
+    }
+    protected String mechResponseTokenMismatch$str() {
+<span class="nc" id="L1250">        return &quot;ELY05169: [%s] Clients response token does not match expected token&quot;;</span>
+    }
+    @Override
+    public final String mechResponseTokenMismatch(final String mechName) {
+<span class="nc" id="L1254">        return String.format(getLoggingLocale(), mechResponseTokenMismatch$str(), mechName);</span>
+    }
+    protected String mechProblemDuringCryptResultIsNull$str() {
+<span class="nc" id="L1257">        return &quot;ELY05170: Problem during crypt: The encrypted result is null. The input data has a length of zero or too short to result in a new block.&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechProblemDuringCryptResultIsNull() {
+<span class="nc" id="L1261">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechProblemDuringCryptResultIsNull$str()));</span>
+<span class="nc" id="L1262">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1263">        return result;</span>
+    }
+    protected String mechProblemDuringDecryptResultIsNull$str() {
+<span class="nc" id="L1266">        return &quot;ELY05171: Problem during decrypt: The decrypted result is null. The input data has a length of zero or too short to result in a new block.&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechProblemDuringDecryptResultIsNull() {
+<span class="nc" id="L1270">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechProblemDuringDecryptResultIsNull$str()));</span>
+<span class="nc" id="L1271">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1272">        return result;</span>
+    }
+    protected String unableToObtainServerCredential$str() {
+<span class="nc" id="L1275">        return &quot;ELY05173: Unable to obtain server credential.&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException unableToObtainServerCredential() {
+<span class="nc" id="L1279">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), unableToObtainServerCredential$str()));</span>
+<span class="nc" id="L1280">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1281">        return result;</span>
+    }
+    protected String mechNotChosenRealm$str() {
+<span class="nc" id="L1284">        return &quot;ELY05174: Callback handler has not chosen realm&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechNotChosenRealm() {
+<span class="nc" id="L1288">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechNotChosenRealm$str()));</span>
+<span class="nc" id="L1289">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1290">        return result;</span>
+    }
+    protected String mechUnableToDetermineBoundServerName$str() {
+<span class="nc" id="L1293">        return &quot;ELY05175: Unable to determine bound server name&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechUnableToDetermineBoundServerName(final Exception e) {
+<span class="nc" id="L1297">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechUnableToDetermineBoundServerName$str()), e);</span>
+<span class="nc" id="L1298">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1299">        return result;</span>
+    }
+    protected String mechCallbackHandlerUnsupportedCallback$str() {
+<span class="nc" id="L1302">        return &quot;ELY05176: Unsupported callback&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechCallbackHandlerUnsupportedCallback(final Throwable cause) {
+<span class="nc" id="L1306">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechCallbackHandlerUnsupportedCallback$str()), cause);</span>
+<span class="nc" id="L1307">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1308">        return result;</span>
+    }
+    protected String mechOneOfDirectivesHasToBeDefined$str() {
+<span class="nc" id="L1311">        return &quot;ELY05177: One of \&quot;%s\&quot; and \&quot;%s\&quot; directives has to be defined&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechOneOfDirectivesHasToBeDefined(final String directive1, final String directive2) {
+<span class="nc" id="L1315">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechOneOfDirectivesHasToBeDefined$str(), directive1, directive2));</span>
+<span class="nc" id="L1316">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1317">        return result;</span>
+    }
+    protected String incorrectlyFormattedHeader$str() {
+<span class="nc" id="L1320">        return &quot;ELY06001: An incorrectly formatted '%s'header was encountered.&quot;;</span>
+    }
+    @Override
+    public final String incorrectlyFormattedHeader(final String headerName) {
+<span class="nc" id="L1324">        return String.format(getLoggingLocale(), incorrectlyFormattedHeader$str(), headerName);</span>
+    }
+    protected String authenticationFailed2$str() {
+<span class="nc" id="L1327">        return &quot;ELY06002: An authentication attempt for user '%s' failed validation using mechanism '%s'.&quot;;</span>
+    }
+    @Override
+    public final String authenticationFailed(final String username, final String mechanismName) {
+<span class="nc" id="L1331">        return String.format(getLoggingLocale(), authenticationFailed2$str(), username, mechanismName);</span>
+    }
+    protected String authenticationFailed0$str() {
+<span class="nc" id="L1334">        return &quot;ELY06003: An authentication attempt failed validation.&quot;;</span>
+    }
+    @Override
+    public final String authenticationFailed() {
+<span class="nc" id="L1338">        return String.format(getLoggingLocale(), authenticationFailed0$str());</span>
+    }
+    protected String authorizationFailed$str() {
+<span class="nc" id="L1341">        return &quot;ELY06006: An authorization check for user '%s' failed.&quot;;</span>
+    }
+    @Override
+    public final String authorizationFailed(final String username) {
+<span class="nc" id="L1345">        return String.format(getLoggingLocale(), authorizationFailed$str(), username);</span>
+    }
+    protected String usernameOrPasswordMissing$str() {
+<span class="nc" id="L1348">        return &quot;ELY06007: Username or password missing from authentication attempt.&quot;;</span>
+    }
+    @Override
+    public final String usernameOrPasswordMissing() {
+<span class="nc" id="L1352">        return String.format(getLoggingLocale(), usernameOrPasswordMissing$str());</span>
+    }
+    protected String digestMechanismRequireRealm$str() {
+<span class="nc" id="L1355">        return &quot;ELY06015: Unable to authenticate using DIGEST mechanism - realm name needs to be specified&quot;;</span>
+    }
+    @Override
+    public final HttpAuthenticationException digestMechanismRequireRealm() {
+<span class="nc" id="L1359">        final HttpAuthenticationException result = new HttpAuthenticationException(String.format(getLoggingLocale(), digestMechanismRequireRealm$str()));</span>
+<span class="nc" id="L1360">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1361">        return result;</span>
+    }
+    protected String digestMechanismInvalidRealm$str() {
+<span class="nc" id="L1364">        return &quot;ELY06019: Unable to authenticate using DIGEST mechanism - mechanism realm name (%s) is not valid&quot;;</span>
+    }
+    @Override
+    public final HttpAuthenticationException digestMechanismInvalidRealm(final String realm) {
+<span class="nc" id="L1368">        final HttpAuthenticationException result = new HttpAuthenticationException(String.format(getLoggingLocale(), digestMechanismInvalidRealm$str(), realm));</span>
+<span class="nc" id="L1369">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1370">        return result;</span>
+    }
+    protected String unsuitableScope$str() {
+<span class="nc" id="L1373">        return &quot;ELY06020: Scope unsuitable for use with authentication state '%s'&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException unsuitableScope(final String scopeName) {
+<span class="nc" id="L1377">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), unsuitableScope$str(), scopeName));</span>
+<span class="nc" id="L1378">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1379">        return result;</span>
+    }
+    protected String unableToIdentifyHttpScope$str() {
+<span class="nc" id="L1382">        return &quot;ELY06021: Unable to identify suitable HttpScope for mechanism state storage&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException unableToIdentifyHttpScope() {
+<span class="nc" id="L1386">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), unableToIdentifyHttpScope$str()));</span>
+<span class="nc" id="L1387">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1388">        return result;</span>
+    }
+    protected String invalidNonceCount$str() {
+<span class="nc" id="L1391">        return &quot;ELY06022: Invalid nonce count %s&quot;;</span>
+    }
+    @Override
+    public final HttpAuthenticationException invalidNonceCount(final int nonceCount) {
+<span class="nc" id="L1395">        final HttpAuthenticationException result = new HttpAuthenticationException(String.format(getLoggingLocale(), invalidNonceCount$str(), nonceCount));</span>
+<span class="nc" id="L1396">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1397">        return result;</span>
+    }
+    protected String asnUnrecognisedAlgorithm$str() {
+<span class="nc" id="L1400">        return &quot;ELY07001: Unrecognized encoding algorithm [%s]&quot;;</span>
+    }
+    @Override
+    public final ASN1Exception asnUnrecognisedAlgorithm(final String algorithm) {
+<span class="nc" id="L1404">        final ASN1Exception result = new ASN1Exception(String.format(getLoggingLocale(), asnUnrecognisedAlgorithm$str(), algorithm));</span>
+<span class="nc" id="L1405">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1406">        return result;</span>
+    }
+    protected String asnInvalidGeneralNameType$str() {
+<span class="nc" id="L1409">        return &quot;ELY07002: Invalid general name type&quot;;</span>
+    }
+    @Override
+    public final ASN1Exception asnInvalidGeneralNameType() {
+<span class="nc" id="L1413">        final ASN1Exception result = new ASN1Exception(String.format(getLoggingLocale(), asnInvalidGeneralNameType$str()));</span>
+<span class="nc" id="L1414">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1415">        return result;</span>
+    }
+    protected String asnUnexpectedTag$str() {
+<span class="nc" id="L1418">        return &quot;ELY07004: Unexpected ASN.1 tag encountered&quot;;</span>
+    }
+    @Override
+    public final ASN1Exception asnUnexpectedTag() {
+<span class="nc" id="L1422">        final ASN1Exception result = new ASN1Exception(String.format(getLoggingLocale(), asnUnexpectedTag$str()));</span>
+<span class="nc" id="L1423">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L1424">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

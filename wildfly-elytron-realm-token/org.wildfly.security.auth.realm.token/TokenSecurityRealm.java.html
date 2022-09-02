@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TokenSecurityRealm.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-realm-token</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.realm.token</a> &gt; <span class="el_source">TokenSecurityRealm.java</span></div><h1>TokenSecurityRealm.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.realm.token;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.auth.principal.NamePrincipal;
+import org.wildfly.security.auth.realm.token._private.ElytronMessages;
+import org.wildfly.security.auth.server.RealmIdentity;
+import org.wildfly.security.auth.server.RealmUnavailableException;
+import org.wildfly.security.auth.server.SecurityRealm;
+import org.wildfly.security.auth.SupportLevel;
+import org.wildfly.security.authz.Attributes;
+import org.wildfly.security.authz.AuthorizationIdentity;
+import org.wildfly.security.credential.Credential;
+import org.wildfly.security.evidence.BearerTokenEvidence;
+import org.wildfly.security.evidence.Evidence;
+
+import java.security.Principal;
+import java.security.spec.AlgorithmParameterSpec;
+import java.util.function.Function;
+
+/**
+ * &lt;p&gt;A {@link SecurityRealm} capable of building identities based on different security token formats based on a {@link TokenValidator}.
+ *
+ * @see TokenValidator
+ * @author &lt;a href=&quot;mailto:psilva@redhat.com&quot;&gt;Pedro Igor&lt;/a&gt;
+ */
+public final class TokenSecurityRealm implements SecurityRealm {
+
+    private final TokenValidator strategy;
+    private final String principalClaimName;
+    /** A function that maps the set of token claims to a Principal. */
+    private final Function&lt;Attributes, Principal&gt; claimToPrincipal;
+
+    /**
+     * Returns a {@link Builder} instance that can be used to configure and create a {@link TokenSecurityRealm}.
+     *
+     * @return the {@link Builder}
+     */
+    public static Builder builder() {
+<span class="fc" id="L57">        return new Builder();</span>
+    }
+
+<span class="fc" id="L60">    TokenSecurityRealm(Builder configuration) {</span>
+<span class="fc" id="L61">        Assert.checkNotNullParam(&quot;configuration&quot;, configuration);</span>
+
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        if (configuration.principalClaimName == null) {</span>
+<span class="nc" id="L64">            this.principalClaimName = &quot;username&quot;;</span>
+        } else {
+<span class="fc" id="L66">            this.principalClaimName = configuration.principalClaimName;</span>
+        }
+
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (configuration.claimToPrincipal == null) {</span>
+<span class="fc" id="L70">            this.claimToPrincipal = this::defaultClaimToPrincipal;</span>
+        } else {
+<span class="nc" id="L72">            this.claimToPrincipal = configuration.claimToPrincipal;</span>
+        }
+
+<span class="fc" id="L75">        this.strategy = Assert.checkNotNullParam(&quot;tokenValidationStrategy&quot;, configuration.strategy);</span>
+<span class="fc" id="L76">    }</span>
+
+    @Override
+    public RealmIdentity getRealmIdentity(final Evidence evidence) {
+<span class="fc" id="L80">        return new TokenRealmIdentity(evidence);</span>
+    }
+
+    @Override
+    public SupportLevel getCredentialAcquireSupport(Class&lt;? extends Credential&gt; credentialType, String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc" id="L85">        return SupportLevel.UNSUPPORTED;</span>
+    }
+
+    @Override
+    public SupportLevel getEvidenceVerifySupport(Class&lt;? extends Evidence&gt; evidenceType, String algorithmName) throws RealmUnavailableException {
+<span class="nc bnc" id="L90" title="All 2 branches missed.">        if (isBearerTokenEvidence(evidenceType)) {</span>
+<span class="nc" id="L91">            return SupportLevel.POSSIBLY_SUPPORTED;</span>
+        }
+
+<span class="nc" id="L94">        return SupportLevel.UNSUPPORTED;</span>
+    }
+
+    private boolean isBearerTokenEvidence(Evidence evidence) {
+<span class="pc bpc" id="L98" title="2 of 4 branches missed.">        return evidence != null &amp;&amp; isBearerTokenEvidence(evidence.getClass());</span>
+    }
+
+    private boolean isBearerTokenEvidence(Class&lt;?&gt; evidenceType) {
+<span class="fc" id="L102">        return BearerTokenEvidence.class.equals(evidenceType);</span>
+    }
+
+    /**
+     * The default implementation of the claimToPrincipal mapping function. Takes the {@linkplain #principalClaimName} claim
+     * value and wraps it in a {@linkplain NamePrincipal}.
+     * @param claims - token claims
+     * @return the NamePrincipal or null on failure to extract claim value
+     */
+    private Principal defaultClaimToPrincipal(Attributes claims) {
+<span class="fc" id="L112">        Principal principal = null;</span>
+        try {
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">            if (!claims.containsKey(principalClaimName)) {</span>
+<span class="nc" id="L115">                throw ElytronMessages.log.tokenRealmFailedToObtainPrincipalWithClaim(principalClaimName);</span>
+            }
+<span class="fc" id="L117">            String principalName = claims.getFirst(principalClaimName);</span>
+<span class="fc" id="L118">            principal = new NamePrincipal(principalName);</span>
+<span class="nc" id="L119">        } catch (Exception e) {</span>
+<span class="nc" id="L120">            throw ElytronMessages.log.tokenRealmFailedToObtainPrincipal(e);</span>
+<span class="fc" id="L121">        }</span>
+<span class="fc" id="L122">        return principal;</span>
+    }
+
+    final class TokenRealmIdentity implements RealmIdentity {
+
+        private final BearerTokenEvidence evidence;
+        private Attributes claims;
+
+<span class="fc" id="L130">        TokenRealmIdentity(Evidence evidence) {</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">            if (isBearerTokenEvidence(evidence)) {</span>
+<span class="fc" id="L132">                this.evidence = BearerTokenEvidence.class.cast(evidence);</span>
+            } else {
+<span class="nc" id="L134">                this.evidence = null;</span>
+            }
+<span class="fc" id="L136">        }</span>
+        @Override
+        public Principal getRealmIdentityPrincipal() {
+<span class="fc" id="L139">            Principal principal = null;</span>
+            try {
+<span class="fc bfc" id="L141" title="All 2 branches covered.">                if (exists()) {</span>
+<span class="fc" id="L142">                    principal = claimToPrincipal.apply(this.claims);</span>
+                }
+<span class="nc" id="L144">            } catch (Exception e) {</span>
+<span class="nc" id="L145">                throw ElytronMessages.log.tokenRealmFailedToObtainPrincipal(e);</span>
+<span class="fc" id="L146">            }</span>
+<span class="fc" id="L147">            return principal;</span>
+        }
+
+        @Override
+        public boolean verifyEvidence(Evidence evidence) throws RealmUnavailableException {
+<span class="nc bnc" id="L152" title="All 2 branches missed.">            return validateToken(evidence) != null;</span>
+        }
+
+        @Override
+        public boolean exists() throws RealmUnavailableException {
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            return getClaims() != null;</span>
+        }
+
+        @Override
+        public AuthorizationIdentity getAuthorizationIdentity() throws RealmUnavailableException {
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            if (exists()) {</span>
+<span class="fc" id="L163">                return new AuthorizationIdentity() {</span>
+                    @Override
+                    public Attributes getAttributes() {
+<span class="fc" id="L166">                        return claims;</span>
+                    }
+                };
+            }
+
+<span class="nc" id="L171">            return null;</span>
+        }
+
+        @Override
+        public SupportLevel getCredentialAcquireSupport(Class&lt;? extends Credential&gt; credentialType, String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc" id="L176">            return SupportLevel.UNSUPPORTED;</span>
+        }
+
+        @Override
+        public &lt;C extends Credential&gt; C getCredential(Class&lt;C&gt; credentialType) throws RealmUnavailableException {
+<span class="nc" id="L181">            return null;</span>
+        }
+
+        @Override
+        public SupportLevel getEvidenceVerifySupport(Class&lt;? extends Evidence&gt; evidenceType, String algorithmName) throws RealmUnavailableException {
+<span class="nc bnc" id="L186" title="All 2 branches missed.">            if (isBearerTokenEvidence(evidenceType)) {</span>
+<span class="nc" id="L187">                return SupportLevel.SUPPORTED;</span>
+            }
+
+<span class="nc" id="L190">            return SupportLevel.UNSUPPORTED;</span>
+        }
+
+        private void setClaims(Attributes claims) throws RealmUnavailableException {
+<span class="fc" id="L194">            this.claims = claims;</span>
+<span class="fc" id="L195">        }</span>
+
+        private Attributes getClaims() throws RealmUnavailableException {
+<span class="fc bfc" id="L198" title="All 2 branches covered.">            if (this.claims == null) {</span>
+<span class="fc" id="L199">                validateToken(this.evidence);</span>
+            }
+<span class="fc" id="L201">            return this.claims;</span>
+        }
+
+        private Attributes validateToken(Evidence evidence) throws RealmUnavailableException {
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">            if (!isBearerTokenEvidence(evidence)) {</span>
+<span class="nc" id="L206">                return null;</span>
+            }
+<span class="fc" id="L208">            BearerTokenEvidence tokenEvidence = BearerTokenEvidence.class.cast(evidence);</span>
+            try {
+<span class="fc" id="L210">                setClaims(strategy.validate(tokenEvidence));</span>
+<span class="fc" id="L211">                return this.claims;</span>
+<span class="fc" id="L212">            } catch (RealmUnavailableException rue) {</span>
+<span class="fc" id="L213">                throw rue;</span>
+<span class="nc" id="L214">            } catch (Exception unknown) {</span>
+<span class="nc" id="L215">                ElytronMessages.log.debugf(unknown, &quot;Failed to validate token evidence [%s]&quot;, tokenEvidence.getToken());</span>
+            }
+<span class="nc" id="L217">            return null;</span>
+        }
+    }
+
+    public static class Builder {
+
+<span class="fc" id="L223">        private String principalClaimName = &quot;username&quot;;</span>
+        private Function&lt;Attributes, Principal&gt; claimToPrincipal;
+        private TokenValidator strategy;
+
+        /**
+         * Construct a new instance.
+         */
+<span class="fc" id="L230">        private Builder() {</span>
+<span class="fc" id="L231">        }</span>
+
+        /**
+         * The name of the claim that should be used to obtain the principal's name.
+         *
+         * @param name the name of the claim that should be used to obtain the principal's name. Defaults to &lt;code&gt;username&lt;/code&gt;
+         * @return this instance
+         */
+        public Builder principalClaimName(String name) {
+<span class="fc" id="L240">            this.principalClaimName = name;</span>
+<span class="fc" id="L241">            return this;</span>
+        }
+
+        /**
+         * A function that maps the set of token claims to a Principal. If not specified, a function that takes the
+         * {@linkplain #principalClaimName} claim value and wraps in in a {@linkplain NamePrincipal} is used.
+         * @param func - the claim set to Principal mapping function.
+         * @return the token Principal.
+         */
+        public Builder claimToPrincipal(Function&lt;Attributes, Principal&gt; func) {
+<span class="nc" id="L251">            this.claimToPrincipal = func;</span>
+<span class="nc" id="L252">            return this;</span>
+        }
+
+        /**
+         * Defines a {@link TokenValidator} that will be used to validate tokens.
+         *
+         * @return this instance
+         */
+        public Builder validator(TokenValidator strategy) {
+<span class="fc" id="L261">            this.strategy = strategy;</span>
+<span class="fc" id="L262">            return this;</span>
+        }
+
+        /**
+         * Creates a {@link TokenSecurityRealm} instance with all the given configuration.
+         *
+         * @return a new {@link TokenSecurityRealm} instance with all the given configuration
+         */
+        public TokenSecurityRealm build() {
+<span class="fc" id="L271">            return new TokenSecurityRealm(this);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

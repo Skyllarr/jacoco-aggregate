@@ -1,0 +1,488 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SaslMechanismPredicate.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl</a> &gt; <span class="el_source">SaslMechanismPredicate.java</span></div><h1>SaslMechanismPredicate.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2017 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl;
+
+import static org.wildfly.common.math.HashMath.*;
+
+import java.util.Arrays;
+import java.util.function.Predicate;
+
+import javax.net.ssl.SSLSession;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.sasl.util.SaslMechanismInformation;
+
+/**
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public abstract class SaslMechanismPredicate {
+    private int hashCode;
+
+<span class="nc" id="L37">    SaslMechanismPredicate() {</span>
+<span class="nc" id="L38">    }</span>
+
+    abstract boolean test(String mechName, final SSLSession sslSession);
+
+    public String toString() {
+<span class="nc" id="L43">        StringBuilder b = new StringBuilder();</span>
+<span class="nc" id="L44">        toString(b);</span>
+<span class="nc" id="L45">        return b.toString();</span>
+    }
+
+    abstract void toString(StringBuilder b);
+
+    public static SaslMechanismPredicate matchTrue() {
+<span class="nc" id="L51">        return TRUE;</span>
+    }
+
+    public static SaslMechanismPredicate matchFalse() {
+<span class="nc" id="L55">        return FALSE;</span>
+    }
+
+    public static SaslMechanismPredicate matchAll(SaslMechanismPredicate... predicates) {
+<span class="nc" id="L59">        return new AllPredicate(predicates);</span>
+    }
+
+    public static SaslMechanismPredicate matchAllOrNone(SaslMechanismPredicate... predicates) {
+<span class="nc" id="L63">        return new AllOrNonePredicate(predicates);</span>
+    }
+
+    public static SaslMechanismPredicate matchAny(SaslMechanismPredicate... predicates) {
+<span class="nc" id="L67">        return new AnyPredicate(predicates);</span>
+    }
+
+    public static SaslMechanismPredicate matchNot(SaslMechanismPredicate predicate) {
+<span class="nc" id="L71">        Assert.checkNotNullParam(&quot;predicate&quot;, predicate);</span>
+<span class="nc" id="L72">        return predicate.not();</span>
+    }
+
+    public static SaslMechanismPredicate matchIf(SaslMechanismPredicate conditionPredicate, SaslMechanismPredicate truePredicate, SaslMechanismPredicate falsePredicate) {
+<span class="nc" id="L76">        Assert.checkNotNullParam(&quot;conditionPredicate&quot;, conditionPredicate);</span>
+<span class="nc" id="L77">        Assert.checkNotNullParam(&quot;truePredicate&quot;, truePredicate);</span>
+<span class="nc" id="L78">        Assert.checkNotNullParam(&quot;falsePredicate&quot;, falsePredicate);</span>
+<span class="nc" id="L79">        return new IfPredicate(conditionPredicate, truePredicate, falsePredicate);</span>
+    }
+
+    public static SaslMechanismPredicate matchExact(String name) {
+<span class="nc" id="L83">        Assert.checkNotNullParam(&quot;name&quot;, name);</span>
+<span class="nc" id="L84">        return new ExactPredicate(name);</span>
+    }
+
+    public static SaslMechanismPredicate matchHashFunction(String digest) {
+<span class="nc" id="L88">        Assert.checkNotNullParam(&quot;digest&quot;, digest);</span>
+<span class="nc" id="L89">        return new HashPredicate(digest);</span>
+    }
+
+    public static SaslMechanismPredicate matchPlus() {
+<span class="nc" id="L93">        return PLUS;</span>
+    }
+
+    public static SaslMechanismPredicate matchMutual() {
+<span class="nc" id="L97">        return MUTUAL;</span>
+    }
+
+    public static SaslMechanismPredicate matchFamily(String name) {
+<span class="nc" id="L101">        Assert.checkNotNullParam(&quot;name&quot;, name);</span>
+        final Predicate&lt;String&gt; predicate;
+<span class="nc bnc" id="L103" title="All 6 branches missed.">        switch (name) {</span>
+<span class="nc" id="L104">            case &quot;DIGEST&quot;: predicate = SaslMechanismInformation.DIGEST; break;</span>
+<span class="nc" id="L105">            case &quot;EAP&quot;: predicate = SaslMechanismInformation.EAP; break;</span>
+<span class="nc" id="L106">            case &quot;GS2&quot;: predicate = SaslMechanismInformation.GS2; break;</span>
+<span class="nc" id="L107">            case &quot;SCRAM&quot;: predicate = SaslMechanismInformation.SCRAM; break;</span>
+<span class="nc" id="L108">            case &quot;IEC-ISO-9798&quot;: predicate = SaslMechanismInformation.IEC_ISO_9798; break;</span>
+<span class="nc" id="L109">            default: predicate = s -&gt; false; break;</span>
+        }
+<span class="nc" id="L111">        return new FamilyPredicate(predicate, name);</span>
+    }
+
+    public static SaslMechanismPredicate matchTLSActive() {
+<span class="nc" id="L115">        return TLS_ACTIVE;</span>
+    }
+
+    public final boolean equals(final Object obj) {
+<span class="nc bnc" id="L119" title="All 4 branches missed.">        return obj instanceof SaslMechanismPredicate &amp;&amp; equals((SaslMechanismPredicate) obj);</span>
+    }
+
+    public abstract boolean equals(SaslMechanismPredicate other);
+
+    public final int hashCode() {
+<span class="nc" id="L125">        int hashCode = this.hashCode;</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (hashCode == 0) {</span>
+<span class="nc" id="L127">            hashCode = calcHashCode();</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">            if (hashCode == 0) {</span>
+<span class="nc" id="L129">                hashCode = 1;</span>
+            }
+<span class="nc" id="L131">            return this.hashCode = hashCode;</span>
+        }
+<span class="nc" id="L133">        return hashCode;</span>
+    }
+
+    abstract int calcHashCode();
+
+    SaslMechanismPredicate not() {
+<span class="nc" id="L139">        return new NotPredicate(this);</span>
+    }
+
+<span class="nc" id="L142">    static final BooleanPredicate TRUE = new BooleanPredicate(true);</span>
+<span class="nc" id="L143">    static final BooleanPredicate FALSE = new BooleanPredicate(false);</span>
+
+<span class="nc" id="L145">    static final SaslMechanismPredicate TLS_ACTIVE = new SaslMechanismPredicate() {</span>
+        boolean test(final String mechName, final SSLSession sslSession) {
+<span class="nc bnc" id="L147" title="All 2 branches missed.">            return sslSession != null;</span>
+        }
+
+        void toString(final StringBuilder b) {
+<span class="nc" id="L151">            b.append(&quot;#TLS&quot;);</span>
+<span class="nc" id="L152">        }</span>
+
+        @SuppressWarnings(&quot;checkstyle:equalshashcode&quot;)
+        public boolean equals(final SaslMechanismPredicate other) {
+<span class="nc bnc" id="L156" title="All 2 branches missed.">            return this == other;</span>
+        }
+
+        int calcHashCode() {
+<span class="nc" id="L160">            return getClass().hashCode();</span>
+        }
+    };
+
+<span class="nc" id="L164">    static final SaslMechanismPredicate PLUS = new SaslMechanismPredicate() {</span>
+        boolean test(final String mechName, final SSLSession sslSession) {
+<span class="nc bnc" id="L166" title="All 4 branches missed.">            return sslSession != null &amp;&amp; SaslMechanismInformation.BINDING.test(mechName);</span>
+        }
+
+        void toString(final StringBuilder b) {
+<span class="nc" id="L170">            b.append(&quot;#PLUS&quot;);</span>
+<span class="nc" id="L171">        }</span>
+
+        @SuppressWarnings(&quot;checkstyle:equalshashcode&quot;)
+        public boolean equals(final SaslMechanismPredicate other) {
+<span class="nc bnc" id="L175" title="All 2 branches missed.">            return this == other;</span>
+        }
+
+        int calcHashCode() {
+<span class="nc" id="L179">            return getClass().hashCode();</span>
+        }
+    };
+
+<span class="nc" id="L183">    static final SaslMechanismPredicate MUTUAL = new SaslMechanismPredicate() {</span>
+        boolean test(final String mechName, final SSLSession sslSession) {
+<span class="nc" id="L185">            return SaslMechanismInformation.MUTUAL.test(mechName);</span>
+        }
+
+        void toString(final StringBuilder b) {
+<span class="nc" id="L189">            b.append(&quot;#MUTUAL&quot;);</span>
+<span class="nc" id="L190">        }</span>
+
+        @SuppressWarnings(&quot;checkstyle:equalshashcode&quot;)
+        public boolean equals(final SaslMechanismPredicate other) {
+<span class="nc bnc" id="L194" title="All 2 branches missed.">            return this == other;</span>
+        }
+
+        int calcHashCode() {
+<span class="nc" id="L198">            return getClass().hashCode();</span>
+        }
+    };
+
+    static final class BooleanPredicate extends SaslMechanismPredicate {
+        private final boolean value;
+
+<span class="nc" id="L205">        BooleanPredicate(final boolean value) {</span>
+<span class="nc" id="L206">            this.value = value;</span>
+<span class="nc" id="L207">        }</span>
+
+        boolean test(final String mechName, final SSLSession sslSession) {
+<span class="nc" id="L210">            return value;</span>
+        }
+
+        void toString(final StringBuilder b) {
+<span class="nc" id="L214">            b.append(value);</span>
+<span class="nc" id="L215">        }</span>
+
+        SaslMechanismPredicate not() {
+<span class="nc bnc" id="L218" title="All 2 branches missed.">            return value ? FALSE : TRUE;</span>
+        }
+
+        @SuppressWarnings(&quot;checkstyle:equalshashcode&quot;)
+        public boolean equals(final SaslMechanismPredicate other) {
+<span class="nc bnc" id="L223" title="All 2 branches missed.">            return this == other;</span>
+        }
+
+        int calcHashCode() {
+<span class="nc bnc" id="L227" title="All 2 branches missed.">            return getClass().hashCode() * 19 + (value ? 1 : 0);</span>
+        }
+    }
+
+    abstract static class MultiPredicate extends SaslMechanismPredicate {
+        final SaslMechanismPredicate[] predicates;
+
+<span class="nc" id="L234">        MultiPredicate(final SaslMechanismPredicate[] predicates) {</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">            for (int i = 0; i &lt; predicates.length; i++) {</span>
+<span class="nc" id="L236">                SaslMechanismPredicate predicate = predicates[i];</span>
+<span class="nc" id="L237">                Assert.checkNotNullArrayParam(&quot;predicates&quot;, i, predicate);</span>
+            }
+<span class="nc" id="L239">            this.predicates = predicates;</span>
+<span class="nc" id="L240">        }</span>
+
+        void toString(final StringBuilder b) {
+<span class="nc" id="L243">            b.append('(');</span>
+<span class="nc" id="L244">            final int length = predicates.length;</span>
+<span class="nc bnc" id="L245" title="All 2 branches missed.">            if (length &gt; 0) {</span>
+<span class="nc" id="L246">                b.append(predicates[0]);</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">                for (int i = 1; i &lt; length; i++) {</span>
+<span class="nc" id="L248">                    appendOperator(b);</span>
+<span class="nc" id="L249">                    b.append(predicates[i]);</span>
+                }
+            }
+<span class="nc" id="L252">            b.append(')');</span>
+<span class="nc" id="L253">        }</span>
+
+        @SuppressWarnings(&quot;checkstyle:equalshashcode&quot;)
+        public boolean equals(final SaslMechanismPredicate other) {
+<span class="nc bnc" id="L257" title="All 4 branches missed.">            return other.getClass() == getClass() &amp;&amp; Arrays.equals(predicates, ((MultiPredicate)other).predicates);</span>
+        }
+
+        int calcHashCode() {
+<span class="nc" id="L261">            int hc = getClass().hashCode() * 19;</span>
+<span class="nc bnc" id="L262" title="All 2 branches missed.">            for (SaslMechanismPredicate predicate : predicates) {</span>
+<span class="nc" id="L263">                hc = multiHashUnordered(hc, predicate.calcHashCode());</span>
+            }
+<span class="nc" id="L265">            return hc;</span>
+        }
+
+        abstract void appendOperator(final StringBuilder b);
+    }
+
+    static final class AllPredicate extends MultiPredicate {
+        AllPredicate(final SaslMechanismPredicate[] predicates) {
+<span class="nc" id="L273">            super(predicates);</span>
+<span class="nc" id="L274">        }</span>
+
+        boolean test(final String mechName, final SSLSession sslSession) {
+<span class="nc bnc" id="L277" title="All 2 branches missed.">            for (SaslMechanismPredicate predicate : predicates) {</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">                if (! predicate.test(mechName, sslSession)) {</span>
+<span class="nc" id="L279">                    return false;</span>
+                }
+            }
+<span class="nc" id="L282">            return true;</span>
+        }
+
+        void appendOperator(final StringBuilder b) {
+<span class="nc" id="L286">            b.append('&amp;').append('&amp;');</span>
+<span class="nc" id="L287">        }</span>
+    }
+
+    static final class AllOrNonePredicate extends MultiPredicate {
+        AllOrNonePredicate(final SaslMechanismPredicate[] predicates) {
+<span class="nc" id="L292">            super(predicates);</span>
+<span class="nc" id="L293">        }</span>
+
+        boolean test(final String mechName, final SSLSession sslSession) {
+<span class="nc" id="L296">            final int length = predicates.length;</span>
+<span class="nc bnc" id="L297" title="All 2 branches missed.">            if (length == 0) {</span>
+<span class="nc" id="L298">                return true;</span>
+            }
+<span class="nc" id="L300">            boolean val = predicates[0].test(mechName, sslSession);</span>
+<span class="nc bnc" id="L301" title="All 2 branches missed.">            for (int i = 1; i &lt; length; i++) {</span>
+<span class="nc" id="L302">                final SaslMechanismPredicate predicate = predicates[i];</span>
+<span class="nc bnc" id="L303" title="All 2 branches missed.">                if (val != predicate.test(mechName, sslSession)) {</span>
+<span class="nc" id="L304">                    return false;</span>
+                }
+            }
+<span class="nc" id="L307">            return true;</span>
+        }
+
+        void appendOperator(final StringBuilder b) {
+<span class="nc" id="L311">            b.append('=').append('=');</span>
+<span class="nc" id="L312">        }</span>
+    }
+
+    static final class AnyPredicate extends MultiPredicate {
+        AnyPredicate(final SaslMechanismPredicate[] predicates) {
+<span class="nc" id="L317">            super(predicates);</span>
+<span class="nc" id="L318">        }</span>
+
+        boolean test(final String mechName, final SSLSession sslSession) {
+<span class="nc bnc" id="L321" title="All 2 branches missed.">            for (SaslMechanismPredicate predicate : predicates) {</span>
+<span class="nc bnc" id="L322" title="All 2 branches missed.">                if (predicate.test(mechName, sslSession)) {</span>
+<span class="nc" id="L323">                    return true;</span>
+                }
+            }
+<span class="nc" id="L326">            return false;</span>
+        }
+
+        void appendOperator(final StringBuilder b) {
+<span class="nc" id="L330">            b.append('|').append('|');</span>
+<span class="nc" id="L331">        }</span>
+    }
+
+    static class NotPredicate extends SaslMechanismPredicate {
+        private final SaslMechanismPredicate predicate;
+
+<span class="nc" id="L337">        NotPredicate(final SaslMechanismPredicate predicate) {</span>
+<span class="nc" id="L338">            this.predicate = predicate;</span>
+<span class="nc" id="L339">        }</span>
+
+        boolean test(final String mechName, final SSLSession sslSession) {
+<span class="nc bnc" id="L342" title="All 2 branches missed.">            return ! predicate.test(mechName, sslSession);</span>
+        }
+
+        void toString(final StringBuilder b) {
+<span class="nc" id="L346">            b.append('!');</span>
+<span class="nc" id="L347">            predicate.toString(b);</span>
+<span class="nc" id="L348">        }</span>
+
+        @SuppressWarnings(&quot;checkstyle:equalshashcode&quot;)
+        public boolean equals(final SaslMechanismPredicate other) {
+<span class="nc bnc" id="L352" title="All 4 branches missed.">            return other instanceof NotPredicate &amp;&amp; predicate.equals(((NotPredicate) other).predicate);</span>
+        }
+
+        int calcHashCode() {
+<span class="nc" id="L356">            return getClass().hashCode() * 19 + predicate.calcHashCode();</span>
+        }
+
+        SaslMechanismPredicate not() {
+<span class="nc" id="L360">            return predicate;</span>
+        }
+    }
+
+    static class ExactPredicate extends SaslMechanismPredicate {
+        private final String mechName;
+
+<span class="nc" id="L367">        ExactPredicate(final String mechName) {</span>
+<span class="nc" id="L368">            this.mechName = mechName;</span>
+<span class="nc" id="L369">        }</span>
+
+        boolean test(final String mechName, final SSLSession sslSession) {
+<span class="nc" id="L372">            return this.mechName.equals(mechName);</span>
+        }
+
+        void toString(final StringBuilder b) {
+<span class="nc" id="L376">            b.append(mechName);</span>
+<span class="nc" id="L377">        }</span>
+
+        @SuppressWarnings(&quot;checkstyle:equalshashcode&quot;)
+        public boolean equals(final SaslMechanismPredicate other) {
+<span class="nc bnc" id="L381" title="All 4 branches missed.">            return other instanceof ExactPredicate &amp;&amp; this.mechName.equals(((ExactPredicate) other).mechName);</span>
+        }
+
+        int calcHashCode() {
+<span class="nc" id="L385">            return getClass().hashCode() * 19 + mechName.hashCode();</span>
+        }
+    }
+
+    static class FamilyPredicate extends SaslMechanismPredicate {
+        private final Predicate&lt;String&gt; predicate;
+        private final String name;
+
+<span class="nc" id="L393">        FamilyPredicate(final Predicate&lt;String&gt; predicate, final String name) {</span>
+<span class="nc" id="L394">            this.predicate = predicate;</span>
+<span class="nc" id="L395">            this.name = name;</span>
+<span class="nc" id="L396">        }</span>
+
+        boolean test(final String mechName, final SSLSession sslSession) {
+<span class="nc" id="L399">            return predicate.test(mechName);</span>
+        }
+
+        void toString(final StringBuilder b) {
+<span class="nc" id="L403">            b.append(&quot;#FAMILY(&quot;).append(name).append(')');</span>
+<span class="nc" id="L404">        }</span>
+
+        @SuppressWarnings(&quot;checkstyle:equalshashcode&quot;)
+        public boolean equals(final SaslMechanismPredicate other) {
+<span class="nc bnc" id="L408" title="All 4 branches missed.">            return other instanceof FamilyPredicate &amp;&amp; equals((FamilyPredicate) other);</span>
+        }
+
+        @SuppressWarnings(&quot;checkstyle:equalshashcode&quot;)
+        private boolean equals(final FamilyPredicate other) {
+<span class="nc bnc" id="L413" title="All 4 branches missed.">            return predicate.equals(other.predicate) &amp;&amp; name.equals(other.name);</span>
+        }
+
+        int calcHashCode() {
+<span class="nc" id="L417">            return multiHashOrdered(multiHashOrdered(getClass().hashCode(), predicate.hashCode()), name.hashCode());</span>
+        }
+    }
+
+    static class IfPredicate extends SaslMechanismPredicate {
+        private final SaslMechanismPredicate conditionPredicate;
+        private final SaslMechanismPredicate truePredicate;
+        private final SaslMechanismPredicate falsePredicate;
+
+<span class="nc" id="L426">        IfPredicate(final SaslMechanismPredicate conditionPredicate, final SaslMechanismPredicate truePredicate, final SaslMechanismPredicate falsePredicate) {</span>
+<span class="nc" id="L427">            this.conditionPredicate = conditionPredicate;</span>
+<span class="nc" id="L428">            this.truePredicate = truePredicate;</span>
+<span class="nc" id="L429">            this.falsePredicate = falsePredicate;</span>
+<span class="nc" id="L430">        }</span>
+
+        boolean test(final String mechName, final SSLSession sslSession) {
+<span class="nc bnc" id="L433" title="All 2 branches missed.">            return conditionPredicate.test(mechName, sslSession) ? truePredicate.test(mechName, sslSession) : falsePredicate.test(mechName, sslSession);</span>
+        }
+
+        void toString(final StringBuilder b) {
+<span class="nc" id="L437">            b.append('(').append(conditionPredicate).append('?').append(truePredicate).append(':').append(falsePredicate).append(')');</span>
+<span class="nc" id="L438">        }</span>
+
+        @SuppressWarnings(&quot;checkstyle:equalshashcode&quot;)
+        public boolean equals(final SaslMechanismPredicate other) {
+<span class="nc bnc" id="L442" title="All 6 branches missed.">            return this == other || other instanceof IfPredicate &amp;&amp; equals((IfPredicate) other);</span>
+        }
+
+        @SuppressWarnings(&quot;checkstyle:equalshashcode&quot;)
+        private boolean equals(final IfPredicate other) {
+<span class="nc bnc" id="L447" title="All 6 branches missed.">            return conditionPredicate.equals(other.conditionPredicate) &amp;&amp; truePredicate.equals(other.truePredicate) &amp;&amp; falsePredicate.equals(other.falsePredicate);</span>
+        }
+
+        int calcHashCode() {
+<span class="nc" id="L451">            return multiHashOrdered(multiHashOrdered(multiHashOrdered(getClass().hashCode(), conditionPredicate.hashCode()), truePredicate.hashCode()), falsePredicate.hashCode());</span>
+        }
+    }
+
+    static class HashPredicate extends SaslMechanismPredicate {
+        private final String digest;
+
+<span class="nc" id="L458">        HashPredicate(final String digest) {</span>
+<span class="nc" id="L459">            this.digest = digest;</span>
+<span class="nc" id="L460">        }</span>
+
+        boolean test(final String mechName, final SSLSession sslSession) {
+<span class="nc bnc" id="L463" title="All 7 branches missed.">            switch (digest) {</span>
+<span class="nc" id="L464">                case &quot;MD5&quot;: return SaslMechanismInformation.HASH_MD5.test(mechName);</span>
+<span class="nc" id="L465">                case &quot;SHA-1&quot;: return SaslMechanismInformation.HASH_SHA.test(mechName);</span>
+<span class="nc" id="L466">                case &quot;SHA-256&quot;: return SaslMechanismInformation.HASH_SHA_256.test(mechName);</span>
+<span class="nc" id="L467">                case &quot;SHA-384&quot;: return SaslMechanismInformation.HASH_SHA_384.test(mechName);</span>
+<span class="nc" id="L468">                case &quot;SHA-512&quot;: return SaslMechanismInformation.HASH_SHA_512.test(mechName);</span>
+<span class="nc" id="L469">                case &quot;SHA-512-256&quot;: return SaslMechanismInformation.HASH_SHA_512_256.test(mechName);</span>
+<span class="nc" id="L470">                default: return false;</span>
+            }
+        }
+
+        void toString(final StringBuilder b) {
+<span class="nc" id="L475">            b.append(&quot;#HASH(&quot;).append(digest).append(')');</span>
+<span class="nc" id="L476">        }</span>
+
+        @SuppressWarnings(&quot;checkstyle:equalshashcode&quot;)
+        public boolean equals(final SaslMechanismPredicate other) {
+<span class="nc bnc" id="L480" title="All 4 branches missed.">            return other instanceof HashPredicate &amp;&amp; digest.equals(((HashPredicate) other).digest);</span>
+        }
+
+        int calcHashCode() {
+<span class="nc" id="L484">            return 0;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DefaultSingleSignOnSession.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-sso</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.util.sso</a> &gt; <span class="el_source">DefaultSingleSignOnSession.java</span></div><h1>DefaultSingleSignOnSession.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2017 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.http.util.sso;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+
+import static org.wildfly.security.http.HttpScopeNotification.SessionNotificationType.INVALIDATED;
+import static org.wildfly.security.http.util.sso.ElytronMessages.log;
+
+import java.io.DataOutputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URI;
+import java.net.URL;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.function.Function;
+
+import org.wildfly.security.auth.principal.NamePrincipal;
+import org.wildfly.security.auth.server.SecurityIdentity;
+import org.wildfly.security.cache.CachedIdentity;
+import org.wildfly.security.http.HttpScope;
+import org.wildfly.security.http.HttpServerRequest;
+import org.wildfly.security.http.Scope;
+
+/**
+ * {@link SingleSignOnSession} that delegates its persistence strategy to a {@link SingleSignOnManager}.
+ * {@link SingleSignOn} entries are created lazily in response to {@link #put(SecurityIdentity)}.
+ * &lt;br/&gt;
+ * This implementation supports single logout in order to invalidate local sessions for each participant of a single sign-on session, where participants
+ * represent the applications with active sessions associated with a given single sign-on session.
+ * @author Paul Ferraro
+ */
+public class DefaultSingleSignOnSession implements SingleSignOnSession {
+    private static final String LOGOUT_REQUEST_PARAMETER = &quot;ely_logout_message&quot;;
+<span class="nc" id="L54">    private static final String SESSION_INVALIDATING_ATTRIBUTE = DefaultSingleSignOnSessionFactory.class.getName() + &quot;.INVALIDATING&quot;;</span>
+<span class="nc" id="L55">    private static final Boolean SINGLE_SIGN_ON_KEY = Boolean.TRUE;</span>
+
+    private final HttpServerRequest request;
+    // Serves as a lazy initializable atomic reference
+<span class="nc" id="L59">    private final ConcurrentMap&lt;Boolean, SingleSignOn&gt; map = new ConcurrentHashMap&lt;&gt;(1);</span>
+    private final SingleSignOnSessionContext context;
+    private final Function&lt;SecurityIdentity, SingleSignOn&gt; ssoFactory;
+
+<span class="nc" id="L63">    public DefaultSingleSignOnSession(SingleSignOnSessionContext context, HttpServerRequest request, String mechanismName, boolean programmatic) {</span>
+<span class="nc" id="L64">        this.context = checkNotNullParam(&quot;context&quot;, context);</span>
+<span class="nc" id="L65">        this.request = checkNotNullParam(&quot;request&quot;, request);</span>
+<span class="nc" id="L66">        checkNotNullParam(&quot;mechanismName&quot;, mechanismName);</span>
+<span class="nc" id="L67">        this.ssoFactory = identity -&gt; context.getSingleSignOnManager().create(mechanismName, programmatic, identity);</span>
+<span class="nc" id="L68">    }</span>
+
+<span class="nc" id="L70">    public DefaultSingleSignOnSession(SingleSignOnSessionContext context, HttpServerRequest request, SingleSignOn sso) {</span>
+<span class="nc" id="L71">        this.context = checkNotNullParam(&quot;context&quot;, context);</span>
+<span class="nc" id="L72">        this.map.put(SINGLE_SIGN_ON_KEY, sso);</span>
+<span class="nc" id="L73">        this.request = checkNotNullParam(&quot;request&quot;, request);</span>
+<span class="nc" id="L74">        checkNotNullParam(&quot;sso&quot;, sso);</span>
+<span class="nc" id="L75">        this.ssoFactory = identity -&gt; sso;</span>
+<span class="nc" id="L76">    }</span>
+
+    @Override
+    public String getId() {
+<span class="nc" id="L80">        SingleSignOn sso = this.map.get(SINGLE_SIGN_ON_KEY);</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        return (sso != null) ? sso.getId() : null;</span>
+    }
+
+    @Override
+    public CachedIdentity get() {
+<span class="nc" id="L86">        SingleSignOn sso = this.map.get(SINGLE_SIGN_ON_KEY);</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        return (sso != null) ? getCachedIdentity(sso) : null;</span>
+    }
+
+    @Override
+    public void put(SecurityIdentity identity) {
+<span class="nc" id="L92">        SingleSignOn sso = this.map.computeIfAbsent(SINGLE_SIGN_ON_KEY, key -&gt; this.ssoFactory.apply(identity));</span>
+<span class="nc" id="L93">        sso.setIdentity(identity);</span>
+
+<span class="nc" id="L95">        HttpScope scope = this.request.getScope(Scope.SESSION);</span>
+
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        if (!scope.exists()) {</span>
+<span class="nc" id="L98">            scope.create();</span>
+        }
+
+<span class="nc" id="L101">        URI uri = this.request.getRequestURI();</span>
+<span class="nc" id="L102">        String sessionId = scope.getID();</span>
+<span class="nc" id="L103">        String applicationId = this.request.getScope(Scope.APPLICATION).getID();</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        if (sso.addParticipant(applicationId, sessionId, uri)) {</span>
+<span class="nc" id="L105">            String id = sso.getId();</span>
+<span class="nc" id="L106">            log.debugf(&quot;Updating local sessions for SSO [%s]. New local session [%s]. Local sessions: [%s]&quot;, id, sessionId, sso.getParticipants());</span>
+
+<span class="nc" id="L108">            scope.registerForNotification(notification -&gt; {</span>
+<span class="nc" id="L109">                HttpScope sessionScope = notification.getScope(Scope.SESSION);</span>
+<span class="nc" id="L110">                Map&lt;String, Map.Entry&lt;String, URI&gt;&gt; logoutTargets = Collections.emptyMap();</span>
+
+<span class="nc" id="L112">                try (SingleSignOn target = this.context.getSingleSignOnManager().find(id)) {</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">                    if (target != null) {</span>
+<span class="nc" id="L114">                        Map.Entry&lt;String, URI&gt; localParticipant = target.removeParticipant(applicationId);</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">                        if (localParticipant != null) {</span>
+<span class="nc" id="L116">                            log.debugf(&quot;Removed local session [%s] from SSO [%s]&quot;, localParticipant.getKey(), target.getId());</span>
+                        }
+<span class="nc bnc" id="L118" title="All 2 branches missed.">                        if (sessionScope.getAttachment(SESSION_INVALIDATING_ATTRIBUTE) == null) {</span>
+<span class="nc" id="L119">                            Map&lt;String, Map.Entry&lt;String, URI&gt;&gt; participants = target.getParticipants();</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">                            if (participants.isEmpty()) {</span>
+<span class="nc" id="L121">                                log.debugf(&quot;Destroying SSO [%s]. SSO is not associated with participants&quot;, target.getId());</span>
+<span class="nc" id="L122">                                target.invalidate();</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">                            } else if (notification.isOfType(INVALIDATED)) {</span>
+<span class="nc" id="L124">                                logoutTargets = participants;</span>
+                            }
+                        }
+                    }
+                }
+
+<span class="nc bnc" id="L130" title="All 2 branches missed.">                if (!logoutTargets.isEmpty()) {</span>
+<span class="nc" id="L131">                    logoutTargets.forEach((participantId, participant) -&gt; {</span>
+<span class="nc" id="L132">                        String remoteSessionId = participant.getKey();</span>
+<span class="nc" id="L133">                        URI remoteURI = participant.getValue();</span>
+                        try {
+<span class="nc" id="L135">                            URL participantUrl = remoteURI.toURL();</span>
+<span class="nc" id="L136">                            HttpURLConnection connection = (HttpURLConnection) participantUrl.openConnection();</span>
+
+<span class="nc" id="L138">                            this.context.configureLogoutConnection(connection);</span>
+
+<span class="nc" id="L140">                            connection.setRequestMethod(&quot;POST&quot;);</span>
+<span class="nc" id="L141">                            connection.setDoOutput(true);</span>
+<span class="nc" id="L142">                            connection.setAllowUserInteraction(false);</span>
+<span class="nc" id="L143">                            connection.setConnectTimeout(10000);</span>
+<span class="nc" id="L144">                            connection.setReadTimeout(10000);</span>
+<span class="nc" id="L145">                            connection.setRequestProperty(&quot;Content-Type&quot;, &quot;application/x-www-form-urlencoded&quot;);</span>
+
+<span class="nc" id="L147">                            StringBuilder parameterBuilder = new StringBuilder();</span>
+
+<span class="nc" id="L149">                            parameterBuilder.append(LOGOUT_REQUEST_PARAMETER).append(&quot;=&quot;).append(this.context.createLogoutParameter(remoteSessionId));</span>
+
+<span class="nc" id="L151">                            connection.setRequestProperty(&quot;Content-Length&quot;, Integer.toString(parameterBuilder.length()));</span>
+
+                            try (
+<span class="nc" id="L154">                                OutputStream outputStream = connection.getOutputStream();</span>
+<span class="nc" id="L155">                                DataOutputStream wr = new DataOutputStream(outputStream);</span>
+                            ) {
+<span class="nc" id="L157">                                wr.writeBytes(parameterBuilder.toString());</span>
+                            }
+
+<span class="nc" id="L160">                            connection.getInputStream().close();</span>
+<span class="nc" id="L161">                        } catch (Exception cause) {</span>
+<span class="nc" id="L162">                            log.warnHttpMechSsoFailedLogoutParticipant(remoteURI.toString(), cause);</span>
+<span class="nc" id="L163">                        }</span>
+<span class="nc" id="L164">                    });</span>
+
+<span class="nc" id="L166">                    try (SingleSignOn target = this.context.getSingleSignOnManager().find(id)) {</span>
+<span class="nc bnc" id="L167" title="All 2 branches missed.">                        if (target != null) {</span>
+                            // If all logout requests were successful, then there should be no participants, and we can invalidate the SSO
+<span class="nc bnc" id="L169" title="All 2 branches missed.">                            if (!target.getParticipants().isEmpty()) {</span>
+<span class="nc" id="L170">                                log.debugf(&quot;Destroying SSO [%s]. Participant list not empty.&quot;, target.getId());</span>
+                            } else {
+<span class="nc" id="L172">                                log.debugf(&quot;Destroying SSO [%s]. SSO is no longer associated with any participants&quot;, target.getId());</span>
+                            }
+<span class="nc" id="L174">                            target.invalidate();</span>
+                        }
+                    }
+                }
+<span class="nc" id="L178">            });</span>
+        }
+<span class="nc" id="L180">    }</span>
+
+    @Override
+    public CachedIdentity remove() {
+<span class="nc" id="L184">        SingleSignOn sso = this.map.get(SINGLE_SIGN_ON_KEY);</span>
+
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        if (sso == null) return null;</span>
+
+<span class="nc" id="L188">        sso.invalidate();</span>
+
+<span class="nc" id="L190">        HttpScope scope = this.request.getScope(Scope.SESSION);</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        if (scope.exists()) {</span>
+<span class="nc" id="L192">            invalidateLocalSession(scope);</span>
+        }
+
+<span class="nc" id="L195">        return getCachedIdentity(sso);</span>
+    }
+
+    @Override
+    public boolean logout() {
+<span class="nc" id="L200">        String logoutMessage = this.request.getFirstParameterValue(LOGOUT_REQUEST_PARAMETER);</span>
+
+<span class="nc bnc" id="L202" title="All 2 branches missed.">        if (logoutMessage == null) {</span>
+<span class="nc" id="L203">            return false;</span>
+        }
+
+        try {
+<span class="nc" id="L207">            String localSessionId = this.context.verifyLogoutParameter(logoutMessage);</span>
+<span class="nc" id="L208">            HttpScope scope = this.request.getScope(Scope.SESSION, localSessionId);</span>
+
+<span class="nc bnc" id="L210" title="All 2 branches missed.">            if (!scope.exists()) {</span>
+<span class="nc" id="L211">                return false;</span>
+            }
+
+<span class="nc" id="L214">            log.debugf(&quot;Invalidating local session [%s] from SSO [%s]&quot;, localSessionId, this.getId());</span>
+
+<span class="nc" id="L216">            invalidateLocalSession(scope);</span>
+<span class="nc" id="L217">        } catch (Exception e) {</span>
+<span class="nc" id="L218">            log.errorHttpMechSsoFailedInvalidateLocalSession(e);</span>
+<span class="nc" id="L219">        }</span>
+
+<span class="nc" id="L221">        this.request.authenticationInProgress(response -&gt; response.setStatusCode(200));</span>
+
+<span class="nc" id="L223">        return true;</span>
+    }
+
+    @Override
+    public void close() {
+<span class="nc" id="L228">        Optional.ofNullable(this.map.remove(SINGLE_SIGN_ON_KEY)).ifPresent(SingleSignOn::close);</span>
+<span class="nc" id="L229">    }</span>
+
+    void invalidateLocalSession(HttpScope scope) {
+<span class="nc" id="L232">        scope.setAttachment(SESSION_INVALIDATING_ATTRIBUTE, true);</span>
+<span class="nc" id="L233">        scope.invalidate();</span>
+<span class="nc" id="L234">        log.debugf(&quot;Local session [%s] invalidated for SSO [%s]&quot;, scope.getID(), this.getId());</span>
+<span class="nc" id="L235">    }</span>
+
+    private static CachedIdentity getCachedIdentity(SingleSignOn sso) {
+<span class="nc" id="L238">        String mechanism = sso.getMechanism();</span>
+<span class="nc" id="L239">        boolean programmatic = sso.isProgrammatic();</span>
+<span class="nc" id="L240">        SecurityIdentity identity = sso.getIdentity();</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">        return (identity != null) ? new CachedIdentity(mechanism, programmatic, identity) : new CachedIdentity(mechanism, programmatic, new NamePrincipal(sso.getName()));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

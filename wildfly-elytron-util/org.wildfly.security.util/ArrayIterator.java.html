@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ArrayIterator.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-util</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.util</a> &gt; <span class="el_source">ArrayIterator.java</span></div><h1>ArrayIterator.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.util;
+
+import java.util.ListIterator;
+import java.util.NoSuchElementException;
+
+import org.wildfly.common.Assert;
+
+/**
+ * A read-only iterator over an array.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class ArrayIterator&lt;E&gt; implements ListIterator&lt;E&gt;, EnumerationIterator&lt;E&gt; {
+    private final E[] elements;
+    private final boolean descending;
+    private int idx;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param elements the elements to iterate over
+     */
+    public ArrayIterator(final E[] elements) {
+<span class="fc" id="L42">        this(elements, false);</span>
+<span class="fc" id="L43">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param elements the elements to iterate over
+     * @param descending {@code true} to iterate in descending order, {@code false} otherwise
+     */
+    public ArrayIterator(final E[] elements, final boolean descending) {
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        this(elements, descending, descending ? elements.length : 0);</span>
+<span class="fc" id="L53">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param elements the elements to iterate over
+     * @param startIdx the starting index (must be within the bounds of {@code elements})
+     */
+    public ArrayIterator(final E[] elements, final int startIdx) {
+<span class="fc" id="L62">        this(elements, false, startIdx);</span>
+<span class="fc" id="L63">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param elements the elements to iterate over
+     * @param descending {@code true} to iterate in descending order, {@code false} otherwise
+     * @param startIdx the starting index (must be within the bounds of {@code elements})
+     */
+<span class="fc" id="L72">    public ArrayIterator(final E[] elements, final boolean descending, final int startIdx) {</span>
+<span class="fc" id="L73">        Assert.checkNotNullParam(&quot;elements&quot;, elements);</span>
+<span class="fc" id="L74">        Assert.checkMinimumParameter(&quot;startIdx&quot;, 0, startIdx);</span>
+<span class="fc" id="L75">        Assert.checkMaximumParameter(&quot;startIdx&quot;, elements.length, startIdx);</span>
+<span class="fc" id="L76">        this.elements = elements;</span>
+<span class="fc" id="L77">        this.descending = descending;</span>
+<span class="fc" id="L78">        this.idx = startIdx;</span>
+<span class="fc" id="L79">    }</span>
+
+    // ListIterator methods
+
+    /**
+     * Determine if there are more elements to iterate over in the reverse direction of this iterator.
+     *
+     * @return {@code true} if there are more elements, {@code false} otherwise
+     */
+    public boolean hasPrevious() {
+<span class="fc bfc" id="L89" title="All 6 branches covered.">        return descending ? idx &lt; elements.length : idx &gt; 0;</span>
+    }
+
+    /**
+     * Determine if there are more elements to iterate over in the direction of this iterator.
+     *
+     * @return {@code true} if there are more elements, {@code false} otherwise
+     */
+    public boolean hasNext() {
+<span class="fc bfc" id="L98" title="All 6 branches covered.">        return descending ? idx &gt; 0 : idx &lt; elements.length;</span>
+    }
+
+    /**
+     * Get the next element in the reverse direction of this iterator.
+     *
+     * @return the next element
+     */
+    public E previous() {
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (! hasPrevious()) throw new NoSuchElementException();</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        return elements[descending ? idx ++ : -- idx];</span>
+    }
+
+    /**
+     * Get the next element in the direction of this iterator.
+     *
+     * @return the next element
+     */
+    public E next() {
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (! hasNext()) throw new NoSuchElementException();</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        return elements[descending ? -- idx : idx ++];</span>
+    }
+
+    /**
+     * Get the next index in the direction of this iterator.
+     *
+     * @return the next index
+     */
+    public int nextIndex() {
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        return descending ? idx - 1 : idx;</span>
+    }
+
+    /**
+     * Get the next index in the reverse direction of this iterator.
+     *
+     * @return the next index
+     */
+    public int previousIndex() {
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        return descending ? idx : idx - 1;</span>
+    }
+
+    // Unsupported stuff
+
+    /**
+     * Unsupported.
+     */
+    public void remove() {
+<span class="nc" id="L145">        throw Assert.unsupported();</span>
+    }
+
+    /**
+     * Unsupported.
+     *
+     * @param e ignored
+     */
+    public void set(final E e) {
+<span class="nc" id="L154">        throw Assert.unsupported();</span>
+    }
+
+    /**
+     * Unsupported.
+     *
+     * @param e ignored
+     */
+    public void add(final E e) {
+<span class="nc" id="L163">        throw Assert.unsupported();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

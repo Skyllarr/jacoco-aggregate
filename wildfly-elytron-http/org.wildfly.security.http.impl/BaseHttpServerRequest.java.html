@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BaseHttpServerRequest.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.impl</a> &gt; <span class="el_source">BaseHttpServerRequest.java</span></div><h1>BaseHttpServerRequest.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2021 Red Hat, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.http.impl;
+
+import java.io.InputStream;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.security.cert.Certificate;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import javax.net.ssl.SSLSession;
+
+import org.wildfly.security.http.HttpExchangeSpi;
+import org.wildfly.security.http.HttpScope;
+import org.wildfly.security.http.HttpServerCookie;
+import org.wildfly.security.http.HttpServerRequest;
+import org.wildfly.security.http.Scope;
+
+/**
+ * A base implementation of {@link HttpServerRequest}
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public abstract class BaseHttpServerRequest implements HttpServerRequest {
+
+    private final HttpExchangeSpi httpExchangeSpi;
+
+<span class="nc" id="L45">    protected BaseHttpServerRequest(final HttpExchangeSpi httpExchangeSpi) {</span>
+<span class="nc" id="L46">        this.httpExchangeSpi = httpExchangeSpi;</span>
+<span class="nc" id="L47">    }</span>
+
+    @Override
+    public HttpScope getScope(Scope scope) {
+<span class="nc" id="L51">        return httpExchangeSpi.getScope(scope);</span>
+    }
+
+    @Override
+    public Collection&lt;String&gt; getScopeIds(Scope scope) {
+<span class="nc" id="L56">        return httpExchangeSpi.getScopeIds(scope);</span>
+    }
+
+    @Override
+    public HttpScope getScope(Scope scope, String id) {
+<span class="nc" id="L61">        return httpExchangeSpi.getScope(scope, id);</span>
+    }
+
+    @Override
+    public List&lt;String&gt; getRequestHeaderValues(String headerName) {
+<span class="nc" id="L66">        return httpExchangeSpi.getRequestHeaderValues(headerName);</span>
+    }
+
+    @Override
+    public String getFirstRequestHeaderValue(String headerName) {
+<span class="nc" id="L71">        return httpExchangeSpi.getFirstRequestHeaderValue(headerName);</span>
+    }
+
+    @Override
+    public SSLSession getSSLSession() {
+<span class="nc" id="L76">        return httpExchangeSpi.getSSLSession();</span>
+    }
+
+    @Override
+    public Certificate[] getPeerCertificates() {
+<span class="nc" id="L81">        return httpExchangeSpi.getPeerCertificates(false);</span>
+    }
+
+    @Override
+    public String getRemoteUser() {
+<span class="nc" id="L86">        return httpExchangeSpi.getRemoteUser();</span>
+    }
+
+    @Override
+    public String getRequestMethod() {
+<span class="nc" id="L91">        return httpExchangeSpi.getRequestMethod();</span>
+    }
+
+    @Override
+    public URI getRequestURI() {
+<span class="nc" id="L96">        return httpExchangeSpi.getRequestURI();</span>
+    }
+
+    @Override
+    public String getRequestPath() {
+<span class="nc" id="L101">        return httpExchangeSpi.getRequestPath();</span>
+    }
+
+    @Override
+    public Map&lt;String, List&lt;String&gt;&gt; getParameters() {
+<span class="nc" id="L106">        return httpExchangeSpi.getRequestParameters();</span>
+    }
+
+    @Override
+    public Set&lt;String&gt; getParameterNames() {
+<span class="nc" id="L111">        return httpExchangeSpi.getRequestParameterNames();</span>
+    }
+
+    @Override
+    public List&lt;String&gt; getParameterValues(String name) {
+<span class="nc" id="L116">        return httpExchangeSpi.getRequestParameterValues(name);</span>
+    }
+
+    @Override
+    public String getFirstParameterValue(String name) {
+<span class="nc" id="L121">        return httpExchangeSpi.getFirstRequestParameterValue(name);</span>
+    }
+
+    @Override
+    public List&lt;HttpServerCookie&gt; getCookies() {
+<span class="nc" id="L126">        return httpExchangeSpi.getCookies();</span>
+    }
+
+    @Override
+    public InputStream getInputStream() {
+<span class="nc" id="L131">        return httpExchangeSpi.getRequestInputStream();</span>
+    }
+
+    @Override
+    public InetSocketAddress getSourceAddress() {
+<span class="nc" id="L136">        return httpExchangeSpi.getSourceAddress();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

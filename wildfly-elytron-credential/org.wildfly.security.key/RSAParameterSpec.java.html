@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RSAParameterSpec.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-credential</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.key</a> &gt; <span class="el_source">RSAParameterSpec.java</span></div><h1>RSAParameterSpec.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.key;
+
+import java.math.BigInteger;
+import java.security.interfaces.RSAKey;
+import java.security.spec.AlgorithmParameterSpec;
+
+import org.wildfly.common.Assert;
+
+/**
+ * Algorithm parameter specification for RSA keys.  RSA keys do not support a parameter object, but it does in fact
+ * have a parameter: the modulus.  The methods on {@link KeyUtil} will therefore treat this class as the parameter type.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class RSAParameterSpec implements AlgorithmParameterSpec {
+    private final BigInteger modulus;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param modulus the modulus (must not be {@code null})
+     */
+<span class="fc" id="L41">    public RSAParameterSpec(final BigInteger modulus) {</span>
+<span class="fc" id="L42">        Assert.checkNotNullParam(&quot;modulus&quot;, modulus);</span>
+<span class="fc" id="L43">        this.modulus = modulus;</span>
+<span class="fc" id="L44">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param rsaKey the RSA key from which the modulus should be acquired (must not be {@code null})
+     */
+    public RSAParameterSpec(final RSAKey rsaKey) {
+<span class="fc" id="L52">        this(Assert.checkNotNullParam(&quot;rsaKey&quot;, rsaKey).getModulus());</span>
+<span class="fc" id="L53">    }</span>
+
+    /**
+     * Get the modulus.
+     *
+     * @return the modulus (not {@code null})
+     */
+    public BigInteger getModulus() {
+<span class="fc" id="L61">        return modulus;</span>
+    }
+
+    public boolean equals(final Object obj) {
+<span class="pc bpc" id="L65" title="3 of 6 branches missed.">        return this == obj || obj instanceof RSAParameterSpec &amp;&amp; modulus.equals(((RSAParameterSpec) obj).getModulus());</span>
+    }
+
+    public int hashCode() {
+<span class="nc" id="L69">        return modulus.hashCode();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

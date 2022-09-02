@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ConfiguredSSLServerSocketFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-ssl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.ssl</a> &gt; <span class="el_source">ConfiguredSSLServerSocketFactory.java</span></div><h1>ConfiguredSSLServerSocketFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.ssl;
+
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLServerSocketFactory;
+
+/**
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+final class ConfiguredSSLServerSocketFactory extends AbstractDelegatingSSLServerSocketFactory {
+    private final SSLContext sslContext;
+    private final SSLConfigurator sslConfigurator;
+    private final boolean wrap;
+
+    ConfiguredSSLServerSocketFactory(final SSLServerSocketFactory delegate, final SSLContext sslContext, final SSLConfigurator sslConfigurator, final boolean wrap) {
+<span class="nc" id="L38">        super(delegate);</span>
+<span class="nc" id="L39">        this.sslContext = sslContext;</span>
+<span class="nc" id="L40">        this.sslConfigurator = sslConfigurator;</span>
+<span class="nc" id="L41">        this.wrap = wrap;</span>
+<span class="nc" id="L42">    }</span>
+
+    public ServerSocket createServerSocket() throws IOException {
+<span class="nc" id="L45">        return wrap(super.createServerSocket());</span>
+    }
+
+    public ServerSocket createServerSocket(final int port) throws IOException {
+<span class="nc" id="L49">        return wrap(super.createServerSocket(port));</span>
+    }
+
+    public ServerSocket createServerSocket(final int port, final int backlog) throws IOException {
+<span class="nc" id="L53">        return wrap(super.createServerSocket(port, backlog));</span>
+    }
+
+    public ServerSocket createServerSocket(final int port, final int backlog, final InetAddress ifAddress) throws IOException {
+<span class="nc" id="L57">        return wrap(super.createServerSocket(port, backlog, ifAddress));</span>
+    }
+
+    public String[] getDefaultCipherSuites() {
+<span class="nc" id="L61">        return sslConfigurator.getDefaultSSLParameters(sslContext, sslContext.getDefaultSSLParameters()).getCipherSuites();</span>
+    }
+
+    public String[] getSupportedCipherSuites() {
+<span class="nc" id="L65">        return sslConfigurator.getSupportedSSLParameters(sslContext, sslContext.getSupportedSSLParameters()).getCipherSuites();</span>
+    }
+
+    private ServerSocket wrap(ServerSocket original) throws IOException {
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        if (original instanceof SSLServerSocket) {</span>
+<span class="nc" id="L70">            final SSLServerSocket sslServerSocket = (SSLServerSocket) original;</span>
+<span class="nc" id="L71">            final SSLContext sslContext = this.sslContext;</span>
+<span class="nc" id="L72">            final SSLConfigurator sslConfigurator = this.sslConfigurator;</span>
+<span class="nc" id="L73">            sslConfigurator.configure(sslContext, sslServerSocket);</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">            return wrap ? new ConfiguredSSLServerSocket(sslServerSocket, sslContext, sslConfigurator) : sslServerSocket;</span>
+        } else {
+<span class="nc" id="L76">            return original;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

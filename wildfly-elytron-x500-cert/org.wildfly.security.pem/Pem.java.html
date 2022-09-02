@@ -1,0 +1,461 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Pem.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-x500-cert</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.pem</a> &gt; <span class="el_source">Pem.java</span></div><h1>Pem.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.pem;
+
+import static org.wildfly.security.x500.cert._private.ElytronMessages.log;
+
+import java.io.IOException;
+import java.math.BigInteger;
+import java.security.GeneralSecurityException;
+import java.security.KeyFactory;
+import java.security.KeyPair;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.cert.CertificateEncodingException;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.RSAPrivateCrtKeySpec;
+import java.security.spec.X509EncodedKeySpec;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
+import java.util.function.BiFunction;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.sshd.common.config.keys.FilePasswordProvider;
+import org.apache.sshd.common.config.keys.loader.openssh.OpenSSHKeyPairResourceParser;
+
+import org.wildfly.common.Assert;
+import org.wildfly.common.bytes.ByteStringBuilder;
+import org.wildfly.common.iteration.ByteIterator;
+import org.wildfly.common.iteration.CodePointIterator;
+import org.wildfly.security.asn1.ASN1;
+import org.wildfly.security.asn1.DERDecoder;
+import org.wildfly.security.x500.cert.PKCS10CertificateSigningRequest;
+
+/**
+ * A class containing utilities which can handle the PEM format.  See &lt;a href=&quot;https://tools.ietf.org/html/rfc7468&quot;&gt;RFC 7468&lt;/a&gt;
+ * for more information.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+<span class="nc" id="L60">public final class Pem {</span>
+<span class="fc" id="L61">    private static final Pattern VALID_LABEL = Pattern.compile(&quot;[^ -~&amp;&amp;[^-]]&quot;);</span>
+    private static final String PUBLIC_KEY_FORMAT = &quot;PUBLIC KEY&quot;;
+    private static final String CERTIFICATE_FORMAT = &quot;CERTIFICATE&quot;;
+    private static final String PRIVATE_KEY_FORMAT = &quot;PRIVATE KEY&quot;;
+    private static final String RSA_PRIVATE_KEY_FORMAT = &quot;RSA PRIVATE KEY&quot;;
+    private static final String CERTIFICATE_REQUEST_FORMAT = &quot;CERTIFICATE REQUEST&quot;;
+    public static final String OPENSSH_PRIVATE_KEY_FORMAT = &quot;OPENSSH PRIVATE KEY&quot;;
+
+    /**
+     * Parse arbitrary PEM content.  The given function is used to parse the content of the PEM representation and produce
+     * some result.  The PEM type string is passed to the function.  If the function throws an exception, that exception
+     * is propagated to the caller of this method.  If the PEM content is malformed, an exception is thrown.  If the
+     * trailing PEM content is found to be invalid after the function returns, the function result is discarded and an
+     * exception is thrown.
+     *
+     * @param pemContent the content to parse (must not be {@code null})
+     * @param contentFunction a function to consume the PEM content and produce a result (must not be {@code null})
+     * @param &lt;R&gt; the value return type
+     * @return the return value of the function or {@code null} if there is no PEM content to parse
+     * @throws IllegalArgumentException if there is a problem with processing the content of the PEM data
+     */
+    public static &lt;R&gt; R parsePemContent(CodePointIterator pemContent, BiFunction&lt;String, ByteIterator, R&gt; contentFunction) throws IllegalArgumentException {
+<span class="fc" id="L83">        Assert.checkNotNullParam(&quot;pemContent&quot;, pemContent);</span>
+<span class="fc" id="L84">        Assert.checkNotNullParam(&quot;contentFunction&quot;, contentFunction);</span>
+
+<span class="fc" id="L86">        long matchIdx = -1;</span>
+
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        while (pemContent.hasNext()) {</span>
+<span class="fc" id="L89">            int cp = pemContent.next();</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            if (cp == '-') {</span>
+<span class="fc" id="L91">                long idx = pemContent.getIndex();</span>
+
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">                if (pemContent.limitedTo(10).contentEquals(&quot;----BEGIN &quot;)) {</span>
+<span class="fc" id="L94">                    String type = pemContent.delimitedBy('-').drainToString();</span>
+<span class="fc" id="L95">                    final Matcher matcher = VALID_LABEL.matcher(type);</span>
+<span class="pc bpc" id="L96" title="2 of 4 branches missed.">                    if (!matcher.find() &amp;&amp; pemContent.limitedTo(5).contentEquals(&quot;-----&quot;)) {</span>
+<span class="fc" id="L97">                        matchIdx = idx;</span>
+<span class="fc" id="L98">                        break;</span>
+                    } else {
+<span class="nc bnc" id="L100" title="All 2 branches missed.">                        while (pemContent.getIndex() &gt; idx) pemContent.previous();</span>
+                    }
+<span class="nc" id="L102">                } else {</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">                    while (pemContent.getIndex() &gt; idx) pemContent.previous();</span>
+                }
+            }
+<span class="fc" id="L106">        }</span>
+
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (matchIdx == -1) return null;</span>
+
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        while (pemContent.getIndex() &gt; matchIdx) pemContent.previous();</span>
+
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (! pemContent.limitedTo(10).contentEquals(&quot;----BEGIN &quot;)) {</span>
+<span class="nc" id="L113">            throw log.malformedPemContent(pemContent.getIndex());</span>
+        }
+<span class="fc" id="L115">        String type = pemContent.delimitedBy('-').drainToString();</span>
+<span class="fc" id="L116">        final Matcher matcher = VALID_LABEL.matcher(type);</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        if (matcher.find()) {</span>
+            // BEGIN string is 11 chars long
+<span class="nc" id="L119">            throw log.malformedPemContent(matcher.start() + 11);</span>
+        }
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (! pemContent.limitedTo(5).contentEquals(&quot;-----&quot;)) {</span>
+<span class="nc" id="L122">            throw log.malformedPemContent(pemContent.getIndex());</span>
+        }
+<span class="fc" id="L124">        CodePointIterator delimitedIterator = pemContent.delimitedBy('-').skip(Character::isWhitespace).skipCrLf();</span>
+<span class="fc" id="L125">        final ByteIterator byteIterator = delimitedIterator.base64Decode();</span>
+<span class="fc" id="L126">        final R result = contentFunction.apply(type, byteIterator);</span>
+<span class="fc" id="L127">        delimitedIterator.skipAll(); // skip until '-'</span>
+
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        if (! pemContent.limitedTo(9).contentEquals(&quot;-----END &quot;)) {</span>
+<span class="nc" id="L130">            throw log.malformedPemContent(pemContent.getIndex());</span>
+        }
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (! pemContent.limitedTo(type.length()).contentEquals(type)) {</span>
+<span class="nc" id="L133">            throw log.malformedPemContent(pemContent.getIndex());</span>
+        }
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        if (! pemContent.limitedTo(5).contentEquals(&quot;-----&quot;)) {</span>
+<span class="nc" id="L136">            throw log.malformedPemContent(pemContent.getIndex());</span>
+        }
+<span class="fc" id="L138">        return result;</span>
+    }
+
+    /**
+     * Iterate over the contents of a PEM file, returning each entry in sequence.
+     *
+     * @param pemContent the code point iterator over the content (must not be {@code null})
+     * @return the iterator (not {@code null})
+     */
+    public static Iterator&lt;PemEntry&lt;?&gt;&gt; parsePemContent(CodePointIterator pemContent) {
+<span class="fc" id="L148">        return new Iterator&lt;PemEntry&lt;?&gt;&gt;() {</span>
+            private PemEntry&lt;?&gt; next;
+
+            public boolean hasNext() {
+<span class="fc bfc" id="L152" title="All 2 branches covered.">                if (next == null) {</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">                    if (! pemContent.hasNext()) {</span>
+<span class="nc" id="L154">                        return false;</span>
+                    }
+<span class="fc" id="L156">                    next = parsePemContent(pemContent, (type, byteIterator) -&gt; {</span>
+<span class="pc bpc" id="L157" title="4 of 5 branches missed.">                        switch (type) {</span>
+                            case CERTIFICATE_FORMAT: {
+<span class="fc" id="L159">                                final X509Certificate x509Certificate = parsePemX509CertificateContent(type, byteIterator);</span>
+<span class="fc" id="L160">                                return new PemEntry&lt;&gt;(x509Certificate);</span>
+                            }
+                            case PUBLIC_KEY_FORMAT: {
+<span class="nc" id="L163">                                final PublicKey publicKey = parsePemPublicKey(type, byteIterator);</span>
+<span class="nc" id="L164">                                return new PemEntry&lt;&gt;(publicKey);</span>
+                            }
+                            case PRIVATE_KEY_FORMAT: {
+<span class="nc" id="L167">                                final PrivateKey privateKey = parsePemPrivateKey(type, byteIterator);</span>
+<span class="nc" id="L168">                                return new PemEntry&lt;&gt;(privateKey);</span>
+                            }
+                            case RSA_PRIVATE_KEY_FORMAT: {
+<span class="nc" id="L171">                                final PrivateKey privateKey = parsePemRsaPrivateKey(type, byteIterator);</span>
+<span class="nc" id="L172">                                return new PemEntry&lt;&gt;(privateKey);</span>
+                            }
+                            default: {
+<span class="nc" id="L175">                                throw log.malformedPemContent(pemContent.getIndex());</span>
+                            }
+                        }
+                    });
+<span class="fc bfc" id="L179" title="All 2 branches covered.">                    if (next == null) {</span>
+<span class="fc" id="L180">                        return false;</span>
+                    }
+                }
+<span class="fc" id="L183">                return true;</span>
+            }
+
+            public PemEntry&lt;?&gt; next() {
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">                if (! hasNext()) {</span>
+<span class="nc" id="L188">                    throw new NoSuchElementException();</span>
+                }
+                try {
+<span class="fc" id="L191">                    return next;</span>
+                } finally {
+<span class="fc" id="L193">                    next = null;</span>
+                }
+            }
+        };
+    }
+
+    /**
+     * Iterate over the contents of a key file in OpenSSH format, returning each entry in sequence.
+     *
+     * @param pemContent the code point iterator over the content (must not be {@code null})
+     * @param passphraseProvider provides the passphrase used to decrypt the private key(may be {@code null})
+     * @return the iterator (not {@code null})
+     * @throws IllegalArgumentException if there is a problem with the data or the key
+     */
+    public static Iterator&lt;PemEntry&lt;?&gt;&gt; parsePemOpenSSHContent(CodePointIterator pemContent, FilePasswordProvider passphraseProvider) throws IllegalArgumentException {
+<span class="fc" id="L208">        return new Iterator&lt;PemEntry&lt;?&gt;&gt;() {</span>
+            private PemEntry&lt;?&gt; next;
+
+            public boolean hasNext() {
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">                if (next == null) {</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">                    if (! pemContent.hasNext()) {</span>
+<span class="nc" id="L214">                        return false;</span>
+                    }
+<span class="fc" id="L216">                    next = parsePemContent(pemContent, (type, byteIterator) -&gt; {</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">                        switch (type) {</span>
+                            case OPENSSH_PRIVATE_KEY_FORMAT: {
+<span class="fc" id="L219">                                final KeyPair keyPair = parseOpenSSHKeys(byteIterator, passphraseProvider);</span>
+<span class="fc" id="L220">                                return new PemEntry&lt;&gt;(keyPair);</span>
+                            }
+                            default: {
+<span class="nc" id="L223">                                throw log.malformedPemContent(pemContent.getIndex());</span>
+                            }
+                        }
+                    });
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">                    if (next == null) {</span>
+<span class="nc" id="L228">                        return false;</span>
+                    }
+                }
+<span class="fc" id="L231">                return true;</span>
+            }
+
+            public PemEntry&lt;?&gt; next() {
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">                if (! hasNext()) {</span>
+<span class="nc" id="L236">                    throw new NoSuchElementException();</span>
+                }
+                try {
+<span class="fc" id="L239">                    return next;</span>
+                } finally {
+<span class="fc" id="L241">                    next = null;</span>
+                }
+            }
+        };
+    }
+
+    /**
+     * Generate PEM content to the given byte string builder.  The appropriate header and footer surrounds the base-64
+     * encoded value.
+     *
+     * @param target the target byte string builder (must not be {@code null})
+     * @param type the content type (must not be {@code null})
+     * @param content the content iterator (must not be {@code null})
+     * @throws IllegalArgumentException if there is a problem with the data or the type
+     */
+    public static void generatePemContent(ByteStringBuilder target, String type, ByteIterator content) throws IllegalArgumentException {
+<span class="fc" id="L257">        Assert.checkNotNullParam(&quot;target&quot;, target);</span>
+<span class="fc" id="L258">        Assert.checkNotNullParam(&quot;type&quot;, type);</span>
+<span class="fc" id="L259">        Assert.checkNotNullParam(&quot;content&quot;, content);</span>
+<span class="fc" id="L260">        final Matcher matcher = VALID_LABEL.matcher(type);</span>
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">        if (matcher.find()) {</span>
+<span class="nc" id="L262">            throw log.invalidPemType(&quot;&lt;any valid PEM type&gt;&quot;, type);</span>
+        }
+<span class="fc" id="L264">        target.append(&quot;-----BEGIN &quot;).append(type).append(&quot;-----&quot;);</span>
+<span class="fc" id="L265">        target.append(content.base64Encode().drainToString(System.lineSeparator(), 64)); // insert the line separator before every 64 code points</span>
+<span class="fc" id="L266">        target.append(System.lineSeparator()).append(&quot;-----END &quot;).append(type).append(&quot;-----&quot;).append(System.lineSeparator());</span>
+<span class="fc" id="L267">    }</span>
+
+    /**
+     * Extracts the DER content from the given &lt;code&gt;pemContent&lt;/code&gt;.
+     *
+     * @param pemContent a {@link CodePointIterator} with the PEM content
+     * @return a byte array with the DER content
+     */
+    public static byte[] extractDerContent(CodePointIterator pemContent) {
+<span class="nc" id="L276">        return parsePemContent(pemContent, (type, byteIterator) -&gt; byteIterator.drain());</span>
+    }
+
+    private static X509Certificate parsePemX509CertificateContent(String type, ByteIterator byteIterator) throws IllegalArgumentException {
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">        if (! type.equals(CERTIFICATE_FORMAT)) {</span>
+<span class="nc" id="L281">            throw log.invalidPemType(CERTIFICATE_FORMAT, type);</span>
+        }
+        try {
+<span class="fc" id="L284">            final CertificateFactory instance = CertificateFactory.getInstance(&quot;X.509&quot;);</span>
+<span class="fc" id="L285">            return (X509Certificate) instance.generateCertificate(byteIterator.asInputStream());</span>
+<span class="nc" id="L286">        } catch (CertificateException e) {</span>
+<span class="nc" id="L287">            throw log.certificateParseError(e);</span>
+        }
+    }
+
+    private static PublicKey parsePemPublicKey(String type, ByteIterator byteIterator) throws IllegalArgumentException {
+<span class="nc bnc" id="L292" title="All 2 branches missed.">        if (! type.equals(PUBLIC_KEY_FORMAT)) {</span>
+<span class="nc" id="L293">            throw log.invalidPemType(PUBLIC_KEY_FORMAT, type);</span>
+        }
+        try {
+<span class="nc" id="L296">            byte[] der = byteIterator.drain();</span>
+<span class="nc" id="L297">            DERDecoder derDecoder = new DERDecoder(der);</span>
+<span class="nc" id="L298">            derDecoder.startSequence();</span>
+<span class="nc bnc" id="L299" title="All 2 branches missed.">            switch (derDecoder.peekType()) {</span>
+                case ASN1.SEQUENCE_TYPE:
+<span class="nc" id="L301">                    derDecoder.startSequence();</span>
+<span class="nc" id="L302">                    String algorithm = derDecoder.decodeObjectIdentifierAsKeyAlgorithm();</span>
+
+<span class="nc bnc" id="L304" title="All 2 branches missed.">                    if (algorithm != null) {</span>
+<span class="nc" id="L305">                        return KeyFactory.getInstance(algorithm).generatePublic(new X509EncodedKeySpec(der));</span>
+                    }
+
+<span class="nc" id="L308">                    throw log.asnUnrecognisedAlgorithm(algorithm);</span>
+                default:
+<span class="nc" id="L310">                    throw log.asnUnexpectedTag();</span>
+            }
+<span class="nc" id="L312">        } catch (Exception cause) {</span>
+<span class="nc" id="L313">            throw log.publicKeyParseError(cause);</span>
+        }
+    }
+
+    private static PrivateKey parsePemPrivateKey(String type, ByteIterator byteIterator) throws IllegalArgumentException {
+<span class="nc bnc" id="L318" title="All 2 branches missed.">        if (! type.equals(PRIVATE_KEY_FORMAT)) {</span>
+<span class="nc" id="L319">            throw log.invalidPemType(PRIVATE_KEY_FORMAT, type);</span>
+        }
+        try {
+<span class="nc" id="L322">            byte[] der = byteIterator.drain();</span>
+<span class="nc" id="L323">            DERDecoder derDecoder = new DERDecoder(der);</span>
+<span class="nc" id="L324">            derDecoder.startSequence();</span>
+
+            // Version
+<span class="nc bnc" id="L327" title="All 2 branches missed.">            if (derDecoder.peekType() != ASN1.INTEGER_TYPE) throw log.asnUnexpectedTag();</span>
+<span class="nc" id="L328">            derDecoder.skipElement();</span>
+
+            // AlgorithmIdentifier
+<span class="nc" id="L331">            derDecoder.startSequence();</span>
+<span class="nc" id="L332">            String algorithm = derDecoder.decodeObjectIdentifierAsKeyAlgorithm();</span>
+
+<span class="nc bnc" id="L334" title="All 2 branches missed.">            if (algorithm != null) {</span>
+<span class="nc" id="L335">                return KeyFactory.getInstance(algorithm).generatePrivate(new PKCS8EncodedKeySpec(der));</span>
+            }
+
+<span class="nc" id="L338">            throw log.asnUnrecognisedAlgorithm(algorithm);</span>
+<span class="nc" id="L339">        } catch (Exception cause) {</span>
+<span class="nc" id="L340">            throw log.privateKeyParseError(cause);</span>
+        }
+    }
+
+    private static PrivateKey parsePemRsaPrivateKey(String type, ByteIterator byteIterator) throws IllegalArgumentException {
+<span class="nc bnc" id="L345" title="All 2 branches missed.">        if (! type.equals(RSA_PRIVATE_KEY_FORMAT)) {</span>
+<span class="nc" id="L346">            throw log.invalidPemType(RSA_PRIVATE_KEY_FORMAT, type);</span>
+        }
+        try {
+<span class="nc" id="L349">            byte[] der = byteIterator.drain();</span>
+<span class="nc" id="L350">            DERDecoder derDecoder = new DERDecoder(der);</span>
+<span class="nc" id="L351">            derDecoder.startSequence();</span>
+
+            // Version
+<span class="nc bnc" id="L354" title="All 2 branches missed.">            if (derDecoder.peekType() != ASN1.INTEGER_TYPE) throw log.asnUnexpectedTag();</span>
+<span class="nc" id="L355">            derDecoder.skipElement();</span>
+
+<span class="nc" id="L357">            BigInteger modulus = derDecoder.decodeInteger();</span>
+<span class="nc" id="L358">            BigInteger publicExp = derDecoder.decodeInteger();</span>
+<span class="nc" id="L359">            BigInteger privateExp = derDecoder.decodeInteger();</span>
+<span class="nc" id="L360">            BigInteger prime1 = derDecoder.decodeInteger();</span>
+<span class="nc" id="L361">            BigInteger prime2 = derDecoder.decodeInteger();</span>
+<span class="nc" id="L362">            BigInteger exp1 = derDecoder.decodeInteger();</span>
+<span class="nc" id="L363">            BigInteger exp2 = derDecoder.decodeInteger();</span>
+<span class="nc" id="L364">            BigInteger crtCoef = derDecoder.decodeInteger();</span>
+
+<span class="nc" id="L366">            RSAPrivateCrtKeySpec keySpec = new RSAPrivateCrtKeySpec(</span>
+                    modulus, publicExp, privateExp, prime1, prime2,
+                    exp1, exp2, crtCoef);
+
+<span class="nc" id="L370">            return KeyFactory.getInstance(&quot;RSA&quot;).generatePrivate(keySpec);</span>
+<span class="nc" id="L371">        } catch (Exception cause) {</span>
+<span class="nc" id="L372">            throw log.privateKeyParseError(cause);</span>
+        }
+    }
+
+    private static KeyPair parseOpenSSHKeys(ByteIterator byteIterator, FilePasswordProvider passphraseProvider) throws IllegalArgumentException {
+<span class="fc" id="L377">        OpenSSHKeyPairResourceParser resourceParser = new OpenSSHKeyPairResourceParser();</span>
+<span class="fc" id="L378">        byte[] stream = byteIterator.drain();</span>
+        try {
+<span class="fc" id="L380">            return  resourceParser.extractKeyPairs(null, null,</span>
+                    OpenSSHKeyPairResourceParser.BEGIN_MARKER, OpenSSHKeyPairResourceParser.END_MARKER,
+<span class="fc" id="L382">                    passphraseProvider, stream, null).iterator().next();</span>
+<span class="nc" id="L383">        } catch (IOException e) {</span>
+<span class="nc" id="L384">            throw log.openSshParseError(e.getMessage());</span>
+<span class="nc" id="L385">        } catch (GeneralSecurityException e) {</span>
+<span class="nc" id="L386">            throw log.openSshGeneratingError(e.getMessage());</span>
+        }
+    }
+
+    /**
+     * Parse an X.509 certificate in PEM format.
+     *
+     * @param pemContent the PEM content (must not be {@code null})
+     * @return the certificate (not {@code null})
+     * @throws IllegalArgumentException if the certificate could not be parsed for some reason
+     */
+    public static X509Certificate parsePemX509Certificate(CodePointIterator pemContent) throws IllegalArgumentException {
+<span class="nc" id="L398">        Assert.checkNotNullParam(&quot;pemContent&quot;, pemContent);</span>
+<span class="nc" id="L399">        return parsePemContent(pemContent, Pem::parsePemX509CertificateContent);</span>
+    }
+
+    /**
+     * Parse a {@link PublicKey} in PEM format.
+     *
+     * @param pemContent the PEM content (must not be {@code null})
+     * @return the public key (not {@code null})
+     * @throws IllegalArgumentException if the public key could not be parsed for some reason
+     */
+    public static PublicKey parsePemPublicKey(CodePointIterator pemContent) throws IllegalArgumentException {
+<span class="nc" id="L410">        Assert.checkNotNullParam(&quot;pemContent&quot;, pemContent);</span>
+<span class="nc" id="L411">        return parsePemContent(pemContent, Pem::parsePemPublicKey);</span>
+    }
+
+    /**
+     * Generate PEM content containing an X.509 certificate.
+     *
+     * @param target the target byte string builder (must not be {@code null})
+     * @param certificate the X.509 certificate (must not be {@code null})
+     */
+    public static void generatePemX509Certificate(ByteStringBuilder target, X509Certificate certificate) {
+<span class="fc" id="L421">        Assert.checkNotNullParam(&quot;target&quot;, target);</span>
+<span class="fc" id="L422">        Assert.checkNotNullParam(&quot;certificate&quot;, certificate);</span>
+        try {
+<span class="fc" id="L424">            generatePemContent(target, CERTIFICATE_FORMAT, ByteIterator.ofBytes(certificate.getEncoded()));</span>
+<span class="nc" id="L425">        } catch (CertificateEncodingException e) {</span>
+<span class="nc" id="L426">            throw log.certificateParseError(e);</span>
+<span class="fc" id="L427">        }</span>
+<span class="fc" id="L428">    }</span>
+
+    /**
+     * Generate PEM content containing a {@link PublicKey}.
+     *
+     * @param target the target byte string builder (must not be {@code null})
+     * @param publicKey the {@link PublicKey} (must not be {@code null})
+     */
+    public static void generatePemPublicKey(ByteStringBuilder target, PublicKey publicKey) {
+<span class="nc" id="L437">        Assert.checkNotNullParam(&quot;target&quot;, target);</span>
+<span class="nc" id="L438">        Assert.checkNotNullParam(&quot;publicKey&quot;, publicKey);</span>
+        try {
+<span class="nc" id="L440">            KeyFactory instance = KeyFactory.getInstance(publicKey.getAlgorithm());</span>
+<span class="nc" id="L441">            X509EncodedKeySpec keySpec = instance.getKeySpec(publicKey, X509EncodedKeySpec.class);</span>
+<span class="nc" id="L442">            generatePemContent(target, PUBLIC_KEY_FORMAT, ByteIterator.ofBytes(keySpec.getEncoded()));</span>
+<span class="nc" id="L443">        } catch (Exception e) {</span>
+<span class="nc" id="L444">            throw log.publicKeyParseError(e);</span>
+<span class="nc" id="L445">        }</span>
+<span class="nc" id="L446">    }</span>
+
+    /**
+     * Generate PEM content containing a PKCS #10 certificate signing request.
+     *
+     * @param target the target byte string builder (must not be {@code null})
+     * @param certificateSigningRequest the PKCS #10 certificate signing request (must not be {@code null})
+     * @since 1.2.0
+     */
+    public static void generatePemPKCS10CertificateSigningRequest(ByteStringBuilder target, PKCS10CertificateSigningRequest certificateSigningRequest) {
+<span class="fc" id="L456">        Assert.checkNotNullParam(&quot;target&quot;, target);</span>
+<span class="fc" id="L457">        Assert.checkNotNullParam(&quot;certificateSigningRequest&quot;, certificateSigningRequest);</span>
+<span class="fc" id="L458">        generatePemContent(target, CERTIFICATE_REQUEST_FORMAT, ByteIterator.ofBytes(certificateSigningRequest.getEncoded()));</span>
+<span class="fc" id="L459">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

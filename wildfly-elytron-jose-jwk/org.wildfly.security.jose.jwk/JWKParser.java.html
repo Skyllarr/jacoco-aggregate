@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>JWKParser.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-jose-jwk</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.jose.jwk</a> &gt; <span class="el_source">JWKParser.java</span></div><h1>JWKParser.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2020 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.jose.jwk;
+
+import static org.wildfly.security.jose.jwk.ElytronMessages.log;
+import static org.wildfly.security.jose.jwk.JWKUtil.BASE64_URL;
+
+import java.math.BigInteger;
+import java.security.AlgorithmParameters;
+import java.security.KeyFactory;
+import java.security.PublicKey;
+import java.security.spec.ECGenParameterSpec;
+import java.security.spec.ECParameterSpec;
+import java.security.spec.ECPoint;
+import java.security.spec.ECPublicKeySpec;
+import java.security.spec.RSAPublicKeySpec;
+
+import org.wildfly.common.iteration.CodePointIterator;
+import org.wildfly.security.jose.util.JsonSerialization;
+
+/**
+ * A JWK parser.
+ *
+ * @author &lt;a href=&quot;mailto:sthorger@redhat.com&quot;&gt;Stian Thorgersen&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ * @since 1.14.0
+ */
+public class JWKParser {
+
+    private JWK jwk;
+
+    private JWKParser() {
+    }
+
+<span class="nc" id="L51">    public JWKParser(JWK jwk) {</span>
+<span class="nc" id="L52">        this.jwk = jwk;</span>
+<span class="nc" id="L53">    }</span>
+
+    public static JWKParser create() {
+<span class="nc" id="L56">        return new JWKParser();</span>
+    }
+
+    public static JWKParser create(JWK jwk) {
+<span class="nc" id="L60">        return new JWKParser(jwk);</span>
+    }
+
+    public JWKParser parse(String jwk) {
+        try {
+<span class="nc" id="L65">            this.jwk = JsonSerialization.mapper.readValue(jwk, JWK.class);</span>
+<span class="nc" id="L66">            return this;</span>
+<span class="nc" id="L67">        } catch (Exception e) {</span>
+<span class="nc" id="L68">            throw log.unableToParseStringJWK(e);</span>
+        }
+    }
+
+    public JWK getJwk() {
+<span class="nc" id="L73">        return jwk;</span>
+    }
+
+    public PublicKey toPublicKey() {
+<span class="nc" id="L77">        String keyType = jwk.getKeyType();</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        if (keyType.equals(RSAPublicJWK.RSA)) {</span>
+<span class="nc" id="L79">            return createRSAPublicKey();</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        } else if (keyType.equals(ECPublicJWK.EC)) {</span>
+<span class="nc" id="L81">            return createECPublicKey();</span>
+        } else {
+<span class="nc" id="L83">            throw log.unsupportedKeyTypeForJWK(keyType);</span>
+        }
+    }
+
+    public boolean isKeyTypeSupported(String keyType) {
+<span class="nc bnc" id="L88" title="All 4 branches missed.">        return (RSAPublicJWK.RSA.equals(keyType) || ECPublicJWK.EC.equals(keyType));</span>
+    }
+
+    private PublicKey createECPublicKey() {
+<span class="nc" id="L92">        String crv = (String) jwk.getOtherClaims().get(ECPublicJWK.CRV);</span>
+
+<span class="nc" id="L94">        BigInteger x = new BigInteger(1,</span>
+<span class="nc" id="L95">                CodePointIterator.ofString((String) jwk.getOtherClaims().get(ECPublicJWK.X)).base64Decode(BASE64_URL, false).drain());</span>
+<span class="nc" id="L96">        BigInteger y = new BigInteger(1,</span>
+<span class="nc" id="L97">                CodePointIterator.ofString((String) jwk.getOtherClaims().get(ECPublicJWK.Y)).base64Decode(BASE64_URL, false).drain());</span>
+
+        String curveName;
+<span class="nc bnc" id="L100" title="All 4 branches missed.">        switch (crv) {</span>
+            case &quot;P-256&quot; :
+<span class="nc" id="L102">                curveName = &quot;secp256r1&quot;;</span>
+<span class="nc" id="L103">                break;</span>
+            case &quot;P-384&quot; :
+<span class="nc" id="L105">                curveName = &quot;secp384r1&quot;;</span>
+<span class="nc" id="L106">                break;</span>
+            case &quot;P-521&quot; :
+<span class="nc" id="L108">                curveName = &quot;secp521r1&quot;;</span>
+<span class="nc" id="L109">                break;</span>
+            default :
+<span class="nc" id="L111">                throw log.unsupportedCurve();</span>
+        }
+
+        try {
+<span class="nc" id="L115">            AlgorithmParameters params = AlgorithmParameters.getInstance(&quot;EC&quot;);</span>
+<span class="nc" id="L116">            params.init(new ECGenParameterSpec(curveName));</span>
+<span class="nc" id="L117">            ECPoint point = new ECPoint(x, y);</span>
+
+<span class="nc" id="L119">            KeyFactory kf = KeyFactory.getInstance(&quot;EC&quot;);</span>
+<span class="nc" id="L120">            return kf.generatePublic(new ECPublicKeySpec(point, params.getParameterSpec(ECParameterSpec.class)));</span>
+<span class="nc" id="L121">        } catch (Exception e) {</span>
+<span class="nc" id="L122">            throw log.unableToCreatePublicKeyFromJWK(e);</span>
+        }
+    }
+
+    private PublicKey createRSAPublicKey() {
+<span class="nc" id="L127">        BigInteger modulus = new BigInteger(1,</span>
+<span class="nc" id="L128">                CodePointIterator.ofString(jwk.getOtherClaims().get(RSAPublicJWK.MODULUS).toString()).base64Decode(BASE64_URL, false).drain());</span>
+<span class="nc" id="L129">        BigInteger publicExponent = new BigInteger(1,</span>
+<span class="nc" id="L130">                CodePointIterator.ofString(jwk.getOtherClaims().get(RSAPublicJWK.PUBLIC_EXPONENT).toString()).base64Decode(BASE64_URL, false).drain());</span>
+
+        try {
+<span class="nc" id="L133">            KeyFactory kf = KeyFactory.getInstance(&quot;RSA&quot;);</span>
+<span class="nc" id="L134">            return kf.generatePublic(new RSAPublicKeySpec(modulus, publicExponent));</span>
+<span class="nc" id="L135">        } catch (Exception e) {</span>
+<span class="nc" id="L136">            throw log.unableToCreatePublicKeyFromJWK(e);</span>
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

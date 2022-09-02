@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages_$logger.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-util</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.util</a> &gt; <span class="el_source">ElytronMessages_$logger.java</span></div><h1>ElytronMessages_$logger.java</h1><pre class="source lang-java linenums">package org.wildfly.security.util;
+
+import java.util.Locale;
+import java.lang.IllegalStateException;
+import java.io.Serializable;
+import javax.annotation.Generated;
+import org.jboss.logging.DelegatingBasicLogger;
+import java.security.GeneralSecurityException;
+import java.lang.String;
+import java.io.IOException;
+import org.jboss.logging.Logger;
+import org.jboss.logging.BasicLogger;
+import java.lang.Throwable;
+import java.lang.Class;
+import java.security.spec.InvalidParameterSpecException;
+import java.util.Arrays;
+import java.lang.IllegalArgumentException;
+
+/**
+ * Warning this class consists of generated code.
+ */
+@Generated(value = &quot;org.jboss.logging.processor.generator.model.MessageLoggerImplementor&quot;, date = &quot;2022-09-02T20:20:01+0200&quot;)
+public class ElytronMessages_$logger extends DelegatingBasicLogger implements ElytronMessages, BasicLogger, Serializable {
+    private static final long serialVersionUID = 1L;
+<span class="nc" id="L25">    private static final String FQCN = ElytronMessages_$logger.class.getName();</span>
+    public ElytronMessages_$logger(final Logger log) {
+<span class="nc" id="L27">        super(log);</span>
+<span class="nc" id="L28">    }</span>
+<span class="nc" id="L29">    private static final Locale LOCALE = Locale.ROOT;</span>
+    protected Locale getLoggingLocale() {
+<span class="nc" id="L31">        return LOCALE;</span>
+    }
+    protected String generalInvalidName$str() {
+<span class="nc" id="L34">        return &quot;ELY00009: Invalid name \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException generalInvalidName(final String str) {
+<span class="nc" id="L38">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), generalInvalidName$str(), str));</span>
+<span class="nc" id="L39">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L40">        return result;</span>
+    }
+    private static void _copyStackTraceMinusOne(final Throwable e) {
+<span class="nc" id="L43">        final StackTraceElement[] st = e.getStackTrace();</span>
+<span class="nc" id="L44">        e.setStackTrace(Arrays.copyOfRange(st, 1, st.length));</span>
+<span class="nc" id="L45">    }</span>
+    protected String iterationCountNotSpecified$str() {
+<span class="nc" id="L47">        return &quot;ELY03025: Iteration count not specified for password based encryption&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException iterationCountNotSpecified() {
+<span class="nc" id="L51">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), iterationCountNotSpecified$str()));</span>
+<span class="nc" id="L52">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L53">        return result;</span>
+    }
+    protected String saltNotSpecified$str() {
+<span class="nc" id="L56">        return &quot;ELY03026: Salt not specified for password based encryption&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException saltNotSpecified() {
+<span class="nc" id="L60">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), saltNotSpecified$str()));</span>
+<span class="nc" id="L61">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L62">        return result;</span>
+    }
+    protected String initialKeyNotSpecified$str() {
+<span class="nc" id="L65">        return &quot;ELY03027: Initial key not specified for password based encryption&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException initialKeyNotSpecified() {
+<span class="nc" id="L69">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), initialKeyNotSpecified$str()));</span>
+<span class="nc" id="L70">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L71">        return result;</span>
+    }
+    protected String securityProviderDoesnExist$str() {
+<span class="nc" id="L74">        return &quot;ELY03028: Security provider \&quot;%s\&quot; doesn't exist&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException securityProviderDoesnExist(final String providerName) {
+<span class="nc" id="L78">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), securityProviderDoesnExist$str(), providerName));</span>
+<span class="nc" id="L79">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L80">        return result;</span>
+    }
+    protected String noSuchKeyAlgorithm$str() {
+<span class="nc" id="L83">        return &quot;ELY03029: No such key algorithm \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException noSuchKeyAlgorithm(final String algorithmName, final GeneralSecurityException cause) {
+<span class="nc" id="L87">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), noSuchKeyAlgorithm$str(), algorithmName), cause);</span>
+<span class="nc" id="L88">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L89">        return result;</span>
+    }
+    protected String closed$str() {
+<span class="nc" id="L92">        return &quot;ELY03030: I/O operation failed: closed&quot;;</span>
+    }
+    @Override
+    public final IOException closed() {
+<span class="nc" id="L96">        final IOException result = new IOException(String.format(getLoggingLocale(), closed$str()));</span>
+<span class="nc" id="L97">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L98">        return result;</span>
+    }
+    protected String wrongBase64InPBCompatibleMode$str() {
+<span class="nc" id="L101">        return &quot;ELY03032: Base64 string created with unsupported PicketBox version \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException wrongBase64InPBCompatibleMode(final String base64) {
+<span class="nc" id="L105">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), wrongBase64InPBCompatibleMode$str(), base64));</span>
+<span class="nc" id="L106">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L107">        return result;</span>
+    }
+    protected String mechanismNotSupported$str() {
+<span class="nc" id="L110">        return &quot;ELY04020: Mechanism \&quot;%s\&quot; not supported by transformation mapper&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException mechanismNotSupported(final String mechanism) {
+<span class="nc" id="L114">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), mechanismNotSupported$str(), mechanism));</span>
+<span class="nc" id="L115">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L116">        return result;</span>
+    }
+    protected String failedToEncode$str() {
+<span class="nc" id="L119">        return &quot;ELY08030: Failed to encode parameter specification&quot;;</span>
+    }
+    @Override
+    public final InvalidParameterSpecException failedToEncode(final Throwable cause) {
+<span class="nc" id="L123">        final InvalidParameterSpecException result = new InvalidParameterSpecException(String.format(getLoggingLocale(), failedToEncode$str()));</span>
+<span class="nc" id="L124">        result.initCause(cause);</span>
+<span class="nc" id="L125">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L126">        return result;</span>
+    }
+    protected String failedToDecode$str() {
+<span class="nc" id="L129">        return &quot;ELY08031: Failed to decode parameter specification&quot;;</span>
+    }
+    @Override
+    public final IOException failedToDecode(final Throwable cause) {
+<span class="nc" id="L133">        final IOException result = new IOException(String.format(getLoggingLocale(), failedToDecode$str()), cause);</span>
+<span class="nc" id="L134">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L135">        return result;</span>
+    }
+    protected String invalidParameterSpec$str() {
+<span class="nc" id="L138">        return &quot;ELY08032: Invalid parameter specification type (expected %s, got %s)&quot;;</span>
+    }
+    @Override
+    public final InvalidParameterSpecException invalidParameterSpec(final Class&lt;?&gt; expected, final Class&lt;?&gt; actual) {
+<span class="nc" id="L142">        final InvalidParameterSpecException result = new InvalidParameterSpecException(String.format(getLoggingLocale(), invalidParameterSpec$str(), expected, actual));</span>
+<span class="nc" id="L143">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L144">        return result;</span>
+    }
+    protected String invalidFormat$str() {
+<span class="nc" id="L147">        return &quot;ELY08033: Invalid format given (expected %s, got %s)&quot;;</span>
+    }
+    @Override
+    public final IOException invalidFormat(final String expected, final String actual) {
+<span class="nc" id="L151">        final IOException result = new IOException(String.format(getLoggingLocale(), invalidFormat$str(), expected, actual));</span>
+<span class="nc" id="L152">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L153">        return result;</span>
+    }
+    protected String algorithmParametersNotInitialized$str() {
+<span class="nc" id="L156">        return &quot;ELY08034: Algorithm parameters instance not initialized&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException algorithmParametersNotInitialized() {
+<span class="nc" id="L160">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), algorithmParametersNotInitialized$str()));</span>
+<span class="nc" id="L161">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L162">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

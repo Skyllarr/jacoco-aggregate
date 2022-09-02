@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PeriodicRotatingFileAuditEndpoint.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-audit</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.audit</a> &gt; <span class="el_source">PeriodicRotatingFileAuditEndpoint.java</span></div><h1>PeriodicRotatingFileAuditEndpoint.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2017 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.audit;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalAdjusters;
+import java.time.temporal.WeekFields;
+import java.util.Locale;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+import static org.wildfly.security.audit.ElytronMessages.audit;
+
+/**
+ * An audit endpoint which rotates the log at a preset time interval.
+ * Depending on set suffix, moves old log records into files tagged by timestamp.
+ * &lt;p&gt;
+ * Based on {@link org.jboss.logmanager.handlers.PeriodicSizeRotatingFileHandler}.
+ *
+ * @author &lt;a href=&quot;mailto:jkalina@redhat.com&quot;&gt;Jan Kalina&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:jperkins@redhat.com&quot;&gt;James R. Perkins&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:yborgess@redhat.com&quot;&gt;Yeray Borges&lt;/a&gt;
+ */
+public class PeriodicRotatingFileAuditEndpoint extends FileAuditEndpoint {
+
+    private final DateTimeFormatter format;
+    private final Period period;
+    private final ZoneId timeZone;
+<span class="nc" id="L53">    private long nextRollover = Long.MAX_VALUE;</span>
+    private String nextSuffix;
+
+    PeriodicRotatingFileAuditEndpoint(Builder builder) throws IOException {
+<span class="nc" id="L57">        super(builder);</span>
+<span class="nc" id="L58">        this.format = builder.format;</span>
+<span class="nc" id="L59">        this.period = builder.period;</span>
+<span class="nc" id="L60">        this.timeZone = builder.timeZone;</span>
+
+<span class="nc" id="L62">        final File file = getFile();</span>
+<span class="nc bnc" id="L63" title="All 4 branches missed.">        calcNextRollover(file != null &amp;&amp; file.lastModified() &gt; 0 ? file.lastModified() : clock.millis());</span>
+<span class="nc" id="L64">    }</span>
+
+    /**
+     * Checks whether time-based log rotation should be done and if so, it moves current log file
+     * into time-tagged file and exchange target file to continue logging into new, non-time-tagged file.
+     *
+     * @param instant time of the message acceptance
+     */
+    @Override
+    protected void preWrite(Instant instant) {
+<span class="nc" id="L74">        final long recordMillis = instant.toEpochMilli();</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        if (recordMillis &gt;= nextRollover) {</span>
+            try {
+<span class="nc" id="L77">                final File file = getFile();</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">                if (file == null) {</span>
+                    // no file is set; a direct output stream or writer was specified
+<span class="nc" id="L80">                    return;</span>
+                }
+<span class="nc" id="L82">                closeStreams(); // close the original file (some OSes won't let you move/rename a file that is open)</span>
+<span class="nc" id="L83">                final Path target = Paths.get(file.toPath() + nextSuffix);</span>
+<span class="nc" id="L84">                Files.move(file.toPath(), target, StandardCopyOption.REPLACE_EXISTING);</span>
+<span class="nc" id="L85">                setFile(file);</span>
+<span class="nc" id="L86">            } catch (IOException e) {</span>
+<span class="nc" id="L87">                audit.unableToRotateLogFile(e);</span>
+<span class="nc" id="L88">            }</span>
+<span class="nc" id="L89">            calcNextRollover(recordMillis);</span>
+        }
+<span class="nc" id="L91">    }</span>
+
+    /**
+     * For given time and period obtains time when should be new log file started
+     */
+    private void calcNextRollover(final long fromTime) {
+<span class="nc bnc" id="L97" title="All 4 branches missed.">        if (period == Period.NEVER || format == null) {</span>
+<span class="nc" id="L98">            nextRollover = Long.MAX_VALUE;</span>
+<span class="nc" id="L99">            return;</span>
+        }
+<span class="nc" id="L101">        ZonedDateTime zonedDateTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(fromTime), timeZone);</span>
+<span class="nc" id="L102">        nextSuffix = format.format(zonedDateTime);</span>
+<span class="nc bnc" id="L103" title="All 8 branches missed.">        switch (period) {</span>
+            case YEAR:
+<span class="nc" id="L105">                zonedDateTime = zonedDateTime.truncatedTo(ChronoUnit.DAYS)</span>
+<span class="nc" id="L106">                        .withDayOfYear(1)</span>
+<span class="nc" id="L107">                        .plus(1, ChronoUnit.YEARS);</span>
+<span class="nc" id="L108">                break;</span>
+            case MONTH:
+<span class="nc" id="L110">                zonedDateTime =  zonedDateTime.truncatedTo(ChronoUnit.DAYS)</span>
+<span class="nc" id="L111">                        .withDayOfMonth(1)</span>
+<span class="nc" id="L112">                        .plus(1,ChronoUnit.MONTHS);</span>
+<span class="nc" id="L113">                break;</span>
+            case WEEK:
+<span class="nc" id="L115">                zonedDateTime = zonedDateTime.truncatedTo(ChronoUnit.DAYS)</span>
+<span class="nc" id="L116">                        .with(TemporalAdjusters.next(WeekFields.of(Locale.getDefault()).getFirstDayOfWeek()));</span>
+<span class="nc" id="L117">                break;</span>
+            case DAY:
+<span class="nc" id="L119">                zonedDateTime = zonedDateTime.truncatedTo(ChronoUnit.DAYS)</span>
+<span class="nc" id="L120">                        .plus(1, ChronoUnit.DAYS);</span>
+<span class="nc" id="L121">                break;</span>
+            case HALF_DAY:
+<span class="nc" id="L123">                ZonedDateTime halfDay = ZonedDateTime.from(zonedDateTime).truncatedTo(ChronoUnit.DAYS)</span>
+<span class="nc" id="L124">                        .plus(1, ChronoUnit.HALF_DAYS);</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">                if ( zonedDateTime.isBefore(halfDay) ) {</span>
+<span class="nc" id="L126">                    zonedDateTime = halfDay;</span>
+                }else{
+<span class="nc" id="L128">                    zonedDateTime = halfDay.plus(1, ChronoUnit.HALF_DAYS);</span>
+                }
+<span class="nc" id="L130">                break;</span>
+            case HOUR:
+<span class="nc" id="L132">                zonedDateTime = zonedDateTime.truncatedTo(ChronoUnit.HOURS)</span>
+<span class="nc" id="L133">                        .plus(1, ChronoUnit.HOURS);</span>
+<span class="nc" id="L134">                break;</span>
+            case MINUTE:
+<span class="nc" id="L136">                zonedDateTime = zonedDateTime.truncatedTo(ChronoUnit.MINUTES)</span>
+<span class="nc" id="L137">                        .plus(1, ChronoUnit.MINUTES);</span>
+        }
+<span class="nc" id="L139">        nextRollover = zonedDateTime.toInstant().toEpochMilli();</span>
+<span class="nc" id="L140">    }</span>
+
+    /**
+     * Possible period values. Keep in strictly ascending order of magnitude.
+     */
+<span class="nc" id="L145">    enum Period {</span>
+<span class="nc" id="L146">        MINUTE,</span>
+<span class="nc" id="L147">        HOUR,</span>
+<span class="nc" id="L148">        HALF_DAY,</span>
+<span class="nc" id="L149">        DAY,</span>
+<span class="nc" id="L150">        WEEK,</span>
+<span class="nc" id="L151">        MONTH,</span>
+<span class="nc" id="L152">        YEAR,</span>
+<span class="nc" id="L153">        NEVER,</span>
+    }
+
+    /**
+     * Obtain a new {@link Builder} capable of building a {@link PeriodicRotatingFileAuditEndpoint}.
+     *
+     * @return a new {@link Builder} capable of building a {@link PeriodicRotatingFileAuditEndpoint}.
+     */
+    public static Builder builder() {
+<span class="nc" id="L162">        return new Builder();</span>
+    }
+
+    /**
+     * A builder for periodic rotating file audit endpoints.
+     */
+    public static class Builder extends FileAuditEndpoint.Builder {
+        DateTimeFormatter format;
+<span class="nc" id="L170">        Period period = Period.NEVER;</span>
+<span class="nc" id="L171">        ZoneId timeZone = ZoneId.systemDefault();</span>
+
+        Builder() {
+<span class="nc" id="L174">            super();</span>
+<span class="nc" id="L175">        }</span>
+
+        /**
+         * Set the configured time zone for this handler.
+         *
+         * @param timeZone the configured time zone
+         * @return this builder
+         */
+        public Builder setTimeZone(ZoneId timeZone) {
+<span class="nc" id="L184">            this.timeZone = checkNotNullParam(&quot;timeZone&quot;, timeZone);</span>
+
+<span class="nc" id="L186">            return this;</span>
+        }
+
+        /**
+         * Set the suffix string.  The string is in a format which can be understood by {@link java.time.format.DateTimeFormatter}.
+         * The period of the rotation is automatically calculated based on the suffix.
+         *
+         * @param suffix the suffix
+         * @return this builder
+         * @throws IllegalArgumentException if the suffix is not valid
+         */
+        public Builder setSuffix(String suffix) throws IllegalArgumentException {
+<span class="nc" id="L198">            format = DateTimeFormatter.ofPattern(suffix).withZone(timeZone);</span>
+<span class="nc" id="L199">            final int len = suffix.length();</span>
+<span class="nc" id="L200">            period = Period.NEVER;</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">            for (int i = 0; i &lt; len; i ++) {</span>
+<span class="nc bnc" id="L202" title="All 10 branches missed.">                switch (suffix.charAt(i)) {</span>
+<span class="nc" id="L203">                    case 'y': period = min(period, Period.YEAR); break;</span>
+<span class="nc" id="L204">                    case 'M': period = min(period, Period.MONTH); break;</span>
+                    case 'w':
+<span class="nc" id="L206">                    case 'W': period = min(period, Period.WEEK); break;</span>
+                    case 'D':
+                    case 'd':
+                    case 'F':
+<span class="nc" id="L210">                    case 'E': period = min(period, Period.DAY); break;</span>
+<span class="nc" id="L211">                    case 'a': period = min(period, Period.HALF_DAY); break;</span>
+                    case 'H':
+                    case 'k':
+                    case 'K':
+<span class="nc" id="L215">                    case 'h': period = min(period, Period.HOUR); break;</span>
+<span class="nc" id="L216">                    case 'm': period = min(period, Period.MINUTE); break;</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">                    case '\'': while (suffix.charAt(++i) != '\''){} break;</span>
+                    case 's':
+<span class="nc" id="L219">                    case 'S': throw audit.rotatingBySecondUnsupported(suffix);</span>
+                }
+            }
+
+<span class="nc" id="L223">            return this;</span>
+        }
+
+        /**
+         * Construct a new instance.
+         *
+         * @return the built audit endpoint.
+         * @throws IOException  if an I/O error occurs.
+         */
+        @Override
+        public AuditEndpoint build() throws IOException {
+<span class="nc" id="L234">            return new PeriodicRotatingFileAuditEndpoint(this);</span>
+        }
+    }
+
+    private static &lt;T extends Comparable&lt;? super T&gt;&gt; T min(T a, T b) {
+<span class="nc bnc" id="L239" title="All 2 branches missed.">        return a.compareTo(b) &lt;= 0 ? a : b;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

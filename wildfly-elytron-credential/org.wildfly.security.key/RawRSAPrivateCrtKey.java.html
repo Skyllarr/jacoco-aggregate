@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RawRSAPrivateCrtKey.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-credential</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.key</a> &gt; <span class="el_source">RawRSAPrivateCrtKey.java</span></div><h1>RawRSAPrivateCrtKey.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.key;
+
+import java.math.BigInteger;
+import java.security.Key;
+import java.security.interfaces.RSAPrivateCrtKey;
+import java.util.Objects;
+
+/**
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+class RawRSAPrivateCrtKey extends RawRSAPrivateKey implements RSAPrivateCrtKey {
+    private static final long serialVersionUID = - 4564257533496478680L;
+
+    private final BigInteger publicExponent;
+    private final BigInteger primeP;
+    private final BigInteger primeQ;
+    private final BigInteger primeExponentP;
+    private final BigInteger primeExponentQ;
+    private final BigInteger crtCoefficient;
+
+    RawRSAPrivateCrtKey(final RSAPrivateCrtKey original) {
+<span class="nc" id="L40">        super(original);</span>
+<span class="nc" id="L41">        publicExponent = original.getPublicExponent();</span>
+<span class="nc" id="L42">        primeP = original.getPrimeP();</span>
+<span class="nc" id="L43">        primeQ = original.getPrimeQ();</span>
+<span class="nc" id="L44">        primeExponentP = original.getPrimeExponentP();</span>
+<span class="nc" id="L45">        primeExponentQ = original.getPrimeExponentQ();</span>
+<span class="nc" id="L46">        crtCoefficient = original.getCrtCoefficient();</span>
+<span class="nc" id="L47">    }</span>
+
+    RawRSAPrivateCrtKey(final Key original) {
+<span class="nc" id="L50">        this((RSAPrivateCrtKey) original);</span>
+<span class="nc" id="L51">    }</span>
+
+    public BigInteger getPublicExponent() {
+<span class="nc" id="L54">        return publicExponent;</span>
+    }
+
+    public BigInteger getPrimeP() {
+<span class="nc" id="L58">        return primeP;</span>
+    }
+
+    public BigInteger getPrimeQ() {
+<span class="nc" id="L62">        return primeQ;</span>
+    }
+
+    public BigInteger getPrimeExponentP() {
+<span class="nc" id="L66">        return primeExponentP;</span>
+    }
+
+    public BigInteger getPrimeExponentQ() {
+<span class="nc" id="L70">        return primeExponentQ;</span>
+    }
+
+    public BigInteger getCrtCoefficient() {
+<span class="nc" id="L74">        return crtCoefficient;</span>
+    }
+
+    boolean isEqual(final Key key) {
+<span class="nc bnc" id="L78" title="All 4 branches missed.">        return key instanceof RSAPrivateCrtKey &amp;&amp; isEqual((RSAPrivateCrtKey) key);</span>
+    }
+
+    boolean isEqual(final RSAPrivateCrtKey key) {
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        return super.isEqual(key)</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">            &amp;&amp; Objects.equals(publicExponent, key.getPublicExponent())</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">            &amp;&amp; Objects.equals(primeP, key.getPrimeP())</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">            &amp;&amp; Objects.equals(primeQ, key.getPrimeQ())</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">            &amp;&amp; Objects.equals(primeExponentP, key.getPrimeExponentP())</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">            &amp;&amp; Objects.equals(primeExponentQ, key.getPrimeExponentQ())</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">            &amp;&amp; Objects.equals(crtCoefficient, key.getCrtCoefficient());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,1302 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LdapSecurityRealm.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-realm-ldap</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.realm.ldap</a> &gt; <span class="el_source">LdapSecurityRealm.java</span></div><h1>LdapSecurityRealm.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.realm.ldap;
+
+import static org.wildfly.security.auth.realm.ldap.ElytronMessages.log;
+
+import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.security.Principal;
+import java.security.Provider;
+import java.security.spec.AlgorithmParameterSpec;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.Spliterator;
+import java.util.Spliterators;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
+
+import javax.naming.Binding;
+import javax.naming.InvalidNameException;
+import javax.naming.NameNotFoundException;
+import javax.naming.NamingEnumeration;
+import javax.naming.NamingException;
+import javax.naming.ReferralException;
+import javax.naming.directory.Attribute;
+import javax.naming.directory.Attributes;
+import javax.naming.directory.BasicAttribute;
+import javax.naming.directory.DirContext;
+import javax.naming.directory.ModificationItem;
+import javax.naming.directory.SearchControls;
+import javax.naming.directory.SearchResult;
+import javax.naming.event.EventContext;
+import javax.naming.event.NamespaceChangeListener;
+import javax.naming.event.NamingEvent;
+import javax.naming.event.NamingExceptionEvent;
+import javax.naming.event.ObjectChangeListener;
+import javax.naming.ldap.Control;
+import javax.naming.ldap.LdapContext;
+import javax.naming.ldap.LdapName;
+import javax.naming.ldap.PagedResultsControl;
+import javax.naming.ldap.PagedResultsResponseControl;
+import javax.naming.ldap.Rdn;
+
+import org.wildfly.common.Assert;
+import org.wildfly.common.function.ExceptionSupplier;
+import org.wildfly.security.auth.principal.NamePrincipal;
+import org.wildfly.security.auth.realm.CacheableSecurityRealm;
+import org.wildfly.security.auth.realm.IdentitySharedExclusiveLock;
+import org.wildfly.security.auth.realm.IdentitySharedExclusiveLock.IdentityLock;
+import org.wildfly.security.auth.server.ModifiableRealmIdentityIterator;
+import org.wildfly.security.auth.server.ModifiableRealmIdentity;
+import org.wildfly.security.auth.server.ModifiableSecurityRealm;
+import org.wildfly.security.auth.server.NameRewriter;
+import org.wildfly.security.auth.server.RealmIdentity;
+import org.wildfly.security.auth.server.RealmUnavailableException;
+import org.wildfly.security.auth.SupportLevel;
+import org.wildfly.security.authz.AuthorizationIdentity;
+import org.wildfly.security.authz.MapAttributes;
+import org.wildfly.security.credential.AlgorithmCredential;
+import org.wildfly.security.credential.Credential;
+import org.wildfly.security.evidence.AlgorithmEvidence;
+import org.wildfly.security.evidence.Evidence;
+import org.wildfly.security.password.spec.Encoding;
+
+/**
+ * Security realm implementation backed by LDAP.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:jkalina@redhat.com&quot;&gt;Jan Kalina&lt;/a&gt;
+ */
+class LdapSecurityRealm implements ModifiableSecurityRealm, CacheableSecurityRealm {
+
+<span class="nc" id="L106">    private final String ENV_BINARY_ATTRIBUTES = &quot;java.naming.ldap.attributes.binary&quot;;</span>
+
+    private final Supplier&lt;Provider[]&gt; providers;
+    private final ExceptionSupplier&lt;DirContext, NamingException&gt; dirContextSupplier;
+    private final NameRewriter nameRewriter;
+    private final IdentityMapping identityMapping;
+    private final int pageSize;
+    private final Charset hashCharset;
+    private final Encoding hashEncoding;
+
+    private final List&lt;CredentialLoader&gt; credentialLoaders;
+    private final List&lt;CredentialPersister&gt; credentialPersisters;
+    private final List&lt;EvidenceVerifier&gt; evidenceVerifiers;
+
+<span class="nc" id="L120">    private final ConcurrentHashMap&lt;String, IdentitySharedExclusiveLock&gt; realmIdentityLocks = new ConcurrentHashMap&lt;&gt;();</span>
+
+<span class="nc" id="L122">    private Set&lt;Consumer&lt;Principal&gt;&gt; listenersPendingRegistration = new LinkedHashSet&lt;Consumer&lt;Principal&gt;&gt;();</span>
+
+    LdapSecurityRealm(final Supplier&lt;Provider[]&gt; providers,
+                      final ExceptionSupplier&lt;DirContext, NamingException&gt; dirContextSupplier,
+                      final NameRewriter nameRewriter,
+                      final IdentityMapping identityMapping,
+                      final List&lt;CredentialLoader&gt; credentialLoaders,
+                      final List&lt;CredentialPersister&gt; credentialPersisters,
+                      final List&lt;EvidenceVerifier&gt; evidenceVerifiers,
+                      final int pageSize,
+                      final Charset hashCharset,
+<span class="nc" id="L133">                      final Encoding hashEncoding) {</span>
+
+<span class="nc" id="L135">        this.providers = providers;</span>
+<span class="nc" id="L136">        this.dirContextSupplier = dirContextSupplier;</span>
+<span class="nc" id="L137">        this.nameRewriter = nameRewriter;</span>
+<span class="nc" id="L138">        this.identityMapping = identityMapping;</span>
+<span class="nc" id="L139">        this.pageSize = pageSize;</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">        this.hashCharset = hashCharset != null ? hashCharset : StandardCharsets.UTF_8;</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        this.hashEncoding = hashEncoding != null ? hashEncoding : Encoding.BASE64;</span>
+
+<span class="nc" id="L143">        this.credentialLoaders = credentialLoaders;</span>
+<span class="nc" id="L144">        this.credentialPersisters = credentialPersisters;</span>
+<span class="nc" id="L145">        this.evidenceVerifiers = evidenceVerifiers;</span>
+<span class="nc" id="L146">    }</span>
+
+    @Override
+    public RealmIdentity getRealmIdentity(final Principal principal) {
+<span class="nc" id="L150">        return getRealmIdentity(principal, false);</span>
+    }
+
+    @Override
+    public ModifiableRealmIdentity getRealmIdentityForUpdate(final Principal principal) {
+<span class="nc" id="L155">        return getRealmIdentity(principal, true);</span>
+    }
+
+    @Override
+    public void registerIdentityChangeListener(Consumer&lt;Principal&gt; listener) {
+<span class="nc" id="L160">        synchronized (this.listenersPendingRegistration) {</span>
+<span class="nc" id="L161">            DirContext dirContext = null;</span>
+            try {
+<span class="nc" id="L163">                dirContext = obtainContext();</span>
+<span class="nc" id="L164">                registerIdentityChangeListener(dirContext, listener);</span>
+<span class="nc" id="L165">            } catch (Exception cause) {</span>
+                // either connection died or realm not available during boot
+                // we need to wait, lets store
+<span class="nc" id="L168">                listenersPendingRegistration.add(listener);</span>
+
+<span class="nc" id="L170">                log.ldapRealmDeferRegistration();</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">                if (log.isDebugEnabled()) {</span>
+<span class="nc" id="L172">                    log.debug(&quot;Listener registration failure: &quot;, cause);</span>
+                }
+            } finally {
+<span class="nc bnc" id="L175" title="All 2 branches missed.">                if (dirContext != null) {</span>
+<span class="nc" id="L176">                    closeContext(dirContext);</span>
+                }
+            }
+<span class="nc" id="L179">        }</span>
+<span class="nc" id="L180">    }</span>
+
+    private void registerIdentityChangeListener(final DirContext dirContext, final Consumer&lt;Principal&gt; listener) throws NamingException {
+<span class="nc" id="L183">        EventContext eventContext = (EventContext) dirContext.lookup(&quot;&quot;);</span>
+<span class="nc" id="L184">        eventContext.addNamingListener(&quot;&quot;, EventContext.SUBTREE_SCOPE, new ServerNotificationListener(listener));</span>
+<span class="nc" id="L185">    }</span>
+
+    private ModifiableRealmIdentity getRealmIdentity(final Principal principal, final boolean exclusive) {
+<span class="nc bnc" id="L188" title="All 2 branches missed.">        if (! (principal instanceof NamePrincipal)) {</span>
+<span class="nc" id="L189">            return ModifiableRealmIdentity.NON_EXISTENT;</span>
+        }
+<span class="nc" id="L191">        String name = nameRewriter.rewriteName(principal.getName());</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">        if (name == null) {</span>
+<span class="nc" id="L193">            throw log.invalidName();</span>
+        }
+
+        // Acquire the appropriate lock for the realm identity
+<span class="nc" id="L197">        log.debugf(&quot;Obtaining lock for identity [%s]...&quot;, name);</span>
+<span class="nc" id="L198">        IdentitySharedExclusiveLock realmIdentityLock = getRealmIdentityLockForName(name);</span>
+        IdentityLock lock;
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        if (exclusive) {</span>
+<span class="nc" id="L201">            lock = realmIdentityLock.lockExclusive();</span>
+        } else {
+<span class="nc" id="L203">            lock = realmIdentityLock.lockShared();</span>
+        }
+<span class="nc" id="L205">        log.debugf(&quot;Obtained lock for identity [%s].&quot;, name);</span>
+<span class="nc" id="L206">        return new LdapRealmIdentity(name, lock, hashCharset, hashEncoding);</span>
+    }
+
+    private DirContext obtainContext() throws RealmUnavailableException {
+        try {
+<span class="nc" id="L211">            DirContext ctx = dirContextSupplier.get();</span>
+<span class="nc" id="L212">            synchronized (this.listenersPendingRegistration) {</span>
+                // we got ctx, this means connection is up
+                // add &amp; remove in case we are ok, take into account network failure.
+<span class="nc" id="L215">                final Iterator&lt;Consumer&lt;Principal&gt;&gt; it = this.listenersPendingRegistration.iterator();</span>
+<span class="nc bnc" id="L216" title="All 2 branches missed.">                while(it.hasNext()) {</span>
+<span class="nc" id="L217">                    registerIdentityChangeListener(ctx, it.next());</span>
+<span class="nc" id="L218">                    it.remove();</span>
+                }
+<span class="nc" id="L220">                return ctx;</span>
+            }
+<span class="nc" id="L222">        } catch (NamingException e) {</span>
+<span class="nc" id="L223">            throw log.ldapRealmFailedToObtainContext(e);</span>
+        }
+    }
+
+    private void closeContext(DirContext dirContext) {
+        try {
+<span class="nc" id="L229">            dirContext.close();</span>
+<span class="nc" id="L230">        } catch (NamingException e) {</span>
+<span class="nc" id="L231">            log.debug(&quot;LdapSecurityRealm failed to close DirContext&quot;, e);</span>
+<span class="nc" id="L232">        }</span>
+<span class="nc" id="L233">    }</span>
+
+    @Override
+    public ModifiableRealmIdentityIterator getRealmIdentityIterator() throws RealmUnavailableException {
+<span class="nc bnc" id="L237" title="All 2 branches missed.">        if (identityMapping.iteratorFilter == null) {</span>
+<span class="nc" id="L238">            throw log.ldapRealmNotConfiguredToSupportIteratingOverIdentities();</span>
+        }
+
+<span class="nc" id="L241">        final DirContext dirContext = obtainContext();</span>
+        final Stream&lt;SearchResult&gt; resultStream;
+<span class="nc" id="L243">        final LdapSearch ldapSearch = new LdapSearch(identityMapping.searchDn, identityMapping.searchRecursive, pageSize, identityMapping.iteratorFilter);</span>
+<span class="nc" id="L244">        ldapSearch.setReturningAttributes(Collections.singleton(identityMapping.rdnIdentifier));</span>
+
+<span class="nc" id="L246">        resultStream = ldapSearch.search(dirContext);</span>
+
+<span class="nc" id="L248">        Iterator&lt;String&gt; iterator = resultStream.map(entry -&gt; {</span>
+            try {
+<span class="nc" id="L250">                return (String) entry.getAttributes().get(identityMapping.rdnIdentifier).get();</span>
+<span class="nc" id="L251">            } catch (NamingException e) {</span>
+<span class="nc" id="L252">                throw new RuntimeException(log.ldapRealmIdentitySearchFailed(e));</span>
+            }
+<span class="nc" id="L254">        }).distinct().iterator(); // distinct to prevent deadlock on identity locking when one identity found twice</span>
+
+<span class="nc" id="L256">        return new ModifiableRealmIdentityIterator() {</span>
+
+            @Override
+            public boolean hasNext() {
+<span class="nc" id="L260">                return iterator.hasNext();</span>
+            }
+
+            @Override
+            public ModifiableRealmIdentity next() {
+<span class="nc" id="L265">                String name = iterator.next();</span>
+<span class="nc" id="L266">                return getRealmIdentityForUpdate(new NamePrincipal(name));</span>
+            }
+
+            @Override
+            public void close() throws RealmUnavailableException {
+<span class="nc" id="L271">                resultStream.close();</span>
+<span class="nc" id="L272">                closeContext(dirContext);</span>
+<span class="nc" id="L273">            }</span>
+        };
+    }
+
+    @Override
+    public SupportLevel getCredentialAcquireSupport(final Class&lt;? extends Credential&gt; credentialType, final String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc" id="L279">        Assert.checkNotNullParam(&quot;credentialType&quot;, credentialType);</span>
+<span class="nc" id="L280">        SupportLevel response = SupportLevel.UNSUPPORTED;</span>
+
+<span class="nc bnc" id="L282" title="All 2 branches missed.">        for (CredentialLoader loader : credentialLoaders) {</span>
+<span class="nc" id="L283">            SupportLevel support = loader.getCredentialAcquireSupport(credentialType, algorithmName, parameterSpec);</span>
+<span class="nc bnc" id="L284" title="All 2 branches missed.">            if (support.isDefinitelySupported()) {</span>
+                // One claiming it is definitely supported is enough!
+<span class="nc" id="L286">                return support;</span>
+            }
+<span class="nc bnc" id="L288" title="All 2 branches missed.">            if (response.compareTo(support) &lt; 0) {</span>
+<span class="nc" id="L289">                response = support;</span>
+            }
+<span class="nc" id="L291">        }</span>
+
+<span class="nc" id="L293">        return response;</span>
+    }
+
+    @Override
+    public SupportLevel getEvidenceVerifySupport(final Class&lt;? extends Evidence&gt; evidenceType, final String algorithmName) throws RealmUnavailableException {
+<span class="nc" id="L298">        Assert.checkNotNullParam(&quot;evidenceType&quot;, evidenceType);</span>
+<span class="nc" id="L299">        SupportLevel response = SupportLevel.UNSUPPORTED;</span>
+
+<span class="nc bnc" id="L301" title="All 2 branches missed.">        for (EvidenceVerifier verifier : evidenceVerifiers) {</span>
+<span class="nc" id="L302">            SupportLevel support = verifier.getEvidenceVerifySupport(evidenceType, algorithmName);</span>
+<span class="nc bnc" id="L303" title="All 2 branches missed.">            if (support.isDefinitelySupported()) {</span>
+                // One claiming it is definitely supported is enough!
+<span class="nc" id="L305">                return support;</span>
+            }
+<span class="nc bnc" id="L307" title="All 2 branches missed.">            if (response.compareTo(support) &lt; 0) {</span>
+<span class="nc" id="L308">                response = support;</span>
+            }
+<span class="nc" id="L310">        }</span>
+<span class="nc" id="L311">        return response;</span>
+    }
+
+    private IdentitySharedExclusiveLock getRealmIdentityLockForName(final String name) {
+<span class="nc" id="L315">        IdentitySharedExclusiveLock realmIdentityLock = realmIdentityLocks.get(name);</span>
+<span class="nc bnc" id="L316" title="All 2 branches missed.">        if (realmIdentityLock == null) {</span>
+<span class="nc" id="L317">            final IdentitySharedExclusiveLock newRealmIdentityLock = new IdentitySharedExclusiveLock();</span>
+<span class="nc" id="L318">            realmIdentityLock = realmIdentityLocks.putIfAbsent(name, newRealmIdentityLock);</span>
+<span class="nc bnc" id="L319" title="All 2 branches missed.">            if (realmIdentityLock == null) {</span>
+<span class="nc" id="L320">                realmIdentityLock = newRealmIdentityLock;</span>
+            }
+        }
+<span class="nc" id="L323">        return realmIdentityLock;</span>
+    }
+
+    private class LdapRealmIdentity implements ModifiableRealmIdentity {
+
+        private final String name;
+        private IdentityLock lock;
+        private final Charset hashCharset;
+        private final Encoding hashEncoding;
+
+<span class="nc" id="L333">        LdapRealmIdentity(final String name, final IdentityLock lock, final Charset hashCharset, final Encoding hashEncoding) {</span>
+<span class="nc" id="L334">            this.name = name;</span>
+<span class="nc" id="L335">            this.lock = lock;</span>
+<span class="nc" id="L336">            this.hashCharset = hashCharset;</span>
+<span class="nc" id="L337">            this.hashEncoding = hashEncoding;</span>
+<span class="nc" id="L338">        }</span>
+
+        public Principal getRealmIdentityPrincipal() {
+<span class="nc" id="L341">            return new NamePrincipal(name);</span>
+        }
+
+        public Charset getHashCharset() {
+<span class="nc" id="L345">            return this.hashCharset;</span>
+        }
+
+        @Override
+        public SupportLevel getCredentialAcquireSupport(final Class&lt;? extends Credential&gt; credentialType, final String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc" id="L350">            Assert.checkNotNullParam(&quot;credentialType&quot;, credentialType);</span>
+
+<span class="nc bnc" id="L352" title="All 2 branches missed.">            if (LdapSecurityRealm.this.getCredentialAcquireSupport(credentialType, algorithmName, parameterSpec) == SupportLevel.UNSUPPORTED) {</span>
+                // If not supported in general then definitely not supported for a specific principal.
+<span class="nc" id="L354">                return SupportLevel.UNSUPPORTED;</span>
+            }
+
+<span class="nc" id="L357">            DirContext dirContext = obtainContext();</span>
+            try {
+<span class="nc" id="L359">                Set&lt;String&gt; attributes = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L360">                Set&lt;String&gt; binaryAttributes = new HashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L361" title="All 2 branches missed.">                for (CredentialLoader loader : credentialLoaders) {</span>
+<span class="nc" id="L362">                    loader.addRequiredIdentityAttributes(attributes);</span>
+<span class="nc" id="L363">                    loader.addBinaryIdentityAttributes(binaryAttributes);</span>
+<span class="nc" id="L364">                }</span>
+
+<span class="nc" id="L366">                LdapIdentity identity = getIdentity(dirContext, attributes, binaryAttributes);</span>
+<span class="nc bnc" id="L367" title="All 2 branches missed.">                if (identity == null) {</span>
+<span class="nc" id="L368">                    return SupportLevel.UNSUPPORTED;</span>
+                }
+<span class="nc" id="L370">                SupportLevel support = SupportLevel.UNSUPPORTED;</span>
+<span class="nc bnc" id="L371" title="All 2 branches missed.">                for (CredentialLoader loader : credentialLoaders) {</span>
+<span class="nc bnc" id="L372" title="All 2 branches missed.">                    if (loader.getCredentialAcquireSupport(credentialType, algorithmName, parameterSpec).mayBeSupported()) {</span>
+<span class="nc" id="L373">                        IdentityCredentialLoader icl = loader.forIdentity(identity.getDirContext(), identity.getDistinguishedName(), identity.getEntry().getAttributes(), hashEncoding);</span>
+
+<span class="nc" id="L375">                        SupportLevel temp = icl.getCredentialAcquireSupport(credentialType, algorithmName, parameterSpec, providers);</span>
+<span class="nc bnc" id="L376" title="All 4 branches missed.">                        if (temp != null &amp;&amp; temp.isDefinitelySupported()) {</span>
+                            // As soon as one claims definite support we know it is supported.
+<span class="nc" id="L378">                            return temp;</span>
+                        }
+
+<span class="nc bnc" id="L381" title="All 4 branches missed.">                        if (temp != null &amp;&amp; support.compareTo(temp) &lt; 0) {</span>
+<span class="nc" id="L382">                            support = temp;</span>
+                        }
+                    }
+<span class="nc" id="L385">                }</span>
+<span class="nc" id="L386">                return support;</span>
+            } finally {
+<span class="nc" id="L388">                closeContext(dirContext);</span>
+            }
+        }
+
+        @Override
+        public &lt;C extends Credential&gt; C getCredential(final Class&lt;C&gt; credentialType) throws RealmUnavailableException {
+<span class="nc" id="L394">            return getCredential(credentialType, null);</span>
+        }
+
+        @Override
+        public &lt;C extends Credential&gt; C getCredential(final Class&lt;C&gt; credentialType, final String algorithmName) throws RealmUnavailableException {
+<span class="nc" id="L399">            return getCredential(credentialType, algorithmName, null);</span>
+        }
+
+        @Override
+        public &lt;C extends Credential&gt; C getCredential(final Class&lt;C&gt; credentialType, final String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc" id="L404">            Assert.checkNotNullParam(&quot;credentialType&quot;, credentialType);</span>
+
+<span class="nc bnc" id="L406" title="All 2 branches missed.">            if (LdapSecurityRealm.this.getCredentialAcquireSupport(credentialType, algorithmName, parameterSpec) == SupportLevel.UNSUPPORTED) {</span>
+                // If not supported in general then definitely not supported for a specific principal.
+<span class="nc" id="L408">                return null;</span>
+            }
+
+<span class="nc" id="L411">            DirContext dirContext = obtainContext();</span>
+            try {
+<span class="nc" id="L413">                Set&lt;String&gt; attributes = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L414">                Set&lt;String&gt; binaryAttributes = new HashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L415" title="All 2 branches missed.">                for (CredentialLoader loader : credentialLoaders) {</span>
+<span class="nc" id="L416">                    loader.addRequiredIdentityAttributes(attributes);</span>
+<span class="nc" id="L417">                    loader.addBinaryIdentityAttributes(binaryAttributes);</span>
+<span class="nc" id="L418">                }</span>
+
+<span class="nc" id="L420">                LdapIdentity identity = getIdentity(dirContext, attributes, binaryAttributes);</span>
+<span class="nc bnc" id="L421" title="All 2 branches missed.">                if (identity == null) {</span>
+<span class="nc" id="L422">                    return null;</span>
+                }
+<span class="nc bnc" id="L424" title="All 2 branches missed.">                for (CredentialLoader loader : credentialLoaders) {</span>
+<span class="nc bnc" id="L425" title="All 2 branches missed.">                    if (loader.getCredentialAcquireSupport(credentialType, algorithmName, parameterSpec).mayBeSupported()) {</span>
+<span class="nc" id="L426">                        IdentityCredentialLoader icl = loader.forIdentity(identity.getDirContext(), identity.getDistinguishedName(), identity.getEntry().getAttributes(), hashEncoding);</span>
+
+<span class="nc" id="L428">                        Credential credential = icl.getCredential(credentialType, algorithmName, parameterSpec, providers);</span>
+<span class="nc bnc" id="L429" title="All 2 branches missed.">                        if (credentialType.isInstance(credential)) {</span>
+<span class="nc" id="L430">                            return credentialType.cast(credential);</span>
+                        }
+                    }
+<span class="nc" id="L433">                }</span>
+            } finally {
+<span class="nc" id="L435">                closeContext(dirContext);</span>
+            }
+<span class="nc" id="L437">            return null;</span>
+        }
+
+        @Override
+        public void setCredentials(final Collection&lt;? extends Credential&gt; credentials) throws RealmUnavailableException {
+<span class="nc" id="L442">            Assert.checkNotNullParam(&quot;credentials&quot;, credentials);</span>
+
+<span class="nc" id="L444">            DirContext dirContext = obtainContext();</span>
+            try {
+<span class="nc" id="L446">                Set&lt;String&gt; attributes = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L447">                Set&lt;String&gt; binaryAttributes = new HashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L448" title="All 2 branches missed.">                for (CredentialPersister persister : credentialPersisters) {</span>
+<span class="nc" id="L449">                    persister.addRequiredIdentityAttributes(attributes);</span>
+<span class="nc" id="L450">                    persister.addBinaryIdentityAttributes(binaryAttributes);</span>
+<span class="nc" id="L451">                }</span>
+
+<span class="nc" id="L453">                LdapIdentity identity = getIdentity(dirContext, attributes, binaryAttributes);</span>
+<span class="nc bnc" id="L454" title="All 2 branches missed.">                if (identity == null) {</span>
+<span class="nc" id="L455">                    throw log.ldapRealmIdentityNotExists(name);</span>
+                }
+
+                // verify support
+<span class="nc bnc" id="L459" title="All 2 branches missed.">                for (Credential credential : credentials) {</span>
+<span class="nc" id="L460">                    final Class&lt;? extends Credential&gt; credentialType = credential.getClass();</span>
+<span class="nc bnc" id="L461" title="All 2 branches missed.">                    final String algorithmName = credential instanceof AlgorithmCredential ? ((AlgorithmCredential) credential).getAlgorithm() : null;</span>
+<span class="nc bnc" id="L462" title="All 2 branches missed.">                    final AlgorithmParameterSpec parameterSpec = credential instanceof AlgorithmCredential ? ((AlgorithmCredential) credential).getParameters() : null;</span>
+<span class="nc" id="L463">                    boolean supported = false;</span>
+<span class="nc bnc" id="L464" title="All 2 branches missed.">                    for (CredentialPersister persister : credentialPersisters) {</span>
+<span class="nc" id="L465">                        IdentityCredentialPersister icp = persister.forIdentity(identity.getDirContext(), identity.getDistinguishedName(), identity.getEntry().getAttributes());</span>
+<span class="nc bnc" id="L466" title="All 2 branches missed.">                        if (icp.getCredentialPersistSupport(credentialType, algorithmName, parameterSpec)) {</span>
+<span class="nc" id="L467">                            supported = true;</span>
+                        }
+<span class="nc" id="L469">                    }</span>
+<span class="nc bnc" id="L470" title="All 2 branches missed.">                    if (!supported) {</span>
+<span class="nc" id="L471">                        throw log.ldapRealmsPersisterNotSupported();</span>
+                    }
+<span class="nc" id="L473">                }</span>
+
+                // clear
+<span class="nc bnc" id="L476" title="All 2 branches missed.">                for (CredentialPersister persister : credentialPersisters) {</span>
+<span class="nc" id="L477">                    IdentityCredentialPersister icp = persister.forIdentity(identity.getDirContext(), identity.getDistinguishedName(), identity.getEntry().getAttributes());</span>
+<span class="nc" id="L478">                    icp.clearCredentials();</span>
+<span class="nc" id="L479">                }</span>
+
+                // set
+<span class="nc bnc" id="L482" title="All 2 branches missed.">                for (Credential credential : credentials) {</span>
+<span class="nc" id="L483">                    final Class&lt;? extends Credential&gt; credentialType = credential.getClass();</span>
+<span class="nc bnc" id="L484" title="All 2 branches missed.">                    final String algorithmName = credential instanceof AlgorithmCredential ? ((AlgorithmCredential) credential).getAlgorithm() : null;</span>
+<span class="nc bnc" id="L485" title="All 2 branches missed.">                    final AlgorithmParameterSpec parameterSpec = credential instanceof AlgorithmCredential ? ((AlgorithmCredential) credential).getParameters() : null;</span>
+<span class="nc bnc" id="L486" title="All 2 branches missed.">                    for (CredentialPersister persister : credentialPersisters) {</span>
+<span class="nc" id="L487">                        IdentityCredentialPersister icp = persister.forIdentity(identity.getDirContext(), identity.getDistinguishedName(), identity.getEntry().getAttributes());</span>
+<span class="nc bnc" id="L488" title="All 2 branches missed.">                        if (icp.getCredentialPersistSupport(credentialType, algorithmName, parameterSpec)) {</span>
+<span class="nc" id="L489">                            icp.persistCredential(credential);</span>
+                            // next credential
+<span class="nc" id="L491">                            break;</span>
+                        }
+<span class="nc" id="L493">                    }</span>
+<span class="nc" id="L494">                }</span>
+
+            } finally {
+<span class="nc" id="L497">                closeContext(dirContext);</span>
+            }
+<span class="nc" id="L499">        }</span>
+
+        @Override
+        public void dispose() {
+            // Release the lock for this realm identity
+<span class="nc" id="L504">            IdentityLock identityLock = lock;</span>
+<span class="nc" id="L505">            lock = null;</span>
+<span class="nc bnc" id="L506" title="All 2 branches missed.">            if (identityLock != null) {</span>
+<span class="nc" id="L507">                identityLock.release();</span>
+            }
+<span class="nc" id="L509">        }</span>
+
+        @Override
+        public AuthorizationIdentity getAuthorizationIdentity() throws RealmUnavailableException {
+<span class="nc" id="L513">            return AuthorizationIdentity.basicIdentity(getAttributes());</span>
+        }
+
+        @Override
+        public org.wildfly.security.authz.Attributes getAttributes() throws RealmUnavailableException {
+<span class="nc" id="L518">            DirContext context = obtainContext();</span>
+            try {
+<span class="nc" id="L520">                LdapIdentity identity = getIdentity(context,</span>
+<span class="nc" id="L521">                        identityMapping.attributes.stream()</span>
+<span class="nc" id="L522">                        .map(AttributeMapping::getIdentityLdapName)</span>
+<span class="nc" id="L523">                        .filter(Objects::nonNull)</span>
+<span class="nc" id="L524">                        .collect(Collectors.toSet()),</span>
+                        null);
+
+<span class="nc bnc" id="L527" title="All 2 branches missed.">                SearchResult entry = identity != null ? identity.getEntry() : null;</span>
+<span class="nc bnc" id="L528" title="All 2 branches missed.">                DirContext identityContext = identity != null ? identity.getDirContext() : null;</span>
+
+<span class="nc" id="L530">                MapAttributes attributes = new MapAttributes();</span>
+<span class="nc" id="L531">                attributes.addAll(extractSimpleAttributes(entry));</span>
+<span class="nc" id="L532">                attributes.addAll(extractFilteredAttributes(entry, context, identityContext));</span>
+
+<span class="nc bnc" id="L534" title="All 2 branches missed.">                if (log.isDebugEnabled()) {</span>
+<span class="nc" id="L535">                    log.debugf(&quot;Obtaining authorization identity attributes for principal [%s]:&quot;, name);</span>
+
+<span class="nc bnc" id="L537" title="All 2 branches missed.">                    if (attributes.isEmpty()) {</span>
+<span class="nc" id="L538">                        log.debugf(&quot;Identity [%s] does not have any attributes.&quot;, name);</span>
+                    } else {
+<span class="nc" id="L540">                        log.debugf(&quot;Identity [%s] attributes are:&quot;, name);</span>
+<span class="nc" id="L541">                        attributes.keySet().forEach(key -&gt; {</span>
+<span class="nc" id="L542">                            org.wildfly.security.authz.Attributes.Entry values = attributes.get(key);</span>
+<span class="nc" id="L543">                            values.forEach(value -&gt; log.debugf(&quot;    Attribute [%s] value [%s].&quot;, key, value));</span>
+<span class="nc" id="L544">                        });</span>
+                    }
+                }
+
+<span class="nc" id="L548">                return attributes.asReadOnly();</span>
+            } finally {
+<span class="nc" id="L550">                closeContext(context);</span>
+            }
+        }
+
+        @Override
+        public SupportLevel getEvidenceVerifySupport(final Class&lt;? extends Evidence&gt; evidenceType, final String algorithmName) throws RealmUnavailableException {
+<span class="nc" id="L556">            Assert.checkNotNullParam(&quot;evidenceType&quot;, evidenceType);</span>
+
+<span class="nc" id="L558">            DirContext dirContext = obtainContext();</span>
+            try {
+
+<span class="nc" id="L561">                Set&lt;String&gt; attributes = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L562">                Set&lt;String&gt; binaryAttributes = new HashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L563" title="All 2 branches missed.">                for (EvidenceVerifier verifier : evidenceVerifiers) {</span>
+<span class="nc" id="L564">                    verifier.addRequiredIdentityAttributes(attributes);</span>
+<span class="nc" id="L565">                    verifier.addBinaryIdentityAttributes(binaryAttributes);</span>
+<span class="nc" id="L566">                }</span>
+
+<span class="nc" id="L568">                LdapIdentity identity = getIdentity(dirContext, attributes, binaryAttributes);</span>
+<span class="nc bnc" id="L569" title="All 2 branches missed.">                if (identity == null) {</span>
+<span class="nc" id="L570">                    return SupportLevel.UNSUPPORTED;</span>
+                }
+
+<span class="nc" id="L573">                SupportLevel response = SupportLevel.UNSUPPORTED;</span>
+<span class="nc bnc" id="L574" title="All 2 branches missed.">                for (EvidenceVerifier verifier : evidenceVerifiers) {</span>
+<span class="nc bnc" id="L575" title="All 2 branches missed.">                    if (verifier.getEvidenceVerifySupport(evidenceType, algorithmName).mayBeSupported()) {</span>
+<span class="nc" id="L576">                        final IdentityEvidenceVerifier iev = verifier.forIdentity(identity.getDirContext(), identity.getDistinguishedName(), identity.getUrl(), identity.getEntry().getAttributes(), hashEncoding);</span>
+
+<span class="nc" id="L578">                        final SupportLevel support = iev.getEvidenceVerifySupport(evidenceType, algorithmName, providers);</span>
+<span class="nc bnc" id="L579" title="All 4 branches missed.">                        if (support != null &amp;&amp; support.isDefinitelySupported()) {</span>
+                            // As soon as one claims definite support we know it is supported.
+<span class="nc" id="L581">                            return support;</span>
+                        }
+
+<span class="nc bnc" id="L584" title="All 4 branches missed.">                        if (support != null &amp;&amp; response.compareTo(support) &lt; 0) {</span>
+<span class="nc" id="L585">                            response = support;</span>
+                        }
+                    }
+<span class="nc" id="L588">                }</span>
+<span class="nc" id="L589">                return response;</span>
+            } finally {
+<span class="nc" id="L591">                closeContext(dirContext);</span>
+            }
+        }
+
+        @Override
+        public boolean verifyEvidence(final Evidence evidence) throws RealmUnavailableException {
+<span class="nc" id="L597">            Assert.checkNotNullParam(&quot;evidence&quot;, evidence);</span>
+
+<span class="nc" id="L599">            final Class&lt;? extends Evidence&gt; evidenceType = evidence.getClass();</span>
+<span class="nc bnc" id="L600" title="All 2 branches missed.">            final String algorithmName = evidence instanceof AlgorithmEvidence ? ((AlgorithmEvidence) evidence).getAlgorithm() : null;</span>
+
+<span class="nc bnc" id="L602" title="All 2 branches missed.">            if (LdapSecurityRealm.this.getEvidenceVerifySupport(evidenceType, algorithmName) == SupportLevel.UNSUPPORTED) {</span>
+                // If not supported in general then definitely not supported for a specific principal.
+<span class="nc" id="L604">                return false;</span>
+            }
+
+<span class="nc" id="L607">            DirContext dirContext = obtainContext();</span>
+            try {
+<span class="nc" id="L609">                Set&lt;String&gt; attributes = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L610">                Set&lt;String&gt; binaryAttributes = new HashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L611" title="All 2 branches missed.">                for (EvidenceVerifier verifier : evidenceVerifiers) {</span>
+<span class="nc" id="L612">                    verifier.addRequiredIdentityAttributes(attributes);</span>
+<span class="nc" id="L613">                    verifier.addBinaryIdentityAttributes(binaryAttributes);</span>
+<span class="nc" id="L614">                }</span>
+
+<span class="nc" id="L616">                LdapIdentity identity = getIdentity(dirContext, attributes, binaryAttributes);</span>
+<span class="nc bnc" id="L617" title="All 2 branches missed.">                if (identity == null) {</span>
+<span class="nc" id="L618">                    return false;</span>
+                }
+
+<span class="nc bnc" id="L621" title="All 2 branches missed.">                for (EvidenceVerifier verifier : evidenceVerifiers) {</span>
+<span class="nc bnc" id="L622" title="All 2 branches missed.">                    if (verifier.getEvidenceVerifySupport(evidenceType, algorithmName).mayBeSupported()) {</span>
+<span class="nc" id="L623">                        IdentityEvidenceVerifier iev = verifier.forIdentity(identity.getDirContext(), identity.getDistinguishedName(), identity.getUrl(), identity.getEntry().getAttributes(), hashEncoding);</span>
+
+<span class="nc bnc" id="L625" title="All 2 branches missed.">                        if (iev.verifyEvidence(evidence, providers, hashCharset)) {</span>
+<span class="nc" id="L626">                            return true;</span>
+                        }
+                    }
+<span class="nc" id="L629">                }</span>
+            } finally {
+<span class="nc" id="L631">                closeContext(dirContext);</span>
+            }
+<span class="nc" id="L633">            return false;</span>
+        }
+
+        @Override
+        public boolean exists() throws RealmUnavailableException {
+<span class="nc" id="L638">            DirContext dirContext = obtainContext();</span>
+            try {
+<span class="nc" id="L640">                LdapIdentity identity = getIdentity(dirContext);</span>
+<span class="nc bnc" id="L641" title="All 2 branches missed.">                boolean exists = identity != null;</span>
+
+<span class="nc bnc" id="L643" title="All 2 branches missed.">                if (!exists) {</span>
+<span class="nc" id="L644">                    log.debugf(&quot;Principal [%s] does not exists.&quot;, name);</span>
+                }
+
+<span class="nc" id="L647">                return exists;</span>
+            } finally {
+<span class="nc" id="L649">                closeContext(dirContext);</span>
+            }
+        }
+
+        private LdapSearch createLdapSearchByDn() {
+<span class="nc bnc" id="L654" title="All 2 branches missed.">            if ( ! name.regionMatches(true, 0, identityMapping.rdnIdentifier, 0, identityMapping.rdnIdentifier.length())) {</span>
+<span class="nc" id="L655">                return null;</span>
+            } // equal sign not checked here as whitespaces can be between yet
+            try {
+<span class="nc" id="L658">                LdapName ldapName = new LdapName(name);</span>
+<span class="nc" id="L659">                int rdnPosition = ldapName.size() - 1;</span>
+<span class="nc" id="L660">                Rdn rdnIdentifier = ldapName.getRdn(rdnPosition);</span>
+<span class="nc bnc" id="L661" title="All 2 branches missed.">                if ( ! rdnIdentifier.getType().equalsIgnoreCase(identityMapping.rdnIdentifier)) { // uid=...</span>
+<span class="nc" id="L662">                    log.tracef(&quot;Getting identity [%s] by DN skipped - RDN does not match [%s]&quot;, name, identityMapping.rdnIdentifier);</span>
+<span class="nc" id="L663">                    return null;</span>
+                }
+<span class="nc bnc" id="L665" title="All 2 branches missed.">                if (identityMapping.searchDn != null) {</span>
+<span class="nc" id="L666">                    List&lt;Rdn&gt; expectedStart = new LdapName(identityMapping.searchDn).getRdns();</span>
+<span class="nc bnc" id="L667" title="All 2 branches missed.">                    if ( ! ldapName.startsWith(expectedStart)) { // ...,search-dn</span>
+<span class="nc" id="L668">                        log.tracef(&quot;Getting identity [%s] by DN skipped - DN not in search-dn [%s]&quot;, name, identityMapping.searchDn);</span>
+<span class="nc" id="L669">                        return null;</span>
+                    }
+<span class="nc bnc" id="L671" title="All 4 branches missed.">                    if ( ! identityMapping.searchRecursive &amp;&amp; ldapName.size() != expectedStart.size() + 1) {</span>
+<span class="nc" id="L672">                        log.tracef(&quot;Getting identity [%s] by DN skipped - DN not directly in search-dn and recursive search not enabled [%s]&quot;, name, identityMapping.searchDn);</span>
+<span class="nc" id="L673">                        return null;</span>
+                    }
+                }
+<span class="nc" id="L676">                return new LdapSearch(ldapName.toString(), SearchControls.OBJECT_SCOPE, 0, identityMapping.filterName, rdnIdentifier.getValue().toString());</span>
+
+<span class="nc" id="L678">            } catch (InvalidNameException e) {</span>
+<span class="nc" id="L679">                log.tracef(e, &quot;Getting identity [%s] by DN failed - will continue by name&quot;, name);</span>
+            }
+<span class="nc" id="L681">            return null;</span>
+        }
+
+        private LdapIdentity getIdentity(DirContext dirContext) throws RealmUnavailableException {
+<span class="nc" id="L685">            return getIdentity(dirContext, null, null);</span>
+        }
+
+        private LdapIdentity getIdentity(DirContext dirContext, Collection&lt;String&gt; returningAttributes, Collection&lt;String&gt; binaryAttributes) throws RealmUnavailableException {
+<span class="nc" id="L689">            log.debugf(&quot;Trying to create identity for principal [%s].&quot;, name);</span>
+<span class="nc" id="L690">            LdapSearch ldapSearch = createLdapSearchByDn();</span>
+<span class="nc bnc" id="L691" title="All 2 branches missed.">            if (ldapSearch == null) { // name is not a valid DN, search by name</span>
+<span class="nc bnc" id="L692" title="All 2 branches missed.">                if (identityMapping.searchDn != null) {</span>
+<span class="nc" id="L693">                    ldapSearch = new LdapSearch(identityMapping.searchDn, identityMapping.searchRecursive, 0, identityMapping.filterName, name);</span>
+                } else {
+<span class="nc" id="L695">                    log.debugf(&quot;Identity for principal [%s] not found. The name is not a valid DN and the search base DN is null&quot;, name);</span>
+<span class="nc" id="L696">                    return null;</span>
+                }
+            }
+
+<span class="nc" id="L700">            ldapSearch.setReturningAttributes(returningAttributes);</span>
+<span class="nc" id="L701">            ldapSearch.setBinaryAttributes(binaryAttributes);</span>
+
+<span class="nc" id="L703">            final LdapSearch ldapSearchFinal = ldapSearch;</span>
+<span class="nc" id="L704">            try (Stream&lt;SearchResult&gt; resultsStream = ldapSearch.search(dirContext)) {</span>
+<span class="nc" id="L705">                SearchResult result = resultsStream.findFirst().orElse(null);</span>
+<span class="nc bnc" id="L706" title="All 2 branches missed.">                if (result != null) {</span>
+<span class="nc bnc" id="L707" title="All 2 branches missed.">                    LdapIdentity identity = new LdapIdentity(name, ldapSearchFinal.getContext(), result.getNameInNamespace(), result.isRelative() ? null : result.getName(), result);</span>
+<span class="nc" id="L708">                    log.debugf(&quot;Identity for principal [%s] found at [%s].&quot;, name, identity.getDistinguishedName());</span>
+<span class="nc" id="L709">                    return identity;</span>
+                } else {
+<span class="nc" id="L711">                    log.debugf(&quot;Identity for principal [%s] not found.&quot;, name);</span>
+<span class="nc" id="L712">                    return null;</span>
+                }
+<span class="nc bnc" id="L714" title="All 2 branches missed.">            }</span>
+        }
+
+        private String extractRdn(AttributeMapping mapping, final String dn) {
+<span class="nc" id="L718">            String valueRdn = mapping.getRdn();</span>
+            try {
+<span class="nc" id="L720">                LdapName dnName = new LdapName(dn);</span>
+                // loop RDNs in reverse order, left to right, to return the leftmost one that matches
+<span class="nc bnc" id="L722" title="All 2 branches missed.">                for (int i = dnName.size() - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L723">                    Rdn rdn = dnName.getRdn(i);</span>
+<span class="nc bnc" id="L724" title="All 2 branches missed.">                    if (rdn.getType().equalsIgnoreCase(valueRdn)) {</span>
+<span class="nc" id="L725">                        return rdn.getValue().toString();</span>
+                    }
+                }
+<span class="nc" id="L728">            } catch (Exception cause) {</span>
+<span class="nc" id="L729">                throw log.ldapRealmInvalidRdnForAttribute(mapping.getName(), dn, valueRdn, cause);</span>
+<span class="nc" id="L730">            }</span>
+<span class="nc" id="L731">            return null;</span>
+        }
+
+        /**
+         * Obtains attribute value by mapping from given entry and put it into given collection.
+         *
+         * @param entry LDAP entry, from which should be values obtained
+         * @param mapping attribute mapping defining attribute, whose values should be obtained
+         * @param outputCollection output collection for obtained values
+         * @return {@code true} if {@code outputCollection} was changed.
+         */
+        private boolean valuesFromAttribute(SearchResult entry, AttributeMapping mapping, Collection&lt;String&gt; outputCollection) throws NamingException {
+<span class="nc bnc" id="L743" title="All 2 branches missed.">            if (mapping.getLdapName() == null) {</span>
+<span class="nc" id="L744">                String value = entry.getNameInNamespace();</span>
+<span class="nc bnc" id="L745" title="All 2 branches missed.">                if (mapping.getRdn() != null) {</span>
+<span class="nc" id="L746">                    value = extractRdn(mapping, value);</span>
+                }
+<span class="nc" id="L748">                return outputCollection.add(value);</span>
+            } else {
+<span class="nc" id="L750">                Attributes entryAttributes = entry.getAttributes();</span>
+<span class="nc" id="L751">                javax.naming.directory.Attribute ldapAttribute = entryAttributes.get(mapping.getLdapName());</span>
+<span class="nc bnc" id="L752" title="All 2 branches missed.">                if (ldapAttribute == null) return false;</span>
+<span class="nc" id="L753">                NamingEnumeration&lt;?&gt; attributesEnum = null;</span>
+                try {
+<span class="nc" id="L755">                    attributesEnum = ldapAttribute.getAll();</span>
+<span class="nc" id="L756">                    Stream&lt;String&gt; values = Collections.list(attributesEnum).stream().map(Object::toString);</span>
+<span class="nc bnc" id="L757" title="All 2 branches missed.">                    if (mapping.getRdn() != null) {</span>
+<span class="nc" id="L758">                        values = values.map(val -&gt; extractRdn(mapping, val)).filter(Objects::nonNull);</span>
+                    }
+<span class="nc bnc" id="L760" title="All 2 branches missed.">                    return values.map(outputCollection::add).filter(changed -&gt; changed).count() != 0;</span>
+                } finally {
+<span class="nc bnc" id="L762" title="All 2 branches missed.">                    if (attributesEnum != null) {</span>
+                        try {
+<span class="nc" id="L764">                            attributesEnum.close();</span>
+<span class="nc" id="L765">                        } catch (NamingException ignore) {</span>
+<span class="nc" id="L766">                        }</span>
+                    }
+                }
+            }
+        }
+
+        private Map&lt;String, Collection&lt;String&gt;&gt; extractFilteredAttributes(SearchResult identityEntry, DirContext context, DirContext identityContext) {
+<span class="nc" id="L773">            return extractAttributes(AttributeMapping::isFilteredOrReference, mapping -&gt; {</span>
+<span class="nc bnc" id="L774" title="All 2 branches missed.">                Collection&lt;String&gt; values = mapping.getRoleRecursionDepth() == 0 ? new ArrayList&lt;&gt;() : new HashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L775" title="All 2 branches missed.">                final String searchDn = mapping.getSearchDn() != null ? mapping.getSearchDn() : identityMapping.searchDn;</span>
+
+<span class="nc" id="L777">                List&lt;SearchResult&gt; toSearch = new LinkedList&lt;&gt;();</span>
+<span class="nc" id="L778">                toSearch.add(identityEntry);</span>
+
+<span class="nc bnc" id="L780" title="All 4 branches missed.">                for (int depth = 0; depth &lt;= mapping.getRoleRecursionDepth() &amp;&amp; ! toSearch.isEmpty(); depth++) {</span>
+<span class="nc" id="L781">                    List&lt;SearchResult&gt; toSearchInNextLevel = new LinkedList&lt;&gt;();</span>
+<span class="nc bnc" id="L782" title="All 2 branches missed.">                    for(SearchResult entry : toSearch) {</span>
+<span class="nc bnc" id="L783" title="All 2 branches missed.">                        final String entryDn = entry != null ? entry.getNameInNamespace() : null;</span>
+<span class="nc bnc" id="L784" title="All 4 branches missed.">                        if (mapping.getReference() != null &amp;&amp; entry != null) { // reference</span>
+<span class="nc" id="L785">                            forEachAttributeValue(entry, mapping.getReference(), value -&gt; {</span>
+<span class="nc" id="L786">                                LdapSearch search = new LdapSearch(value);</span>
+<span class="nc" id="L787">                                extractFilteredAttributesFromSearch(search, entry, mapping, context, identityContext, values, toSearchInNextLevel);</span>
+<span class="nc" id="L788">                            });</span>
+<span class="nc bnc" id="L789" title="All 2 branches missed.">                        } else if (mapping.getReference() == null) { // filter</span>
+<span class="nc bnc" id="L790" title="All 2 branches missed.">                            if (depth == 0) { // roles of identity</span>
+<span class="nc" id="L791">                                LdapSearch search = new LdapSearch(searchDn, mapping.getRecursiveSearch(), 0, mapping.getFilter(), name, entryDn);</span>
+<span class="nc" id="L792">                                extractFilteredAttributesFromSearch(search, entry, mapping, context, identityContext, values, toSearchInNextLevel);</span>
+<span class="nc bnc" id="L793" title="All 2 branches missed.">                            } else if (entry != null) { // roles of role</span>
+<span class="nc" id="L794">                                forEachAttributeValue(entry, mapping.getRoleRecursionName(), roleName -&gt; {</span>
+<span class="nc" id="L795">                                    LdapSearch search = new LdapSearch(searchDn, mapping.getRecursiveSearch(), 0, mapping.getFilter(), roleName, entryDn);</span>
+<span class="nc" id="L796">                                    extractFilteredAttributesFromSearch(search, entry, mapping, context, identityContext, values, toSearchInNextLevel);</span>
+<span class="nc" id="L797">                                });</span>
+                            }
+                        }
+<span class="nc" id="L800">                    }</span>
+<span class="nc" id="L801">                    toSearch = toSearchInNextLevel;</span>
+                }
+<span class="nc" id="L803">                return values;</span>
+            });
+        }
+
+        private void extractFilteredAttributesFromSearch(LdapSearch search, SearchResult referencedEntry, AttributeMapping mapping, DirContext context, DirContext identityContext, Collection&lt;String&gt; identityAttributeValues, Collection&lt;SearchResult&gt; toSearchInNextLevel) {
+<span class="nc bnc" id="L808" title="All 2 branches missed.">            String referencedDn = referencedEntry != null ? referencedEntry.getNameInNamespace() : null;</span>
+
+<span class="nc" id="L810">            Set&lt;String&gt; attributes = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L811">            attributes.add(mapping.getLdapName());</span>
+<span class="nc" id="L812">            attributes.add(mapping.getReference());</span>
+<span class="nc" id="L813">            attributes.add(mapping.getRoleRecursionName());</span>
+<span class="nc" id="L814">            search.setReturningAttributes(attributes);</span>
+
+<span class="nc bnc" id="L816" title="All 2 branches missed.">            try (Stream&lt;SearchResult&gt; entries = search.search(mapping.searchInIdentityContext() ? identityContext : context)) {</span>
+<span class="nc" id="L817">                entries.forEach(entry -&gt; {</span>
+                    try {
+<span class="nc bnc" id="L819" title="All 2 branches missed.">                        if (valuesFromAttribute(entry, mapping, identityAttributeValues)) {</span>
+<span class="nc" id="L820">                            toSearchInNextLevel.add(entry);</span>
+                        }
+<span class="nc" id="L822">                    } catch (Exception cause) {</span>
+<span class="nc" id="L823">                        throw ElytronMessages.log.ldapRealmFailedObtainAttributes(referencedDn, cause);</span>
+<span class="nc" id="L824">                    }</span>
+<span class="nc" id="L825">                });</span>
+<span class="nc" id="L826">            } catch (Exception cause) {</span>
+<span class="nc" id="L827">                throw ElytronMessages.log.ldapRealmFailedObtainAttributes(referencedDn, cause);</span>
+<span class="nc" id="L828">            }</span>
+<span class="nc" id="L829">        }</span>
+
+        private Map&lt;String, Collection&lt;String&gt;&gt; extractSimpleAttributes(SearchResult identityEntry) {
+<span class="nc bnc" id="L832" title="All 2 branches missed.">            if (identityEntry == null) return Collections.emptyMap();</span>
+<span class="nc bnc" id="L833" title="All 2 branches missed.">            return extractAttributes(mapping -&gt; !mapping.isFilteredOrReference(), mapping -&gt; {</span>
+<span class="nc" id="L834">                Collection&lt;String&gt; identityAttributeValues = new ArrayList&lt;&gt;();</span>
+                try {
+<span class="nc" id="L836">                    valuesFromAttribute(identityEntry, mapping, identityAttributeValues);</span>
+<span class="nc" id="L837">                } catch (Exception cause) {</span>
+<span class="nc" id="L838">                    throw ElytronMessages.log.ldapRealmFailedObtainAttributes(identityEntry.getNameInNamespace(), cause);</span>
+<span class="nc" id="L839">                }</span>
+<span class="nc" id="L840">                return identityAttributeValues;</span>
+            });
+        }
+
+        private Map&lt;String, Collection&lt;String&gt;&gt; extractAttributes(Predicate&lt;AttributeMapping&gt; filter, Function&lt;AttributeMapping, Collection&lt;String&gt;&gt; valueFunction) {
+<span class="nc" id="L845">            return identityMapping.attributes.stream()</span>
+<span class="nc" id="L846">                    .filter(filter)</span>
+<span class="nc" id="L847">                    .collect(Collectors.toMap(AttributeMapping::getName, valueFunction, (values1, values2) -&gt; {</span>
+<span class="nc" id="L848">                        List&lt;String&gt; merged = new ArrayList&lt;&gt;(values1);</span>
+<span class="nc" id="L849">                        merged.addAll(values2);</span>
+<span class="nc" id="L850">                        return merged;</span>
+                    }));
+        }
+
+        private void forEachAttributeValue(SearchResult entry, String attrId, Consumer&lt;String&gt; action) {
+<span class="nc" id="L855">            NamingEnumeration&lt;?&gt; attributesEnum = null;</span>
+            try {
+<span class="nc" id="L857">                Attribute attribute = entry.getAttributes().get(attrId);</span>
+<span class="nc bnc" id="L858" title="All 2 branches missed.">                if (attribute == null) return;</span>
+<span class="nc" id="L859">                attributesEnum = attribute.getAll();</span>
+<span class="nc" id="L860">                Collections.list(attributesEnum).stream().map(Object::toString).forEach(action);</span>
+<span class="nc" id="L861">            } catch (NamingException e) {</span>
+<span class="nc" id="L862">                throw ElytronMessages.log.ldapRealmFailedObtainAttributes(entry.getNameInNamespace(), e);</span>
+            } finally {
+<span class="nc bnc" id="L864" title="All 2 branches missed.">                if (attributesEnum != null) {</span>
+                    try {
+<span class="nc" id="L866">                        attributesEnum.close();</span>
+<span class="nc" id="L867">                    } catch (NamingException e) {</span>
+<span class="nc" id="L868">                        log.trace(&quot;Unable to close attributesEnum&quot;, e);</span>
+<span class="nc" id="L869">                    }</span>
+                }
+            }
+<span class="nc" id="L872">        }</span>
+
+        @Override
+        public void delete() throws RealmUnavailableException {
+<span class="nc" id="L876">            DirContext context = obtainContext();</span>
+            try {
+<span class="nc" id="L878">                LdapIdentity identity = getIdentity(context);</span>
+<span class="nc bnc" id="L879" title="All 2 branches missed.">                if (identity == null) {</span>
+<span class="nc" id="L880">                    throw log.noSuchIdentity();</span>
+                }
+<span class="nc" id="L882">                log.debugf(&quot;Removing identity [%s] with DN [%s] from LDAP&quot;, name, identity.getDistinguishedName());</span>
+<span class="nc" id="L883">                identity.getDirContext().destroySubcontext(new LdapName(identity.getDistinguishedName()));</span>
+<span class="nc" id="L884">            } catch (NamingException e) {</span>
+<span class="nc" id="L885">                throw log.ldapRealmFailedDeleteIdentityFromServer(e);</span>
+            } finally {
+<span class="nc" id="L887">                closeContext(context);</span>
+            }
+<span class="nc" id="L889">        }</span>
+
+        @Override
+        public void create() throws RealmUnavailableException {
+<span class="nc bnc" id="L893" title="All 4 branches missed.">            if (identityMapping.newIdentityParent == null || identityMapping.newIdentityAttributes == null) {</span>
+<span class="nc" id="L894">                throw log.ldapRealmNotConfiguredToSupportCreatingIdentities();</span>
+            }
+
+<span class="nc" id="L897">            DirContext context = obtainContext();</span>
+            try {
+<span class="nc" id="L899">                LdapName distinguishName = (LdapName) identityMapping.newIdentityParent.clone();</span>
+<span class="nc" id="L900">                distinguishName.add(new Rdn(identityMapping.rdnIdentifier, name));</span>
+
+<span class="nc" id="L902">                log.debugf(&quot;Creating identity [%s] with DN [%s] in LDAP&quot;, name, distinguishName.toString());</span>
+<span class="nc" id="L903">                context.createSubcontext(distinguishName, identityMapping.newIdentityAttributes);</span>
+
+<span class="nc" id="L905">            } catch (NamingException e) {</span>
+<span class="nc" id="L906">                throw log.ldapRealmFailedCreateIdentityOnServer(e);</span>
+            } finally {
+<span class="nc" id="L908">                closeContext(context);</span>
+            }
+<span class="nc" id="L910">        }</span>
+
+        @Override public void setAttributes(org.wildfly.security.authz.Attributes attributes) throws RealmUnavailableException {
+<span class="nc" id="L913">            log.debugf(&quot;Trying to set attributes for principal [%s].&quot;, name);</span>
+<span class="nc" id="L914">            DirContext context = obtainContext();</span>
+            try {
+<span class="nc" id="L916">                LdapIdentity identity = getIdentity(context);</span>
+<span class="nc bnc" id="L917" title="All 2 branches missed.">                if (identity == null) {</span>
+<span class="nc" id="L918">                    throw log.noSuchIdentity();</span>
+                }
+
+<span class="nc" id="L921">                List&lt;ModificationItem&gt; modItems = new LinkedList&lt;&gt;();</span>
+<span class="nc" id="L922">                LdapName identityLdapName = new LdapName(identity.getDistinguishedName());</span>
+<span class="nc" id="L923">                String renameTo = null;</span>
+
+<span class="nc bnc" id="L925" title="All 2 branches missed.">                for(AttributeMapping mapping : identityMapping.attributes) {</span>
+<span class="nc bnc" id="L926" title="All 6 branches missed.">                    if (mapping.getFilter() != null || mapping.getReference() != null || mapping.getRdn() != null) { // read-only mapping</span>
+<span class="nc bnc" id="L927" title="All 2 branches missed.">                        if (attributes.size(mapping.getName()) != 0) {</span>
+<span class="nc" id="L928">                            log.ldapRealmDoesNotSupportSettingFilteredAttribute(mapping.getName(), name);</span>
+                        }
+<span class="nc bnc" id="L930" title="All 2 branches missed.">                    } else if (identityMapping.rdnIdentifier.equalsIgnoreCase(mapping.getLdapName())) { // entry rename</span>
+<span class="nc bnc" id="L931" title="All 2 branches missed.">                        if (attributes.size(mapping.getName()) == 1) {</span>
+<span class="nc" id="L932">                            renameTo = attributes.get(mapping.getName(), 0);</span>
+                        } else {
+<span class="nc" id="L934">                            throw log.ldapRealmRequiresExactlyOneRdnAttribute(mapping.getName(), name);</span>
+                        }
+                    } else { // standard ldap attributes
+<span class="nc bnc" id="L937" title="All 2 branches missed.">                        if (attributes.size(mapping.getName()) == 0) {</span>
+<span class="nc" id="L938">                            BasicAttribute attribute = new BasicAttribute(mapping.getLdapName());</span>
+<span class="nc" id="L939">                            modItems.add(new ModificationItem(DirContext.REMOVE_ATTRIBUTE, attribute));</span>
+<span class="nc" id="L940">                        } else {</span>
+<span class="nc" id="L941">                            BasicAttribute attribute = new BasicAttribute(mapping.getLdapName());</span>
+<span class="nc" id="L942">                            attributes.get(mapping.getName()).forEach(attribute::add);</span>
+<span class="nc" id="L943">                            modItems.add(new ModificationItem(DirContext.REPLACE_ATTRIBUTE, attribute));</span>
+                        }
+                    }
+<span class="nc" id="L946">                }</span>
+
+<span class="nc bnc" id="L948" title="All 2 branches missed.">                for(org.wildfly.security.authz.Attributes.Entry entry : attributes.entries()) {</span>
+<span class="nc bnc" id="L949" title="All 2 branches missed.">                    if (identityMapping.attributes.stream().filter(mp -&gt; mp.getName().equals(entry.getKey())).count() == 0) {</span>
+<span class="nc" id="L950">                        throw log.ldapRealmCannotSetAttributeWithoutMapping(entry.getKey(), name);</span>
+                    }
+<span class="nc" id="L952">                }</span>
+
+<span class="nc" id="L954">                ModificationItem[] modItemsArray = modItems.toArray(new ModificationItem[modItems.size()]);</span>
+<span class="nc" id="L955">                identity.getDirContext().modifyAttributes(identityLdapName, modItemsArray);</span>
+
+<span class="nc bnc" id="L957" title="All 4 branches missed.">                if (renameTo != null &amp;&amp; ! renameTo.equals(identityLdapName.getRdn(identityLdapName.size()-1).getValue())) {</span>
+<span class="nc" id="L958">                    LdapName newLdapName = new LdapName(identityLdapName.getRdns().subList(0, identityLdapName.size()-1));</span>
+<span class="nc" id="L959">                    newLdapName.add(new Rdn(identityMapping.rdnIdentifier, renameTo));</span>
+<span class="nc" id="L960">                    identity.getDirContext().rename(identityLdapName, newLdapName);</span>
+                }
+
+<span class="nc" id="L963">            } catch (Exception e) {</span>
+<span class="nc" id="L964">                throw log.ldapRealmAttributesSettingFailed(name, e);</span>
+            } finally {
+<span class="nc" id="L966">                closeContext(context);</span>
+            }
+<span class="nc" id="L968">        }</span>
+
+        private class LdapIdentity {
+
+            private final String name;
+            private final DirContext dirContext;
+            private final String distinguishedName;
+            private final String url;
+            private final SearchResult entry;
+
+<span class="nc" id="L978">            LdapIdentity(String name, DirContext dirContext, String distinguishedName, String url, SearchResult entry) {</span>
+<span class="nc" id="L979">                this.name = name;</span>
+<span class="nc" id="L980">                this.dirContext = dirContext;</span>
+<span class="nc" id="L981">                this.distinguishedName = distinguishedName;</span>
+<span class="nc" id="L982">                this.url = url;</span>
+<span class="nc" id="L983">                this.entry = entry;</span>
+<span class="nc" id="L984">            }</span>
+
+            String getName() {
+<span class="nc" id="L987">                return this.name;</span>
+            }
+
+            DirContext getDirContext() {
+<span class="nc" id="L991">                return this.dirContext;</span>
+            }
+
+            String getDistinguishedName() {
+<span class="nc" id="L995">                return this.distinguishedName;</span>
+            }
+
+            String getUrl() {
+<span class="nc" id="L999">                return this.url;</span>
+            }
+
+            SearchResult getEntry() {
+<span class="nc" id="L1003">                return this.entry;</span>
+            }
+        }
+    }
+
+    private class LdapSearch {
+
+<span class="nc" id="L1010">        private final String NO_FILTER = &quot;(objectclass=*)&quot;;</span>
+
+        private final String searchDn;
+        private final int searchScope;
+        private final int pageSize;
+        private final String filter;
+        private final String[] filterArgs;
+        private Collection&lt;String&gt; returningAttributes;
+        private Collection&lt;String&gt; binaryAttributes;
+        private DirContext context;
+        private NamingEnumeration&lt;SearchResult&gt; result;
+        private byte[] cookie;
+        private ReferralException referralException;
+
+        public LdapSearch(String searchDn, boolean searchRecursive, int pageSize, String filter, String... filterArgs) {
+<span class="nc bnc" id="L1025" title="All 2 branches missed.">            this(searchDn, searchRecursive ? SearchControls.SUBTREE_SCOPE : SearchControls.ONELEVEL_SCOPE, pageSize, filter, filterArgs);</span>
+<span class="nc" id="L1026">        }</span>
+
+<span class="nc" id="L1028">        public LdapSearch(String searchDn, int searchScope, int pageSize, String filter, String... filterArgs) {</span>
+<span class="nc" id="L1029">            this.searchDn = searchDn;</span>
+<span class="nc" id="L1030">            this.searchScope = searchScope;</span>
+<span class="nc" id="L1031">            this.pageSize = pageSize;</span>
+<span class="nc" id="L1032">            this.filter = filter;</span>
+<span class="nc" id="L1033">            this.filterArgs = filterArgs;</span>
+<span class="nc" id="L1034">        }</span>
+
+<span class="nc" id="L1036">        public LdapSearch(String searchDn) {</span>
+<span class="nc" id="L1037">            this.searchDn = searchDn;</span>
+<span class="nc" id="L1038">            this.searchScope = SearchControls.OBJECT_SCOPE;</span>
+<span class="nc" id="L1039">            this.pageSize = 0;</span>
+<span class="nc" id="L1040">            this.filter = NO_FILTER;</span>
+<span class="nc" id="L1041">            this.filterArgs = null;</span>
+<span class="nc" id="L1042">        }</span>
+
+        public Stream&lt;SearchResult&gt; search(DirContext ctx) throws RealmUnavailableException {
+<span class="nc bnc" id="L1045" title="All 2 branches missed.">            if (log.isDebugEnabled()) {</span>
+<span class="nc" id="L1046">                log.debugf(&quot;Executing search [%s] in context [%s] with arguments [%s]. Returning attributes are [%s]. Binary attributes are [%s].&quot;,</span>
+                        filter, searchDn,
+<span class="nc bnc" id="L1048" title="All 2 branches missed.">                        filterArgs == null ? null : String.join(&quot;, &quot;, filterArgs),</span>
+<span class="nc bnc" id="L1049" title="All 2 branches missed.">                        returningAttributes == null ? null : String.join(&quot;, &quot;, returningAttributes),</span>
+<span class="nc bnc" id="L1050" title="All 2 branches missed.">                        binaryAttributes == null ? null : String.join(&quot;, &quot;, binaryAttributes)</span>
+                );
+            }
+<span class="nc" id="L1053">            context = ctx;</span>
+<span class="nc" id="L1054">            cookie = null;</span>
+            try {
+                try {
+<span class="nc" id="L1057">                    result = searchWithPagination();</span>
+<span class="nc" id="L1058">                } catch (ReferralException e) {</span>
+<span class="nc" id="L1059">                    referralException = e;</span>
+<span class="nc" id="L1060">                }</span>
+<span class="nc" id="L1061">                return StreamSupport.stream(new Spliterators.AbstractSpliterator&lt;SearchResult&gt;(Long.MAX_VALUE, Spliterator.NONNULL) {</span>
+
+<span class="nc" id="L1063">                    boolean finished = false;</span>
+<span class="nc" id="L1064">                    Set&lt;Object&gt; followedReferrals = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L1065">                    boolean exceptionWasFollowed = false;</span>
+<span class="nc" id="L1066">                    boolean execute = false;</span>
+
+                    @Override
+                    public boolean tryAdvance(Consumer&lt;? super SearchResult&gt; action) {
+
+<span class="nc bnc" id="L1071" title="All 2 branches missed.">                        if (finished) return false;</span>
+
+                        try {
+                            while (true) {
+                                try {
+<span class="nc bnc" id="L1076" title="All 2 branches missed.">                                    if(execute) {</span>
+<span class="nc" id="L1077">                                        execute = false;</span>
+<span class="nc" id="L1078">                                        result = searchWithPagination();</span>
+                                    }
+
+<span class="nc bnc" id="L1081" title="All 4 branches missed.">                                    if(referralException != null &amp;&amp; !exceptionWasFollowed) {</span>
+<span class="nc" id="L1082">                                        exceptionWasFollowed = true;</span>
+<span class="nc" id="L1083">                                        throw referralException;</span>
+                                    }
+
+<span class="nc bnc" id="L1086" title="All 2 branches missed.">                                    if ( ! result.hasMore()) { // end of page</span>
+<span class="nc bnc" id="L1087" title="All 4 branches missed.">                                        if ( ! (pageSize != 0 &amp;&amp; context instanceof LdapContext) ) {</span>
+<span class="nc" id="L1088">                                            log.trace(&quot;Identity iterating - pagination not supported - end of list&quot;);</span>
+<span class="nc" id="L1089">                                            finished = true;</span>
+<span class="nc" id="L1090">                                            return false;</span>
+                                        }
+<span class="nc" id="L1092">                                        Control[] controls = ((LdapContext) context).getResponseControls();</span>
+<span class="nc bnc" id="L1093" title="All 2 branches missed.">                                        if (controls != null) {</span>
+<span class="nc bnc" id="L1094" title="All 2 branches missed.">                                            for (Control control : controls) {</span>
+<span class="nc bnc" id="L1095" title="All 2 branches missed.">                                                if (control instanceof PagedResultsResponseControl) {</span>
+<span class="nc" id="L1096">                                                    cookie = ((PagedResultsResponseControl) control).getCookie();</span>
+<span class="nc bnc" id="L1097" title="All 2 branches missed.">                                                    if (cookie == null) {</span>
+<span class="nc" id="L1098">                                                        log.trace(&quot;Identity iterating - no more pages - end of list&quot;);</span>
+<span class="nc" id="L1099">                                                        finished = true;</span>
+<span class="nc" id="L1100">                                                        return false; // no more pages</span>
+                                                    }
+                                                }
+                                            }
+                                        }
+<span class="nc" id="L1105">                                        result.close();</span>
+
+<span class="nc" id="L1107">                                        result = searchWithPagination();</span>
+<span class="nc bnc" id="L1108" title="All 2 branches missed.">                                        if ( ! result.hasMore()) {</span>
+<span class="nc" id="L1109">                                            log.trace(&quot;Identity iterating - even after page loading no results - end of list&quot;);</span>
+<span class="nc" id="L1110">                                            finished = true;</span>
+<span class="nc" id="L1111">                                            return false; // no more elements</span>
+                                        }
+                                    }
+<span class="nc" id="L1114">                                    SearchResult entry = result.next();</span>
+<span class="nc" id="L1115">                                    log.debugf(&quot;Found entry [%s].&quot;, entry.getNameInNamespace());</span>
+<span class="nc" id="L1116">                                    action.accept(entry);</span>
+<span class="nc" id="L1117">                                    return true;</span>
+<span class="nc" id="L1118">                                } catch (ReferralException e) {</span>
+<span class="nc bnc" id="L1119" title="All 2 branches missed.">                                    if (followedReferrals.add(e.getReferralInfo())) { // follow</span>
+<span class="nc" id="L1120">                                        log.debugf(&quot;Next referral following in identity iterating: [%s]&quot;, e.getReferralInfo());</span>
+<span class="nc" id="L1121">                                        context = ((DelegatingLdapContext) context).wrapReferralContextObtaining(e);</span>
+<span class="nc" id="L1122">                                        execute = true;</span>
+                                    } else { // already searched - skip
+<span class="nc bnc" id="L1124" title="All 2 branches missed.">                                        if (e.skipReferral()) {</span>
+<span class="nc" id="L1125">                                            log.debugf(&quot;Referral skipped, continue: [%s]&quot;, e.getReferralInfo());</span>
+<span class="nc" id="L1126">                                            context = ((DelegatingLdapContext) context).wrapReferralContextObtaining(e);</span>
+<span class="nc" id="L1127">                                            execute = true;</span>
+                                        } else {
+<span class="nc" id="L1129">                                            log.debugf(&quot;Referral skipped and no more elements: [%s]&quot;, e.getReferralInfo());</span>
+<span class="nc" id="L1130">                                            finished = true;</span>
+<span class="nc" id="L1131">                                            return false; // no more elements</span>
+                                        }
+                                    }
+<span class="nc" id="L1134">                                }</span>
+                            }
+<span class="nc" id="L1136">                        } catch (NamingException | IOException e) {</span>
+                            try {
+<span class="nc bnc" id="L1138" title="All 2 branches missed.">                                if(result != null){</span>
+<span class="nc" id="L1139">                                    result.close();</span>
+                                }
+<span class="nc" id="L1141">                            } catch (NamingException ex) {</span>
+<span class="nc" id="L1142">                                log.trace(&quot;Unable to close result&quot;, ex);</span>
+<span class="nc" id="L1143">                            }</span>
+<span class="nc" id="L1144">                            throw log.ldapRealmErrorWhileConsumingResultsFromSearch(searchDn, filter, Arrays.toString(filterArgs), e);</span>
+                        }
+                    }
+<span class="nc" id="L1147">                }, false).onClose(() -&gt; {</span>
+<span class="nc bnc" id="L1148" title="All 2 branches missed.">                    if (result != null) {</span>
+                        try {
+<span class="nc" id="L1150">                            result.close();</span>
+<span class="nc" id="L1151">                        } catch (NamingException e) {</span>
+<span class="nc" id="L1152">                            log.trace(&quot;Unable to close result&quot;, e);</span>
+<span class="nc" id="L1153">                        }</span>
+                    }
+<span class="nc" id="L1155">                });</span>
+<span class="nc" id="L1156">            } catch (NameNotFoundException e) {</span>
+<span class="nc" id="L1157">                log.trace(&quot;Error searching&quot;, e);</span>
+<span class="nc" id="L1158">                return Stream.empty();</span>
+<span class="nc" id="L1159">            } catch (Exception e) {</span>
+<span class="nc" id="L1160">                throw log.ldapRealmIdentitySearchFailed(e);</span>
+            }
+        }
+
+        private NamingEnumeration&lt;SearchResult&gt; searchWithPagination() throws NamingException, IOException {
+<span class="nc" id="L1165">            Control[] controlsBackup = null;</span>
+<span class="nc" id="L1166">            Object binaryAttributesBackup = null;</span>
+
+            // backup and set environment
+<span class="nc bnc" id="L1169" title="All 4 branches missed.">            if (pageSize != 0 &amp;&amp; context instanceof LdapContext) {</span>
+<span class="nc" id="L1170">                controlsBackup = ((LdapContext)context).getRequestControls();</span>
+<span class="nc" id="L1171">                ((LdapContext)context).setRequestControls(new Control[]{</span>
+                        new PagedResultsControl(pageSize, cookie, Control.CRITICAL)
+                });
+            }
+<span class="nc bnc" id="L1175" title="All 4 branches missed.">            if (binaryAttributes != null &amp;&amp; binaryAttributes.size() != 0) { // set attributes which should be returned in binary form</span>
+<span class="nc" id="L1176">                binaryAttributesBackup = context.getEnvironment().get(ENV_BINARY_ATTRIBUTES);</span>
+<span class="nc" id="L1177">                context.addToEnvironment(ENV_BINARY_ATTRIBUTES, String.join(&quot; &quot;, binaryAttributes));</span>
+            }
+
+<span class="nc" id="L1180">            NamingEnumeration&lt;SearchResult&gt; results = context.search(new LdapName(searchDn), filter, filterArgs, createSearchControls());</span>
+
+            // revert environment change
+<span class="nc bnc" id="L1183" title="All 4 branches missed.">            if (binaryAttributes != null &amp;&amp; binaryAttributes.size() != 0) {</span>
+<span class="nc bnc" id="L1184" title="All 2 branches missed.">                if (binaryAttributesBackup == null) {</span>
+<span class="nc" id="L1185">                    context.removeFromEnvironment(ENV_BINARY_ATTRIBUTES);</span>
+                } else {
+<span class="nc" id="L1187">                    context.addToEnvironment(ENV_BINARY_ATTRIBUTES, binaryAttributesBackup);</span>
+                }
+            }
+<span class="nc bnc" id="L1190" title="All 4 branches missed.">            if (pageSize != 0 &amp;&amp; context instanceof LdapContext) {</span>
+<span class="nc" id="L1191">                ((LdapContext)context).setRequestControls(controlsBackup);</span>
+            }
+<span class="nc" id="L1193">            return results;</span>
+        }
+
+        private void setReturningAttributes(Collection&lt;String&gt; returningAttributes) {
+<span class="nc" id="L1197">            this.returningAttributes = returningAttributes;</span>
+<span class="nc" id="L1198">        }</span>
+
+        private void setBinaryAttributes(Collection&lt;String&gt; binaryAttributes) {
+<span class="nc" id="L1201">            this.binaryAttributes = binaryAttributes;</span>
+<span class="nc" id="L1202">        }</span>
+
+        private SearchControls createSearchControls() {
+<span class="nc" id="L1205">            SearchControls searchControls = new SearchControls();</span>
+<span class="nc" id="L1206">            searchControls.setSearchScope(searchScope);</span>
+<span class="nc" id="L1207">            searchControls.setTimeLimit(identityMapping.searchTimeLimit);</span>
+<span class="nc bnc" id="L1208" title="All 2 branches missed.">            if (returningAttributes == null) {</span>
+<span class="nc" id="L1209">                searchControls.setReturningAttributes(new String[]{});</span>
+            } else {
+<span class="nc" id="L1211">                searchControls.setReturningAttributes(returningAttributes.toArray(new String[returningAttributes.size()]));</span>
+            }
+<span class="nc" id="L1213">            return searchControls;</span>
+        }
+
+        /**
+         * Get context, where the last obtained entry was found
+         */
+        private DirContext getContext() {
+<span class="nc" id="L1220">            return context;</span>
+        }
+    }
+
+    static class IdentityMapping {
+
+        // NOTE: This class is not a general purpose holder for all possible realm configuration, the purpose is to cover
+        // configuration related to locating the identity and loading it's attributes.
+
+        private final String searchDn;
+        private final boolean searchRecursive;
+        private final int searchTimeLimit;
+        private final String rdnIdentifier;
+        private final List&lt;AttributeMapping&gt; attributes;
+        private final LdapName newIdentityParent;
+        private final Attributes newIdentityAttributes;
+        private final String filterName;
+        private final String iteratorFilter;
+
+<span class="nc" id="L1239">        public IdentityMapping(String searchDn, boolean searchRecursive, int searchTimeLimit, String rdnIdentifier, List&lt;AttributeMapping&gt; attributes, LdapName newIdentityParent, Attributes newIdentityAttributes, String filterName, String iteratorFilter) {</span>
+<span class="nc" id="L1240">            Assert.checkNotNullParam(&quot;rdnIdentifier&quot;, rdnIdentifier);</span>
+<span class="nc" id="L1241">            this.searchDn = searchDn;</span>
+<span class="nc" id="L1242">            this.searchRecursive = searchRecursive;</span>
+<span class="nc" id="L1243">            this.searchTimeLimit = searchTimeLimit;</span>
+<span class="nc" id="L1244">            this.rdnIdentifier = rdnIdentifier;</span>
+<span class="nc" id="L1245">            this.attributes = attributes;</span>
+<span class="nc" id="L1246">            this.newIdentityParent = newIdentityParent;</span>
+<span class="nc" id="L1247">            this.newIdentityAttributes = newIdentityAttributes;</span>
+<span class="nc" id="L1248">            this.filterName = filterName;</span>
+<span class="nc" id="L1249">            this.iteratorFilter = iteratorFilter;</span>
+<span class="nc" id="L1250">        }</span>
+    }
+
+    private class ServerNotificationListener implements ObjectChangeListener, NamespaceChangeListener {
+
+        private final Consumer&lt;Principal&gt; listener;
+
+<span class="nc" id="L1257">        ServerNotificationListener(Consumer&lt;Principal&gt; listener) {</span>
+<span class="nc" id="L1258">            this.listener = listener;</span>
+<span class="nc" id="L1259">        }</span>
+
+        @Override
+        public void objectAdded(NamingEvent evt) {
+
+<span class="nc" id="L1264">        }</span>
+
+        @Override
+        public void objectRemoved(NamingEvent evt) {
+<span class="nc" id="L1268">            invokeCacheUpdateListener(evt);</span>
+<span class="nc" id="L1269">        }</span>
+
+        @Override
+        public void objectRenamed(NamingEvent evt) {
+<span class="nc" id="L1273">            invokeCacheUpdateListener(evt);</span>
+<span class="nc" id="L1274">        }</span>
+
+        @Override
+        public void objectChanged(NamingEvent evt) {
+<span class="nc" id="L1278">            invokeCacheUpdateListener(evt);</span>
+<span class="nc" id="L1279">        }</span>
+
+        @Override
+        public void namingExceptionThrown(NamingExceptionEvent evt) {
+
+<span class="nc" id="L1284">        }</span>
+
+        private void invokeCacheUpdateListener(NamingEvent evt) {
+<span class="nc" id="L1287">            Binding oldBinding = evt.getOldBinding();</span>
+            LdapName ldapName;
+            try {
+<span class="nc" id="L1290">                ldapName = new LdapName(oldBinding.getName());</span>
+<span class="nc" id="L1291">            } catch (InvalidNameException e) {</span>
+<span class="nc" id="L1292">                throw log.ldapInvalidLdapName(oldBinding.getName(), e);</span>
+<span class="nc" id="L1293">            }</span>
+<span class="nc" id="L1294">            ldapName.getRdns().stream()</span>
+<span class="nc" id="L1295">                    .filter(rdn -&gt; rdn.getType().equals(identityMapping.rdnIdentifier))</span>
+<span class="nc" id="L1296">                    .map(rdn -&gt; new NamePrincipal(rdn.getValue().toString()))</span>
+<span class="nc" id="L1297">                    .findFirst()</span>
+<span class="nc" id="L1298">                    .ifPresent(listener::accept);</span>
+<span class="nc" id="L1299">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

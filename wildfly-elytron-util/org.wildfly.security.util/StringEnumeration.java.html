@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>StringEnumeration.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-util</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.util</a> &gt; <span class="el_source">StringEnumeration.java</span></div><h1>StringEnumeration.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.util;
+
+import java.util.HashMap;
+
+import org.wildfly.common.Assert;
+
+/**
+ * An indexed enumeration of strings.  The enumeration can look up string indexes by number, numeric indexes by string,
+ * or retrieve the interned string value by name.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class StringEnumeration {
+    private final HashMap&lt;String, Data&gt; index;
+    private final Data[] byId;
+
+<span class="fc" id="L35">    private StringEnumeration(final HashMap&lt;String, Data&gt; index, final Data[] byId) {</span>
+<span class="fc" id="L36">        this.index = index;</span>
+<span class="fc" id="L37">        this.byId = byId;</span>
+<span class="fc" id="L38">    }</span>
+
+    /**
+     * Construct a new instance.  The given values are used as the string members in the order they are given.
+     *
+     * @param values the values
+     * @return the string enumeration
+     */
+    public static StringEnumeration of(String... values) {
+<span class="fc" id="L47">        final int length = values.length;</span>
+<span class="fc" id="L48">        Data[] byId = new Data[length];</span>
+<span class="fc" id="L49">        HashMap&lt;String, Data&gt; index = new HashMap&lt;&gt;(length);</span>
+        String str;
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i ++) {</span>
+<span class="fc" id="L52">            str = Assert.checkNotNullArrayParam(&quot;values&quot;, i, values[i]);</span>
+<span class="fc" id="L53">            index.put(str, byId[i] = new Data(i, str));</span>
+        }
+<span class="fc" id="L55">        return new StringEnumeration(index, byId);</span>
+    }
+
+    /**
+     * Get the canonical name for a string.  If the string is not found, an exception is thrown.
+     *
+     * @param str the string to look up (must not be {@code null})
+     * @return the canonical name (not {@code null})
+     */
+    public String canonicalName(String str) {
+<span class="fc" id="L65">        Assert.checkNotNullParam(&quot;str&quot;, str);</span>
+<span class="fc" id="L66">        final Data data = index.get(str);</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (data == null) {</span>
+<span class="nc" id="L68">            throw ElytronMessages.log.generalInvalidName(str);</span>
+        }
+<span class="fc" id="L70">        return data.canonicalName;</span>
+    }
+
+    /**
+     * Get the numeric index for a string.  If the string is not found, an exception is thrown.
+     *
+     * @param str the string to look up (must not be {@code null})
+     * @return the numeric index
+     */
+    public int indexOf(String str) {
+<span class="fc" id="L80">        Assert.checkNotNullParam(&quot;str&quot;, str);</span>
+<span class="fc" id="L81">        final Data data = index.get(str);</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if (data == null) {</span>
+<span class="nc" id="L83">            throw ElytronMessages.log.generalInvalidName(str);</span>
+        }
+<span class="fc" id="L85">        return data.index;</span>
+    }
+
+    /**
+     * Get the canonical name for an index.  If the index is out of range, an exception is thrown.
+     *
+     * @param index the index to seek
+     * @return the canonical name (not {@code null})
+     */
+    public String nameOf(int index) {
+<span class="fc" id="L95">        final Data[] byId = this.byId;</span>
+<span class="fc" id="L96">        Assert.checkMinimumParameter(&quot;index&quot;, 0, index);</span>
+<span class="fc" id="L97">        Assert.checkMaximumParameter(&quot;index&quot;, size() - 1, index);</span>
+<span class="fc" id="L98">        return byId[index].canonicalName;</span>
+    }
+
+    /**
+     * Get the size of this enumeration.
+     *
+     * @return the size of this enumeration
+     */
+    public int size() {
+<span class="fc" id="L107">        return byId.length;</span>
+    }
+
+    static class Data {
+        final int index;
+        final String canonicalName;
+
+<span class="fc" id="L114">        Data(final int index, final String canonicalName) {</span>
+<span class="fc" id="L115">            this.index = index;</span>
+<span class="fc" id="L116">            this.canonicalName = canonicalName;</span>
+<span class="fc" id="L117">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

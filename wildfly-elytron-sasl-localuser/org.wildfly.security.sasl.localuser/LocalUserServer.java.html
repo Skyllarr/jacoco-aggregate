@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LocalUserServer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl-localuser</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.localuser</a> &gt; <span class="el_source">LocalUserServer.java</span></div><h1>LocalUserServer.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.localuser;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
+import java.security.SecureRandom;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Random;
+
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.NameCallback;
+import javax.security.sasl.AuthorizeCallback;
+import javax.security.sasl.RealmCallback;
+import javax.security.sasl.SaslException;
+import javax.security.sasl.SaslServer;
+
+import org.wildfly.common.Assert;
+import org.wildfly.common.array.Arrays2;
+import org.wildfly.common.iteration.CodePointIterator;
+import org.wildfly.security.manager.action.ReadPropertyAction;
+import org.wildfly.security.sasl.util.AbstractSaslServer;
+
+import static org.wildfly.security.mechanism._private.ElytronMessages.saslLocal;
+
+/**
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+final class LocalUserServer extends AbstractSaslServer implements SaslServer {
+
+    // Should SecureRandom be used? Default to true
+    public static final String LOCAL_USER_USE_SECURE_RANDOM = &quot;wildfly.sasl.local-user.use-secure-random&quot;;
+    public static final String LEGACY_LOCAL_USER_USE_SECURE_RANDOM = &quot;jboss.sasl.local-user.use-secure-random&quot;;
+    public static final String LOCAL_USER_CHALLENGE_PATH = &quot;wildfly.sasl.local-user.challenge-path&quot;;
+    public static final String LEGACY_LOCAL_USER_CHALLENGE_PATH = &quot;jboss.sasl.local-user.challenge-path&quot;;
+    public static final String DEFAULT_USER = &quot;wildfly.sasl.local-user.default-user&quot;;
+    public static final String LEGACY_DEFAULT_USER = &quot;jboss.sasl.local-user.default-user&quot;;
+
+    private static final byte UTF8NUL = 0x00;
+
+    private static final int INITIAL_CHALLENGE_STATE = 1;
+    private static final int PROCESS_RESPONSE_STATE = 2;
+
+    private volatile String authorizationId;
+    private volatile File challengeFile;
+    private volatile byte[] challengeBytes;
+    private final File basePath;
+    private final String defaultUser;
+    private final boolean useSecureRandom;
+
+    LocalUserServer(final String protocol, final String serverName, Map&lt;String, ?&gt; props, final CallbackHandler callbackHandler) {
+<span class="nc" id="L76">        super(LocalUserSaslFactory.JBOSS_LOCAL_USER, protocol, serverName, callbackHandler, saslLocal);</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        if (props == null) props = Collections.emptyMap();</span>
+        String value;
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        if (props.containsKey(LOCAL_USER_CHALLENGE_PATH)) {</span>
+<span class="nc" id="L80">            basePath = new File(props.get(LOCAL_USER_CHALLENGE_PATH).toString()).getAbsoluteFile();</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        } else if (props.containsKey(LEGACY_LOCAL_USER_CHALLENGE_PATH)) {</span>
+<span class="nc" id="L82">            basePath = new File(props.get(LEGACY_LOCAL_USER_CHALLENGE_PATH).toString()).getAbsoluteFile();</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        } else if ((value = getProperty(LOCAL_USER_CHALLENGE_PATH)) != null) {</span>
+<span class="nc" id="L84">            basePath = new File(value).getAbsoluteFile();</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        } else if ((value = getProperty(LEGACY_LOCAL_USER_CHALLENGE_PATH)) != null) {</span>
+<span class="nc" id="L86">            basePath = new File(value).getAbsoluteFile();</span>
+        } else {
+<span class="nc" id="L88">            basePath = new File(getProperty(&quot;java.io.tmpdir&quot;));</span>
+        }
+
+<span class="nc" id="L91">        Object useSecureRandomObj = null;</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        if (props.containsKey(LOCAL_USER_USE_SECURE_RANDOM)) {</span>
+<span class="nc" id="L93">            useSecureRandomObj = props.get(LOCAL_USER_USE_SECURE_RANDOM);</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        } else if (props.containsKey(LEGACY_LOCAL_USER_USE_SECURE_RANDOM)) {</span>
+<span class="nc" id="L95">            useSecureRandomObj = props.get(LEGACY_LOCAL_USER_USE_SECURE_RANDOM);</span>
+        } else {
+<span class="nc" id="L97">            useSecureRandomObj = getProperty(LOCAL_USER_USE_SECURE_RANDOM);</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            if (useSecureRandomObj == null) {</span>
+<span class="nc" id="L99">                useSecureRandomObj = getProperty(LEGACY_LOCAL_USER_USE_SECURE_RANDOM);</span>
+            }
+        }
+
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        if (useSecureRandomObj != null) {</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">            if (useSecureRandomObj instanceof Boolean) {</span>
+<span class="nc" id="L105">                useSecureRandom = ((Boolean) useSecureRandomObj).booleanValue();</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            } else if (useSecureRandomObj instanceof String) {</span>
+<span class="nc" id="L107">                useSecureRandom = Boolean.parseBoolean((String) useSecureRandomObj);</span>
+            } else {
+<span class="nc" id="L109">                useSecureRandom = true;</span>
+            }
+        } else {
+<span class="nc" id="L112">            useSecureRandom = true;</span>
+        }
+
+<span class="nc bnc" id="L115" title="All 2 branches missed.">        if (props.containsKey(DEFAULT_USER)) {</span>
+<span class="nc" id="L116">            defaultUser = (String) props.get(DEFAULT_USER);</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        } else if (props.containsKey(LEGACY_DEFAULT_USER)) {</span>
+<span class="nc" id="L118">            defaultUser = (String) props.get(LEGACY_DEFAULT_USER);</span>
+        } else {
+<span class="nc" id="L120">            defaultUser = null;</span>
+        }
+<span class="nc" id="L122">    }</span>
+
+    private static String getProperty(final String name) {
+<span class="nc" id="L125">        return doPrivileged(new ReadPropertyAction(name, null));</span>
+    }
+
+    private static &lt;T&gt; T doPrivileged(final PrivilegedAction&lt;T&gt; action) {
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        return System.getSecurityManager() != null ? AccessController.doPrivileged(action) : action.run();</span>
+    }
+
+    private Random getRandom() {
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        if (useSecureRandom) {</span>
+<span class="nc" id="L134">            return new SecureRandom();</span>
+        } else {
+<span class="nc" id="L136">            return new Random();</span>
+        }
+    }
+
+    @Override
+    public void init() {
+<span class="nc" id="L142">        setNegotiationState(INITIAL_CHALLENGE_STATE);</span>
+<span class="nc" id="L143">    }</span>
+
+    @Override
+    public String getAuthorizationID() {
+<span class="nc" id="L147">        assertComplete();</span>
+
+<span class="nc" id="L149">        return authorizationId;</span>
+    }
+
+    private void deleteChallenge() {
+<span class="nc bnc" id="L153" title="All 2 branches missed.">        if (challengeFile != null) {</span>
+<span class="nc" id="L154">            challengeFile.delete();</span>
+<span class="nc" id="L155">            challengeFile = null;</span>
+        }
+<span class="nc" id="L157">    }</span>
+
+    @Override
+    public void dispose() throws SaslException {
+<span class="nc" id="L161">        super.dispose();</span>
+<span class="nc" id="L162">        deleteChallenge();</span>
+<span class="nc" id="L163">    }</span>
+
+    @Override
+    protected byte[] evaluateMessage(int state, final byte[] message) throws SaslException {
+<span class="nc bnc" id="L167" title="All 3 branches missed.">        switch (state) {</span>
+            case INITIAL_CHALLENGE_STATE:
+<span class="nc bnc" id="L169" title="All 2 branches missed.">                if (message.length == 0) {</span>
+                    // trigger initial response
+<span class="nc" id="L171">                    return NO_BYTES;</span>
+                }
+
+                // initial message
+<span class="nc bnc" id="L175" title="All 4 branches missed.">                if (message.length == 1 &amp;&amp; message[0] == UTF8NUL) {</span>
+<span class="nc" id="L176">                    authorizationId = null;</span>
+                } else {
+<span class="nc" id="L178">                    authorizationId = new String(message, StandardCharsets.UTF_8);</span>
+                }
+<span class="nc" id="L180">                final Random random = getRandom();</span>
+                try {
+<span class="nc" id="L182">                    challengeFile = File.createTempFile(&quot;local&quot;, &quot;.challenge&quot;, basePath);</span>
+<span class="nc" id="L183">                } catch (IOException e) {</span>
+<span class="nc" id="L184">                    throw saslLocal.mechFailedToCreateChallengeFile(e).toSaslException();</span>
+<span class="nc" id="L185">                }</span>
+
+                final FileOutputStream fos;
+                try {
+<span class="nc" id="L189">                    fos = new FileOutputStream(challengeFile);</span>
+<span class="nc" id="L190">                } catch (FileNotFoundException e) {</span>
+<span class="nc" id="L191">                    throw saslLocal.mechFailedToCreateChallengeFile(e).toSaslException();</span>
+<span class="nc" id="L192">                }</span>
+<span class="nc" id="L193">                boolean ok = false;</span>
+                final byte[] bytes;
+                try {
+<span class="nc" id="L196">                    bytes = new byte[8];</span>
+<span class="nc" id="L197">                    random.nextBytes(bytes);</span>
+                    try {
+<span class="nc" id="L199">                        fos.write(bytes);</span>
+<span class="nc" id="L200">                        fos.close();</span>
+<span class="nc" id="L201">                        ok = true;</span>
+<span class="nc" id="L202">                    } catch (IOException e) {</span>
+<span class="nc" id="L203">                        throw saslLocal.mechFailedToCreateChallengeFile(e).toSaslException();</span>
+<span class="nc" id="L204">                    }</span>
+                } finally {
+<span class="nc bnc" id="L206" title="All 2 branches missed.">                    if (!ok) {</span>
+<span class="nc" id="L207">                        deleteChallenge();</span>
+                    }
+                    try {
+<span class="nc" id="L210">                        fos.close();</span>
+<span class="nc" id="L211">                    } catch (Throwable ignored) {</span>
+<span class="nc" id="L212">                    }</span>
+                }
+<span class="nc" id="L214">                challengeBytes = bytes;</span>
+<span class="nc" id="L215">                final String path = challengeFile.getAbsolutePath();</span>
+<span class="nc" id="L216">                final byte[] response = CodePointIterator.ofString(path).asUtf8(true).drain();</span>
+<span class="nc" id="L217">                setNegotiationState(PROCESS_RESPONSE_STATE);</span>
+<span class="nc" id="L218">                return response;</span>
+            case PROCESS_RESPONSE_STATE:
+<span class="nc" id="L220">                deleteChallenge();</span>
+<span class="nc" id="L221">                final int length = message.length;</span>
+<span class="nc bnc" id="L222" title="All 2 branches missed.">                if (length &lt; 8) {</span>
+<span class="nc" id="L223">                    throw saslLocal.mechInvalidClientMessage().toSaslException();</span>
+                }
+<span class="nc bnc" id="L225" title="All 2 branches missed.">                if (!Arrays.equals(challengeBytes, Arrays.copyOf(message, 8))) {</span>
+<span class="nc" id="L226">                    throw saslLocal.mechAuthenticationRejectedInvalidProof().toSaslException();</span>
+                }
+                String authenticationRealm;
+                String authenticationId;
+<span class="nc" id="L230">                final int firstMarker = Arrays2.indexOf(message, 0, 8);</span>
+<span class="nc bnc" id="L231" title="All 2 branches missed.">                if (firstMarker &gt; -1) {</span>
+<span class="nc" id="L232">                    authenticationId = new String(message, 8, firstMarker - 8, StandardCharsets.UTF_8);</span>
+<span class="nc" id="L233">                    final int secondMarker = Arrays2.indexOf(message, 0, firstMarker + 1);</span>
+<span class="nc bnc" id="L234" title="All 2 branches missed.">                    if (secondMarker &gt; -1) {</span>
+<span class="nc" id="L235">                        authenticationRealm = new String(message, firstMarker + 1, secondMarker - firstMarker - 1, StandardCharsets.UTF_8);</span>
+                    } else {
+<span class="nc" id="L237">                        authenticationRealm = null;</span>
+                    }
+<span class="nc" id="L239">                } else {</span>
+<span class="nc" id="L240">                    authenticationId = null;</span>
+<span class="nc" id="L241">                    authenticationRealm = null;</span>
+                }
+<span class="nc bnc" id="L243" title="All 4 branches missed.">                if (authenticationId == null || authenticationId.isEmpty()) {</span>
+<span class="nc" id="L244">                    authenticationId = defaultUser;</span>
+                }
+<span class="nc bnc" id="L246" title="All 4 branches missed.">                if (authenticationId == null || authenticationId.isEmpty()) {</span>
+<span class="nc" id="L247">                    throw saslLocal.mechAuthenticationNameIsEmpty().toSaslException();</span>
+                }
+<span class="nc bnc" id="L249" title="All 4 branches missed.">                if (authorizationId == null || authorizationId.isEmpty()) {</span>
+                    // If no authorization ID is specified default to authentication ID
+<span class="nc" id="L251">                    authorizationId = authenticationId;</span>
+                }
+<span class="nc" id="L253">                final NameCallback nameCallback = new NameCallback(&quot;User name&quot;, authenticationId);</span>
+<span class="nc" id="L254">                final AuthorizeCallback authorizeCallback = new AuthorizeCallback(authenticationId, authorizationId);</span>
+<span class="nc bnc" id="L255" title="All 2 branches missed.">                if (authenticationRealm == null) {</span>
+<span class="nc" id="L256">                    handleCallbacks(nameCallback, authorizeCallback);</span>
+                } else {
+<span class="nc" id="L258">                    final RealmCallback realmCallback = new RealmCallback(&quot;User realm&quot;, authenticationRealm);</span>
+<span class="nc" id="L259">                    handleCallbacks(realmCallback, nameCallback, authorizeCallback);</span>
+                }
+<span class="nc bnc" id="L261" title="All 2 branches missed.">                if (!authorizeCallback.isAuthorized()) {</span>
+<span class="nc" id="L262">                    throw saslLocal.mechAuthorizationFailed(authenticationId, authorizationId).toSaslException();</span>
+                }
+<span class="nc" id="L264">                negotiationComplete();</span>
+<span class="nc" id="L265">                return null;</span>
+        }
+<span class="nc" id="L267">        throw Assert.impossibleSwitchCase(state);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

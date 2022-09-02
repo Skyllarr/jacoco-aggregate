@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SSLSaslServerFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.util</a> &gt; <span class="el_source">SSLSaslServerFactory.java</span></div><h1>SSLSaslServerFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.util;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+
+import java.util.Map;
+import java.util.function.Supplier;
+
+import javax.net.ssl.SSLSession;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.sasl.SaslException;
+import javax.security.sasl.SaslServer;
+import javax.security.sasl.SaslServerFactory;
+
+import org.wildfly.security.ssl.SSLConnection;
+
+/**
+ * A SASL server factory which provides information about the security layer of the connection to the callback handler.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class SSLSaslServerFactory extends AbstractDelegatingSaslServerFactory implements SaslServerFactory {
+    private final Supplier&lt;SSLConnection&gt; sslConnectionSupplier;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param sslConnectionSupplier supplier for the current SSL connection
+     * @param delegate the delegate SASL server factory
+     */
+    public SSLSaslServerFactory(final Supplier&lt;SSLConnection&gt; sslConnectionSupplier, final SaslServerFactory delegate) {
+<span class="nc" id="L49">        super(delegate);</span>
+<span class="nc" id="L50">        this.sslConnectionSupplier = checkNotNullParam(&quot;sslConnectionSupplier&quot;, sslConnectionSupplier);</span>
+<span class="nc" id="L51">    }</span>
+
+    /**
+     * Construct a new instance.  The session connection is assumed to be in server mode.
+     *
+     * @param sslSession supplier for the current SSL session
+     * @param delegate the delegate SASL server factory
+     * @deprecated Use {@link #SSLSaslServerFactory(Supplier, SaslServerFactory)} to avoid problems where a TLS server is acting as a SASL client.
+     */
+    @Deprecated
+    public SSLSaslServerFactory(final SaslServerFactory delegate, final Supplier&lt;SSLSession&gt; sslSession) {
+<span class="nc" id="L62">        this(() -&gt; SSLConnection.forSession(sslSession.get(), false), delegate);</span>
+<span class="nc" id="L63">    }</span>
+
+    public SaslServer createSaslServer(final String mechanism, final String protocol, final String serverName, final Map&lt;String, ?&gt; props, final CallbackHandler cbh) throws SaslException {
+<span class="nc" id="L66">        final SSLQueryCallbackHandler newHandler = new SSLQueryCallbackHandler(cbh, sslConnectionSupplier);</span>
+<span class="nc" id="L67">        SaslServer saslServer = super.createSaslServer(mechanism, protocol, serverName, props, newHandler);</span>
+<span class="nc" id="L68">        newHandler.activate();</span>
+
+<span class="nc" id="L70">        return saslServer;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

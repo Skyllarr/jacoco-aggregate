@@ -1,0 +1,354 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DigestSaslClient.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl-digest</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.digest</a> &gt; <span class="el_source">DigestSaslClient.java</span></div><h1>DigestSaslClient.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.digest;
+
+import static org.wildfly.security.mechanism._private.ElytronMessages.saslDigest;
+import static org.wildfly.security.mechanism.digest.DigestUtil.parseResponse;
+import static org.wildfly.security.sasl.digest._private.DigestUtil.H_A1;
+import static org.wildfly.security.sasl.digest._private.DigestUtil.QOP_AUTH;
+import static org.wildfly.security.sasl.digest._private.DigestUtil.QOP_AUTH_CONF;
+import static org.wildfly.security.sasl.digest._private.DigestUtil.QOP_VALUES;
+import static org.wildfly.security.sasl.digest._private.DigestUtil.convertToHexBytesWithLeftPadding;
+import static org.wildfly.security.sasl.digest._private.DigestUtil.digestResponse;
+
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.security.Provider;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.function.Supplier;
+
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.sasl.SaslClient;
+import javax.security.sasl.SaslException;
+
+import org.wildfly.common.Assert;
+import org.wildfly.common.bytes.ByteStringBuilder;
+import org.wildfly.security.mechanism.AuthenticationMechanismException;
+import org.wildfly.security.mechanism.digest.DigestQuote;
+import org.wildfly.security.sasl.util.SaslMechanismInformation;
+import org.wildfly.security.util.DefaultTransformationMapper;
+import org.wildfly.security.util.TransformationMapper;
+import org.wildfly.security.util.TransformationSpec;
+
+/**
+ * A client implementation of RFC 2831 {@code DIGEST} SASL mechanism.
+ *
+ * @author &lt;a href=&quot;mailto:pskopek@redhat.com&quot;&gt;Peter Skopek&lt;/a&gt;
+ */
+final class DigestSaslClient extends AbstractDigestMechanism implements SaslClient {
+
+    private static final byte STEP_TWO = 2;
+    private static final byte STEP_FOUR = 4;
+
+    private String[] realms;
+    private String[] clientQops;
+<span class="nc" id="L63">    private boolean stale = false;</span>
+<span class="nc" id="L64">    private int maxbuf = DEFAULT_MAXBUF;</span>
+    private String cipher_opts;
+    private byte[] digest_urp;
+
+    private final boolean hasInitialResponse;
+    private final String[] demandedCiphers;
+
+    DigestSaslClient(String mechanism, String protocol, String serverName, CallbackHandler callbackHandler, String authorizationId, boolean hasInitialResponse, Charset charset, String[] qops, String[] ciphers, Supplier&lt;Provider[]&gt; providers) throws SaslException {
+<span class="nc" id="L72">        super(mechanism, protocol, serverName, callbackHandler, FORMAT.CLIENT, charset, ciphers, providers);</span>
+
+<span class="nc" id="L74">        this.hasInitialResponse = hasInitialResponse;</span>
+<span class="nc" id="L75">        this.authorizationId = authorizationId;</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">        this.clientQops = qops == null ? QOP_VALUES : qops;</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        this.demandedCiphers = ciphers == null ? new String[] {} : ciphers;</span>
+<span class="nc" id="L78">    }</span>
+
+    private void noteChallengeData(HashMap&lt;String, byte[]&gt; parsedChallenge) throws SaslException {
+<span class="nc" id="L81">        stale = false;</span>
+
+<span class="nc" id="L83">        LinkedList&lt;String&gt; realmList = new LinkedList&lt;String&gt;();</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        for (String keyWord: parsedChallenge.keySet()) {</span>
+
+<span class="nc bnc" id="L86" title="All 2 branches missed.">            if (keyWord.startsWith(&quot;realm&quot;)) {</span>
+<span class="nc" id="L87">                realmList.add(new String(parsedChallenge.get(keyWord), StandardCharsets.UTF_8));</span>
+            }
+<span class="nc bnc" id="L89" title="All 2 branches missed.">            else if (keyWord.equals(&quot;qop&quot;)) {</span>
+<span class="nc" id="L90">                String serverQops = new String(parsedChallenge.get(keyWord), StandardCharsets.UTF_8);</span>
+<span class="nc" id="L91">                this.qop = selectQop(serverQops.split(String.valueOf(DELIMITER)), clientQops);</span>
+<span class="nc" id="L92">            }</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">            else if (keyWord.equals(&quot;stale&quot;)) {</span>
+<span class="nc" id="L94">                stale = Boolean.parseBoolean(new String(parsedChallenge.get(keyWord), StandardCharsets.UTF_8));</span>
+            }
+<span class="nc bnc" id="L96" title="All 2 branches missed.">            else if (keyWord.equals(&quot;maxbuf&quot;)) {</span>
+<span class="nc" id="L97">                int maxbuf = Integer.parseInt(new String(parsedChallenge.get(keyWord), StandardCharsets.UTF_8));</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">                if (maxbuf &gt; 0) {</span>
+<span class="nc" id="L99">                    this.maxbuf = maxbuf;</span>
+                }
+<span class="nc" id="L101">            }</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">            else if (keyWord.equals(&quot;nonce&quot;)) {</span>
+<span class="nc" id="L103">                nonce = parsedChallenge.get(keyWord);</span>
+            }
+<span class="nc bnc" id="L105" title="All 2 branches missed.">            else if (keyWord.equals(&quot;cipher&quot;)) {</span>
+<span class="nc" id="L106">                cipher_opts = new String(parsedChallenge.get(keyWord), StandardCharsets.UTF_8);</span>
+<span class="nc" id="L107">                cipher = selectCipher(cipher_opts);</span>
+            }
+<span class="nc" id="L109">        }</span>
+
+<span class="nc bnc" id="L111" title="All 4 branches missed.">        if (qop != null &amp;&amp; qop.equals(QOP_AUTH) == false) {</span>
+<span class="nc" id="L112">            setWrapper(new DigestWrapper(qop.equals(QOP_AUTH_CONF)));</span>
+        }
+
+<span class="nc" id="L115">        realms = new String[realmList.size()];</span>
+<span class="nc" id="L116">        realmList.toArray(realms);</span>
+<span class="nc" id="L117">    }</span>
+
+    private String selectQop(String[] serverQops, String[] clientQops) throws SaslException {
+        // select by client preferences
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        for(String clientQop : clientQops){</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">            if (arrayContains(serverQops, clientQop)) {</span>
+<span class="nc" id="L123">                return clientQop;</span>
+            }
+        }
+<span class="nc" id="L126">        throw saslDigest.mechNoCommonProtectionLayer().toSaslException();</span>
+    }
+
+    private String selectCipher(String ciphersFromServer) throws SaslException {
+<span class="nc bnc" id="L130" title="All 2 branches missed.">        if (ciphersFromServer == null) {</span>
+<span class="nc" id="L131">            throw saslDigest.mechNoCiphersOfferedByServer().toSaslException();</span>
+        }
+
+<span class="nc" id="L134">        TransformationMapper trans = new DefaultTransformationMapper();</span>
+<span class="nc" id="L135">        String[] tokensToChooseFrom = ciphersFromServer.split(String.valueOf(DELIMITER));</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        for (TransformationSpec ts: trans.getTransformationSpecByStrength(SaslMechanismInformation.Names.DIGEST_MD5, tokensToChooseFrom)) {</span>
+            // take the strongest cipher
+<span class="nc bnc" id="L138" title="All 2 branches missed.">            for (String c: demandedCiphers) {</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">                if (c.equals(ts.getToken())) {</span>
+<span class="nc" id="L140">                   return ts.getToken();</span>
+               }
+            }
+        }
+
+<span class="nc" id="L145">        throw saslDigest.mechNoCommonCipher().toSaslException();</span>
+    }
+
+
+    /**
+     * Method creates client response to the server challenge:
+     *
+     *    digest-response  = 1#( username | realm | nonce | cnonce |
+     *                     nonce-count | qop | digest-uri | response |
+     *                     maxbuf | charset | cipher | authzid |
+     *                     auth-param )
+     *
+     *  username         = &quot;username&quot; &quot;=&quot; &amp;lt;&quot;&amp;gt; username-value &amp;lt;&quot;&amp;gt;
+     *  username-value   = qdstr-val
+     *  cnonce           = &quot;cnonce&quot; &quot;=&quot; &amp;lt;&quot;&amp;gt; cnonce-value &amp;lt;&quot;&amp;gt;
+     *  cnonce-value     = qdstr-val
+     *  nonce-count      = &quot;nc&quot; &quot;=&quot; nc-value
+     *  nc-value         = 8LHEX
+     *  qop              = &quot;qop&quot; &quot;=&quot; qop-value
+     *  digest-uri       = &quot;digest-uri&quot; &quot;=&quot; &amp;lt;&quot;&amp;gt; digest-uri-value &amp;lt;&quot;&amp;gt;
+     *  digest-uri-value  = serv-type &quot;/&quot; host [ &quot;/&quot; serv-name ]
+     *  serv-type        = 1*ALPHA
+     *  host             = 1*( ALPHA | DIGIT | &quot;-&quot; | &quot;.&quot; )
+     *  serv-name        = host
+     *  response         = &quot;response&quot; &quot;=&quot; response-value
+     *  response-value   = 32LHEX
+     *  LHEX             = &quot;0&quot; | &quot;1&quot; | &quot;2&quot; | &quot;3&quot; |
+     *                     &quot;4&quot; | &quot;5&quot; | &quot;6&quot; | &quot;7&quot; |
+     *                     &quot;8&quot; | &quot;9&quot; | &quot;a&quot; | &quot;b&quot; |
+     *                     &quot;c&quot; | &quot;d&quot; | &quot;e&quot; | &quot;f&quot;
+     *  cipher           = &quot;cipher&quot; &quot;=&quot; cipher-value
+     *  authzid          = &quot;authzid&quot; &quot;=&quot; &amp;lt;&quot;&amp;gt; authzid-value &amp;lt;&quot;&amp;gt;
+     *  authzid-value    = qdstr-val
+     *
+     * @param parsedChallenge
+     * @return
+     * @throws SaslException
+     */
+    private byte[] createResponse(HashMap&lt;String, byte[]&gt; parsedChallenge) throws SaslException {
+
+<span class="nc" id="L185">        ByteStringBuilder digestResponse = new ByteStringBuilder();</span>
+
+        // charset on server
+        Charset serverHashedURPUsingcharset;
+<span class="nc" id="L189">        byte[] chb = parsedChallenge.get(&quot;charset&quot;);</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">        if (chb != null) {</span>
+<span class="nc" id="L191">            String chs = new String(chb, StandardCharsets.UTF_8);</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">            if (&quot;utf-8&quot;.equals(chs)) {</span>
+<span class="nc" id="L193">                serverHashedURPUsingcharset = StandardCharsets.UTF_8;</span>
+            } else {
+<span class="nc" id="L195">                serverHashedURPUsingcharset = StandardCharsets.ISO_8859_1;</span>
+            }
+<span class="nc" id="L197">        } else {</span>
+<span class="nc" id="L198">            serverHashedURPUsingcharset = StandardCharsets.ISO_8859_1;</span>
+        }
+
+<span class="nc bnc" id="L201" title="All 2 branches missed.">        if (StandardCharsets.UTF_8.equals(serverHashedURPUsingcharset)) {</span>
+<span class="nc" id="L202">            digestResponse.append(&quot;charset=&quot;);</span>
+<span class="nc" id="L203">            digestResponse.append(&quot;utf-8&quot;);</span>
+<span class="nc" id="L204">            digestResponse.append(DELIMITER);</span>
+        }
+
+<span class="nc bnc" id="L207" title="All 4 branches missed.">        if (! stale || username == null) {</span>
+<span class="nc" id="L208">            username = authorizationId; // default username</span>
+
+<span class="nc bnc" id="L210" title="All 4 branches missed.">            if (realms != null &amp;&amp; realms.length &gt;= 1) {</span>
+<span class="nc" id="L211">                realm = realms[0]; // default realm is first realm from selection</span>
+            }
+
+<span class="nc" id="L214">            digest_urp = handleUserRealmPasswordCallbacks(realms, false, false);</span>
+        } else {
+<span class="nc" id="L216">            saslDigest.trace(&quot;Stale nonce - re-authenticating using same credential&quot;);</span>
+        }
+
+        // username
+<span class="nc" id="L220">        digestResponse.append(&quot;username=\&quot;&quot;);</span>
+<span class="nc" id="L221">        digestResponse.append(DigestQuote.quote(username).getBytes(serverHashedURPUsingcharset));</span>
+<span class="nc" id="L222">        digestResponse.append(&quot;\&quot;&quot;).append(DELIMITER);</span>
+
+        // realm
+<span class="nc bnc" id="L225" title="All 2 branches missed.">        if(realm != null){</span>
+<span class="nc" id="L226">            digestResponse.append(&quot;realm=\&quot;&quot;);</span>
+<span class="nc" id="L227">            digestResponse.append(DigestQuote.quote(realm).getBytes(serverHashedURPUsingcharset));</span>
+<span class="nc" id="L228">            digestResponse.append(&quot;\&quot;&quot;).append(DELIMITER);</span>
+        }
+
+        // nonce
+<span class="nc bnc" id="L232" title="All 2 branches missed.">        if(nonce == null){</span>
+<span class="nc" id="L233">            throw saslDigest.mechMissingDirective(&quot;nonce&quot;).toSaslException();</span>
+        }
+<span class="nc" id="L235">        digestResponse.append(&quot;nonce=\&quot;&quot;);</span>
+<span class="nc" id="L236">        digestResponse.append(nonce);</span>
+<span class="nc" id="L237">        digestResponse.append(&quot;\&quot;&quot;).append(DELIMITER);</span>
+
+        // nc | nonce-count
+<span class="nc" id="L240">        digestResponse.append(&quot;nc=&quot;);</span>
+<span class="nc" id="L241">        int nonceCount = getNonceCount();</span>
+<span class="nc" id="L242">        digestResponse.append(convertToHexBytesWithLeftPadding(nonceCount, 8));</span>
+<span class="nc" id="L243">        digestResponse.append(DELIMITER);</span>
+
+        // cnonce
+<span class="nc" id="L246">        digestResponse.append(&quot;cnonce=\&quot;&quot;);</span>
+<span class="nc" id="L247">        cnonce = generateNonce();</span>
+<span class="nc" id="L248">        digestResponse.append(cnonce);</span>
+<span class="nc" id="L249">        digestResponse.append(&quot;\&quot;&quot;).append(DELIMITER);</span>
+
+        // digest-uri
+<span class="nc" id="L252">        digestResponse.append(&quot;digest-uri=\&quot;&quot;);</span>
+<span class="nc" id="L253">        digestResponse.append(digestURI);</span>
+<span class="nc" id="L254">        digestResponse.append(&quot;\&quot;&quot;).append(DELIMITER);</span>
+
+        // maxbuf
+<span class="nc" id="L257">        digestResponse.append(&quot;maxbuf=&quot;);</span>
+<span class="nc" id="L258">        digestResponse.append(String.valueOf(maxbuf));</span>
+<span class="nc" id="L259">        digestResponse.append(DELIMITER);</span>
+
+        // response
+<span class="nc" id="L262">        hA1 = H_A1(messageDigest, digest_urp, nonce, cnonce, authorizationId, serverHashedURPUsingcharset);</span>
+<span class="nc" id="L263">        byte[] response_value = digestResponse(messageDigest, hA1, nonce, nonceCount, cnonce, authorizationId, qop, digestURI, true);</span>
+<span class="nc" id="L264">        digestResponse.append(&quot;response=&quot;);</span>
+<span class="nc" id="L265">        digestResponse.append(response_value);</span>
+
+        // qop
+<span class="nc" id="L268">        digestResponse.append(DELIMITER);</span>
+<span class="nc" id="L269">        digestResponse.append(&quot;qop=&quot;);</span>
+<span class="nc bnc" id="L270" title="All 2 branches missed.">        digestResponse.append(qop !=null ? qop : QOP_AUTH);</span>
+
+        // cipher
+<span class="nc bnc" id="L273" title="All 4 branches missed.">        if (cipher != null &amp;&amp; cipher.length() != 0) {</span>
+<span class="nc" id="L274">            digestResponse.append(DELIMITER);</span>
+<span class="nc" id="L275">            digestResponse.append(&quot;cipher=\&quot;&quot;);</span>
+<span class="nc" id="L276">            digestResponse.append(cipher);</span>
+<span class="nc" id="L277">            digestResponse.append(&quot;\&quot;&quot;);</span>
+        }
+
+        // authzid
+<span class="nc bnc" id="L281" title="All 2 branches missed.">        if (authorizationId != null) {</span>
+<span class="nc" id="L282">            digestResponse.append(DELIMITER);</span>
+<span class="nc" id="L283">            digestResponse.append(&quot;authzid=\&quot;&quot;);</span>
+<span class="nc" id="L284">            digestResponse.append(DigestQuote.quote(authorizationId).getBytes(serverHashedURPUsingcharset));</span>
+<span class="nc" id="L285">            digestResponse.append(&quot;\&quot;&quot;);</span>
+        }
+
+<span class="nc" id="L288">        createCiphersAndKeys();</span>
+
+<span class="nc" id="L290">        return digestResponse.toArray();</span>
+    }
+
+    /**
+     * For now it returns always 1
+     * @return
+     */
+    private int getNonceCount() {
+<span class="nc" id="L298">        return 1;</span>
+    }
+
+    private void checkResponseAuth(HashMap&lt;String, byte[]&gt; parsedChallenge) throws SaslException {
+<span class="nc" id="L302">        byte[] expected = digestResponse(messageDigest, hA1, nonce, getNonceCount(), cnonce, authorizationId, qop, digestURI, false);</span>
+<span class="nc bnc" id="L303" title="All 2 branches missed.">        if(!Arrays.equals(expected, parsedChallenge.get(&quot;rspauth&quot;))) {</span>
+<span class="nc" id="L304">            throw saslDigest.mechServerAuthenticityCannotBeVerified().toSaslException();</span>
+        }
+<span class="nc" id="L306">    }</span>
+
+    /* (non-Javadoc)
+     * @see org.wildfly.sasl.util.AbstractSaslParticipant#init()
+     */
+    @Override
+    public void init() {
+<span class="nc" id="L313">        setNegotiationState(STEP_TWO);</span>
+<span class="nc" id="L314">    }</span>
+
+    @Override
+    public boolean hasInitialResponse() {
+<span class="nc" id="L318">        return hasInitialResponse;</span>
+    }
+
+    @Override
+    public byte[] evaluateChallenge(byte[] challenge) throws SaslException {
+<span class="nc" id="L323">        return evaluateMessage(challenge);</span>
+    }
+
+    @Override
+    protected byte[] evaluateMessage(int state, final byte[] message) throws SaslException {
+        HashMap&lt;String, byte[]&gt; parsedChallenge;
+        try {
+<span class="nc" id="L330">            parsedChallenge = parseResponse(message, charset, true, saslDigest);</span>
+<span class="nc" id="L331">        } catch (AuthenticationMechanismException e) {</span>
+<span class="nc" id="L332">            throw e.toSaslException();</span>
+<span class="nc" id="L333">        }</span>
+        while(true) {
+<span class="nc bnc" id="L335" title="All 3 branches missed.">            switch (state) {</span>
+                case STEP_TWO:
+<span class="nc" id="L337">                    noteChallengeData(parsedChallenge);</span>
+<span class="nc" id="L338">                    setNegotiationState(STEP_FOUR);</span>
+<span class="nc" id="L339">                    return createResponse(parsedChallenge);</span>
+                case STEP_FOUR:
+<span class="nc bnc" id="L341" title="All 2 branches missed.">                    if (parsedChallenge.containsKey(&quot;nonce&quot;)) {</span>
+<span class="nc" id="L342">                        saslDigest.trace(&quot;Server requested re-authentication&quot;);</span>
+<span class="nc" id="L343">                        state = STEP_TWO;</span>
+<span class="nc" id="L344">                        continue;</span>
+                    }
+<span class="nc" id="L346">                    checkResponseAuth(parsedChallenge);</span>
+<span class="nc" id="L347">                    negotiationComplete();</span>
+<span class="nc" id="L348">                    return null;</span>
+            }
+<span class="nc" id="L350">            throw Assert.impossibleSwitchCase(state);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

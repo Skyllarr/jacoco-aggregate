@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SetMechanismInformationMechanismFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-util</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.util</a> &gt; <span class="el_source">SetMechanismInformationMechanismFactory.java</span></div><h1>SetMechanismInformationMechanismFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.http.util;
+
+import static org.wildfly.security.http.HttpConstants.HOST;
+import static org.wildfly.security.http.util.ElytronMessages.log;
+
+import java.util.Map;
+
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+
+import org.wildfly.security.auth.callback.MechanismInformationCallback;
+import org.wildfly.security.auth.server.MechanismInformation;
+import org.wildfly.security.http.HttpAuthenticationException;
+import org.wildfly.security.http.HttpServerAuthenticationMechanism;
+import org.wildfly.security.http.HttpServerAuthenticationMechanismFactory;
+import org.wildfly.security.http.HttpServerRequest;
+
+/**
+ * A wrapper {@link HttpServerAuthenticationMechanismFactory} to ensure that mechanism information for the current
+ * authentication request is set before the first authentication callbacks.
+ *
+ * The host name and protocol are derived from the current request being authenticated.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public class SetMechanismInformationMechanismFactory implements HttpServerAuthenticationMechanismFactory {
+
+    private HttpServerAuthenticationMechanismFactory delegate;
+
+    /**
+     * Construct a wrapping mechanism factory instance.
+     *
+     * @param delegate the wrapped mechanism factory
+     */
+<span class="nc" id="L52">    public SetMechanismInformationMechanismFactory(final HttpServerAuthenticationMechanismFactory delegate) {</span>
+<span class="nc" id="L53">        this.delegate = delegate;</span>
+<span class="nc" id="L54">    }</span>
+
+    @Override
+    public String[] getMechanismNames(Map&lt;String, ?&gt; properties) {
+<span class="nc" id="L58">        return delegate.getMechanismNames(properties);</span>
+    }
+
+    @Override
+    public HttpServerAuthenticationMechanism createAuthenticationMechanism(final String mechanismName, Map&lt;String, ?&gt; properties,
+            final CallbackHandler callbackHandler) throws HttpAuthenticationException {
+<span class="nc" id="L64">        final HttpServerAuthenticationMechanism mechanism = delegate.createAuthenticationMechanism(mechanismName, properties, callbackHandler);</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        return mechanism != null ? new HttpServerAuthenticationMechanism() {</span>
+
+            @Override
+            public String getMechanismName() {
+<span class="nc" id="L69">                return mechanism.getMechanismName();</span>
+            }
+
+            @Override
+            public void evaluateRequest(HttpServerRequest request) throws HttpAuthenticationException {
+<span class="nc" id="L74">                String host = request.getFirstRequestHeaderValue(HOST);</span>
+<span class="nc" id="L75">                String resolvedHostName = null;</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">                if (host != null) {</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">                  if (host.startsWith(&quot;[&quot;)) {</span>
+<span class="nc" id="L78">                      int close = host.indexOf(']');</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">                      if (close &gt; 0) {</span>
+<span class="nc" id="L80">                          resolvedHostName = host.substring(0, close + 1);</span>
+                      }
+<span class="nc" id="L82">                  } else {</span>
+<span class="nc" id="L83">                      int colon = host.lastIndexOf(':');</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">                      resolvedHostName = colon &gt; 0 ? host.substring(0, colon) : host;</span>
+                  }
+                }
+
+                try {
+<span class="nc" id="L89">                    final String mechanismName = getMechanismName();</span>
+<span class="nc" id="L90">                    final String hostName = resolvedHostName;</span>
+<span class="nc" id="L91">                    final String protocol = request.getRequestURI().getScheme();</span>
+<span class="nc" id="L92">                    callbackHandler.handle(new Callback[] { new MechanismInformationCallback(new MechanismInformation() {</span>
+
+                        @Override
+                        public String getProtocol() {
+<span class="nc" id="L96">                            return protocol;</span>
+                        }
+
+                        @Override
+                        public String getMechanismType() {
+<span class="nc" id="L101">                            return &quot;HTTP&quot;;</span>
+                        }
+
+                        @Override
+                        public String getMechanismName() {
+<span class="nc" id="L106">                            return mechanismName;</span>
+                        }
+
+                        @Override
+                        public String getHostName() {
+<span class="nc" id="L111">                            return hostName;</span>
+                        }
+                    })});
+
+<span class="nc" id="L115">                } catch (Throwable e) {</span>
+<span class="nc" id="L116">                    throw log.unableToLocateMechanismConfiguration(e).toHttpAuthenticationException();</span>
+<span class="nc" id="L117">                }</span>
+
+<span class="nc" id="L119">                mechanism.evaluateRequest(request);</span>
+<span class="nc" id="L120">            }</span>
+
+            @Override
+            public void dispose() {
+<span class="nc" id="L124">                mechanism.dispose();</span>
+<span class="nc" id="L125">            }</span>
+
+<span class="nc" id="L127">        } : null;</span>
+    }
+
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

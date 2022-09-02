@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MappedRegexRealmMapper.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-util</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.util</a> &gt; <span class="el_source">MappedRegexRealmMapper.java</span></div><h1>MappedRegexRealmMapper.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.util;
+
+import java.security.Principal;
+import java.util.Map;
+import java.util.regex.Pattern;
+
+import org.wildfly.security.auth.server.RealmMapper;
+import org.wildfly.security.evidence.Evidence;
+
+/**
+ * A simple mapping regular expression-based realm mapper. The pattern is used to find the realm portion
+ * of the user name. Then, a map is consulted to map this realm portion to an actual configured realm name.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public class MappedRegexRealmMapper extends SimpleRegexRealmMapper {
+    private final Map&lt;String, String&gt; realmNameMap;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param realmNamePattern the realm name pattern, which must contain at least one capture group (cannot be {@code null})
+     * @param realmNameMap the realm portion to realm name map (cannot be {@code null})
+     */
+    public MappedRegexRealmMapper(final Pattern realmNamePattern, final Map&lt;String, String&gt; realmNameMap) {
+<span class="fc" id="L44">        super(realmNamePattern);</span>
+<span class="fc" id="L45">        this.realmNameMap = realmNameMap;</span>
+<span class="fc" id="L46">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param realmNamePattern the realm name pattern, which must contain at least one capture group (cannot be {@code null})
+     * @param delegate the delegate mapper to use if the pattern is not matched (cannot be {@code null})
+     * @param realmNameMap the realm portion to realm name map (cannot be {@code null})
+     */
+    public MappedRegexRealmMapper(final Pattern realmNamePattern, final RealmMapper delegate, final Map&lt;String, String&gt; realmNameMap) {
+<span class="nc" id="L56">        super(realmNamePattern, delegate);</span>
+<span class="nc" id="L57">        this.realmNameMap = realmNameMap;</span>
+<span class="nc" id="L58">    }</span>
+
+    public String getRealmMapping(final Principal principal, final Evidence evidence) {
+<span class="fc" id="L61">        final String mappedRealmPart = super.getRealmMapping(principal, evidence);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (mappedRealmPart == null) return null;</span>
+<span class="fc" id="L63">        return realmNameMap.get(mappedRealmPart);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RawKey.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-credential</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.key</a> &gt; <span class="el_source">RawKey.java</span></div><h1>RawKey.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.key;
+
+import java.io.Serializable;
+import java.security.Key;
+import java.util.Arrays;
+import java.util.Objects;
+
+/**
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+abstract class RawKey implements Serializable {
+
+    private static final long serialVersionUID = -5953606815393608941L;
+
+    private final String algorithm;
+    private final String format;
+    private final byte[] encoded;
+
+<span class="nc" id="L37">    RawKey(Key original) {</span>
+<span class="nc" id="L38">        algorithm = original.getAlgorithm();</span>
+<span class="nc" id="L39">        format = original.getFormat();</span>
+<span class="nc" id="L40">        final byte[] encoded = original.getEncoded();</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">        this.encoded = encoded == null ? null : encoded.clone();</span>
+<span class="nc" id="L42">    }</span>
+
+    public String getAlgorithm() {
+<span class="nc" id="L45">        return algorithm;</span>
+    }
+
+    public String getFormat() {
+<span class="nc" id="L49">        return format;</span>
+    }
+
+    public byte[] getEncoded() {
+<span class="nc" id="L53">        final byte[] encoded = this.encoded;</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        return encoded == null ? null : encoded.clone();</span>
+    }
+
+    public final boolean equals(final Object obj) {
+<span class="nc bnc" id="L58" title="All 6 branches missed.">        return this == obj || obj instanceof Key &amp;&amp; isEqual((Key) obj);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc bnc" id="L63" title="All 2 branches missed.">        return (algorithm != null ? algorithm.hashCode() : 1) +</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">                (format != null ? format.hashCode() : 3) +</span>
+<span class="nc" id="L65">                Arrays.hashCode(encoded);</span>
+    }
+
+    boolean isEqual(Key key) {
+<span class="nc bnc" id="L69" title="All 4 branches missed.">        return Objects.equals(key.getAlgorithm(), algorithm) &amp;&amp; Objects.equals(key.getFormat(), format);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

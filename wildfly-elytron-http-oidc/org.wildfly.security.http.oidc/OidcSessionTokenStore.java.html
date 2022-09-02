@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OidcSessionTokenStore.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-oidc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.oidc</a> &gt; <span class="el_source">OidcSessionTokenStore.java</span></div><h1>OidcSessionTokenStore.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2021 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.http.oidc;
+
+import static org.wildfly.security.http.oidc.ElytronMessages.log;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+
+import org.wildfly.security.http.HttpScope;
+import org.wildfly.security.http.HttpScopeNotification;
+import org.wildfly.security.http.Scope;
+
+/**
+ * @author &lt;a href=&quot;mailto:psilva@redhat.com&quot;&gt;Pedro Igor&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:mposolda@redhat.com&quot;&gt;Marek Posolda&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+public class OidcSessionTokenStore implements OidcTokenStore {
+
+    private final OidcHttpFacade httpFacade;
+
+<span class="nc" id="L40">    public OidcSessionTokenStore(OidcHttpFacade httpFacade) {</span>
+<span class="nc" id="L41">        this.httpFacade = httpFacade;</span>
+<span class="nc" id="L42">    }</span>
+
+    @Override
+    public void checkCurrentToken() {
+<span class="nc" id="L46">        HttpScope session = httpFacade.getScope(Scope.SESSION);</span>
+<span class="nc bnc" id="L47" title="All 4 branches missed.">        if (session == null || ! session.exists()) return;</span>
+<span class="nc" id="L48">        RefreshableOidcSecurityContext securityContext = (RefreshableOidcSecurityContext) session.getAttachment(OidcSecurityContext.class.getName());</span>
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        if (securityContext == null) return;</span>
+
+        // just in case session got serialized
+<span class="nc bnc" id="L52" title="All 2 branches missed.">        if (securityContext.getOidcClientConfiguration() == null) {</span>
+<span class="nc" id="L53">            securityContext.setCurrentRequestInfo(httpFacade.getOidcClientConfiguration(), this);</span>
+        }
+
+<span class="nc bnc" id="L56" title="All 4 branches missed.">        if (securityContext.isActive() &amp;&amp; ! securityContext.getOidcClientConfiguration().isAlwaysRefreshToken()) return;</span>
+
+        // FYI: A refresh requires same scope, so same roles will be set.  Otherwise, refresh will fail and token will
+        // not be updated
+<span class="nc" id="L60">        boolean success = securityContext.refreshToken(false);</span>
+<span class="nc bnc" id="L61" title="All 4 branches missed.">        if (success &amp;&amp; securityContext.isActive()) return;</span>
+
+        // Refresh failed, so user is already logged out from keycloak. Cleanup and expire our session
+<span class="nc" id="L64">        session.setAttachment(OidcSecurityContext.class.getName(), null);</span>
+<span class="nc" id="L65">        session.invalidate();</span>
+<span class="nc" id="L66">    }</span>
+
+    @Override
+    public boolean isCached(RequestAuthenticator authenticator) {
+<span class="nc" id="L70">        HttpScope session = this.httpFacade.getScope(Scope.SESSION);</span>
+
+<span class="nc bnc" id="L72" title="All 4 branches missed.">        if (session == null || !session.supportsAttachments()) {</span>
+<span class="nc" id="L73">            log.debug(&quot;session was null, returning null&quot;);</span>
+<span class="nc" id="L74">            return false;</span>
+        }
+
+        OidcAccount account;
+
+        try {
+<span class="nc" id="L80">            account = (OidcAccount) session.getAttachment(OidcAccount.class.getName());</span>
+<span class="nc" id="L81">        } catch (IllegalStateException e) {</span>
+<span class="nc" id="L82">            log.debug(&quot;session was invalidated.  Return false.&quot;);</span>
+<span class="nc" id="L83">            return false;</span>
+<span class="nc" id="L84">        }</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        if (account == null) {</span>
+<span class="nc" id="L86">            log.debug(&quot;Account was not in session, returning null&quot;);</span>
+<span class="nc" id="L87">            return false;</span>
+        }
+
+<span class="nc" id="L90">        OidcClientConfiguration deployment = httpFacade.getOidcClientConfiguration();</span>
+
+<span class="nc bnc" id="L92" title="All 4 branches missed.">        if (deployment.getRealm() != null &amp;&amp; ! deployment.getRealm().equals(account.getOidcSecurityContext().getRealm())) {</span>
+<span class="nc" id="L93">            log.debug(&quot;Account in session belongs to a different realm than for this request.&quot;);</span>
+<span class="nc" id="L94">            return false;</span>
+        }
+
+<span class="nc" id="L97">        boolean active = account.checkActive();</span>
+
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        if (! active) {</span>
+<span class="nc" id="L100">            active = account.tryRefresh();</span>
+        }
+
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        if (active) {</span>
+<span class="nc" id="L104">            log.debug(&quot;Cached account found&quot;);</span>
+<span class="nc" id="L105">            restoreRequest();</span>
+<span class="nc" id="L106">            httpFacade.authenticationComplete(account, true);</span>
+<span class="nc" id="L107">            return true;</span>
+        } else {
+<span class="nc" id="L109">            log.debug(&quot;Refresh failed. Account was not active. Returning null and invalidating Http session&quot;);</span>
+            try {
+<span class="nc" id="L111">                session.setAttachment(OidcSecurityContext.class.getName(), null);</span>
+<span class="nc" id="L112">                session.setAttachment(OidcAccount.class.getName(), null);</span>
+<span class="nc" id="L113">                session.invalidate();</span>
+<span class="nc" id="L114">            } catch (Exception e) {</span>
+<span class="nc" id="L115">                log.debug(&quot;Failed to invalidate session, might already be invalidated&quot;);</span>
+<span class="nc" id="L116">            }</span>
+<span class="nc" id="L117">            return false;</span>
+        }
+    }
+
+    @Override
+    public void saveAccountInfo(OidcAccount account) {
+<span class="nc" id="L123">        HttpScope session = this.httpFacade.getScope(Scope.SESSION);</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        if (! session.exists()) {</span>
+<span class="nc" id="L125">            session.create();</span>
+<span class="nc" id="L126">            session.registerForNotification(httpScopeNotification -&gt; {</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">                if (! httpScopeNotification.isOfType(HttpScopeNotification.SessionNotificationType.UNDEPLOY)) {</span>
+<span class="nc" id="L128">                    HttpScope invalidated = httpScopeNotification.getScope(Scope.SESSION);</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">                    if (invalidated != null) {</span>
+<span class="nc" id="L130">                        invalidated.setAttachment(OidcAccount.class.getName(), null);</span>
+<span class="nc" id="L131">                        invalidated.setAttachment(OidcSecurityContext.class.getName(), null);</span>
+                    }
+                }
+<span class="nc" id="L134">            });</span>
+        }
+
+<span class="nc" id="L137">        session.setAttachment(OidcAccount.class.getName(), account);</span>
+<span class="nc" id="L138">        session.setAttachment(OidcSecurityContext.class.getName(), account.getOidcSecurityContext());</span>
+
+<span class="nc" id="L140">        HttpScope scope = this.httpFacade.getScope(Scope.EXCHANGE);</span>
+
+<span class="nc" id="L142">        scope.setAttachment(OidcSecurityContext.class.getName(), account.getOidcSecurityContext());</span>
+<span class="nc" id="L143">    }</span>
+
+    @Override
+    public void logout() {
+<span class="nc" id="L147">        logout(false);</span>
+<span class="nc" id="L148">    }</span>
+
+    @Override
+    public void refreshCallback(RefreshableOidcSecurityContext securityContext) {
+<span class="nc" id="L152">        OidcPrincipal&lt;RefreshableOidcSecurityContext&gt; principal = new OidcPrincipal&lt;&gt;(securityContext.getIDToken().getPrincipalName(this.httpFacade.getOidcClientConfiguration()), securityContext);</span>
+<span class="nc" id="L153">        saveAccountInfo(new OidcAccount(principal));</span>
+<span class="nc" id="L154">    }</span>
+
+    @Override
+    public void saveRequest() {
+<span class="nc" id="L158">        this.httpFacade.suspendRequest();</span>
+<span class="nc" id="L159">    }</span>
+
+    @Override
+    public boolean restoreRequest() {
+<span class="nc" id="L163">        return this.httpFacade.restoreRequest();</span>
+    }
+
+    @Override
+    public void logout(boolean glo) {
+<span class="nc" id="L168">        HttpScope session = this.httpFacade.getScope(Scope.SESSION);</span>
+
+<span class="nc bnc" id="L170" title="All 2 branches missed.">        if (! session.exists()) {</span>
+<span class="nc" id="L171">            return;</span>
+        }
+
+<span class="nc" id="L174">        OidcSecurityContext securityContext = (OidcSecurityContext) session.getAttachment(OidcSecurityContext.class.getName());</span>
+
+        try {
+<span class="nc bnc" id="L177" title="All 4 branches missed.">            if (glo &amp;&amp; securityContext != null) {</span>
+<span class="nc" id="L178">                OidcClientConfiguration deployment = httpFacade.getOidcClientConfiguration();</span>
+<span class="nc" id="L179">                session.invalidate();</span>
+<span class="nc bnc" id="L180" title="All 6 branches missed.">                if (! deployment.isBearerOnly() &amp;&amp; securityContext != null &amp;&amp; securityContext instanceof RefreshableOidcSecurityContext) {</span>
+<span class="nc" id="L181">                    ((RefreshableOidcSecurityContext) securityContext).logout(deployment);</span>
+                }
+<span class="nc" id="L183">            } else {</span>
+<span class="nc" id="L184">                session.setAttachment(OidcAccount.class.getName(), null);</span>
+<span class="nc" id="L185">                session.setAttachment(OidcSecurityContext.class.getName(), null);</span>
+            }
+<span class="nc" id="L187">        } catch (IllegalStateException ise) {</span>
+            // Session may be already logged-out in case that app has adminUrl
+<span class="nc" id="L189">            log.debugf(&quot;Session %s logged-out already&quot;, session.getID());</span>
+<span class="nc" id="L190">        }</span>
+<span class="nc" id="L191">    }</span>
+
+    @Override
+    public void logoutAll() {
+<span class="nc" id="L195">        Collection&lt;String&gt; sessions = httpFacade.getScopeIds(Scope.SESSION);</span>
+<span class="nc" id="L196">        logoutHttpSessions(new ArrayList&lt;&gt;(sessions));</span>
+<span class="nc" id="L197">    }</span>
+
+    @Override
+    public void logoutHttpSessions(List&lt;String&gt; ids) {
+<span class="nc bnc" id="L201" title="All 2 branches missed.">        for (String id : ids) {</span>
+<span class="nc" id="L202">            HttpScope session = httpFacade.getScope(Scope.SESSION, id);</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">            if (session != null) {</span>
+<span class="nc" id="L204">                session.invalidate();</span>
+            }
+<span class="nc" id="L206">        }</span>
+<span class="nc" id="L207">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

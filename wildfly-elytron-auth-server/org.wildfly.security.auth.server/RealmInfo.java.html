@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RealmInfo.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.server</a> &gt; <span class="el_source">RealmInfo.java</span></div><h1>RealmInfo.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source
+ *
+ * Copyright 2013 Red Hat, Inc. and/or its affiliates.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.auth.server;
+
+import java.security.Principal;
+import java.util.function.Function;
+
+import org.wildfly.security.authz.RoleDecoder;
+import org.wildfly.security.authz.RoleMapper;
+
+/**
+ * &lt;p&gt;Holds the reference to a {@link SecurityRealm} and the configuration associated with it.&lt;/p&gt;
+ *
+ * @author &lt;a href=&quot;mailto:psilva@redhat.com&quot;&gt;Pedro Igor&lt;/a&gt;
+ */
+class RealmInfo {
+
+    private final SecurityRealm securityRealm;
+    private final String name;
+    private final RoleMapper roleMapper;
+    private final Function&lt;Principal, Principal&gt; principalRewriter;
+    private final RoleDecoder roleDecoder;
+
+<span class="fc" id="L39">    RealmInfo(final SecurityDomain.RealmBuilder realmBuilder) {</span>
+<span class="fc" id="L40">        this.name = realmBuilder.getName();</span>
+<span class="fc" id="L41">        this.securityRealm = realmBuilder.getRealm();</span>
+<span class="fc" id="L42">        this.roleMapper = realmBuilder.getRoleMapper();</span>
+<span class="fc" id="L43">        this.principalRewriter = realmBuilder.getPrincipalRewriter();</span>
+<span class="fc" id="L44">        this.roleDecoder = realmBuilder.getRoleDecoder();</span>
+<span class="fc" id="L45">    }</span>
+
+<span class="fc" id="L47">    RealmInfo() {</span>
+<span class="fc" id="L48">        this.securityRealm = SecurityRealm.EMPTY_REALM;</span>
+<span class="fc" id="L49">        this.name = &quot;default&quot;;</span>
+<span class="fc" id="L50">        this.roleMapper = RoleMapper.IDENTITY_ROLE_MAPPER;</span>
+<span class="fc" id="L51">        this.principalRewriter = Function.identity();</span>
+<span class="fc" id="L52">        this.roleDecoder = RoleDecoder.DEFAULT;</span>
+<span class="fc" id="L53">    }</span>
+
+    String getName() {
+<span class="nc" id="L56">        return this.name;</span>
+    }
+
+    SecurityRealm getSecurityRealm() {
+<span class="fc" id="L60">        return this.securityRealm;</span>
+    }
+
+    RoleMapper getRoleMapper() {
+<span class="fc" id="L64">        return this.roleMapper;</span>
+    }
+
+    Function&lt;Principal, Principal&gt; getPrincipalRewriter() {
+<span class="fc" id="L68">        return principalRewriter;</span>
+    }
+
+    RoleDecoder getRoleDecoder() {
+<span class="fc" id="L72">        return roleDecoder;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L77">        return &quot;RealmInfo{name='&quot; + name + &quot;', securityRealm=&quot; + securityRealm + &quot;}&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

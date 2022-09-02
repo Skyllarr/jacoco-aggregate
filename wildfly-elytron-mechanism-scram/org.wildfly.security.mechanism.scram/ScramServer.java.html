@@ -1,0 +1,491 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ScramServer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-mechanism-scram</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.mechanism.scram</a> &gt; <span class="el_source">ScramServer.java</span></div><h1>ScramServer.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.mechanism.scram;
+
+import static java.lang.Math.max;
+import static java.lang.Math.min;
+import static java.util.Arrays.copyOfRange;
+import static org.wildfly.security.mechanism._private.ElytronMessages.saslScram;
+
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.Provider;
+import java.security.SecureRandom;
+import java.util.NoSuchElementException;
+import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Supplier;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.NameCallback;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.sasl.AuthorizeCallback;
+
+import org.wildfly.common.Assert;
+import org.wildfly.common.bytes.ByteStringBuilder;
+import org.wildfly.common.iteration.ByteIterator;
+import org.wildfly.security.auth.callback.ChannelBindingCallback;
+import org.wildfly.security.mechanism._private.MechanismUtil;
+import org.wildfly.security.mechanism.AuthenticationMechanismException;
+import org.wildfly.security.mechanism.ScramServerErrorCode;
+import org.wildfly.security.mechanism.ScramServerException;
+import org.wildfly.security.password.interfaces.ScramDigestPassword;
+import org.wildfly.security.password.spec.IteratedPasswordAlgorithmSpec;
+import org.wildfly.security.sasl.util.StringPrep;
+
+/**
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class ScramServer {
+    private final Supplier&lt;Provider[]&gt; providers;
+    private final ScramMechanism mechanism;
+    private final CallbackHandler callbackHandler;
+    private final SecureRandom random;
+    private final byte[] bindingData;
+    private final String bindingType;
+    private final int minimumIterationCount;
+    private final int maximumIterationCount;
+
+<span class="nc" id="L70">    ScramServer(final ScramMechanism mechanism, final CallbackHandler callbackHandler, final SecureRandom random, final byte[] bindingData, final String bindingType, final int minimumIterationCount, final int maximumIterationCount, final Supplier&lt;Provider[]&gt; providers) {</span>
+<span class="nc" id="L71">        this.mechanism = mechanism;</span>
+<span class="nc" id="L72">        this.callbackHandler = callbackHandler;</span>
+<span class="nc" id="L73">        this.random = random;</span>
+<span class="nc" id="L74">        this.bindingData = bindingData;</span>
+<span class="nc" id="L75">        this.bindingType = bindingType;</span>
+<span class="nc" id="L76">        this.minimumIterationCount = minimumIterationCount;</span>
+<span class="nc" id="L77">        this.maximumIterationCount = maximumIterationCount;</span>
+<span class="nc" id="L78">        this.providers = providers;</span>
+<span class="nc" id="L79">    }</span>
+
+    /**
+     * Construct an initial response object from a byte array.
+     *
+     * @param bindingCallback the optional channel binding callback result (may be {@code null})
+     * @param bytes the message bytes (must not be {@code null})
+     * @return the constructed initial response (not {@code null})
+     * @throws AuthenticationMechanismException if the content of the message is invalid
+     */
+    public ScramInitialClientMessage parseInitialClientMessage(ChannelBindingCallback bindingCallback, byte[] bytes) throws AuthenticationMechanismException {
+<span class="nc" id="L90">        byte[] response = bytes.clone();</span>
+<span class="nc" id="L91">        ByteIterator bi = ByteIterator.ofBytes(response);</span>
+        try {
+<span class="nc" id="L93">            final char cbindFlag = (char) bi.next();</span>
+            final boolean binding;
+            final String bindingType;
+            final byte[] bindingData;
+<span class="nc bnc" id="L97" title="All 2 branches missed.">            if (bindingCallback != null) {</span>
+<span class="nc" id="L98">                bindingType = bindingCallback.getBindingType();</span>
+<span class="nc" id="L99">                bindingData = bindingCallback.getBindingData();</span>
+            } else {
+<span class="nc" id="L101">                bindingType = null;</span>
+<span class="nc" id="L102">                bindingData = null;</span>
+            }
+<span class="nc bnc" id="L104" title="All 2 branches missed.">            if (cbindFlag == 'p') {</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">                if (! mechanism.isPlus()) {</span>
+<span class="nc" id="L106">                    throw new ScramServerException(saslScram.mechChannelBindingNotSupported(), ScramServerErrorCode.SERVER_DOES_NOT_SUPPORT_CHANNEL_BINDING);</span>
+                }
+<span class="nc bnc" id="L108" title="All 4 branches missed.">                if (bindingType == null || bindingData == null) {</span>
+<span class="nc" id="L109">                    throw new ScramServerException(saslScram.mechChannelBindingNotProvided(), ScramServerErrorCode.CHANNEL_BINDING_NOT_PROVIDED);</span>
+                }
+<span class="nc bnc" id="L111" title="All 2 branches missed.">                if (bi.next() != '=') {</span>
+<span class="nc" id="L112">                    throw saslScram.mechInvalidMessageReceived();</span>
+                }
+<span class="nc bnc" id="L114" title="All 2 branches missed.">                if (! bindingType.equals(bi.delimitedBy(',').asUtf8String().drainToString())) {</span>
+<span class="nc" id="L115">                    throw new ScramServerException(saslScram.mechChannelBindingTypeMismatch(), ScramServerErrorCode.UNSUPPORTED_CHANNEL_BINDING_TYPE);</span>
+                }
+<span class="nc" id="L117">                binding = true;</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">            } else if (cbindFlag == 'y') {</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">                if (mechanism.isPlus()) {</span>
+<span class="nc" id="L120">                    throw new ScramServerException(saslScram.mechChannelBindingNotProvided(), ScramServerErrorCode.SERVER_DOES_SUPPORT_CHANNEL_BINDING);</span>
+                }
+<span class="nc bnc" id="L122" title="All 4 branches missed.">                if (bindingType != null || bindingData != null) {</span>
+<span class="nc" id="L123">                    throw new ScramServerException(saslScram.mechChannelBindingNotProvided(), ScramServerErrorCode.SERVER_DOES_SUPPORT_CHANNEL_BINDING);</span>
+                }
+<span class="nc" id="L125">                binding = true;</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">            } else if (cbindFlag == 'n') {</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">                if (mechanism.isPlus()) {</span>
+<span class="nc" id="L128">                    throw new ScramServerException(saslScram.mechChannelBindingNotProvided(), ScramServerErrorCode.SERVER_DOES_SUPPORT_CHANNEL_BINDING);</span>
+                }
+<span class="nc bnc" id="L130" title="All 4 branches missed.">                if (bindingType != null || bindingData != null) {</span>
+<span class="nc" id="L131">                    throw new ScramServerException(saslScram.mechChannelBindingNotProvided(), ScramServerErrorCode.SERVER_DOES_SUPPORT_CHANNEL_BINDING);</span>
+                }
+<span class="nc" id="L133">                binding = false;</span>
+            } else {
+<span class="nc" id="L135">                throw saslScram.mechInvalidMessageReceived();</span>
+            }
+<span class="nc bnc" id="L137" title="All 2 branches missed.">            if (bi.next() != ',') {</span>
+<span class="nc" id="L138">                throw saslScram.mechInvalidMessageReceived();</span>
+            }
+
+            // authorization ID
+<span class="nc" id="L142">            final int c = bi.next();</span>
+            final String authorizationID;
+<span class="nc bnc" id="L144" title="All 2 branches missed.">            if (c == 'a') {</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">                if (bi.next() != '=') {</span>
+<span class="nc" id="L146">                    throw saslScram.mechInvalidClientMessage();</span>
+                }
+<span class="nc" id="L148">                authorizationID = bi.delimitedBy(',').asUtf8String().drainToString();</span>
+<span class="nc" id="L149">                bi.next(); // skip delimiter</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">            } else if (c == ',') {</span>
+<span class="nc" id="L151">                authorizationID = null;</span>
+            } else {
+<span class="nc" id="L153">                throw saslScram.mechInvalidClientMessage();</span>
+            }
+
+<span class="nc" id="L156">            final int initialPartIndex = (int) bi.getIndex();</span>
+
+            // user name
+            final String authenticationName;
+<span class="nc bnc" id="L160" title="All 2 branches missed.">            if (bi.next() == 'n') {</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">                if (bi.next() != '=') {</span>
+<span class="nc" id="L162">                    throw saslScram.mechInvalidClientMessage();</span>
+                }
+<span class="nc" id="L164">                ByteStringBuilder bsb = new ByteStringBuilder();</span>
+<span class="nc" id="L165">                StringPrep.encode(bi.delimitedBy(',').asUtf8String().drainToString(), bsb, StringPrep.PROFILE_SASL_QUERY | StringPrep.UNMAP_SCRAM_LOGIN_CHARS);</span>
+<span class="nc" id="L166">                authenticationName = new String(bsb.toArray(), StandardCharsets.UTF_8);</span>
+<span class="nc" id="L167">                bi.next(); // skip delimiter</span>
+<span class="nc" id="L168">            } else {</span>
+<span class="nc" id="L169">                throw saslScram.mechInvalidClientMessage();</span>
+            }
+
+            // random nonce
+<span class="nc bnc" id="L173" title="All 4 branches missed.">            if (bi.next() != 'r' || bi.next() != '=') {</span>
+<span class="nc" id="L174">                throw saslScram.mechInvalidClientMessage();</span>
+            }
+<span class="nc" id="L176">            final byte[] nonce = bi.delimitedBy(',').drain();</span>
+
+<span class="nc bnc" id="L178" title="All 2 branches missed.">            if (bi.hasNext()) {</span>
+<span class="nc" id="L179">                throw saslScram.mechInvalidClientMessage();</span>
+            }
+
+<span class="nc" id="L182">            return new ScramInitialClientMessage(mechanism, authorizationID, authenticationName, binding, bindingType, bindingData, nonce, initialPartIndex, response);</span>
+<span class="nc" id="L183">        } catch (NoSuchElementException ignored) {</span>
+<span class="nc" id="L184">            throw saslScram.mechInvalidMessageReceived();</span>
+        }
+    }
+
+    public ScramInitialServerResult evaluateInitialResponse(final ScramInitialClientMessage clientMessage) throws AuthenticationMechanismException {
+<span class="nc" id="L189">        final boolean trace = saslScram.isTraceEnabled();</span>
+
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        if (clientMessage.getMechanism() != mechanism) {</span>
+<span class="nc" id="L192">            throw saslScram.mechUnmatchedMechanism(mechanism.toString(), clientMessage.getMechanism().toString());</span>
+        }
+
+        // get salted password
+<span class="nc" id="L196">        final NameCallback nameCallback = new NameCallback(&quot;Remote authentication name&quot;, clientMessage.getAuthenticationName());</span>
+
+        try {
+<span class="nc" id="L199">            MechanismUtil.handleCallbacks(saslScram, callbackHandler, nameCallback);</span>
+<span class="nc" id="L200">        } catch (UnsupportedCallbackException e) {</span>
+<span class="nc" id="L201">            throw saslScram.mechCallbackHandlerDoesNotSupportUserName(e);</span>
+<span class="nc" id="L202">        }</span>
+
+<span class="nc" id="L204">        final IteratedPasswordAlgorithmSpec generateParameters = new IteratedPasswordAlgorithmSpec(</span>
+<span class="nc" id="L205">            max(minimumIterationCount, min(maximumIterationCount, ScramDigestPassword.DEFAULT_ITERATION_COUNT))</span>
+        );
+<span class="nc" id="L207">        final ScramDigestPassword password = MechanismUtil.getPasswordCredential(clientMessage.getAuthenticationName(), callbackHandler, ScramDigestPassword.class, mechanism.getPasswordAlgorithm(), null, generateParameters, providers, saslScram);</span>
+
+<span class="nc" id="L209">        final byte[] saltedPasswordBytes = password.getDigest();</span>
+<span class="nc" id="L210">        final int iterationCount = password.getIterationCount();</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">        if (iterationCount &lt; minimumIterationCount) {</span>
+<span class="nc" id="L212">            throw saslScram.mechIterationCountIsTooLow(iterationCount, minimumIterationCount);</span>
+        }
+<span class="nc bnc" id="L214" title="All 2 branches missed.">        if (iterationCount &gt; maximumIterationCount) {</span>
+<span class="nc" id="L215">            throw saslScram.mechIterationCountIsTooHigh(iterationCount, maximumIterationCount);</span>
+        }
+<span class="nc" id="L217">        final byte[] salt = password.getSalt();</span>
+
+<span class="nc bnc" id="L219" title="All 2 branches missed.">        if(trace) saslScram.tracef(&quot;[S] Salt: %s%n&quot;, ByteIterator.ofBytes(salt).hexEncode().drainToString());</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">        if(trace) saslScram.tracef(&quot;[S] Salted password: %s%n&quot;, ByteIterator.ofBytes(saltedPasswordBytes).hexEncode().drainToString());</span>
+
+<span class="nc" id="L222">        ByteStringBuilder b = new ByteStringBuilder();</span>
+
+        // nonce (client + server nonce)
+<span class="nc" id="L225">        b.append('r').append('=');</span>
+<span class="nc" id="L226">        b.append(clientMessage.getRawNonce());</span>
+<span class="nc" id="L227">        final byte[] serverNonce = ScramUtil.generateNonce(28, getRandom());</span>
+<span class="nc" id="L228">        b.append(serverNonce);</span>
+<span class="nc" id="L229">        b.append(',');</span>
+
+        // salt
+<span class="nc" id="L232">        b.append('s').append('=');</span>
+<span class="nc" id="L233">        b.appendLatin1(ByteIterator.ofBytes(salt).base64Encode());</span>
+<span class="nc" id="L234">        b.append(',');</span>
+<span class="nc" id="L235">        b.append('i').append('=');</span>
+<span class="nc" id="L236">        b.append(Integer.toString(iterationCount));</span>
+
+<span class="nc" id="L238">        byte[] messageBytes = b.toArray();</span>
+
+<span class="nc" id="L240">        return new ScramInitialServerResult(new ScramInitialServerMessage(clientMessage, serverNonce, salt, iterationCount, messageBytes), password);</span>
+    }
+
+    public ScramFinalClientMessage parseFinalClientMessage(final ScramInitialClientMessage initialResponse, final ScramInitialServerResult initialResult, final byte[] bytes) throws AuthenticationMechanismException {
+<span class="nc" id="L244">        final ScramInitialServerMessage initialChallenge = initialResult.getScramInitialChallenge();</span>
+<span class="nc" id="L245">        Assert.checkNotNullParam(&quot;initialResponse&quot;, initialResponse);</span>
+<span class="nc" id="L246">        Assert.checkNotNullParam(&quot;initialChallenge&quot;, initialChallenge);</span>
+<span class="nc" id="L247">        final ScramMechanism mechanism = initialResponse.getMechanism();</span>
+<span class="nc bnc" id="L248" title="All 2 branches missed.">        if (mechanism != initialChallenge.getMechanism()) {</span>
+<span class="nc" id="L249">            throw saslScram.mechUnmatchedMechanism(mechanism.toString(), initialChallenge.getMechanism().toString());</span>
+        }
+<span class="nc" id="L251">        byte[] response = bytes.clone();</span>
+<span class="nc" id="L252">        ByteIterator bi = ByteIterator.ofBytes(response);</span>
+        try {
+<span class="nc bnc" id="L254" title="All 4 branches missed.">            if (bi.next() != 'c' || bi.next() != '=') {</span>
+<span class="nc" id="L255">                throw saslScram.mechInvalidMessageReceived();</span>
+            }
+<span class="nc" id="L257">            ByteIterator ibi = bi.delimitedBy(',').asUtf8String().base64Decode();</span>
+<span class="nc" id="L258">            char cbindFlag = (char) ibi.next();</span>
+<span class="nc" id="L259">            final String bindingType = initialResponse.getBindingType();</span>
+<span class="nc" id="L260">            final byte[] bindingData = initialResponse.getRawBindingData();</span>
+<span class="nc" id="L261">            final boolean binding = initialResponse.isBinding();</span>
+<span class="nc bnc" id="L262" title="All 2 branches missed.">            if (cbindFlag == 'p') {</span>
+<span class="nc bnc" id="L263" title="All 2 branches missed.">                if (! binding) {</span>
+<span class="nc" id="L264">                    throw new ScramServerException(saslScram.mechChannelBindingNotSupported(), ScramServerErrorCode.CHANNEL_BINDING_NOT_SUPPORTED);</span>
+                }
+<span class="nc bnc" id="L266" title="All 4 branches missed.">                if (bindingType == null || bindingData == null) {</span>
+<span class="nc" id="L267">                    throw new ScramServerException(saslScram.mechChannelBindingNotProvided(), ScramServerErrorCode.CHANNEL_BINDING_NOT_PROVIDED);</span>
+                }
+<span class="nc bnc" id="L269" title="All 2 branches missed.">                if (ibi.next() != '=') {</span>
+<span class="nc" id="L270">                    throw saslScram.mechInvalidMessageReceived();</span>
+                }
+<span class="nc bnc" id="L272" title="All 2 branches missed.">                if (! bindingType.equals(ibi.delimitedBy(',').asUtf8String().drainToString())) {</span>
+<span class="nc" id="L273">                    throw new ScramServerException(saslScram.mechChannelBindingTypeMismatch(), ScramServerErrorCode.UNSUPPORTED_CHANNEL_BINDING_TYPE);</span>
+                }
+<span class="nc bnc" id="L275" title="All 2 branches missed.">            } else if (cbindFlag == 'y') {</span>
+<span class="nc bnc" id="L276" title="All 2 branches missed.">                if (mechanism.isPlus()) {</span>
+<span class="nc" id="L277">                    throw new ScramServerException(saslScram.mechChannelBindingNotProvided(), ScramServerErrorCode.SERVER_DOES_SUPPORT_CHANNEL_BINDING);</span>
+                }
+<span class="nc bnc" id="L279" title="All 4 branches missed.">                if (bindingType != null || bindingData != null) {</span>
+<span class="nc" id="L280">                    throw new ScramServerException(saslScram.mechChannelBindingNotProvided(), ScramServerErrorCode.SERVER_DOES_SUPPORT_CHANNEL_BINDING);</span>
+                }
+<span class="nc bnc" id="L282" title="All 2 branches missed.">            } else if (cbindFlag == 'n') {</span>
+<span class="nc bnc" id="L283" title="All 2 branches missed.">                if (binding) {</span>
+<span class="nc" id="L284">                    throw new ScramServerException(saslScram.mechChannelBindingNotProvided(), ScramServerErrorCode.SERVER_DOES_SUPPORT_CHANNEL_BINDING);</span>
+                }
+<span class="nc bnc" id="L286" title="All 2 branches missed.">                if (mechanism.isPlus()) {</span>
+<span class="nc" id="L287">                    throw new ScramServerException(saslScram.mechChannelBindingNotProvided(), ScramServerErrorCode.SERVER_DOES_SUPPORT_CHANNEL_BINDING);</span>
+                }
+            } else {
+<span class="nc" id="L290">                throw saslScram.mechInvalidMessageReceived();</span>
+            }
+<span class="nc bnc" id="L292" title="All 2 branches missed.">            if (ibi.next() != ',') {</span>
+<span class="nc" id="L293">                throw saslScram.mechInvalidMessageReceived();</span>
+            }
+
+            // authorization ID
+<span class="nc" id="L297">            int c = ibi.next();</span>
+            final String authorizationID;
+<span class="nc bnc" id="L299" title="All 2 branches missed.">            if (c == 'a') {</span>
+<span class="nc bnc" id="L300" title="All 2 branches missed.">                if (ibi.next() != '=') {</span>
+<span class="nc" id="L301">                    throw saslScram.mechInvalidClientMessage();</span>
+                }
+<span class="nc" id="L303">                authorizationID = ibi.delimitedBy(',').asUtf8String().drainToString();</span>
+<span class="nc" id="L304">                ibi.next(); // skip delimiter</span>
+<span class="nc bnc" id="L305" title="All 2 branches missed.">                if (! authorizationID.equals(initialResponse.getAuthorizationId())) {</span>
+<span class="nc" id="L306">                    throw saslScram.mechAuthorizationIdChanged();</span>
+                }
+<span class="nc bnc" id="L308" title="All 2 branches missed.">            } else if (c == ',') {</span>
+<span class="nc bnc" id="L309" title="All 2 branches missed.">                if (initialResponse.getAuthorizationId() != null) {</span>
+<span class="nc" id="L310">                    throw saslScram.mechAuthorizationIdChanged();</span>
+                }
+            } else {
+<span class="nc" id="L313">                throw saslScram.mechInvalidClientMessage();</span>
+            }
+
+            // channel binding data
+<span class="nc bnc" id="L317" title="All 4 branches missed.">            if (bindingData != null &amp;&amp; ! ibi.contentEquals(ByteIterator.ofBytes(bindingData))) {</span>
+<span class="nc" id="L318">                throw new ScramServerException(saslScram.mechChannelBindingChanged(), ScramServerErrorCode.CHANNEL_BINDINGS_DONT_MATCH);</span>
+            }
+
+<span class="nc" id="L321">            bi.next(); // skip delim</span>
+
+            // random nonce
+<span class="nc bnc" id="L324" title="All 4 branches missed.">            if (bi.next() != 'r' || bi.next() != '=') {</span>
+<span class="nc" id="L325">                throw saslScram.mechInvalidClientMessage();</span>
+            }
+<span class="nc" id="L327">            final byte[] clientNonce = initialResponse.getRawNonce();</span>
+<span class="nc" id="L328">            final byte[] serverNonce = initialChallenge.getRawServerNonce();</span>
+<span class="nc" id="L329">            final byte[] expectedMessageNonce = ByteBuffer.allocate(clientNonce.length + serverNonce.length).put(clientNonce).put(serverNonce).array();</span>
+<span class="nc" id="L330">            final byte[] messageNonce = bi.delimitedBy(',').drain();</span>
+<span class="nc bnc" id="L331" title="All 2 branches missed.">            if (! MessageDigest.isEqual(messageNonce, expectedMessageNonce)) {</span>
+<span class="nc" id="L332">                throw saslScram.mechNoncesDoNotMatch();</span>
+            }
+
+<span class="nc" id="L335">            final int proofOffset = (int) bi.getIndex();</span>
+
+<span class="nc" id="L337">            bi.next(); // skip delimiter</span>
+
+            // proof
+<span class="nc bnc" id="L340" title="All 4 branches missed.">            if (bi.next() != 'p' || bi.next() != '=') {</span>
+<span class="nc" id="L341">                throw saslScram.mechInvalidClientMessage();</span>
+            }
+            final byte[] proof;
+<span class="nc" id="L344">            proof = bi.delimitedBy(',').asUtf8String().base64Decode().drain();</span>
+
+<span class="nc bnc" id="L346" title="All 2 branches missed.">            if (bi.hasNext()) {</span>
+<span class="nc" id="L347">                throw saslScram.mechInvalidClientMessage();</span>
+            }
+<span class="nc" id="L349">            return new ScramFinalClientMessage(initialResponse, initialChallenge, initialResult.getScramDigestPassword(), proof, response, proofOffset);</span>
+<span class="nc" id="L350">        } catch (NoSuchElementException ignored) {</span>
+<span class="nc" id="L351">            throw saslScram.mechInvalidMessageReceived();</span>
+        }
+    }
+
+    public ScramFinalServerMessage evaluateFinalClientMessage(final ScramInitialServerResult initialResult, final ScramFinalClientMessage clientMessage) throws AuthenticationMechanismException {
+<span class="nc" id="L356">        final boolean trace = saslScram.isTraceEnabled();</span>
+
+<span class="nc bnc" id="L358" title="All 2 branches missed.">        if (clientMessage.getMechanism() != mechanism) {</span>
+<span class="nc" id="L359">            throw saslScram.mechUnmatchedMechanism(mechanism.toString(), clientMessage.getMechanism().toString());</span>
+        }
+
+<span class="nc" id="L362">        ByteStringBuilder b = new ByteStringBuilder();</span>
+
+        try {
+
+<span class="nc" id="L366">            final Mac mac = Mac.getInstance(getMechanism().getHmacName());</span>
+<span class="nc" id="L367">            final MessageDigest messageDigest = MessageDigest.getInstance(getMechanism().getMessageDigestName());</span>
+
+            // == verify proof ==
+
+            // client key
+            byte[] clientKey;
+<span class="nc" id="L373">            mac.reset();</span>
+<span class="nc" id="L374">            byte[] saltedPassword = initialResult.getScramDigestPassword().getDigest();</span>
+<span class="nc" id="L375">            mac.init(new SecretKeySpec(saltedPassword, mac.getAlgorithm()));</span>
+<span class="nc" id="L376">            mac.update(ScramUtil.CLIENT_KEY_BYTES);</span>
+<span class="nc" id="L377">            clientKey = mac.doFinal();</span>
+<span class="nc bnc" id="L378" title="All 2 branches missed.">            if(trace) saslScram.tracef(&quot;[S] Client key: %s%n&quot;, ByteIterator.ofBytes(clientKey).hexEncode().drainToString());</span>
+
+            // stored key
+            byte[] storedKey;
+<span class="nc" id="L382">            messageDigest.reset();</span>
+<span class="nc" id="L383">            messageDigest.update(clientKey);</span>
+<span class="nc" id="L384">            storedKey = messageDigest.digest();</span>
+<span class="nc bnc" id="L385" title="All 2 branches missed.">            if(trace) saslScram.tracef(&quot;[S] Stored key: %s%n&quot;, ByteIterator.ofBytes(storedKey).hexEncode().drainToString());</span>
+
+            // client signature
+<span class="nc" id="L388">            mac.reset();</span>
+<span class="nc" id="L389">            mac.init(new SecretKeySpec(storedKey, mac.getAlgorithm()));</span>
+<span class="nc" id="L390">            final byte[] clientFirstMessage = clientMessage.getInitialResponse().getRawMessageBytes();</span>
+<span class="nc" id="L391">            final int clientFirstMessageBareStart = clientMessage.getInitialResponse().getInitialPartIndex();</span>
+<span class="nc" id="L392">            mac.update(clientFirstMessage, clientFirstMessageBareStart, clientFirstMessage.length - clientFirstMessageBareStart);</span>
+<span class="nc bnc" id="L393" title="All 2 branches missed.">            if(trace) saslScram.tracef(&quot;[S] Using client first message: %s%n&quot;, ByteIterator.ofBytes(copyOfRange(clientFirstMessage, clientFirstMessageBareStart, clientFirstMessage.length)).hexEncode().drainToString());</span>
+<span class="nc" id="L394">            mac.update((byte) ',');</span>
+<span class="nc" id="L395">            final byte[] serverFirstMessage = initialResult.getScramInitialChallenge().getRawMessageBytes();</span>
+<span class="nc" id="L396">            mac.update(serverFirstMessage);</span>
+<span class="nc bnc" id="L397" title="All 2 branches missed.">            if(trace) saslScram.tracef(&quot;[S] Using server first message: %s%n&quot;, ByteIterator.ofBytes(serverFirstMessage).hexEncode().drainToString());</span>
+<span class="nc" id="L398">            mac.update((byte) ',');</span>
+<span class="nc" id="L399">            final byte[] response = clientMessage.getRawMessageBytes();</span>
+<span class="nc" id="L400">            final int proofOffset = clientMessage.getProofOffset();</span>
+<span class="nc" id="L401">            mac.update(response, 0, proofOffset); // client-final-message-without-proof</span>
+<span class="nc bnc" id="L402" title="All 2 branches missed.">            if(trace) saslScram.tracef(&quot;[S] Using client final message without proof: %s%n&quot;, ByteIterator.ofBytes(copyOfRange(response, 0, proofOffset)).hexEncode().drainToString());</span>
+<span class="nc" id="L403">            byte[] clientSignature = mac.doFinal();</span>
+<span class="nc bnc" id="L404" title="All 2 branches missed.">            if(trace) saslScram.tracef(&quot;[S] Client signature: %s%n&quot;, ByteIterator.ofBytes(clientSignature).hexEncode().drainToString());</span>
+
+            // server key
+            byte[] serverKey;
+<span class="nc" id="L408">            mac.reset();</span>
+<span class="nc" id="L409">            mac.init(new SecretKeySpec(saltedPassword, mac.getAlgorithm()));</span>
+<span class="nc" id="L410">            mac.update(ScramUtil.SERVER_KEY_BYTES);</span>
+<span class="nc" id="L411">            serverKey = mac.doFinal();</span>
+<span class="nc bnc" id="L412" title="All 2 branches missed.">            if(trace) saslScram.tracef(&quot;[S] Server key: %s%n&quot;, ByteIterator.ofBytes(serverKey).hexEncode().drainToString());</span>
+
+            // server signature
+            byte[] serverSignature;
+<span class="nc" id="L416">            mac.reset();</span>
+<span class="nc" id="L417">            mac.init(new SecretKeySpec(serverKey, mac.getAlgorithm()));</span>
+<span class="nc" id="L418">            mac.update(clientFirstMessage, clientFirstMessageBareStart, clientFirstMessage.length - clientFirstMessageBareStart);</span>
+<span class="nc" id="L419">            mac.update((byte) ',');</span>
+<span class="nc" id="L420">            mac.update(serverFirstMessage);</span>
+<span class="nc" id="L421">            mac.update((byte) ',');</span>
+<span class="nc" id="L422">            mac.update(response, 0, proofOffset); // client-final-message-without-proof</span>
+<span class="nc" id="L423">            serverSignature = mac.doFinal();</span>
+<span class="nc bnc" id="L424" title="All 2 branches missed.">            if(trace) saslScram.tracef(&quot;[S] Server signature: %s%n&quot;, ByteIterator.ofBytes(serverSignature).hexEncode().drainToString());</span>
+
+<span class="nc" id="L426">            final byte[] recoveredClientProof = clientMessage.getRawClientProof();</span>
+<span class="nc bnc" id="L427" title="All 2 branches missed.">            if(trace) saslScram.tracef(&quot;[S] Client proof: %s%n&quot;, ByteIterator.ofBytes(recoveredClientProof).hexEncode().drainToString());</span>
+
+            // now check the proof
+<span class="nc" id="L430">            byte[] recoveredClientKey = clientSignature.clone();</span>
+<span class="nc" id="L431">            ScramUtil.xor(recoveredClientKey, recoveredClientProof);</span>
+<span class="nc bnc" id="L432" title="All 2 branches missed.">            if(trace) saslScram.tracef(&quot;[S] Recovered client key: %s%n&quot;, ByteIterator.ofBytes(recoveredClientKey).hexEncode().drainToString());</span>
+<span class="nc bnc" id="L433" title="All 2 branches missed.">            if (! MessageDigest.isEqual(recoveredClientKey, clientKey)) {</span>
+<span class="nc" id="L434">                throw saslScram.mechAuthenticationRejectedInvalidProof();</span>
+            }
+
+<span class="nc" id="L437">            String userName = clientMessage.getInitialResponse().getAuthenticationName();</span>
+<span class="nc" id="L438">            String authorizationID = clientMessage.getInitialResponse().getAuthorizationId();</span>
+<span class="nc bnc" id="L439" title="All 4 branches missed.">            if (authorizationID == null || authorizationID.isEmpty()) {</span>
+<span class="nc" id="L440">                authorizationID = userName;</span>
+            } else {
+<span class="nc" id="L442">                ByteStringBuilder bsb = new ByteStringBuilder();</span>
+<span class="nc" id="L443">                StringPrep.encode(authorizationID, bsb, StringPrep.PROFILE_SASL_QUERY | StringPrep.UNMAP_SCRAM_LOGIN_CHARS);</span>
+<span class="nc" id="L444">                authorizationID = new String(bsb.toArray(), StandardCharsets.UTF_8);</span>
+            }
+<span class="nc" id="L446">            final AuthorizeCallback authorizeCallback = new AuthorizeCallback(userName, authorizationID);</span>
+            try {
+<span class="nc" id="L448">                MechanismUtil.handleCallbacks(saslScram, callbackHandler, authorizeCallback);</span>
+<span class="nc" id="L449">            } catch (UnsupportedCallbackException e) {</span>
+<span class="nc" id="L450">                throw saslScram.mechAuthorizationUnsupported(e);</span>
+<span class="nc" id="L451">            }</span>
+<span class="nc bnc" id="L452" title="All 2 branches missed.">            if ( ! authorizeCallback.isAuthorized()) {</span>
+<span class="nc" id="L453">                throw saslScram.mechAuthorizationFailed(userName, authorizationID);</span>
+            }
+
+            // == send response ==
+<span class="nc" id="L457">            b.setLength(0);</span>
+<span class="nc" id="L458">            b.append('v').append('=');</span>
+<span class="nc" id="L459">            b.appendUtf8(ByteIterator.ofBytes(serverSignature).base64Encode());</span>
+
+<span class="nc" id="L461">            return new ScramFinalServerMessage(serverSignature, b.toArray());</span>
+<span class="nc" id="L462">        } catch (NoSuchAlgorithmException | InvalidKeyException e) {</span>
+<span class="nc" id="L463">            throw saslScram.mechMacAlgorithmNotSupported(e);</span>
+        }
+    }
+
+    public ScramMechanism getMechanism() {
+<span class="nc" id="L468">        return mechanism;</span>
+    }
+
+    public CallbackHandler getCallbackHandler() {
+<span class="nc" id="L472">        return callbackHandler;</span>
+    }
+
+    Random getRandom() {
+<span class="nc bnc" id="L476" title="All 2 branches missed.">        return random != null ? random : ThreadLocalRandom.current();</span>
+    }
+
+    public byte[] getBindingData() {
+<span class="nc bnc" id="L480" title="All 2 branches missed.">        return bindingData == null ? null : bindingData.clone();</span>
+    }
+
+    byte[] getRawBindingData() {
+<span class="nc" id="L484">        return bindingData;</span>
+    }
+
+    public String getBindingType() {
+<span class="nc" id="L488">        return bindingType;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

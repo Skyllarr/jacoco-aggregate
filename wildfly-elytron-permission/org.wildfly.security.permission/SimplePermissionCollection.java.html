@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SimplePermissionCollection.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-permission</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.permission</a> &gt; <span class="el_source">SimplePermissionCollection.java</span></div><h1>SimplePermissionCollection.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.permission;
+
+import java.security.Permission;
+import java.util.Enumeration;
+import java.util.Iterator;
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.wildfly.security.util.ArrayIterator;
+
+/**
+ * A trivially simple permission collection, suitable as a default for most permission types (though probably not as efficient
+ * as a specialized type in many cases).
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class SimplePermissionCollection extends AbstractPermissionCollection {
+
+    private static final long serialVersionUID = - 9157630531211570679L;
+
+<span class="nc" id="L38">    private final AtomicReference&lt;Permission[]&gt; permissionsRef = new AtomicReference&lt;&gt;(PermissionUtil.NO_PERMISSIONS);</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param sourcePermission the source permission for this collection (must not be {@code null})
+     */
+    public SimplePermissionCollection(final AbstractPermission&lt;?&gt; sourcePermission) {
+<span class="nc" id="L46">        super(sourcePermission);</span>
+<span class="nc" id="L47">    }</span>
+
+    public int size() {
+<span class="nc" id="L50">        return permissionsRef.get().length;</span>
+    }
+
+    protected void doAdd(final AbstractPermission&lt;?&gt; permission) {
+        Permission[] oldVal, readVal, newVal;
+        int count;
+<span class="nc" id="L56">        final AtomicReference&lt;Permission[]&gt; permissionsRef = this.permissionsRef;</span>
+        do {
+<span class="nc" id="L58">            readVal = permissionsRef.get();</span>
+            do {
+<span class="nc" id="L60">                count = 0;</span>
+<span class="nc" id="L61">                oldVal = readVal;</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">                for (Permission test : oldVal) {</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">                    if (test.implies(permission)) {</span>
+<span class="nc" id="L64">                        return;</span>
+                    }
+<span class="nc bnc" id="L66" title="All 2 branches missed.">                    if (! permission.implies(test)) {</span>
+                        // prepare to skip any permissions that are obviated by this one
+<span class="nc" id="L68">                        count ++;</span>
+                    }
+                }
+                // see if it's still what we expect before we commit to the possibly expensive update...
+<span class="nc" id="L72">                readVal = permissionsRef.get();</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">            } while (readVal != oldVal);</span>
+<span class="nc" id="L74">            newVal = new Permission[count + 1];</span>
+<span class="nc" id="L75">            int i = 0;</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">            for (Permission test : oldVal) {</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">                if (! permission.implies(test)) {</span>
+<span class="nc" id="L78">                    newVal[i++] = test;</span>
+                }
+            }
+<span class="nc" id="L81">            newVal[i] = permission;</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        } while (! permissionsRef.compareAndSet(oldVal, newVal));</span>
+<span class="nc" id="L83">    }</span>
+
+    public boolean implies(final Permission permission) {
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        for (Permission test : permissionsRef.get()) {</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">            if (test.implies(permission)) {</span>
+<span class="nc" id="L88">                return true;</span>
+            }
+        }
+<span class="nc" id="L91">        return false;</span>
+    }
+
+    public Iterator&lt;Permission&gt; iterator() {
+<span class="nc" id="L95">        return new ArrayIterator&lt;Permission&gt;(permissionsRef.get());</span>
+    }
+
+    public Enumeration&lt;Permission&gt; elements() {
+<span class="nc" id="L99">        return new ArrayIterator&lt;Permission&gt;(permissionsRef.get());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

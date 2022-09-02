@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DirectEvidenceVerifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-realm-ldap</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.realm.ldap</a> &gt; <span class="el_source">DirectEvidenceVerifier.java</span></div><h1>DirectEvidenceVerifier.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.auth.realm.ldap;
+
+import static org.wildfly.security.auth.realm.ldap.ElytronMessages.log;
+
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.security.Provider;
+import java.util.Properties;
+import java.util.function.Supplier;
+
+import javax.naming.AuthenticationException;
+import javax.naming.NamingException;
+import javax.naming.directory.Attributes;
+import javax.naming.directory.DirContext;
+import javax.naming.ldap.InitialLdapContext;
+import javax.naming.ldap.LdapContext;
+
+import org.wildfly.security.auth.server.RealmUnavailableException;
+import org.wildfly.security.auth.SupportLevel;
+import org.wildfly.security.evidence.Evidence;
+import org.wildfly.security.evidence.PasswordGuessEvidence;
+
+/**
+ * An {@link EvidenceVerifier} that verifies a guess by using it to connect to LDAP.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+class DirectEvidenceVerifier implements EvidenceVerifier {
+
+    private final boolean allowBlankPassword;
+
+<span class="nc" id="L49">    DirectEvidenceVerifier(boolean allowBlankPassword) {</span>
+<span class="nc" id="L50">        this.allowBlankPassword = allowBlankPassword;</span>
+<span class="nc" id="L51">    }</span>
+
+    @Override
+    public SupportLevel getEvidenceVerifySupport(final Class&lt;? extends Evidence&gt; evidenceType, final String algorithmName) throws RealmUnavailableException {
+<span class="nc bnc" id="L55" title="All 2 branches missed.">        return evidenceType == PasswordGuessEvidence.class ? SupportLevel.SUPPORTED : SupportLevel.UNSUPPORTED;</span>
+    }
+
+    @Override
+    public IdentityEvidenceVerifier forIdentity(final DirContext dirContext, final String distinguishedName, final String url, Attributes attributes) throws RealmUnavailableException {
+<span class="nc" id="L60">        return new IdentityEvidenceVerifier() {</span>
+            @Override
+            public SupportLevel getEvidenceVerifySupport(final Class&lt;? extends Evidence&gt; evidenceType, final String algorithmName, final Supplier&lt;Provider[]&gt; providers) throws RealmUnavailableException {
+<span class="nc bnc" id="L63" title="All 4 branches missed.">                return evidenceType == PasswordGuessEvidence.class &amp;&amp; dirContext instanceof LdapContext ? SupportLevel.SUPPORTED : SupportLevel.UNSUPPORTED;</span>
+            }
+
+            @Override
+            public boolean verifyEvidence(Evidence evidence, final Supplier&lt;Provider[]&gt; providers) throws RealmUnavailableException {
+<span class="nc bnc" id="L68" title="All 2 branches missed.">                if (evidence instanceof PasswordGuessEvidence) {</span>
+<span class="nc" id="L69">                    char[] password = ((PasswordGuessEvidence) evidence).getGuess();</span>
+                    try {
+<span class="nc bnc" id="L71" title="All 4 branches missed.">                        if ( ! allowBlankPassword &amp;&amp; password.length == 0) {</span>
+<span class="nc" id="L72">                            log.debugf(&quot;Credential direct evidence verification does not allow blank password.&quot;);</span>
+<span class="nc" id="L73">                            return false;</span>
+                        }
+
+<span class="nc bnc" id="L76" title="All 2 branches missed.">                        if (url != null) { // different server - create new context</span>
+<span class="nc" id="L77">                            URI uri = new URI(url);</span>
+<span class="nc" id="L78">                            String namingProviderURL = uri.getScheme() + &quot;://&quot; + uri.getAuthority();</span>
+
+<span class="nc" id="L80">                            Properties props = new Properties();</span>
+<span class="nc" id="L81">                            dirContext.getEnvironment().forEach(props::put);</span>
+<span class="nc" id="L82">                            props.put(LdapContext.PROVIDER_URL, namingProviderURL);</span>
+<span class="nc" id="L83">                            props.put(LdapContext.SECURITY_PRINCIPAL, distinguishedName);</span>
+<span class="nc" id="L84">                            props.put(LdapContext.SECURITY_CREDENTIALS, password);</span>
+
+                            LdapContext userContext;
+<span class="nc bnc" id="L87" title="All 2 branches missed.">                            if (dirContext instanceof DelegatingLdapContext) {</span>
+<span class="nc" id="L88">                                userContext = ((DelegatingLdapContext) dirContext).newInitialLdapContext(props, null);</span>
+                            } else {
+<span class="nc" id="L90">                                userContext = new InitialLdapContext(props, null);</span>
+                            }
+<span class="nc" id="L92">                            userContext.close();</span>
+<span class="nc" id="L93">                        } else { // the same context - copy context</span>
+<span class="nc" id="L94">                            LdapContext userContext = ((LdapContext) dirContext).newInstance(null);</span>
+<span class="nc" id="L95">                            userContext.addToEnvironment(LdapContext.SECURITY_PRINCIPAL, distinguishedName);</span>
+<span class="nc" id="L96">                            userContext.addToEnvironment(LdapContext.SECURITY_CREDENTIALS, password);</span>
+<span class="nc" id="L97">                            userContext.reconnect(null);</span>
+<span class="nc" id="L98">                            userContext.close();</span>
+                        }
+<span class="nc" id="L100">                        return true;</span>
+<span class="nc" id="L101">                    } catch (AuthenticationException e) {</span>
+<span class="nc" id="L102">                        log.debugf(e, &quot;Credential direct evidence verification failed. DN: [%s]&quot;, distinguishedName);</span>
+<span class="nc" id="L103">                    } catch (NamingException | URISyntaxException e) {</span>
+<span class="nc" id="L104">                        throw log.directLdapVerificationFailed(distinguishedName, url, e);</span>
+                    } finally {
+<span class="nc" id="L106">                        ((PasswordGuessEvidence) evidence).destroy();</span>
+                    }
+                }
+
+<span class="nc" id="L110">                return false;</span>
+            }
+
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

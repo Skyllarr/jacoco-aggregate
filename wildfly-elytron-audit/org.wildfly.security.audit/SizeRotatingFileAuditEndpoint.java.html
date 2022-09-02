@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SizeRotatingFileAuditEndpoint.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-audit</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.audit</a> &gt; <span class="el_source">SizeRotatingFileAuditEndpoint.java</span></div><h1>SizeRotatingFileAuditEndpoint.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2017 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.audit;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+import static org.wildfly.security.audit.ElytronMessages.audit;
+
+/**
+ * An audit endpoint which rotates the log when log file size reach given value.
+ * &lt;p&gt;
+ * Moves old log records into files tagged by index - the older has the higher index.
+ * When index reach {@code maxBackupIndex}, the oldest log file is removed,
+ * so there are at most {@code maxBackupIndex + 1} log files.
+ * &lt;p&gt;
+ * Based on {@link org.jboss.logmanager.handlers.PeriodicSizeRotatingFileHandler}.
+ *
+ * @author &lt;a href=&quot;mailto:jkalina@redhat.com&quot;&gt;Jan Kalina&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:jperkins@redhat.com&quot;&gt;James R. Perkins&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:yborgess@redhat.com&quot;&gt;Yeray Borges&lt;/a&gt;
+ */
+public class SizeRotatingFileAuditEndpoint extends FileAuditEndpoint {
+    private final long rotateSize;
+    private final int maxBackupIndex;
+    private final boolean rotateOnBoot;
+<span class="nc" id="L51">    private long currentSize = 0;</span>
+    private final String suffix;
+    private final DateTimeFormatter dateTimeFormatter;
+
+    SizeRotatingFileAuditEndpoint(Builder builder) throws IOException {
+<span class="nc" id="L56">        super(builder);</span>
+<span class="nc" id="L57">        this.rotateSize = builder.rotateSize;</span>
+<span class="nc" id="L58">        this.maxBackupIndex = builder.maxBackupIndex;</span>
+<span class="nc" id="L59">        this.rotateOnBoot = builder.rotateOnBoot;</span>
+<span class="nc" id="L60">        this.suffix = builder.suffix;</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">        this.dateTimeFormatter = this.suffix != null ? DateTimeFormatter.ofPattern(this.suffix).withZone(builder.timeZone) : null;</span>
+
+<span class="nc" id="L63">        final File file = getFile();</span>
+<span class="nc bnc" id="L64" title="All 10 branches missed.">        if (rotateOnBoot &amp;&amp; maxBackupIndex &gt; 0 &amp;&amp; file != null &amp;&amp; file.exists() &amp;&amp; file.length() &gt; 0L) {</span>
+<span class="nc" id="L65">            rotate(file);</span>
+        }
+<span class="nc" id="L67">    }</span>
+
+    @Override
+    protected void write(byte[] bytes) throws IOException {
+<span class="nc" id="L71">        super.write(bytes);</span>
+<span class="nc" id="L72">        currentSize += bytes.length;</span>
+<span class="nc" id="L73">    }</span>
+
+    @Override
+    protected void preWrite(Instant instant) {
+<span class="nc bnc" id="L77" title="All 4 branches missed.">        if (currentSize &gt; rotateSize &amp;&amp; maxBackupIndex &gt; 0) {</span>
+            try {
+<span class="nc" id="L79">                final File file = getFile();</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">                if (file == null) {</span>
+                    // no file is set; a direct output stream or writer was specified
+<span class="nc" id="L82">                    return;</span>
+                }
+<span class="nc" id="L84">                rotate(file);</span>
+<span class="nc" id="L85">                currentSize = 0;</span>
+<span class="nc" id="L86">            } catch (IOException e) {</span>
+<span class="nc" id="L87">                audit.unableToRotateLogFile(e);</span>
+<span class="nc" id="L88">            }</span>
+        }
+<span class="nc" id="L90">    }</span>
+
+    /**
+     * Moves file to file.1, file.1 to file.2 etc. Removes file.{maxBackupIndex}
+     */
+    private void rotate(final File file) throws IOException {
+<span class="nc" id="L96">        closeStreams();</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        final String suffix = dateTimeFormatter != null ? dateTimeFormatter.format(ZonedDateTime.now(clock)) : &quot;&quot;;</span>
+<span class="nc" id="L98">        final Path fileWithSuffix = Paths.get(file.getAbsolutePath() + suffix);</span>
+<span class="nc" id="L99">        Files.deleteIfExists(Paths.get(fileWithSuffix + &quot;.&quot; + maxBackupIndex));</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        for (int i = maxBackupIndex - 1; i &gt;= 1; i--) {</span>
+<span class="nc" id="L101">            final Path src = Paths.get(fileWithSuffix + &quot;.&quot; + i);</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">            if (Files.exists(src)) {</span>
+<span class="nc" id="L103">                final Path target = Paths.get(fileWithSuffix + &quot;.&quot; + (i + 1));</span>
+<span class="nc" id="L104">                Files.move(src, target, StandardCopyOption.REPLACE_EXISTING);</span>
+            }
+        }
+<span class="nc" id="L107">        Files.move(file.toPath(), Paths.get(fileWithSuffix + &quot;.1&quot;), StandardCopyOption.REPLACE_EXISTING);</span>
+<span class="nc" id="L108">        setFile(file);</span>
+<span class="nc" id="L109">    }</span>
+
+    /**
+     * Obtain a new {@link Builder} capable of building a {@link SizeRotatingFileAuditEndpoint}.
+     *
+     * @return a new {@link Builder} capable of building a {@link SizeRotatingFileAuditEndpoint}.
+     */
+    public static Builder builder() {
+<span class="nc" id="L117">        return new Builder();</span>
+    }
+
+    /**
+     * A builder for size rotating file audit endpoints.
+     */
+    public static class Builder extends FileAuditEndpoint.Builder {
+
+<span class="nc" id="L125">        private long rotateSize = 0xa0000L; // 10 MB by default</span>
+<span class="nc" id="L126">        private int maxBackupIndex = 1;</span>
+        private boolean rotateOnBoot;
+        private String suffix;
+
+<span class="nc" id="L130">        ZoneId timeZone = ZoneId.systemDefault();</span>
+
+        Builder() {
+<span class="nc" id="L133">            super();</span>
+<span class="nc" id="L134">        }</span>
+
+        /**
+         * Set the log file size the file should rotate at.
+         *
+         * @param rotateSize the size the file should rotate at
+         * @return this builder.
+         */
+        public Builder setRotateSize(long rotateSize) {
+<span class="nc" id="L143">            this.rotateSize = rotateSize;</span>
+
+<span class="nc" id="L145">            return this;</span>
+        }
+
+        /**
+         * Sets the suffix to be appended to the file name during the file rotation. The suffix does not play a role in
+         * determining when the file should be rotated.
+         * &lt;p/&gt;
+         * The suffix must be a string understood by the  {@link java.time.format.DateTimeFormatter}.
+         * &lt;p/&gt;
+         * &lt;b&gt;Note:&lt;/b&gt; Files will be rotated for the same suffix until reach the maximum backup index configured by {@link #setMaxBackupIndex(int)}.
+         * If the suffix is resolved to a new value, any files rotated with a different suffix will not be deleted.
+         * For example if the suffix is .yyyy-DD-mm, the maximum size was reached 20 times on the same day and the maxBackupIndex
+         * was set to 10, then there will only be 10 files kept. What will not be purged is files from a previous day.
+         *
+         * @param suffix the suffix to place after the filename when the file is rotated
+         */
+        public Builder setSuffix(String suffix){
+<span class="nc" id="L162">            this.suffix = suffix;</span>
+
+<span class="nc" id="L164">            return this;</span>
+        }
+
+        /**
+         * Set the maximum number of files to backup.
+         *
+         * @param maxBackupIndex the maximum number of files to backup
+         * @return this builder.
+         */
+        public Builder setMaxBackupIndex(int maxBackupIndex) {
+<span class="nc" id="L174">            this.maxBackupIndex = maxBackupIndex;</span>
+
+<span class="nc" id="L176">            return this;</span>
+        }
+
+        /**
+         * Set to a value of {@code true} if the file should be rotated before the a new file is set. The rotation only
+         * happens if the file names are the same and the file has a {@link java.io.File#length() length} greater than 0.
+         *
+         * @param rotateOnBoot {@code true} to rotate on boot, otherwise {@code false}
+         * @return this builder.
+         */
+        public SizeRotatingFileAuditEndpoint.Builder setRotateOnBoot(boolean rotateOnBoot) {
+<span class="nc" id="L187">            this.rotateOnBoot = rotateOnBoot;</span>
+
+<span class="nc" id="L189">            return this;</span>
+        }
+
+        /**
+         * Set the configured time zone for this handler.
+         *
+         * @param timeZone the configured time zone
+         * @return this builder.
+         */
+        public SizeRotatingFileAuditEndpoint.Builder setTimeZone(ZoneId timeZone) {
+<span class="nc" id="L199">            this.timeZone = checkNotNullParam(&quot;timeZone&quot;, timeZone);</span>
+
+<span class="nc" id="L201">            return this;</span>
+        }
+
+        /**
+         * Construct a new instance.
+         *
+         * @return the built audit endpoint.
+         * @throws IOException  if an I/O error occurs.
+         */
+
+        @Override
+        public AuditEndpoint build() throws IOException {
+<span class="nc" id="L213">            return new SizeRotatingFileAuditEndpoint(this);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

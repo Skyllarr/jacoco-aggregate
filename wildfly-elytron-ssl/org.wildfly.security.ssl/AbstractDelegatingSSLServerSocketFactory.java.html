@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractDelegatingSSLServerSocketFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-ssl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.ssl</a> &gt; <span class="el_source">AbstractDelegatingSSLServerSocketFactory.java</span></div><h1>AbstractDelegatingSSLServerSocketFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.ssl;
+
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+
+import javax.net.ssl.SSLServerSocketFactory;
+
+/**
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+abstract class AbstractDelegatingSSLServerSocketFactory extends SSLServerSocketFactory {
+    private final SSLServerSocketFactory delegate;
+
+<span class="nc" id="L33">    AbstractDelegatingSSLServerSocketFactory(final SSLServerSocketFactory delegate) {</span>
+<span class="nc" id="L34">        this.delegate = delegate;</span>
+<span class="nc" id="L35">    }</span>
+
+    public String[] getDefaultCipherSuites() {
+<span class="nc" id="L38">        return delegate.getDefaultCipherSuites();</span>
+    }
+
+    public String[] getSupportedCipherSuites() {
+<span class="nc" id="L42">        return delegate.getSupportedCipherSuites();</span>
+    }
+
+    public ServerSocket createServerSocket() throws IOException {
+<span class="nc" id="L46">        return delegate.createServerSocket();</span>
+    }
+
+    public ServerSocket createServerSocket(final int port) throws IOException {
+<span class="nc" id="L50">        return delegate.createServerSocket(port);</span>
+    }
+
+    public ServerSocket createServerSocket(final int port, final int backlog) throws IOException {
+<span class="nc" id="L54">        return delegate.createServerSocket(port, backlog);</span>
+    }
+
+    public ServerSocket createServerSocket(final int port, final int backlog, final InetAddress ifAddress) throws IOException {
+<span class="nc" id="L58">        return delegate.createServerSocket(port, backlog, ifAddress);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

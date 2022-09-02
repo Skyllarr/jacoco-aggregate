@@ -1,0 +1,558 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SelectingServerSSLEngine.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-ssl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.ssl</a> &gt; <span class="el_source">SelectingServerSSLEngine.java</span></div><h1>SelectingServerSSLEngine.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.ssl;
+
+import java.nio.ByteBuffer;
+import java.security.Principal;
+import java.security.cert.Certificate;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLEngineResult;
+import javax.net.ssl.SSLException;
+import javax.net.ssl.SSLParameters;
+import javax.net.ssl.SSLPeerUnverifiedException;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.SSLSessionContext;
+import javax.security.cert.X509Certificate;
+
+import org.wildfly.common.Assert;
+
+/**
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+class SelectingServerSSLEngine extends SSLEngine {
+
+<span class="nc" id="L47">    private static final SSLEngineResult UNDERFLOW_UNWRAP = new SSLEngineResult(SSLEngineResult.Status.BUFFER_UNDERFLOW, SSLEngineResult.HandshakeStatus.NEED_UNWRAP, 0, 0);</span>
+<span class="nc" id="L48">    private static final SSLEngineResult OK_UNWRAP = new SSLEngineResult(SSLEngineResult.Status.OK, SSLEngineResult.HandshakeStatus.NEED_UNWRAP, 0, 0);</span>
+    private final AtomicReference&lt;SSLEngine&gt; currentRef;
+
+<span class="nc" id="L51">    SelectingServerSSLEngine(final SSLContextSelector selector) {</span>
+<span class="nc" id="L52">        currentRef = new AtomicReference&lt;&gt;(new InitialState(selector, SSLContext::createSSLEngine));</span>
+<span class="nc" id="L53">    }</span>
+
+    SelectingServerSSLEngine(final SSLContextSelector selector, final String host, final int port) {
+<span class="nc" id="L56">        super(host, port);</span>
+<span class="nc" id="L57">        currentRef = new AtomicReference&lt;&gt;(new InitialState(selector, sslContext -&gt; sslContext.createSSLEngine(host, port)));</span>
+<span class="nc" id="L58">    }</span>
+
+    public SSLEngineResult wrap(final ByteBuffer[] srcs, final int offset, final int length, final ByteBuffer dst) throws SSLException {
+<span class="nc" id="L61">        return currentRef.get().wrap(srcs, offset, length, dst);</span>
+    }
+
+    public SSLEngineResult wrap(final ByteBuffer src, final ByteBuffer dst) throws SSLException {
+<span class="nc" id="L65">        return currentRef.get().wrap(src, dst);</span>
+    }
+
+    public SSLEngineResult wrap(final ByteBuffer[] srcs, final ByteBuffer dst) throws SSLException {
+<span class="nc" id="L69">        return currentRef.get().wrap(srcs, dst);</span>
+    }
+
+    public SSLEngineResult unwrap(final ByteBuffer src, final ByteBuffer[] dsts, final int offset, final int length) throws SSLException {
+<span class="nc" id="L73">        return currentRef.get().unwrap(src, dsts, offset, length);</span>
+    }
+
+    public SSLEngineResult unwrap(final ByteBuffer src, final ByteBuffer dst) throws SSLException {
+<span class="nc" id="L77">        return currentRef.get().unwrap(src, dst);</span>
+    }
+
+    public SSLEngineResult unwrap(final ByteBuffer src, final ByteBuffer[] dsts) throws SSLException {
+<span class="nc" id="L81">        return currentRef.get().unwrap(src, dsts);</span>
+    }
+
+    public String getPeerHost() {
+<span class="nc" id="L85">        return currentRef.get().getPeerHost();</span>
+    }
+
+    public int getPeerPort() {
+<span class="nc" id="L89">        return currentRef.get().getPeerPort();</span>
+    }
+
+    public SSLSession getHandshakeSession() {
+<span class="nc" id="L93">        return currentRef.get().getHandshakeSession();</span>
+    }
+
+    public SSLParameters getSSLParameters() {
+<span class="nc" id="L97">        return currentRef.get().getSSLParameters();</span>
+    }
+
+    public void setSSLParameters(final SSLParameters params) {
+<span class="nc" id="L101">        currentRef.get().setSSLParameters(params);</span>
+<span class="nc" id="L102">    }</span>
+
+    public Runnable getDelegatedTask() {
+<span class="nc" id="L105">        return currentRef.get().getDelegatedTask();</span>
+    }
+
+    public void closeInbound() throws SSLException {
+<span class="nc" id="L109">        currentRef.get().closeInbound();</span>
+<span class="nc" id="L110">    }</span>
+
+    public boolean isInboundDone() {
+<span class="nc" id="L113">        return currentRef.get().isInboundDone();</span>
+    }
+
+    public void closeOutbound() {
+<span class="nc" id="L117">        currentRef.get().closeOutbound();</span>
+<span class="nc" id="L118">    }</span>
+
+    public boolean isOutboundDone() {
+<span class="nc" id="L121">        return currentRef.get().isOutboundDone();</span>
+    }
+
+    public String[] getSupportedCipherSuites() {
+<span class="nc" id="L125">        return currentRef.get().getSupportedCipherSuites();</span>
+    }
+
+    public String[] getEnabledCipherSuites() {
+<span class="nc" id="L129">        return currentRef.get().getEnabledCipherSuites();</span>
+    }
+
+    public void setEnabledCipherSuites(final String[] cipherSuites) {
+<span class="nc" id="L133">        currentRef.get().setEnabledCipherSuites(cipherSuites);</span>
+<span class="nc" id="L134">    }</span>
+
+    public String[] getSupportedProtocols() {
+<span class="nc" id="L137">        return currentRef.get().getSupportedProtocols();</span>
+    }
+
+    public String[] getEnabledProtocols() {
+<span class="nc" id="L141">        return currentRef.get().getEnabledProtocols();</span>
+    }
+
+    public void setEnabledProtocols(final String[] protocols) {
+<span class="nc" id="L145">        currentRef.get().setEnabledProtocols(protocols);</span>
+<span class="nc" id="L146">    }</span>
+
+    public SSLSession getSession() {
+<span class="nc" id="L149">        return currentRef.get().getSession();</span>
+    }
+
+    public void beginHandshake() throws SSLException {
+<span class="nc" id="L153">        currentRef.get().beginHandshake();</span>
+<span class="nc" id="L154">    }</span>
+
+    public SSLEngineResult.HandshakeStatus getHandshakeStatus() {
+<span class="nc" id="L157">        return currentRef.get().getHandshakeStatus();</span>
+    }
+
+    public void setUseClientMode(final boolean clientMode) {
+<span class="nc" id="L161">        currentRef.get().setUseClientMode(clientMode);</span>
+<span class="nc" id="L162">    }</span>
+
+    public boolean getUseClientMode() {
+<span class="nc" id="L165">        return currentRef.get().getUseClientMode();</span>
+    }
+
+    public void setNeedClientAuth(final boolean clientAuth) {
+<span class="nc" id="L169">         currentRef.get().setNeedClientAuth(clientAuth);</span>
+<span class="nc" id="L170">    }</span>
+
+    public boolean getNeedClientAuth() {
+<span class="nc" id="L173">        return currentRef.get().getNeedClientAuth();</span>
+    }
+
+    public void setWantClientAuth(final boolean want) {
+<span class="nc" id="L177">        currentRef.get().setWantClientAuth(want);</span>
+<span class="nc" id="L178">    }</span>
+
+    public boolean getWantClientAuth() {
+<span class="nc" id="L181">        return currentRef.get().getWantClientAuth();</span>
+    }
+
+    public void setEnableSessionCreation(final boolean flag) {
+<span class="nc" id="L185">        currentRef.get().setEnableSessionCreation(flag);</span>
+<span class="nc" id="L186">    }</span>
+
+    public boolean getEnableSessionCreation() {
+<span class="nc" id="L189">        return currentRef.get().getEnableSessionCreation();</span>
+    }
+
+    public String getApplicationProtocol() {
+<span class="nc" id="L193">        return JDKSpecific.getApplicationProtocol(currentRef.get());</span>
+    }
+
+    public String getHandshakeApplicationProtocol() {
+<span class="nc" id="L197">        return JDKSpecific.getHandshakeApplicationProtocol(currentRef.get());</span>
+    }
+
+    public void setHandshakeApplicationProtocolSelector(BiFunction&lt;SSLEngine, List&lt;String&gt;, String&gt; selector) {
+<span class="nc" id="L201">        JDKSpecific.setHandshakeApplicationProtocolSelector(currentRef.get(), selector);</span>
+<span class="nc" id="L202">    }</span>
+
+    public BiFunction&lt;SSLEngine, List&lt;String&gt;, String&gt; getHandshakeApplicationProtocolSelector() {
+<span class="nc" id="L205">        return JDKSpecific.getHandshakeApplicationProtocolSelector(currentRef.get());</span>
+    }
+
+    static final int FL_WANT_C_AUTH = 1 &lt;&lt; 0;
+    static final int FL_NEED_C_AUTH = 1 &lt;&lt; 1;
+    static final int FL_SESSION_CRE = 1 &lt;&lt; 2;
+
+    class InitialState extends SSLEngine {
+
+        private final SSLContextSelector selector;
+<span class="nc" id="L215">        private final AtomicInteger flags = new AtomicInteger(FL_SESSION_CRE);</span>
+        private final Function&lt;SSLContext, SSLEngine&gt; engineFunction;
+<span class="nc" id="L217">        private int packetBufferSize = SSLExplorer.RECORD_HEADER_SIZE;</span>
+<span class="nc" id="L218">        private final SSLSession handshakeSession = new SSLSession() {</span>
+            public byte[] getId() {
+<span class="nc" id="L220">                throw Assert.unsupported();</span>
+            }
+
+            public SSLSessionContext getSessionContext() {
+<span class="nc" id="L224">                throw Assert.unsupported();</span>
+            }
+
+            public long getCreationTime() {
+<span class="nc" id="L228">                throw Assert.unsupported();</span>
+            }
+
+            public long getLastAccessedTime() {
+<span class="nc" id="L232">                throw Assert.unsupported();</span>
+            }
+
+            public void invalidate() {
+<span class="nc" id="L236">                throw Assert.unsupported();</span>
+            }
+
+            public boolean isValid() {
+<span class="nc" id="L240">                return false;</span>
+            }
+
+            public void putValue(final String s, final Object o) {
+<span class="nc" id="L244">                throw Assert.unsupported();</span>
+            }
+
+            public Object getValue(final String s) {
+<span class="nc" id="L248">                return null;</span>
+            }
+
+            public void removeValue(final String s) {
+<span class="nc" id="L252">            }</span>
+
+            public String[] getValueNames() {
+<span class="nc" id="L255">                throw Assert.unsupported();</span>
+            }
+
+            public Certificate[] getPeerCertificates() throws SSLPeerUnverifiedException {
+<span class="nc" id="L259">                throw Assert.unsupported();</span>
+            }
+
+            public Certificate[] getLocalCertificates() {
+<span class="nc" id="L263">                return null;</span>
+            }
+
+            public X509Certificate[] getPeerCertificateChain() throws SSLPeerUnverifiedException {
+<span class="nc" id="L267">                throw Assert.unsupported();</span>
+            }
+
+            public Principal getPeerPrincipal() throws SSLPeerUnverifiedException {
+<span class="nc" id="L271">                throw Assert.unsupported();</span>
+            }
+
+            public Principal getLocalPrincipal() {
+<span class="nc" id="L275">                throw Assert.unsupported();</span>
+            }
+
+            public String getCipherSuite() {
+<span class="nc" id="L279">                throw Assert.unsupported();</span>
+            }
+
+            public String getProtocol() {
+<span class="nc" id="L283">                throw Assert.unsupported();</span>
+            }
+
+            public String getPeerHost() {
+<span class="nc" id="L287">                return SelectingServerSSLEngine.this.getPeerHost();</span>
+            }
+
+            public int getPeerPort() {
+<span class="nc" id="L291">                return SelectingServerSSLEngine.this.getPeerPort();</span>
+            }
+
+            public int getPacketBufferSize() {
+<span class="nc" id="L295">                return packetBufferSize;</span>
+            }
+
+            public int getApplicationBufferSize() {
+<span class="nc" id="L299">                throw Assert.unsupported();</span>
+            }
+        };
+
+<span class="nc" id="L303">        InitialState(final SSLContextSelector selector, final Function&lt;SSLContext, SSLEngine&gt; engineFunction) {</span>
+<span class="nc" id="L304">            this.selector = selector;</span>
+<span class="nc" id="L305">            this.engineFunction = engineFunction;</span>
+<span class="nc" id="L306">        }</span>
+
+        public SSLSession getHandshakeSession() {
+<span class="nc" id="L309">            return handshakeSession;</span>
+        }
+
+        public SSLEngineResult wrap(final ByteBuffer[] srcs, final int offset, final int length, final ByteBuffer dst) throws SSLException {
+<span class="nc" id="L313">            return OK_UNWRAP;</span>
+        }
+
+        public SSLEngineResult unwrap(final ByteBuffer src, final ByteBuffer[] dsts, final int offset, final int length) throws SSLException {
+            SSLEngine next;
+<span class="nc" id="L318">            final int mark = src.position();</span>
+            try {
+<span class="nc bnc" id="L320" title="All 2 branches missed.">                if (src.remaining() &lt; SSLExplorer.RECORD_HEADER_SIZE) {</span>
+<span class="nc" id="L321">                    packetBufferSize = SSLExplorer.RECORD_HEADER_SIZE;</span>
+<span class="nc" id="L322">                    return UNDERFLOW_UNWRAP;</span>
+                }
+<span class="nc" id="L324">                final int requiredSize = SSLExplorer.getRequiredSize(src);</span>
+<span class="nc bnc" id="L325" title="All 2 branches missed.">                if (src.remaining() &lt; requiredSize) {</span>
+<span class="nc" id="L326">                    packetBufferSize = requiredSize;</span>
+<span class="nc" id="L327">                    return UNDERFLOW_UNWRAP;</span>
+                }
+<span class="nc" id="L329">                SSLContext sslContext = selector.selectContext(SSLExplorer.explore(src));</span>
+<span class="nc bnc" id="L330" title="All 2 branches missed.">                if (sslContext == null) {</span>
+                    // no SSL context is available
+<span class="nc" id="L332">                    throw ElytronMessages.log.noContextForSslConnection();</span>
+                }
+<span class="nc" id="L334">                next = engineFunction.apply(sslContext);</span>
+<span class="nc" id="L335">                next.setUseClientMode(false);</span>
+<span class="nc" id="L336">                final int flagsVal = flags.get();</span>
+<span class="nc bnc" id="L337" title="All 2 branches missed.">                if ((flagsVal &amp; FL_WANT_C_AUTH) != 0) {</span>
+<span class="nc" id="L338">                    next.setWantClientAuth(true);</span>
+<span class="nc bnc" id="L339" title="All 2 branches missed.">                } else if ((flagsVal &amp; FL_NEED_C_AUTH) != 0) {</span>
+<span class="nc" id="L340">                    next.setNeedClientAuth(true);</span>
+                }
+<span class="nc bnc" id="L342" title="All 2 branches missed.">                if ((flagsVal &amp; FL_SESSION_CRE) != 0) {</span>
+<span class="nc" id="L343">                    next.setEnableSessionCreation(true);</span>
+                }
+<span class="nc" id="L345">                currentRef.set(next);</span>
+            } finally {
+<span class="nc" id="L347">                src.position(mark);</span>
+            }
+<span class="nc" id="L349">            return next.unwrap(src, dsts, offset, length);</span>
+        }
+
+        public Runnable getDelegatedTask() {
+<span class="nc" id="L353">            return null;</span>
+        }
+
+        public void closeInbound() throws SSLException {
+<span class="nc" id="L357">            currentRef.set(CLOSED_STATE);</span>
+<span class="nc" id="L358">        }</span>
+
+        public boolean isInboundDone() {
+<span class="nc" id="L361">            return false;</span>
+        }
+
+        public void closeOutbound() {
+<span class="nc" id="L365">            currentRef.set(CLOSED_STATE);</span>
+<span class="nc" id="L366">        }</span>
+
+        public boolean isOutboundDone() {
+<span class="nc" id="L369">            return false;</span>
+        }
+
+        public String[] getSupportedCipherSuites() {
+<span class="nc" id="L373">            throw Assert.unsupported();</span>
+        }
+
+        public String[] getEnabledCipherSuites() {
+<span class="nc" id="L377">            throw Assert.unsupported();</span>
+        }
+
+        public void setEnabledCipherSuites(final String[] suites) {
+<span class="nc" id="L381">            throw Assert.unsupported();</span>
+        }
+
+        public String[] getSupportedProtocols() {
+<span class="nc" id="L385">            throw Assert.unsupported();</span>
+        }
+
+        public String[] getEnabledProtocols() {
+<span class="nc" id="L389">            throw Assert.unsupported();</span>
+        }
+
+        public void setEnabledProtocols(final String[] protocols) {
+<span class="nc" id="L393">            throw Assert.unsupported();</span>
+        }
+
+        public SSLSession getSession() {
+<span class="nc" id="L397">            return null;</span>
+        }
+
+        public void beginHandshake() throws SSLException {
+<span class="nc" id="L401">        }</span>
+
+        public SSLEngineResult.HandshakeStatus getHandshakeStatus() {
+<span class="nc" id="L404">            return SSLEngineResult.HandshakeStatus.NEED_UNWRAP;</span>
+        }
+
+        public void setUseClientMode(final boolean mode) {
+<span class="nc bnc" id="L408" title="All 2 branches missed.">            if (mode) throw Assert.unsupported();</span>
+<span class="nc" id="L409">        }</span>
+
+        public boolean getUseClientMode() {
+<span class="nc" id="L412">            return false;</span>
+        }
+
+        public void setNeedClientAuth(final boolean need) {
+<span class="nc" id="L416">            final AtomicInteger flags = this.flags;</span>
+            int oldVal, newVal;
+            do {
+<span class="nc" id="L419">                oldVal = flags.get();</span>
+<span class="nc bnc" id="L420" title="All 4 branches missed.">                if (((oldVal &amp; FL_NEED_C_AUTH) != 0) == need) {</span>
+<span class="nc" id="L421">                    return;</span>
+                }
+<span class="nc" id="L423">                newVal = oldVal &amp; FL_SESSION_CRE | FL_NEED_C_AUTH;</span>
+<span class="nc bnc" id="L424" title="All 2 branches missed.">            } while (! flags.compareAndSet(oldVal, newVal));</span>
+<span class="nc" id="L425">        }</span>
+
+        public boolean getNeedClientAuth() {
+<span class="nc bnc" id="L428" title="All 2 branches missed.">            return (flags.get() &amp; FL_NEED_C_AUTH) != 0;</span>
+        }
+
+        public void setWantClientAuth(final boolean want) {
+<span class="nc" id="L432">            final AtomicInteger flags = this.flags;</span>
+            int oldVal, newVal;
+            do {
+<span class="nc" id="L435">                oldVal = flags.get();</span>
+<span class="nc bnc" id="L436" title="All 4 branches missed.">                if (((oldVal &amp; FL_WANT_C_AUTH) != 0) == want) {</span>
+<span class="nc" id="L437">                    return;</span>
+                }
+<span class="nc" id="L439">                newVal = oldVal &amp; FL_SESSION_CRE | FL_WANT_C_AUTH;</span>
+<span class="nc bnc" id="L440" title="All 2 branches missed.">            } while (! flags.compareAndSet(oldVal, newVal));</span>
+<span class="nc" id="L441">        }</span>
+
+        public boolean getWantClientAuth() {
+<span class="nc bnc" id="L444" title="All 2 branches missed.">            return (flags.get() &amp; FL_WANT_C_AUTH) != 0;</span>
+        }
+
+        public void setEnableSessionCreation(final boolean flag) {
+<span class="nc" id="L448">            final AtomicInteger flags = this.flags;</span>
+            int oldVal, newVal;
+            do {
+<span class="nc" id="L451">                oldVal = flags.get();</span>
+<span class="nc bnc" id="L452" title="All 4 branches missed.">                if (((oldVal &amp; FL_SESSION_CRE) != 0) == flag) {</span>
+<span class="nc" id="L453">                    return;</span>
+                }
+<span class="nc" id="L455">                newVal = oldVal ^ FL_SESSION_CRE;</span>
+<span class="nc bnc" id="L456" title="All 2 branches missed.">            } while (! flags.compareAndSet(oldVal, newVal));</span>
+<span class="nc" id="L457">        }</span>
+
+        public boolean getEnableSessionCreation() {
+<span class="nc bnc" id="L460" title="All 2 branches missed.">            return (flags.get() &amp; FL_SESSION_CRE) != 0;</span>
+        }
+    }
+
+<span class="nc" id="L464">    static final SSLEngine CLOSED_STATE = new SSLEngine() {</span>
+        public SSLEngineResult wrap(final ByteBuffer[] srcs, final int offset, final int length, final ByteBuffer dst) throws SSLException {
+<span class="nc" id="L466">            throw ElytronMessages.log.sslClosed();</span>
+        }
+
+        public SSLEngineResult unwrap(final ByteBuffer src, final ByteBuffer[] dsts, final int offset, final int length) throws SSLException {
+<span class="nc" id="L470">            throw ElytronMessages.log.sslClosed();</span>
+        }
+
+        public Runnable getDelegatedTask() {
+<span class="nc" id="L474">            return null;</span>
+        }
+
+        public void closeInbound() throws SSLException {
+<span class="nc" id="L478">        }</span>
+
+        public boolean isInboundDone() {
+<span class="nc" id="L481">            return true;</span>
+        }
+
+        public void closeOutbound() {
+
+<span class="nc" id="L486">        }</span>
+
+        public boolean isOutboundDone() {
+<span class="nc" id="L489">            return true;</span>
+        }
+
+        public String[] getSupportedCipherSuites() {
+<span class="nc" id="L493">            throw Assert.unsupported();</span>
+        }
+
+        public String[] getEnabledCipherSuites() {
+<span class="nc" id="L497">            throw Assert.unsupported();</span>
+        }
+
+        public void setEnabledCipherSuites(final String[] suites) {
+<span class="nc" id="L501">            throw Assert.unsupported();</span>
+        }
+
+        public String[] getSupportedProtocols() {
+<span class="nc" id="L505">            throw Assert.unsupported();</span>
+        }
+
+        public String[] getEnabledProtocols() {
+<span class="nc" id="L509">            throw Assert.unsupported();</span>
+        }
+
+        public void setEnabledProtocols(final String[] protocols) {
+<span class="nc" id="L513">            throw Assert.unsupported();</span>
+        }
+
+        public SSLSession getSession() {
+<span class="nc" id="L517">            return null;</span>
+        }
+
+        public void beginHandshake() throws SSLException {
+<span class="nc" id="L521">            throw ElytronMessages.log.sslClosed();</span>
+        }
+
+        public SSLEngineResult.HandshakeStatus getHandshakeStatus() {
+<span class="nc" id="L525">            return SSLEngineResult.HandshakeStatus.NOT_HANDSHAKING;</span>
+        }
+
+        public void setUseClientMode(final boolean mode) {
+<span class="nc" id="L529">            throw Assert.unsupported();</span>
+        }
+
+        public boolean getUseClientMode() {
+<span class="nc" id="L533">            return false;</span>
+        }
+
+        public void setNeedClientAuth(final boolean need) {
+<span class="nc" id="L537">        }</span>
+
+        public boolean getNeedClientAuth() {
+<span class="nc" id="L540">            return false;</span>
+        }
+
+        public void setWantClientAuth(final boolean want) {
+<span class="nc" id="L544">        }</span>
+
+        public boolean getWantClientAuth() {
+<span class="nc" id="L547">            return false;</span>
+        }
+
+        public void setEnableSessionCreation(final boolean flag) {
+<span class="nc" id="L551">        }</span>
+
+        public boolean getEnableSessionCreation() {
+<span class="nc" id="L554">            return false;</span>
+        }
+    };
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

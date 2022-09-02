@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>HttpAuthenticationFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server-http</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.server.http</a> &gt; <span class="el_source">HttpAuthenticationFactory.java</span></div><h1>HttpAuthenticationFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.auth.server.http;
+
+import static java.util.Arrays.asList;
+import static java.util.Collections.emptySet;
+import static java.util.Collections.singleton;
+import static org.wildfly.security.auth.server.http.ElytronMessages.log;
+
+import java.util.Collection;
+import java.util.Collections;
+import java.util.function.UnaryOperator;
+
+import javax.security.auth.callback.CallbackHandler;
+
+import org.wildfly.security.auth.server.AbstractMechanismAuthenticationFactory;
+import org.wildfly.security.auth.server.MechanismConfigurationSelector;
+import org.wildfly.security.auth.server.SecurityDomain;
+import org.wildfly.security.credential.AlgorithmCredential;
+import org.wildfly.security.credential.Credential;
+import org.wildfly.security.credential.PasswordCredential;
+import org.wildfly.security.evidence.AlgorithmEvidence;
+import org.wildfly.security.evidence.Evidence;
+import org.wildfly.security.evidence.PasswordGuessEvidence;
+import org.wildfly.security.http.HttpAuthenticationException;
+import org.wildfly.security.http.HttpConstants;
+import org.wildfly.security.http.HttpServerAuthenticationMechanism;
+import org.wildfly.security.http.HttpServerAuthenticationMechanismFactory;
+import org.wildfly.security.password.interfaces.ClearPassword;
+import org.wildfly.security.password.interfaces.DigestPassword;
+
+/**
+ * A HTTP authentication mechanism configuration, the configuration is associated with the {@link SecurityDomain} and
+ * {@link HttpServerAuthenticationMechanismFactory} for obtaining configured mechanisms.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public final class HttpAuthenticationFactory extends AbstractMechanismAuthenticationFactory&lt;HttpServerAuthenticationMechanism, HttpServerAuthenticationMechanismFactory, HttpAuthenticationException&gt; {
+
+    HttpAuthenticationFactory(final SecurityDomain securityDomain, final MechanismConfigurationSelector mechanismConfigurationSelector, final HttpServerAuthenticationMechanismFactory factory) {
+<span class="nc" id="L56">        super(securityDomain, mechanismConfigurationSelector, factory);</span>
+<span class="nc" id="L57">    }</span>
+
+    protected HttpServerAuthenticationMechanism doCreate(final String name, final CallbackHandler callbackHandler, final UnaryOperator&lt;HttpServerAuthenticationMechanismFactory&gt; factoryTransformation) throws HttpAuthenticationException {
+<span class="nc" id="L60">        HttpServerAuthenticationMechanism server = new SecurityIdentityServerMechanismFactory(factoryTransformation.apply(getFactory())).createAuthenticationMechanism(name, Collections.emptyMap(), callbackHandler);</span>
+<span class="nc" id="L61">        log.tracef(&quot;Created HttpServerAuthenticationMechanism [%s] for mechanism [%s]&quot;, server, name);</span>
+<span class="nc" id="L62">        return server;</span>
+    }
+
+    protected Collection&lt;String&gt; getAllSupportedMechNames() {
+<span class="nc" id="L66">        return asList(getFactory().getMechanismNames(Collections.emptyMap()));</span>
+    }
+
+    // TODO: at some point these should no longer be hard-coded
+
+    protected Collection&lt;Class&lt;? extends Evidence&gt;&gt; getSupportedEvidenceTypes(final String mechName) {
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        switch (mechName) {</span>
+            case HttpConstants.BASIC_NAME: {
+<span class="nc" id="L74">                return singleton(PasswordGuessEvidence.class);</span>
+            }
+            default: {
+<span class="nc" id="L77">                return emptySet();</span>
+            }
+        }
+    }
+
+    protected Collection&lt;String&gt; getSupportedEvidenceAlgorithmNames(final Class&lt;? extends AlgorithmEvidence&gt; evidenceType, final String mechName) {
+<span class="nc" id="L83">        return emptySet();</span>
+    }
+
+    protected Collection&lt;Class&lt;? extends Credential&gt;&gt; getSupportedCredentialTypes(final String mechName) {
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        switch (mechName) {</span>
+            case HttpConstants.BASIC_NAME:
+            case &quot;DIGEST&quot;: {
+<span class="nc" id="L90">                return singleton(PasswordCredential.class);</span>
+            }
+            default: {
+<span class="nc" id="L93">                return emptySet();</span>
+            }
+        }
+    }
+
+    protected Collection&lt;String&gt; getSupportedCredentialAlgorithmNames(final Class&lt;? extends AlgorithmCredential&gt; credentialType, final String mechName) {
+<span class="nc bnc" id="L99" title="All 3 branches missed.">        switch (mechName) {</span>
+            case HttpConstants.BASIC_NAME: {
+<span class="nc" id="L101">                return singleton(&quot;*&quot;);</span>
+            }
+            case &quot;DIGEST&quot;: {
+<span class="nc" id="L104">                return asList(ClearPassword.ALGORITHM_CLEAR, DigestPassword.ALGORITHM_DIGEST_MD5);</span>
+            }
+            default: {
+<span class="nc" id="L107">                return emptySet();</span>
+            }
+        }
+    }
+
+    protected boolean usesCredentials(final String mechName) {
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        switch (mechName) {</span>
+            case HttpConstants.BASIC_NAME:
+            case &quot;DIGEST&quot;: {
+<span class="nc" id="L116">                return true;</span>
+            }
+            default: {
+<span class="nc" id="L119">                return false;</span>
+            }
+        }
+    }
+
+    public void shutdownAuthenticationMechanismFactory() {
+<span class="nc" id="L125">        super.getFactory().shutdown();</span>
+<span class="nc" id="L126">    }</span>
+
+    /**
+     * Obtain a new {@link Builder} capable of building a {@link HttpAuthenticationFactory}.
+     *
+     * @return a new {@link Builder} capable of building a {@link HttpAuthenticationFactory}.
+     */
+    public static Builder builder() {
+<span class="nc" id="L134">        return new Builder();</span>
+    }
+
+    /**
+     * A builder for SASL server factory configurations.
+     */
+    public static final class Builder extends AbstractMechanismAuthenticationFactory.Builder&lt;HttpServerAuthenticationMechanism, HttpServerAuthenticationMechanismFactory, HttpAuthenticationException&gt; {
+
+        /**
+         * Construct a new instance.
+         */
+<span class="nc" id="L145">        Builder() {</span>
+<span class="nc" id="L146">        }</span>
+
+        public Builder setSecurityDomain(final SecurityDomain securityDomain) {
+<span class="nc" id="L149">            super.setSecurityDomain(securityDomain);</span>
+<span class="nc" id="L150">            return this;</span>
+        }
+
+        public Builder setMechanismConfigurationSelector(final MechanismConfigurationSelector mechanismConfigurationSelector) {
+<span class="nc" id="L154">            super.setMechanismConfigurationSelector(mechanismConfigurationSelector);</span>
+<span class="nc" id="L155">            return this;</span>
+        }
+
+        public Builder setFactory(final HttpServerAuthenticationMechanismFactory factory) {
+<span class="nc" id="L159">            super.setFactory(factory);</span>
+<span class="nc" id="L160">            return this;</span>
+        }
+
+        public HttpAuthenticationFactory build() {
+<span class="nc" id="L164">            return new HttpAuthenticationFactory(getSecurityDomain(), getMechanismConfigurationSelector(), getFactory());</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

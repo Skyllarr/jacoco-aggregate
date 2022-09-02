@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>X509CertificateExtension.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-x500-cert</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.x500.cert</a> &gt; <span class="el_source">X509CertificateExtension.java</span></div><h1>X509CertificateExtension.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.x500.cert;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.security.cert.Extension;
+
+import org.wildfly.security.asn1.ASN1Encodable;
+import org.wildfly.security.asn1.DEREncoder;
+
+/**
+ * An X.509 certificate extension.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public abstract class X509CertificateExtension implements ASN1Encodable, Extension {
+    private final boolean critical;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param critical {@code true} if this extension is to be marked &lt;em&gt;critical&lt;/em&gt;, {@code false} otherwise
+     */
+<span class="fc" id="L41">    protected X509CertificateExtension(final boolean critical) {</span>
+<span class="fc" id="L42">        this.critical = critical;</span>
+<span class="fc" id="L43">    }</span>
+
+    /**
+     * Get the OID of this extension.
+     *
+     * @return the OID of this extension (must not be {@code null})
+     */
+    public abstract String getId();
+
+    /**
+     * Determine whether this object represents a critical extension (as defined by &lt;a
+     * href=&quot;https://tools.ietf.org/html/rfc5280&quot;&gt;RFC 5280&lt;/a&gt;).
+     *
+     * @return {@code true} if the extension is critical, {@code false} otherwise
+     */
+    public final boolean isCritical() {
+<span class="fc" id="L59">        return critical;</span>
+    }
+
+    public void encode(final OutputStream out) throws IOException {
+<span class="nc" id="L63">        out.write(getValue());</span>
+<span class="nc" id="L64">    }</span>
+
+    public byte[] getValue() {
+<span class="nc" id="L67">        DEREncoder encoder = new DEREncoder();</span>
+<span class="nc" id="L68">        encodeTo(encoder);</span>
+<span class="nc" id="L69">        return encoder.getEncoded();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

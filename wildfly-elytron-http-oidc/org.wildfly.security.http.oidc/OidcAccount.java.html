@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OidcAccount.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-oidc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.oidc</a> &gt; <span class="el_source">OidcAccount.java</span></div><h1>OidcAccount.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2020 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.http.oidc;
+
+import static org.wildfly.security.http.oidc.ElytronMessages.log;
+
+import java.io.Serializable;
+import java.security.Principal;
+import java.util.HashSet;
+import java.util.Set;
+
+/**
+ * @author &lt;a href=&quot;mailto:psilva@redhat.com&quot;&gt;Pedro Igor&lt;/a&gt;
+ */
+public class OidcAccount implements Serializable {
+
+    private static final long serialVersionUID = -2871833856346510925L;
+    private final OidcPrincipal&lt;RefreshableOidcSecurityContext&gt; principal;
+
+<span class="nc" id="L36">    public OidcAccount(OidcPrincipal&lt;RefreshableOidcSecurityContext&gt; principal) {</span>
+<span class="nc" id="L37">        this.principal = principal;</span>
+<span class="nc" id="L38">    }</span>
+
+    public RefreshableOidcSecurityContext getOidcSecurityContext() {
+<span class="nc" id="L41">        return principal.getOidcSecurityContext();</span>
+    }
+
+    public Principal getPrincipal() {
+<span class="nc" id="L45">        return principal;</span>
+    }
+
+    public Set&lt;String&gt; getRoles() {
+<span class="nc" id="L49">        Set&lt;String&gt; roles = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L50">        return roles;</span>
+    }
+
+    void setCurrentRequestInfo(OidcClientConfiguration deployment, OidcTokenStore tokenStore) {
+<span class="nc" id="L54">        principal.getOidcSecurityContext().setCurrentRequestInfo(deployment, tokenStore);</span>
+<span class="nc" id="L55">    }</span>
+
+    public boolean checkActive() {
+<span class="nc" id="L58">        RefreshableOidcSecurityContext session = getOidcSecurityContext();</span>
+<span class="nc bnc" id="L59" title="All 4 branches missed.">        if (session.isActive() &amp;&amp; ! session.getOidcClientConfiguration().isAlwaysRefreshToken()) {</span>
+<span class="nc" id="L60">            log.debug(&quot;session is active&quot;);</span>
+<span class="nc" id="L61">            return true;</span>
+        }
+<span class="nc" id="L63">        log.debug(&quot;session not active&quot;);</span>
+<span class="nc" id="L64">        return false;</span>
+    }
+
+    boolean tryRefresh() {
+<span class="nc" id="L68">        log.debug(&quot;Trying to refresh&quot;);</span>
+<span class="nc" id="L69">        RefreshableOidcSecurityContext securityContext = getOidcSecurityContext();</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        if (securityContext == null) {</span>
+<span class="nc" id="L71">            log.debug(&quot;No security context. Aborting refresh.&quot;);</span>
+        }
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        if (securityContext.refreshToken(false)) {</span>
+<span class="nc" id="L74">            log.debug(&quot;refresh succeeded&quot;);</span>
+<span class="nc" id="L75">            return true;</span>
+        }
+<span class="nc" id="L77">        return checkActive();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

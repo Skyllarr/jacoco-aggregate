@@ -1,0 +1,477 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CipherSuitePredicate.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-ssl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.ssl</a> &gt; <span class="el_source">CipherSuitePredicate.java</span></div><h1>CipherSuitePredicate.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.ssl;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.EnumSet;
+
+/**
+ * An opaque predicate which can be used to match SSL/TLS cipher suites.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public abstract class CipherSuitePredicate {
+
+    // constant predicates
+
+<span class="fc" id="L34">    private static final CipherSuitePredicate DEFAULTS_PREDICATE = matchAny(</span>
+<span class="fc" id="L35">        matchEncryption(Encryption.RC2, Encryption.RC4, Encryption.NULL),</span>
+<span class="fc" id="L36">        matchAuthentication(Authentication.NULL)</span>
+    );
+<span class="fc" id="L38">    private static final CipherSuitePredicate ANON_DH_PREDICATE = matchAll(</span>
+<span class="fc" id="L39">        matchKeyExchange(KeyAgreement.DHd, KeyAgreement.DHr, KeyAgreement.DHE),</span>
+<span class="fc" id="L40">        matchAuthentication(Authentication.NULL)</span>
+    );
+<span class="fc" id="L42">    private static final CipherSuitePredicate OPENSSL_COMPLEMENT_OF_ALL = matchEncryption(Encryption.NULL);</span>
+<span class="fc" id="L43">    private static final CipherSuitePredicate OPENSSL_DEFAULT_DELETES = matchAny(</span>
+<span class="fc" id="L44">        matchAuthentication(Authentication.NULL),</span>
+<span class="fc" id="L45">        matchEncryption(Encryption.NULL),</span>
+<span class="fc" id="L46">        matchExport(),</span>
+<span class="fc" id="L47">        matchLevel(SecurityLevel.LOW),</span>
+<span class="fc" id="L48">        matchProtocol(Protocol.SSLv2)</span>
+    );
+<span class="fc" id="L50">    private static final CipherSuitePredicate OPENSSL_COMPLEMENT_OF_DEFAULT = matchAll(</span>
+<span class="fc" id="L51">        matchAuthentication(Authentication.NULL),</span>
+<span class="fc" id="L52">        matchNot(matchEncryption(Encryption.NULL))</span>
+    );
+<span class="fc" id="L54">    private static final CipherSuitePredicate OPENSSL_ALL = matchNot(OPENSSL_COMPLEMENT_OF_ALL);</span>
+
+<span class="fc" id="L56">    CipherSuitePredicate() {</span>
+<span class="fc" id="L57">    }</span>
+
+    static CipherSuitePredicate optimize(CipherSuitePredicate predicate) {
+<span class="pc bpc" id="L60" title="2 of 4 branches missed.">        return predicate.isAlwaysFalse() ? matchFalse() : predicate.isAlwaysTrue() ? matchTrue() : predicate;</span>
+    }
+
+    // general logical
+
+    /**
+     * Match all possible cipher suites.
+     *
+     * @return the {@code true} predicate
+     */
+    public static CipherSuitePredicate matchTrue() {
+<span class="nc" id="L71">        return BooleanCipherSuitePredicate.TRUE;</span>
+    }
+
+    /**
+     * Match no possible cipher suites.
+     *
+     * @return the {@code false} predicate
+     */
+    public static CipherSuitePredicate matchFalse() {
+<span class="nc" id="L80">        return BooleanCipherSuitePredicate.FALSE;</span>
+    }
+
+    /**
+     * Match all of the given predicates.
+     *
+     * @param predicates the predicates
+     * @return a predicate that is {@code true} when all nested predicates are {@code true}
+     */
+    public static CipherSuitePredicate matchAll(CipherSuitePredicate... predicates) {
+<span class="fc" id="L90">        return optimize(new AndCipherSuitePredicate(predicates));</span>
+    }
+
+    /**
+     * Match any of the given predicates.
+     *
+     * @param predicates the predicates
+     * @return a predicate that is {@code true} when any nested predicate is {@code true}
+     */
+    public static CipherSuitePredicate matchAny(CipherSuitePredicate... predicates) {
+<span class="fc" id="L100">        return optimize(new OrCipherSuitePredicate(predicates));</span>
+    }
+
+    /**
+     * Invert the given predicate.
+     *
+     * @param predicate the predicate
+     * @return a predicate which is {@code true} when the nested predicate is {@code false}, and vice-versa
+     */
+    public static CipherSuitePredicate matchNot(CipherSuitePredicate predicate) {
+<span class="fc" id="L110">        return optimize(new NotCipherSuitePredicate(predicate));</span>
+    }
+
+    static &lt;T&gt; T[] withoutNulls(T[] orig) {
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        if (orig == null) return null;</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        for (T item : orig) {</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">            if (item == null) {</span>
+<span class="nc" id="L117">                ArrayList&lt;T&gt; list = null;</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">                for (T item2 : orig) {</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">                    if (item2 != null) {</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">                        if (list == null) {</span>
+<span class="nc" id="L121">                            list = new ArrayList&lt;T&gt;(orig.length - 1);</span>
+                        }
+<span class="nc" id="L123">                        list.add(item2);</span>
+                    }
+                }
+<span class="nc bnc" id="L126" title="All 2 branches missed.">                return list == null ? null : list.toArray(Arrays.copyOf(orig, list.size()));</span>
+            }
+        }
+        // no nulls
+<span class="fc" id="L130">        return orig;</span>
+    }
+
+    // specific criteria
+
+    /**
+     * Return a predicate which matches the given encryption scheme.
+     *
+     * @param encryption the encryption scheme
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchEncryption(Encryption encryption) {
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        return encryption == null ? matchFalse() : new EncryptionCipherSuitePredicate(EnumSet.of(encryption));</span>
+    }
+
+    /**
+     * Return a predicate which matches any of the given encryption schemes.
+     *
+     * @param encryptions the encryption schemes
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchEncryption(Encryption... encryptions) {
+<span class="fc" id="L152">        encryptions = withoutNulls(encryptions);</span>
+<span class="pc bpc" id="L153" title="3 of 6 branches missed.">        return encryptions == null || encryptions.length == 0 ? matchFalse() : encryptions.length == Encryption.fullSize ? matchTrue() : new EncryptionCipherSuitePredicate(EnumSet.of(encryptions[0], encryptions));</span>
+    }
+
+    /**
+     * Return a predicate which matches any of the given encryption schemes.
+     *
+     * @param encryptions the encryption schemes
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchEncryption(EnumSet&lt;Encryption&gt; encryptions) {
+<span class="nc bnc" id="L163" title="All 6 branches missed.">        return encryptions == null || encryptions.isEmpty() ? matchFalse() : Encryption.isFull(encryptions) ? matchTrue() : new EncryptionCipherSuitePredicate(encryptions);</span>
+    }
+
+    /**
+     * Return a predicate which matches the given authentication scheme.
+     *
+     * @param authentication the authentication scheme
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchAuthentication(Authentication authentication) {
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        return authentication == null ? matchFalse() : new AuthenticationCipherSuitePredicate(true, EnumSet.of(authentication));</span>
+    }
+
+    /**
+     * Return a predicate which matches any of the given authentication schemes.
+     *
+     * @param authentications the authentication schemes
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchAuthentication(Authentication... authentications) {
+<span class="nc" id="L183">        authentications = withoutNulls(authentications);</span>
+<span class="nc bnc" id="L184" title="All 6 branches missed.">        return authentications == null || authentications.length == 0 ? matchFalse() : authentications.length == Authentication.fullSize ? matchTrue() : new AuthenticationCipherSuitePredicate(true, EnumSet.of(authentications[0], authentications));</span>
+    }
+
+    /**
+     * Return a predicate which matches any of the given authentication schemes.
+     *
+     * @param authentications the authentication schemes
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchAuthentication(EnumSet&lt;Authentication&gt; authentications) {
+<span class="nc bnc" id="L194" title="All 6 branches missed.">        return authentications == null || authentications.isEmpty() ? matchFalse() : Authentication.isFull(authentications) ? matchTrue() : optimize(new AuthenticationCipherSuitePredicate(true, authentications));</span>
+    }
+
+    /**
+     * Return a predicate which matches the given key exchange scheme.
+     *
+     * @param keyAgreement the key exchange scheme
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchKeyAgreement(KeyAgreement keyAgreement) {
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">        return keyAgreement == null ? matchFalse() : new KeyAgreementCipherSuitePredicate(EnumSet.of(keyAgreement));</span>
+    }
+
+    /**
+     * Return a predicate which matches any of the given key exchange schemes.
+     *
+     * @param keyAgreements the key exchange schemes
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchKeyExchange(KeyAgreement... keyAgreements) {
+<span class="fc" id="L214">        keyAgreements = withoutNulls(keyAgreements);</span>
+<span class="pc bpc" id="L215" title="3 of 6 branches missed.">        return keyAgreements == null || keyAgreements.length == 0 ? matchFalse() : keyAgreements.length == KeyAgreement.fullSize ? matchTrue() : new KeyAgreementCipherSuitePredicate(EnumSet.of(keyAgreements[0], keyAgreements));</span>
+    }
+
+    /**
+     * Return a predicate which matches any of the given key exchange schemes.
+     *
+     * @param keyAgreements the key exchange schemes
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchKeyExchange(EnumSet&lt;KeyAgreement&gt; keyAgreements) {
+<span class="nc bnc" id="L225" title="All 6 branches missed.">        return keyAgreements == null || keyAgreements.isEmpty() ? matchFalse() : KeyAgreement.isFull(keyAgreements) ? matchTrue() : new KeyAgreementCipherSuitePredicate(keyAgreements);</span>
+    }
+
+    /**
+     * Return a predicate which matches the given digest scheme.
+     *
+     * @param digest the digest scheme
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchDigest(Digest digest) {
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        return digest == null ? matchFalse() : new DigestCipherSuitePredicate(EnumSet.of(digest));</span>
+    }
+
+    /**
+     * Return a predicate which matches any of the given digest schemes.
+     *
+     * @param digests the digest schemes
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchDigest(Digest... digests) {
+<span class="nc" id="L245">        digests = withoutNulls(digests);</span>
+<span class="nc bnc" id="L246" title="All 6 branches missed.">        return digests == null || digests.length == 0 ? matchFalse() : digests.length == Digest.fullSize ? matchTrue() : new DigestCipherSuitePredicate(EnumSet.of(digests[0], digests));</span>
+    }
+
+    /**
+     * Return a predicate which matches any of the given digest schemes.
+     *
+     * @param digests the digest schemes
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchDigest(EnumSet&lt;Digest&gt; digests) {
+<span class="nc bnc" id="L256" title="All 6 branches missed.">        return digests == null || digests.isEmpty() ? matchFalse() : Digest.isFull(digests) ? matchTrue() : new DigestCipherSuitePredicate(digests);</span>
+    }
+
+    /**
+     * Return a predicate which matches the given protocol.
+     *
+     * @param protocol the protocol
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchProtocol(Protocol protocol) {
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">        return protocol == null ? matchFalse() : new ProtocolCipherSuitePredicate(EnumSet.of(protocol));</span>
+    }
+
+    /**
+     * Return a predicate which matches any of the given protocols.
+     *
+     * @param protocols the protocols
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchProtocol(Protocol... protocols) {
+<span class="nc" id="L276">        protocols = withoutNulls(protocols);</span>
+<span class="nc bnc" id="L277" title="All 6 branches missed.">        return protocols == null || protocols.length == 0 ? matchFalse() : protocols.length == Protocol.fullSize ? matchTrue() : new ProtocolCipherSuitePredicate(EnumSet.of(protocols[0], protocols));</span>
+    }
+
+    /**
+     * Return a predicate which matches any of the given protocols.
+     *
+     * @param protocols the protocols
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchProtocol(EnumSet&lt;Protocol&gt; protocols) {
+<span class="nc bnc" id="L287" title="All 6 branches missed.">        return protocols == null || protocols.isEmpty() ? matchFalse() : Protocol.isFull(protocols) ? matchTrue() : new ProtocolCipherSuitePredicate(protocols);</span>
+    }
+
+    /**
+     * Return a predicate which matches the given security level.
+     *
+     * @param level the security level
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchLevel(SecurityLevel level) {
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">        return level == null ? matchFalse() : new LevelCipherSuitePredicate(EnumSet.of(level));</span>
+    }
+
+    /**
+     * Return a predicate which matches any of the given security levels.
+     *
+     * @param levels the security levels
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchLevel(SecurityLevel... levels) {
+<span class="nc" id="L307">        levels = withoutNulls(levels);</span>
+<span class="nc bnc" id="L308" title="All 6 branches missed.">        return levels == null || levels.length == 0 ? matchFalse() : levels.length == SecurityLevel.fullSize ? matchTrue() : new LevelCipherSuitePredicate(EnumSet.of(levels[0], levels));</span>
+    }
+
+    /**
+     * Return a predicate which matches any of the given security levels.
+     *
+     * @param levels the security levels
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchLevel(EnumSet&lt;SecurityLevel&gt; levels) {
+<span class="nc bnc" id="L318" title="All 6 branches missed.">        return levels == null || levels.isEmpty() ? matchFalse() : SecurityLevel.isFull(levels) ? matchTrue() : new LevelCipherSuitePredicate(levels);</span>
+    }
+
+    /**
+     * Return a predicate which matches all security levels less than the given level.
+     *
+     * @param level the security level to compare against
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchLevelLessThan(final SecurityLevel level) {
+<span class="nc bnc" id="L328" title="All 4 branches missed.">        return level == null || level == SecurityLevel.NONE ? matchFalse() : new CipherSuitePredicate() {</span>
+            void toString(final StringBuilder b) {
+<span class="nc" id="L330">                b.append(&quot;security level is less than &quot;).append(level);</span>
+<span class="nc" id="L331">            }</span>
+
+            boolean test(final MechanismDatabase.Entry entry) {
+<span class="nc bnc" id="L334" title="All 2 branches missed.">                return entry.getLevel().compareTo(level) &lt; 0;</span>
+            }
+        };
+    }
+
+    /**
+     * Return a predicate which matches all FIPS cipher suites.
+     *
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchFips() {
+<span class="nc" id="L345">        return FipsCipherSuitePredicate.TRUE;</span>
+    }
+
+    /**
+     * Return a predicate which matches all non-FIPS cipher suites.
+     *
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchNonFips() {
+<span class="nc" id="L354">        return FipsCipherSuitePredicate.FALSE;</span>
+    }
+
+    /**
+     * Return a predicate which matches all exportable cipher suites.
+     *
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchExport() {
+<span class="fc" id="L363">        return ExportCipherSuitePredicate.TRUE;</span>
+    }
+
+    /**
+     * Return a predicate which matches all non-exportable cipher suites.
+     *
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchNonExport() {
+<span class="nc" id="L372">        return ExportCipherSuitePredicate.FALSE;</span>
+    }
+
+    /**
+     * Return a predicate which matches a cipher suite with the given name.  The cipher suite name must be a
+     * standard or OpenSSL-style mechanism name identifying a single mechanism.
+     *
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchName(final String name) {
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">        return name == null ? matchFalse() : new CipherSuitePredicate() {</span>
+            void toString(final StringBuilder b) {
+<span class="nc" id="L384">                b.append(&quot;cipher name is \&quot;&quot;).append(name).append(&quot;\&quot;&quot;);</span>
+<span class="nc" id="L385">            }</span>
+
+            boolean test(final MechanismDatabase.Entry entry) {
+<span class="fc bfc" id="L388" title="All 6 branches covered.">                return entry.getOpenSslNames().contains(name) || entry.getAliases().contains(name) || entry.getName().equals(name);</span>
+            }
+        };
+    }
+
+    /* -- Our defaults -- */
+
+    /**
+     * Return a predicate which matches all cipher suites that would be fully deleted in the default selector
+     * configuration.
+     *
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchDefaultDeletes() {
+<span class="nc" id="L402">        return DEFAULTS_PREDICATE;</span>
+    }
+
+    /* -- OpenSSL specials -- */
+
+    /**
+     * Match all anonymous ciphers which use Diffie-Hellman key exchange.
+     *
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchAnonDH() {
+<span class="fc" id="L413">        return ANON_DH_PREDICATE;</span>
+    }
+
+    /**
+     * Match all cipher suites except for anonymous and encryptionless suites, which must be explicitly enabled.
+     *
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchOpenSslAll() {
+<span class="fc" id="L422">        return OPENSSL_ALL;</span>
+    }
+
+    /**
+     * Match all cipher suites included by {@link #matchOpenSslAll()} but are disabled by default (generally,
+     * anonymous Diffie-Hellman suites including elliptic curve suites).
+     *
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchOpenSslComplementOfAll() {
+<span class="fc" id="L432">        return OPENSSL_COMPLEMENT_OF_ALL;</span>
+    }
+
+    /**
+     * Match all of the cipher suites which are automatically deleted by OpenSSL when using the special {@code DEFAULT}
+     * rule.
+     *
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchOpenSslDefaultDeletes() {
+<span class="fc" id="L442">        return OPENSSL_DEFAULT_DELETES;</span>
+    }
+
+    /**
+     * Match all of the cipher suites which are added by OpenSSL when using the special {@code COMPLEMENTOFDEFAULT}
+     * rule.
+     *
+     * @return the predicate
+     */
+    public static CipherSuitePredicate matchOpenSslComplementOfDefault() {
+<span class="nc" id="L452">        return OPENSSL_COMPLEMENT_OF_DEFAULT;</span>
+    }
+
+    abstract void toString(StringBuilder b);
+
+    /**
+     * Get the string representation of this predicate.
+     *
+     * @return the string representation of this predicate
+     */
+    public final String toString() {
+<span class="nc" id="L463">        StringBuilder b = new StringBuilder();</span>
+<span class="nc" id="L464">        toString(b);</span>
+<span class="nc" id="L465">        return b.toString();</span>
+    }
+
+    abstract boolean test(MechanismDatabase.Entry entry);
+
+    boolean isAlwaysTrue() {
+<span class="fc" id="L471">        return false;</span>
+    }
+    boolean isAlwaysFalse() {
+<span class="fc" id="L474">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

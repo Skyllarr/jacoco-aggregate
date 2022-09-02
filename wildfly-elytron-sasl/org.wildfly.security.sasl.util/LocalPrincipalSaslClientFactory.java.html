@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LocalPrincipalSaslClientFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.util</a> &gt; <span class="el_source">LocalPrincipalSaslClientFactory.java</span></div><h1>LocalPrincipalSaslClientFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2017 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.util;
+
+import static org.wildfly.security.sasl._private.ElytronMessages.sasl;
+
+import java.io.IOException;
+import java.security.Principal;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
+
+import javax.net.ssl.SSLSession;
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.NameCallback;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.auth.x500.X500Principal;
+import javax.security.sasl.SaslClient;
+import javax.security.sasl.SaslClientFactory;
+import javax.security.sasl.SaslException;
+
+import org.wildfly.security.auth.callback.CredentialCallback;
+import org.wildfly.security.auth.callback.SSLCallback;
+import org.wildfly.security.auth.principal.AnonymousPrincipal;
+import org.wildfly.security.auth.principal.NamePrincipal;
+import org.wildfly.security.credential.Credential;
+import org.wildfly.security.credential.X509CertificateChainCredential;
+import org.wildfly.security.sasl.WildFlySasl;
+
+/**
+ * A delegating SASL client factory whose instances can track and return the assumed principal used for authentication.  Use
+ * the {@link WildFlySasl#PRINCIPAL} negotiated property to retrieve the principal.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class LocalPrincipalSaslClientFactory extends AbstractDelegatingSaslClientFactory {
+
+    /**
+     * Construct a new instance.
+     *
+     * @param delegate the delegate client factory (must not be {@code null})
+     */
+    public LocalPrincipalSaslClientFactory(final SaslClientFactory delegate) {
+<span class="nc" id="L61">        super(delegate);</span>
+<span class="nc" id="L62">    }</span>
+
+    public SaslClient createSaslClient(final String[] mechanisms, final String authorizationId, final String protocol, final String serverName, final Map&lt;String, ?&gt; props, final CallbackHandler cbh) throws SaslException {
+        Supplier&lt;Principal&gt; principalSupplier;
+        CallbackHandler realCallbackHandler;
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        if (authorizationId != null) {</span>
+<span class="nc" id="L68">            Principal principal = new NamePrincipal(authorizationId);</span>
+<span class="nc" id="L69">            principalSupplier = () -&gt; principal;</span>
+<span class="nc" id="L70">            realCallbackHandler = cbh;</span>
+<span class="nc" id="L71">        } else {</span>
+<span class="nc" id="L72">            final ClientPrincipalQueryCallbackHandler handler = new ClientPrincipalQueryCallbackHandler(cbh);</span>
+<span class="nc" id="L73">            principalSupplier = handler::getPrincipal;</span>
+<span class="nc" id="L74">            realCallbackHandler = handler;</span>
+        }
+<span class="nc" id="L76">        final SaslClient delegate = super.createSaslClient(mechanisms, authorizationId, protocol, serverName, props, realCallbackHandler);</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        if (delegate == null) {</span>
+<span class="nc" id="L78">            return null;</span>
+        }
+<span class="nc" id="L80">        return new LocalPrincipalSaslClient(delegate, principalSupplier);</span>
+    }
+
+    static final class ClientPrincipalQueryCallbackHandler implements CallbackHandler {
+        private final CallbackHandler delegate;
+<span class="nc" id="L85">        private final AtomicReference&lt;Principal&gt; principalRef = new AtomicReference&lt;&gt;(AnonymousPrincipal.getInstance());</span>
+
+<span class="nc" id="L87">        ClientPrincipalQueryCallbackHandler(final CallbackHandler delegate) {</span>
+<span class="nc" id="L88">            this.delegate = delegate;</span>
+<span class="nc" id="L89">        }</span>
+
+        public void handle(final Callback[] callbacks) throws IOException, UnsupportedCallbackException {
+            try {
+<span class="nc" id="L93">                delegate.handle(callbacks);</span>
+            } finally {
+                // try to determine the used principal
+<span class="nc bnc" id="L96" title="All 2 branches missed.">                for (Callback callback : callbacks) {</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">                    if (callback instanceof NameCallback) {</span>
+<span class="nc" id="L98">                        final String name = ((NameCallback) callback).getName();</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">                        if (name != null) {</span>
+<span class="nc" id="L100">                            principalRef.set(new NamePrincipal(name));</span>
+                        }
+<span class="nc bnc" id="L102" title="All 2 branches missed.">                    } else if (callback instanceof CredentialCallback) {</span>
+<span class="nc" id="L103">                        final Credential credential = ((CredentialCallback) callback).getCredential();</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">                        if (credential instanceof X509CertificateChainCredential) {</span>
+<span class="nc" id="L105">                            final X500Principal principal = ((X509CertificateChainCredential) credential).getFirstCertificate().getSubjectX500Principal();</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">                            if (principal != null) {</span>
+<span class="nc" id="L107">                                principalRef.set(principal);</span>
+                            }
+                        }
+<span class="nc bnc" id="L110" title="All 2 branches missed.">                    } else if (callback instanceof SSLCallback) {</span>
+                        // SSL callback always comes before name callback
+<span class="nc" id="L112">                        final SSLSession sslSession = ((SSLCallback) callback).getSslConnection().getSession();</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">                        if (sslSession != null) {</span>
+<span class="nc" id="L114">                            final Principal localPrincipal = sslSession.getLocalPrincipal();</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">                            if (localPrincipal != null) {</span>
+<span class="nc" id="L116">                                principalRef.set(localPrincipal);</span>
+                            }
+                        }
+                    }
+                }
+            }
+<span class="nc" id="L122">        }</span>
+
+        public Principal getPrincipal() {
+<span class="nc" id="L125">            return principalRef.get();</span>
+        }
+    }
+
+    final class LocalPrincipalSaslClient extends AbstractDelegatingSaslClient {
+        private final Supplier&lt;Principal&gt; principalSupplier;
+
+<span class="nc" id="L132">        LocalPrincipalSaslClient(final SaslClient delegate, final Supplier&lt;Principal&gt; principalSupplier) {</span>
+<span class="nc" id="L133">            super(delegate);</span>
+<span class="nc" id="L134">            this.principalSupplier = principalSupplier;</span>
+<span class="nc" id="L135">        }</span>
+
+        @Override
+        public Object getNegotiatedProperty(final String propName) {
+<span class="nc bnc" id="L139" title="All 2 branches missed.">            if (! isComplete()) {</span>
+<span class="nc" id="L140">                throw sasl.mechAuthenticationNotComplete();</span>
+            }
+            // The mechanism might be smart enough to know its principal; if so, use their value instead of our guess.
+<span class="nc" id="L143">            final Object value = super.getNegotiatedProperty(propName);</span>
+<span class="nc bnc" id="L144" title="All 4 branches missed.">            return value == null &amp;&amp; WildFlySasl.PRINCIPAL.equals(propName) ? principalSupplier.get() : value;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

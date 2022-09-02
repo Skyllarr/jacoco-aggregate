@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractSaslFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.util</a> &gt; <span class="el_source">AbstractSaslFactory.java</span></div><h1>AbstractSaslFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.util;
+
+import java.util.Map;
+
+import javax.security.sasl.Sasl;
+
+import org.wildfly.security.sasl.WildFlySasl;
+
+/**
+ * Abstract SASL factory base class.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public abstract class AbstractSaslFactory {
+
+<span class="nc" id="L34">    static final String[] EMPTY = new String[0];</span>
+
+    private final String[] names;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param name the mechanism name
+     */
+<span class="nc" id="L43">    protected AbstractSaslFactory(final String name) {</span>
+<span class="nc" id="L44">        names = new String[] { name };</span>
+<span class="nc" id="L45">    }</span>
+
+    /**
+     * Get the mechanism names matching the given properties.
+     *
+     * @param props the properties
+     * @return the mechanism names
+     */
+    public String[] getMechanismNames(Map&lt;String, ?&gt; props) {
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        if (matches(props, true)) {</span>
+<span class="nc" id="L55">            return names;</span>
+        } else {
+<span class="nc" id="L57">            return EMPTY;</span>
+        }
+    }
+
+    /**
+     * Determine whether the properties match this mechanism.
+     *
+     * @param props the properties
+     * @param query is this call querying names? Or creating the mechanism.
+     *
+     * @return {@code true} if there is a match, {@code false} otherwise
+     */
+    protected boolean matches(final Map&lt;String, ?&gt; props, final boolean query) {
+<span class="nc bnc" id="L70" title="All 4 branches missed.">        return (getPropertyValue(WildFlySasl.MECHANISM_QUERY_ALL, props, false) &amp;&amp; query) ||</span>
+<span class="nc bnc" id="L71" title="All 4 branches missed.">                ! (getPropertyValue(Sasl.POLICY_NOPLAINTEXT, props, false) &amp;&amp; isPlainText()</span>
+<span class="nc bnc" id="L72" title="All 4 branches missed.">                || getPropertyValue(Sasl.POLICY_NOANONYMOUS, props, false) &amp;&amp; isAnonymous()</span>
+<span class="nc bnc" id="L73" title="All 4 branches missed.">                || getPropertyValue(Sasl.POLICY_FORWARD_SECRECY, props, false) &amp;&amp; ! isForwardSecrecy()</span>
+<span class="nc bnc" id="L74" title="All 4 branches missed.">                || getPropertyValue(Sasl.POLICY_NOACTIVE, props, false) &amp;&amp; isActiveSusceptible()</span>
+<span class="nc bnc" id="L75" title="All 4 branches missed.">                || getPropertyValue(Sasl.POLICY_NODICTIONARY, props, false) &amp;&amp; isDictionarySusceptible()</span>
+<span class="nc bnc" id="L76" title="All 4 branches missed.">                || getPropertyValue(Sasl.POLICY_PASS_CREDENTIALS, props, false) &amp;&amp; ! isPassCredentials());</span>
+    }
+
+    /**
+     * Determine whether the mechanism passes client credentials.
+     *
+     * @return {@code true} if it does (default is {@code false})
+     */
+    protected boolean isPassCredentials() {
+<span class="nc" id="L85">        return false;</span>
+    }
+
+    /**
+     * Determine whether the mechanism is susceptible to dictionary (passive) attacks.
+     *
+     * @return {@code true} if it is (default is {@code true})
+     */
+    protected boolean isDictionarySusceptible() {
+<span class="nc" id="L94">        return true;</span>
+    }
+
+    /**
+     * Determine whether the mechanism is susceptible to active attack.
+     *
+     * @return {@code true} if it is (default is {@code true})
+     */
+    protected boolean isActiveSusceptible() {
+<span class="nc" id="L103">        return true;</span>
+    }
+
+    /**
+     * Determine whether forward secrecy is implemented.
+     *
+     * @return {@code true} if it is (default is {@code false})
+     */
+    protected boolean isForwardSecrecy() {
+<span class="nc" id="L112">        return false;</span>
+    }
+
+    /**
+     * Determine whether the algorithm employs plain text.
+     *
+     * @return {@code true} if it does so (default is {@code true})
+     */
+    protected boolean isPlainText() {
+<span class="nc" id="L121">        return true;</span>
+    }
+
+    /**
+     * Determine whether the algorithm is anonymous.
+     *
+     * @return {@code true} if it is (default is {@code true})
+     */
+    protected boolean isAnonymous() {
+<span class="nc" id="L130">        return true;</span>
+    }
+
+    /**
+     * Get a boolean property value from the properties map.
+     *
+     * @param property the property name
+     * @param props the properties map
+     * @param defaultValue the default value
+     * @return the value
+     */
+    protected boolean getPropertyValue(final String property, final Map&lt;String, ?&gt; props, boolean defaultValue) {
+<span class="nc bnc" id="L142" title="All 4 branches missed.">        return (props == null || ! props.containsKey(property)) ? defaultValue : Boolean.parseBoolean(props.get(property).toString());</span>
+    }
+
+    /**
+     * Determine whether our mechanism name is among those given.
+     *
+     * @param names the names
+     * @return {@code true} if the names include our mechanism
+     */
+    protected boolean isIncluded(final String... names) {
+<span class="nc" id="L152">        final String ourName = this.names[0];</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">        for (String name : names) {</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">            if (name.equals(ourName)) {</span>
+<span class="nc" id="L155">                return true;</span>
+            }
+        }
+<span class="nc" id="L158">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

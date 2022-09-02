@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages_$logger.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl._private</a> &gt; <span class="el_source">ElytronMessages_$logger.java</span></div><h1>ElytronMessages_$logger.java</h1><pre class="source lang-java linenums">package org.wildfly.security.sasl._private;
+
+import java.util.Locale;
+import java.lang.IllegalStateException;
+import java.io.Serializable;
+import javax.annotation.Generated;
+import org.jboss.logging.DelegatingBasicLogger;
+import org.jboss.logging.BasicLogger;
+import java.lang.Throwable;
+import java.lang.String;
+import org.jboss.logging.Logger;
+import java.util.Arrays;
+import java.lang.IllegalArgumentException;
+import org.wildfly.security.mechanism.AuthenticationMechanismException;
+
+
+import static org.jboss.logging.Logger.Level.WARN;
+
+/**
+ * Warning this class consists of generated code.
+ */
+@Generated(value = &quot;org.jboss.logging.processor.generator.model.MessageLoggerImplementor&quot;, date = &quot;2022-09-02T20:21:41+0200&quot;)
+public class ElytronMessages_$logger extends DelegatingBasicLogger implements ElytronMessages, BasicLogger, Serializable {
+    private static final long serialVersionUID = 1L;
+<span class="fc" id="L25">    private static final String FQCN = ElytronMessages_$logger.class.getName();</span>
+    public ElytronMessages_$logger(final Logger log) {
+<span class="fc" id="L27">        super(log);</span>
+<span class="fc" id="L28">    }</span>
+<span class="fc" id="L29">    private static final Locale LOCALE = Locale.ROOT;</span>
+    protected Locale getLoggingLocale() {
+<span class="fc" id="L31">        return LOCALE;</span>
+    }
+    @Override
+    public final void unableToResolveMechanismConfiguration(final Throwable e) {
+<span class="nc" id="L35">        super.log.logf(FQCN, WARN, e, unableToResolveMechanismConfiguration$str());</span>
+<span class="nc" id="L36">    }</span>
+    protected String unableToResolveMechanismConfiguration$str() {
+<span class="nc" id="L38">        return &quot;ELY01157: Unable to resolve MechanismConfiguration for MechanismInformation&quot;;</span>
+    }
+    protected String mechMessageAfterComplete$str() {
+<span class="nc" id="L41">        return &quot;ELY05001: Authentication mechanism exchange received a message after authentication was already complete&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechMessageAfterComplete() {
+<span class="nc" id="L45">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechMessageAfterComplete$str()));</span>
+<span class="nc" id="L46">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L47">        return result;</span>
+    }
+    private static void _copyStackTraceMinusOne(final Throwable e) {
+<span class="fc" id="L50">        final StackTraceElement[] st = e.getStackTrace();</span>
+<span class="fc" id="L51">        e.setStackTrace(Arrays.copyOfRange(st, 1, st.length));</span>
+<span class="fc" id="L52">    }</span>
+    protected String mechAuthenticationNotComplete$str() {
+<span class="nc" id="L54">        return &quot;ELY05005: Authentication mechanism authentication is not yet complete&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException mechAuthenticationNotComplete() {
+<span class="nc" id="L58">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), mechAuthenticationNotComplete$str()));</span>
+<span class="nc" id="L59">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L60">        return result;</span>
+    }
+    protected String mechSelectorUnexpectedChar$str() {
+<span class="nc" id="L63">        return &quot;ELY05015: Unexpected character U+%04x at offset %d of mechanism selection string \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException mechSelectorUnexpectedChar(final int codePoint, final long offset, final String string) {
+<span class="nc" id="L67">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), mechSelectorUnexpectedChar$str(), codePoint, offset, string));</span>
+<span class="nc" id="L68">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L69">        return result;</span>
+    }
+    protected String mechSelectorTokenNotAllowed$str() {
+<span class="nc" id="L72">        return &quot;ELY05017: Token \&quot;%s\&quot; not allowed at offset %d of mechanism selection string \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException mechSelectorTokenNotAllowed(final String token, final long offset, final String string) {
+<span class="nc" id="L76">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), mechSelectorTokenNotAllowed$str(), token, offset, string));</span>
+<span class="nc" id="L77">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L78">        return result;</span>
+    }
+    protected String mechSelectorUnexpectedEnd$str() {
+<span class="nc" id="L81">        return &quot;ELY05020: Unexpected end of mechanism selection string \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException mechSelectorUnexpectedEnd(final String string) {
+<span class="nc" id="L85">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), mechSelectorUnexpectedEnd$str(), string));</span>
+<span class="nc" id="L86">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L87">        return result;</span>
+    }
+    protected String mechAuthenticationFailed$str() {
+<span class="nc" id="L90">        return &quot;ELY05058: Authentication failed&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechAuthenticationFailed() {
+<span class="nc" id="L94">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechAuthenticationFailed$str()));</span>
+<span class="nc" id="L95">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L96">        return result;</span>
+    }
+    protected String wrappingNotConfigured$str() {
+<span class="nc" id="L99">        return &quot;ELY05090: Wrapping is not configured&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException wrappingNotConfigured() {
+<span class="nc" id="L103">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), wrappingNotConfigured$str()));</span>
+<span class="nc" id="L104">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L105">        return result;</span>
+    }
+    protected String invalidNonAsciiSpace$str() {
+<span class="fc" id="L108">        return &quot;ELY05130: Invalid non-ASCII space \&quot;0x%X\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidNonAsciiSpace(final int input) {
+<span class="fc" id="L112">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidNonAsciiSpace$str(), input));</span>
+<span class="fc" id="L113">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L114">        return result;</span>
+    }
+    protected String mechCallbackHandlerFailedForUnknownReason$str() {
+<span class="nc" id="L117">        return &quot;ELY05053: Callback handler failed for unknown reason&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechCallbackHandlerFailedForUnknownReason(final Throwable cause) {
+<span class="nc" id="L121">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechCallbackHandlerFailedForUnknownReason$str()), cause);</span>
+<span class="nc" id="L122">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L123">        return result;</span>
+    }
+    protected String invalidAsciiControl$str() {
+<span class="fc" id="L126">        return &quot;ELY05131: Invalid ASCII control \&quot;0x%X\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidAsciiControl(final int input) {
+<span class="fc" id="L130">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidAsciiControl$str(), input));</span>
+<span class="fc" id="L131">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L132">        return result;</span>
+    }
+    protected String invalidNonAsciiControl$str() {
+<span class="fc" id="L135">        return &quot;ELY05132: Invalid non-ASCII control \&quot;0x%X\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidNonAsciiControl(final int input) {
+<span class="fc" id="L139">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidNonAsciiControl$str(), input));</span>
+<span class="fc" id="L140">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L141">        return result;</span>
+    }
+    protected String invalidPrivateUseCharacter$str() {
+<span class="fc" id="L144">        return &quot;ELY05133: Invalid private use character \&quot;0x%X\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidPrivateUseCharacter(final int input) {
+<span class="fc" id="L148">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidPrivateUseCharacter$str(), input));</span>
+<span class="fc" id="L149">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L150">        return result;</span>
+    }
+    protected String invalidNonCharacterCodePoint$str() {
+<span class="fc" id="L153">        return &quot;ELY05134: Invalid non-character code point \&quot;0x%X\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidNonCharacterCodePoint(final int input) {
+<span class="fc" id="L157">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidNonCharacterCodePoint$str(), input));</span>
+<span class="fc" id="L158">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L159">        return result;</span>
+    }
+    protected String invalidSurrogateCodePoint$str() {
+<span class="nc" id="L162">        return &quot;ELY05135: Invalid surrogate code point \&quot;0x%X\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidSurrogateCodePoint(final int input) {
+<span class="nc" id="L166">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidSurrogateCodePoint$str(), input));</span>
+<span class="nc" id="L167">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L168">        return result;</span>
+    }
+    protected String invalidPlainTextCodePoint$str() {
+<span class="fc" id="L171">        return &quot;ELY05136: Invalid plain text code point \&quot;0x%X\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidPlainTextCodePoint(final int input) {
+<span class="fc" id="L175">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidPlainTextCodePoint$str(), input));</span>
+<span class="fc" id="L176">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L177">        return result;</span>
+    }
+    protected String invalidNonCanonicalCodePoint$str() {
+<span class="fc" id="L180">        return &quot;ELY05137: Invalid non-canonical code point \&quot;0x%X\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidNonCanonicalCodePoint(final int input) {
+<span class="fc" id="L184">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidNonCanonicalCodePoint$str(), input));</span>
+<span class="fc" id="L185">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L186">        return result;</span>
+    }
+    protected String invalidControlCharacter$str() {
+<span class="fc" id="L189">        return &quot;ELY05138: Invalid control character \&quot;0x%X\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidControlCharacter(final int input) {
+<span class="fc" id="L193">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidControlCharacter$str(), input));</span>
+<span class="fc" id="L194">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L195">        return result;</span>
+    }
+    protected String invalidTaggingCharacter$str() {
+<span class="fc" id="L198">        return &quot;ELY05139: Invalid tagging character \&quot;0x%X\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidTaggingCharacter(final int input) {
+<span class="fc" id="L202">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidTaggingCharacter$str(), input));</span>
+<span class="fc" id="L203">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L204">        return result;</span>
+    }
+    protected String unassignedCodePoint$str() {
+<span class="nc" id="L207">        return &quot;ELY05140: Unassigned code point \&quot;0x%X\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException unassignedCodePoint(final int input) {
+<span class="nc" id="L211">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), unassignedCodePoint$str(), input));</span>
+<span class="nc" id="L212">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L213">        return result;</span>
+    }
+    protected String invalidSurrogatePairHightAtEnd$str() {
+<span class="fc" id="L216">        return &quot;ELY05141: Invalid surrogate pair (high at end of string) \&quot;0x%X\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidSurrogatePairHightAtEnd(final char input) {
+<span class="nc" id="L220">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidSurrogatePairHightAtEnd$str(), input));</span>
+<span class="nc" id="L221">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L222">        return result;</span>
+    }
+    protected String invalidSurrogatePairSecondIsNotLow$str() {
+<span class="fc" id="L225">        return &quot;ELY05142: Invalid surrogate pair (second is not low) \&quot;0x%X 0x%X\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidSurrogatePairSecondIsNotLow(final char high, final char low) {
+<span class="nc" id="L229">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidSurrogatePairSecondIsNotLow$str(), high, low));</span>
+<span class="nc" id="L230">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L231">        return result;</span>
+    }
+    protected String invalidSurrogatePairLowWithoutHigh$str() {
+<span class="fc" id="L234">        return &quot;ELY05143: Invalid surrogate pair (low without high) \&quot;0x%X\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidSurrogatePairLowWithoutHigh(final char low) {
+<span class="nc" id="L238">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidSurrogatePairLowWithoutHigh$str(), low));</span>
+<span class="nc" id="L239">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L240">        return result;</span>
+    }
+    protected String invalidCodePoint$str() {
+<span class="nc" id="L243">        return &quot;ELY05144: Invalid code point \&quot;0x%X\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidCodePoint(final int input) {
+<span class="nc" id="L247">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidCodePoint$str(), input));</span>
+<span class="nc" id="L248">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L249">        return result;</span>
+    }
+    protected String disallowedRalDirectionalityInL$str() {
+<span class="fc" id="L252">        return &quot;ELY05145: Disallowed R/AL directionality character in L string&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException disallowedRalDirectionalityInL() {
+<span class="fc" id="L256">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), disallowedRalDirectionalityInL$str()));</span>
+<span class="fc" id="L257">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L258">        return result;</span>
+    }
+    protected String disallowedLDirectionalityInRal$str() {
+<span class="fc" id="L261">        return &quot;ELY05146: Disallowed L directionality character in R/AL string&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException disallowedLDirectionalityInRal() {
+<span class="fc" id="L265">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), disallowedLDirectionalityInRal$str()));</span>
+<span class="fc" id="L266">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L267">        return result;</span>
+    }
+    protected String missingTrailingRal$str() {
+<span class="fc" id="L270">        return &quot;ELY05147: Missing trailing R/AL directionality character&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException missingTrailingRal() {
+<span class="fc" id="L274">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), missingTrailingRal$str()));</span>
+<span class="fc" id="L275">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L276">        return result;</span>
+    }
+    protected String invalidEscapeSequence$str() {
+<span class="nc" id="L279">        return &quot;ELY05148: Invalid escape sequence&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidEscapeSequence() {
+<span class="nc" id="L283">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidEscapeSequence$str()));</span>
+<span class="nc" id="L284">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L285">        return result;</span>
+    }
+    protected String mechServerTimedOut$str() {
+<span class="nc" id="L288">        return &quot;ELY05163: Authentication mechanism server timed out&quot;;</span>
+    }
+    @Override
+    public final AuthenticationMechanismException mechServerTimedOut() {
+<span class="nc" id="L292">        final AuthenticationMechanismException result = new AuthenticationMechanismException(String.format(getLoggingLocale(), mechServerTimedOut$str()));</span>
+<span class="nc" id="L293">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L294">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

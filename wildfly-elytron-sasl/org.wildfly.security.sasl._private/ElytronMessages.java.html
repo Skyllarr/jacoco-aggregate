@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl._private</a> &gt; <span class="el_source">ElytronMessages.java</span></div><h1>ElytronMessages.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl._private;
+
+import static org.jboss.logging.Logger.Level.WARN;
+
+import org.jboss.logging.BasicLogger;
+import org.jboss.logging.Logger;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.LogMessage;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageLogger;
+import org.jboss.logging.annotations.ValidIdRange;
+import org.jboss.logging.annotations.ValidIdRanges;
+import org.wildfly.security.mechanism.AuthenticationMechanismException;
+
+
+/**
+ * Log messages and exceptions for Elytron.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+@MessageLogger(projectCode = &quot;ELY&quot;, length = 5)
+@ValidIdRanges({
+    @ValidIdRange(min = 1157, max = 1157),
+    @ValidIdRange(min = 5001, max = 5163)
+})
+public interface ElytronMessages extends BasicLogger {
+
+<span class="fc" id="L47">    ElytronMessages log = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security&quot;);</span>
+<span class="fc" id="L48">    ElytronMessages sasl = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.sasl&quot;);</span>
+
+    @LogMessage(level = WARN)
+    @Message(id = 1157, value = &quot;Unable to resolve MechanismConfiguration for MechanismInformation&quot;)
+    void unableToResolveMechanismConfiguration(@Cause Throwable e);
+
+    @Message(id = 5001, value = &quot;Authentication mechanism exchange received a message after authentication was already complete&quot;)
+    AuthenticationMechanismException mechMessageAfterComplete();
+
+    @Message(id = 5005, value = &quot;Authentication mechanism authentication is not yet complete&quot;)
+    IllegalStateException mechAuthenticationNotComplete();
+
+    @Message(id = 5015, value = &quot;Unexpected character U+%04x at offset %d of mechanism selection string \&quot;%s\&quot;&quot;)
+    IllegalArgumentException mechSelectorUnexpectedChar(int codePoint, long offset, String string);
+
+    @Message(id = 5017, value = &quot;Token \&quot;%s\&quot; not allowed at offset %d of mechanism selection string \&quot;%s\&quot;&quot;)
+    IllegalArgumentException mechSelectorTokenNotAllowed(String token, long offset, String string);
+
+    @Message(id = 5020, value = &quot;Unexpected end of mechanism selection string \&quot;%s\&quot;&quot;)
+    IllegalArgumentException mechSelectorUnexpectedEnd(String string);
+
+    @Message(id = 5058, value = &quot;Authentication failed&quot;)
+    AuthenticationMechanismException mechAuthenticationFailed();
+
+    @Message(id = 5090, value = &quot;Wrapping is not configured&quot;)
+    IllegalStateException wrappingNotConfigured();
+
+    @Message(id = 5130, value = &quot;Invalid non-ASCII space \&quot;0x%X\&quot;&quot;)
+    IllegalArgumentException invalidNonAsciiSpace(int input);
+
+    @Message(id = 5053, value = &quot;Callback handler failed for unknown reason&quot;)
+    AuthenticationMechanismException mechCallbackHandlerFailedForUnknownReason(@Cause Throwable cause);
+
+    @Message(id = 5131, value = &quot;Invalid ASCII control \&quot;0x%X\&quot;&quot;)
+    IllegalArgumentException invalidAsciiControl(int input);
+
+    @Message(id = 5132, value = &quot;Invalid non-ASCII control \&quot;0x%X\&quot;&quot;)
+    IllegalArgumentException invalidNonAsciiControl(int input);
+
+    @Message(id = 5133, value = &quot;Invalid private use character \&quot;0x%X\&quot;&quot;)
+    IllegalArgumentException invalidPrivateUseCharacter(int input);
+
+    @Message(id = 5134, value = &quot;Invalid non-character code point \&quot;0x%X\&quot;&quot;)
+    IllegalArgumentException invalidNonCharacterCodePoint(int input);
+
+    @Message(id = 5135, value = &quot;Invalid surrogate code point \&quot;0x%X\&quot;&quot;)
+    IllegalArgumentException invalidSurrogateCodePoint(int input);
+
+    @Message(id = 5136, value = &quot;Invalid plain text code point \&quot;0x%X\&quot;&quot;)
+    IllegalArgumentException invalidPlainTextCodePoint(int input);
+
+    @Message(id = 5137, value = &quot;Invalid non-canonical code point \&quot;0x%X\&quot;&quot;)
+    IllegalArgumentException invalidNonCanonicalCodePoint(int input);
+
+    @Message(id = 5138, value = &quot;Invalid control character \&quot;0x%X\&quot;&quot;)
+    IllegalArgumentException invalidControlCharacter(int input);
+
+    @Message(id = 5139, value = &quot;Invalid tagging character \&quot;0x%X\&quot;&quot;)
+    IllegalArgumentException invalidTaggingCharacter(int input);
+
+    @Message(id = 5140, value = &quot;Unassigned code point \&quot;0x%X\&quot;&quot;)
+    IllegalArgumentException unassignedCodePoint(int input);
+
+    @Message(id = 5141, value = &quot;Invalid surrogate pair (high at end of string) \&quot;0x%X\&quot;&quot;)
+    IllegalArgumentException invalidSurrogatePairHightAtEnd(char input);
+
+    @Message(id = 5142, value = &quot;Invalid surrogate pair (second is not low) \&quot;0x%X 0x%X\&quot;&quot;)
+    IllegalArgumentException invalidSurrogatePairSecondIsNotLow(char high, char low);
+
+    @Message(id = 5143, value = &quot;Invalid surrogate pair (low without high) \&quot;0x%X\&quot;&quot;)
+    IllegalArgumentException invalidSurrogatePairLowWithoutHigh(char low);
+
+    @Message(id = 5144, value = &quot;Invalid code point \&quot;0x%X\&quot;&quot;)
+    IllegalArgumentException invalidCodePoint(int input);
+
+    @Message(id = 5145, value = &quot;Disallowed R/AL directionality character in L string&quot;)
+    IllegalArgumentException disallowedRalDirectionalityInL();
+
+    @Message(id = 5146, value = &quot;Disallowed L directionality character in R/AL string&quot;)
+    IllegalArgumentException disallowedLDirectionalityInRal();
+
+    @Message(id = 5147, value = &quot;Missing trailing R/AL directionality character&quot;)
+    IllegalArgumentException missingTrailingRal();
+
+    @Message(id = 5148, value = &quot;Invalid escape sequence&quot;)
+    IllegalArgumentException invalidEscapeSequence();
+
+    @Message(id = 5163, value = &quot;Authentication mechanism server timed out&quot;)
+    AuthenticationMechanismException mechServerTimedOut();
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

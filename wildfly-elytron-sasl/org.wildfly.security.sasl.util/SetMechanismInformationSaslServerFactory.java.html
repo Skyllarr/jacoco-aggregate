@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SetMechanismInformationSaslServerFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.util</a> &gt; <span class="el_source">SetMechanismInformationSaslServerFactory.java</span></div><h1>SetMechanismInformationSaslServerFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.sasl.util;
+
+import java.util.Map;
+
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.sasl.SaslException;
+import javax.security.sasl.SaslServer;
+import javax.security.sasl.SaslServerFactory;
+
+import org.wildfly.security.auth.callback.MechanismInformationCallback;
+import org.wildfly.security.auth.server.MechanismInformation;
+
+import static org.wildfly.security.sasl._private.ElytronMessages.log;
+
+/**
+ * A {@link SaslServerFactory} implementation that will always ensure mechanism information is passed to the {@link CallbackHandler} before the first authentication callbacks.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public final class SetMechanismInformationSaslServerFactory extends AbstractDelegatingSaslServerFactory {
+
+    /**
+     * Construct a new instance of the {@code SetMechanismInformationSaslServerFactory}.
+     *
+     * @param delegate the {@link SaslServerFactory} being delegated to.
+     */
+    public SetMechanismInformationSaslServerFactory(SaslServerFactory delegate) {
+<span class="nc" id="L46">        super(delegate);</span>
+<span class="nc" id="L47">    }</span>
+
+    @Override
+    public SaslServer createSaslServer(final String mechanism, final String protocol, final String serverName, Map&lt;String, ?&gt; props, final CallbackHandler cbh) throws SaslException {
+        try {
+<span class="nc" id="L52">            final MechanismInformationCallback mechanismInformationCallback = new MechanismInformationCallback(new MechanismInformation() {</span>
+
+                @Override
+                public String getProtocol() {
+<span class="nc" id="L56">                    return protocol;</span>
+                }
+
+                @Override
+                public String getMechanismType() {
+<span class="nc" id="L61">                    return &quot;SASL&quot;;</span>
+                }
+
+                @Override
+                public String getMechanismName() {
+<span class="nc" id="L66">                    return mechanism;</span>
+                }
+
+                @Override
+                public String getHostName() {
+<span class="nc" id="L71">                    return serverName;</span>
+                }
+            });
+<span class="nc" id="L74">            cbh.handle(new Callback[] { mechanismInformationCallback });</span>
+<span class="nc" id="L75">        } catch (Throwable e) {</span>
+            // The mechanism information could not be successfully resolved to a mechanism configuration
+<span class="nc" id="L77">            log.unableToResolveMechanismConfiguration(e);</span>
+<span class="nc" id="L78">            return null;</span>
+<span class="nc" id="L79">        }</span>
+<span class="nc" id="L80">        return super.createSaslServer(mechanism, protocol, serverName, props, cbh);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

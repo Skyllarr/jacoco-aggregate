@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SimpleSecurityEventFormatter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-audit</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.audit</a> &gt; <span class="el_source">SimpleSecurityEventFormatter.java</span></div><h1>SimpleSecurityEventFormatter.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2017 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.audit;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+
+import java.security.Permission;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
+import java.util.function.Supplier;
+
+import org.wildfly.security.auth.server.SecurityIdentity;
+import org.wildfly.security.auth.server.event.SecurityAuthenticationFailedEvent;
+import org.wildfly.security.auth.server.event.SecurityDefiniteOutcomeEvent;
+import org.wildfly.security.auth.server.event.SecurityEvent;
+import org.wildfly.security.auth.server.event.SecurityEventVisitor;
+import org.wildfly.security.auth.server.event.SecurityPermissionCheckEvent;
+import org.wildfly.security.auth.server.event.SecurityRealmUnavailableEvent;
+import org.wildfly.security.auth.server.event.SyslogAuditEvent;
+
+/**
+ * A formatter for security events that converts events into human-readable strings.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public class SimpleSecurityEventFormatter extends SecurityEventVisitor&lt;Void, String&gt; {
+
+    private final Supplier&lt;DateTimeFormatter&gt; dateFormatSupplier;
+
+<span class="nc" id="L46">    SimpleSecurityEventFormatter(Builder builder) {</span>
+<span class="nc" id="L47">        this.dateFormatSupplier = builder.dateTimeFormatterSupplier;</span>
+<span class="nc" id="L48">    }</span>
+
+    @Override
+    public String handleUnknownEvent(SecurityEvent event, Void param) {
+<span class="nc" id="L52">        checkNotNullParam(&quot;event&quot;, event);</span>
+<span class="nc" id="L53">        StringBuilder stringBuilder = new StringBuilder(&quot;{&quot;);</span>
+<span class="nc" id="L54">        handleUnknownEvent(event, stringBuilder);</span>
+<span class="nc" id="L55">        return stringBuilder.append('}').toString();</span>
+    }
+
+    private void handleUnknownEvent(SecurityEvent event, StringBuilder stringBuilder) {
+<span class="nc" id="L59">        DateTimeFormatter dateFormat = dateFormatSupplier.get();</span>
+
+<span class="nc" id="L61">        stringBuilder.append(&quot;event=&quot;).append(event.getClass().getSimpleName());</span>
+<span class="nc" id="L62">        stringBuilder.append(&quot;,event-time=&quot;).append(dateFormat.format(event.getInstant()));</span>
+
+<span class="nc" id="L64">        SecurityIdentity securityIdentity = event.getSecurityIdentity();</span>
+<span class="nc" id="L65">        stringBuilder.append(&quot;,security-identity=[name=&quot;).append(securityIdentity.getPrincipal().getName());</span>
+<span class="nc" id="L66">        stringBuilder.append(&quot;,creation-time=&quot;).append(dateFormat.format(securityIdentity.getCreationTime())).append(']');</span>
+<span class="nc" id="L67">    }</span>
+
+
+    @Override
+    public String handleDefiniteOutcomeEvent(SecurityDefiniteOutcomeEvent event, Void param) {
+<span class="nc" id="L72">        checkNotNullParam(&quot;event&quot;, event);</span>
+<span class="nc" id="L73">        StringBuilder stringBuilder = new StringBuilder(&quot;{&quot;);</span>
+<span class="nc" id="L74">        handleDefiniteOutcomeEvent(event, stringBuilder);</span>
+<span class="nc" id="L75">        return stringBuilder.append('}').toString();</span>
+    }
+
+    private void handleDefiniteOutcomeEvent(SecurityDefiniteOutcomeEvent event, StringBuilder stringBuilder) {
+<span class="nc" id="L79">        handleUnknownEvent(event, stringBuilder);</span>
+<span class="nc" id="L80">        stringBuilder.append(&quot;,success=&quot;).append(event.isSuccessful());</span>
+<span class="nc" id="L81">    }</span>
+
+    @Override
+    public String handleAuthenticationFailedEvent(SecurityAuthenticationFailedEvent event, Void param) {
+<span class="nc" id="L85">        checkNotNullParam(&quot;event&quot;, event);</span>
+<span class="nc" id="L86">        StringBuilder stringBuilder = new StringBuilder(&quot;{&quot;);</span>
+<span class="nc" id="L87">        handleAuthenticationFailedEvent(event, stringBuilder);</span>
+<span class="nc" id="L88">        return stringBuilder.append('}').toString();</span>
+    }
+
+    private void handleAuthenticationFailedEvent(SecurityAuthenticationFailedEvent event, StringBuilder stringBuilder) {
+<span class="nc" id="L92">        handleDefiniteOutcomeEvent(event, stringBuilder);</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        stringBuilder.append(&quot;,principal=&quot;).append(event.getPrincipal() != null ? event.getPrincipal().toString() : null);</span>
+<span class="nc" id="L94">    }</span>
+
+    @Override
+    public String handlePermissionCheckEvent(SecurityPermissionCheckEvent event, Void param) {
+<span class="nc" id="L98">        checkNotNullParam(&quot;event&quot;, event);</span>
+<span class="nc" id="L99">        StringBuilder stringBuilder = new StringBuilder(&quot;{&quot;);</span>
+<span class="nc" id="L100">        handlePermissionCheckEvent(event, stringBuilder);</span>
+<span class="nc" id="L101">        return stringBuilder.append('}').toString();</span>
+    }
+
+    private void handlePermissionCheckEvent(SecurityPermissionCheckEvent event, StringBuilder stringBuilder) {
+<span class="nc" id="L105">        handleDefiniteOutcomeEvent(event, stringBuilder);</span>
+
+<span class="nc" id="L107">        Permission permission = event.getPermission();</span>
+<span class="nc" id="L108">        stringBuilder.append(&quot;,permission=[type=&quot;).append(permission.getClass().getName());</span>
+<span class="nc" id="L109">        stringBuilder.append(&quot;,actions=&quot;).append(permission.getActions());</span>
+<span class="nc" id="L110">        stringBuilder.append(&quot;,name=&quot;).append(permission.getName()).append(']');</span>
+<span class="nc" id="L111">    }</span>
+
+    @Override
+    public String handleSyslogAuditEvent(SyslogAuditEvent event, Void param) {
+<span class="nc" id="L115">        checkNotNullParam(&quot;event&quot;, event);</span>
+<span class="nc" id="L116">        StringBuilder stringBuilder = new StringBuilder(&quot;{&quot;);</span>
+<span class="nc" id="L117">        handleSyslogAuditEvent(event, stringBuilder);</span>
+<span class="nc" id="L118">        return stringBuilder.append('}').toString();</span>
+    }
+
+    private void handleSyslogAuditEvent(SyslogAuditEvent event, StringBuilder stringBuilder) {
+<span class="nc" id="L122">        handleUnknownEvent(event, stringBuilder);</span>
+<span class="nc" id="L123">        stringBuilder.append(&quot;,syslog-format&quot;).append(event.getFormat().toString());</span>
+<span class="nc" id="L124">    }</span>
+
+    @Override
+    public String handleRealmUnavailableEvent(SecurityRealmUnavailableEvent event, Void param) {
+<span class="nc" id="L128">        checkNotNullParam(&quot;event&quot;, event);</span>
+<span class="nc" id="L129">        StringBuilder stringBuilder = new StringBuilder(&quot;{&quot;);</span>
+<span class="nc" id="L130">        handleRealmUnavailableEvent(event, stringBuilder);</span>
+<span class="nc" id="L131">        return stringBuilder.append('}').toString();</span>
+    }
+
+    private void handleRealmUnavailableEvent(SecurityRealmUnavailableEvent event, StringBuilder stringBuilder) {
+<span class="nc" id="L135">        handleUnknownEvent(event, stringBuilder);</span>
+<span class="nc" id="L136">        stringBuilder.append(&quot;,realm-name=&quot;).append(event.getRealmName());</span>
+<span class="nc" id="L137">    }</span>
+
+    /**
+     * Create a new builder.
+     *
+     * @return a new builder
+     */
+    public static Builder builder() {
+<span class="nc" id="L145">        return new Builder();</span>
+    }
+
+    /**
+     * A builder for simple security event formatter.
+     */
+    public static class Builder {
+
+<span class="nc" id="L153">        private Supplier&lt;DateTimeFormatter&gt; dateTimeFormatterSupplier = ()  -&gt; DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT).withZone(ZoneId.systemDefault());</span>
+
+<span class="nc" id="L155">        Builder() {</span>
+<span class="nc" id="L156">        }</span>
+
+        /**
+         * Set a supplier of formatter to format any dates in the resulting output.
+         * The supplied {@link DateTimeFormatter} has to have a time zone configured.
+         *
+         * @param dateTimeFormatterSupplier a supplier of formatter to format dates in the resulting output
+         * @return this builder
+         */
+        public Builder setDateTimeFormatterSupplier(Supplier&lt;DateTimeFormatter&gt; dateTimeFormatterSupplier) {
+<span class="nc" id="L166">            this.dateTimeFormatterSupplier = checkNotNullParam(&quot;dateTimeFormatterSupplier&quot;, dateTimeFormatterSupplier);</span>
+
+<span class="nc" id="L168">            return this;</span>
+        }
+
+        /**
+         * Build a new {@link SecurityEventVisitor} which will convert events into human-readable strings.
+         * &lt;p&gt;
+         * Once built the Builder can continue to be configured to create additional instances.
+         *
+         * @return a new {@link SecurityEventVisitor} which will convert events into human-readable strings
+         */
+        public SecurityEventVisitor&lt;Void, String&gt; build() {
+<span class="nc" id="L179">            return new SimpleSecurityEventFormatter(this);</span>
+        }
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,369 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MechanismDatabase.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-ssl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.ssl</a> &gt; <span class="el_source">MechanismDatabase.java</span></div><h1>MechanismDatabase.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.ssl;
+
+import static org.wildfly.security.ssl.ElytronMessages.log;
+
+import java.io.IOError;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+
+class MechanismDatabase {
+<span class="fc" id="L38">    private static final MechanismDatabase INSTANCE = new MechanismDatabase(&quot;MechanismDatabase.properties&quot;);</span>
+<span class="fc" id="L39">    private static final MechanismDatabase TLS13_INSTANCE = new MechanismDatabase(&quot;TLS13MechanismDatabase.properties&quot;, true);</span>
+
+    private final Map&lt;String, Entry&gt; entriesByStdName;
+    private final Map&lt;String, Entry&gt; entriesByOSSLName;
+    private final Entry[][] algorithmsById;
+    private final boolean isTLS13;
+
+    static MechanismDatabase getInstance() {
+<span class="fc" id="L47">        return INSTANCE;</span>
+    }
+
+    static MechanismDatabase getTLS13Instance() {
+<span class="fc" id="L51">        return TLS13_INSTANCE;</span>
+    }
+
+    MechanismDatabase(String databaseFileName) {
+<span class="fc" id="L55">        this(databaseFileName, false);</span>
+<span class="fc" id="L56">    }</span>
+
+<span class="fc" id="L58">    MechanismDatabase(String databaseFileName, boolean isTLS13) {</span>
+<span class="fc" id="L59">        this.isTLS13 = isTLS13;</span>
+        // load and initialize database properties
+<span class="fc" id="L61">        final LinkedProperties properties = new LinkedProperties();</span>
+
+<span class="fc" id="L63">        try (InputStream stream = getClass().getResourceAsStream(databaseFileName)) {</span>
+<span class="fc" id="L64">            try (InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {</span>
+<span class="fc" id="L65">                properties.load(reader);</span>
+            }
+<span class="nc" id="L67">        } catch (IOException e) {</span>
+<span class="nc" id="L68">            throw new IOError(e);</span>
+<span class="fc" id="L69">        }</span>
+
+<span class="fc" id="L71">        Pattern p = Pattern.compile(&quot;\\s*,\\s*&quot;);</span>
+<span class="fc" id="L72">        final Map&lt;String, Entry&gt; entriesByStdName = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L73">        final Map&lt;String, Entry&gt; entriesByOSSLName = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L74">        final Map&lt;KeyAgreement, List&lt;Entry&gt;&gt; entriesByKeyExchange = new EnumMap&lt;KeyAgreement, List&lt;Entry&gt;&gt;(KeyAgreement.class);</span>
+<span class="fc" id="L75">        final Map&lt;Authentication, List&lt;Entry&gt;&gt; entriesByAuthentication = new EnumMap&lt;Authentication, List&lt;Entry&gt;&gt;(Authentication.class);</span>
+<span class="fc" id="L76">        final Map&lt;Encryption, List&lt;Entry&gt;&gt; entriesByEncryption = new EnumMap&lt;Encryption, List&lt;Entry&gt;&gt;(Encryption.class);</span>
+<span class="fc" id="L77">        final Map&lt;Digest, List&lt;Entry&gt;&gt; entriesByDigest = new EnumMap&lt;Digest, List&lt;Entry&gt;&gt;(Digest.class);</span>
+<span class="fc" id="L78">        final Map&lt;Protocol, List&lt;Entry&gt;&gt; entriesByProtocol = new EnumMap&lt;Protocol, List&lt;Entry&gt;&gt;(Protocol.class);</span>
+<span class="fc" id="L79">        final Map&lt;SecurityLevel, List&lt;Entry&gt;&gt; entriesByLevel = new EnumMap&lt;SecurityLevel, List&lt;Entry&gt;&gt;(SecurityLevel.class);</span>
+
+<span class="fc" id="L81">        final Map&lt;String, String&gt; aliases = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L82">        final Entry[][] algorithms = new Entry[256][];</span>
+
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; mapEntry : properties.stringMapEntries()) {</span>
+<span class="fc" id="L85">            final String name = mapEntry.getKey();</span>
+<span class="fc" id="L86">            final String rawValue = mapEntry.getValue();</span>
+<span class="fc" id="L87">            final String[] strings = p.split(rawValue);</span>
+<span class="pc bpc" id="L88" title="1 of 4 branches missed.">            if (strings.length == 1 &amp;&amp; strings[0].startsWith(&quot;alias:&quot;)) {</span>
+<span class="fc" id="L89">                String target = strings[0].substring(6);</span>
+<span class="fc" id="L90">                aliases.put(name, target);</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">                if (name.startsWith(&quot;TLS_&quot;)) {</span>
+<span class="fc" id="L92">                    aliases.put(&quot;SSL_&quot; + name.substring(4), target);</span>
+                }
+<span class="pc bpc" id="L94" title="1 of 4 branches missed.">            } else if (strings.length != 11 &amp;&amp; strings.length != 13) {</span>
+<span class="nc" id="L95">                log.warnInvalidStringCountForMechanismDatabaseEntry(name);</span>
+            } else {
+<span class="fc" id="L97">                boolean ok = true;</span>
+<span class="fc" id="L98">                final String[] openSslNames = strings[0].split(&quot;\\|&quot;);</span>
+<span class="fc" id="L99">                final KeyAgreement key = KeyAgreement.forName(strings[1]);</span>
+<span class="pc bpc" id="L100" title="1 of 4 branches missed.">                if (! isTLS13 &amp;&amp; key == null) {</span>
+<span class="nc" id="L101">                    log.warnInvalidKeyExchangeForMechanismDatabaseEntry(strings[1], name);</span>
+<span class="nc" id="L102">                    ok = false;</span>
+                }
+<span class="fc" id="L104">                final Authentication auth = Authentication.forName(strings[2]);</span>
+<span class="pc bpc" id="L105" title="2 of 8 branches missed.">                if ((! isTLS13 &amp;&amp; auth == null) || (isTLS13 &amp;&amp; ! strings[2].equals(&quot;ANY&quot;))) {</span>
+<span class="nc" id="L106">                    log.warnInvalidAuthenticationForMechanismDatabaseEntry(strings[2], name);</span>
+<span class="nc" id="L107">                    ok = false;</span>
+                }
+<span class="fc" id="L109">                final Encryption enc = Encryption.forName(strings[3]);</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">                if (enc == null) {</span>
+<span class="nc" id="L111">                    log.warnInvalidEncryptionForMechanismDatabaseEntry(strings[3], name);</span>
+<span class="nc" id="L112">                    ok = false;</span>
+                }
+<span class="fc" id="L114">                final Digest digest = Digest.forName(strings[4]);</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">                if (digest == null) {</span>
+<span class="nc" id="L116">                    log.warnInvalidDigestForMechanismDatabaseEntry(strings[4], name);</span>
+<span class="nc" id="L117">                    ok = false;</span>
+                }
+<span class="fc" id="L119">                final Protocol prot = Protocol.forName(strings[5]);</span>
+<span class="pc bpc" id="L120" title="2 of 4 branches missed.">                if ((prot == null) || (isTLS13 ^ prot.equals(Protocol.TLSv1_3))) {</span>
+<span class="nc" id="L121">                    log.warnInvalidProtocolForMechanismDatabaseEntry(strings[5], name);</span>
+<span class="nc" id="L122">                    ok = false;</span>
+                }
+<span class="fc" id="L124">                final boolean export = Boolean.parseBoolean(strings[6]);</span>
+<span class="fc" id="L125">                final SecurityLevel level = SecurityLevel.forName(strings[7]);</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">                if (level == null) {</span>
+<span class="nc" id="L127">                    log.warnInvalidLevelForMechanismDatabaseEntry(strings[7], name);</span>
+<span class="nc" id="L128">                    ok = false;</span>
+                }
+<span class="fc" id="L130">                final boolean fips = Boolean.parseBoolean(strings[8]);</span>
+                int strBits;
+                try {
+<span class="fc" id="L133">                    strBits = Integer.parseInt(strings[9], 10);</span>
+<span class="nc" id="L134">                } catch (NumberFormatException ignored) {</span>
+<span class="nc" id="L135">                    log.warnInvalidStrengthBitsForMechanismDatabaseEntry(strings[9], name);</span>
+<span class="nc" id="L136">                    strBits = 0;</span>
+<span class="nc" id="L137">                    ok = false;</span>
+<span class="fc" id="L138">                }</span>
+                int algBits;
+                try {
+<span class="fc" id="L141">                    algBits = Integer.parseInt(strings[10], 10);</span>
+<span class="nc" id="L142">                } catch (NumberFormatException ignored) {</span>
+<span class="nc" id="L143">                    log.warnInvalidAlgorithmBitsForMechanismDatabaseEntry(strings[10], name);</span>
+<span class="nc" id="L144">                    algBits = 0;</span>
+<span class="nc" id="L145">                    ok = false;</span>
+<span class="fc" id="L146">                }</span>
+                int byte1, byte2;
+                try {
+<span class="fc" id="L149">                    byte1 = Integer.parseInt(strings[11], 16);</span>
+<span class="fc" id="L150">                    byte2 = Integer.parseInt(strings[12], 16);</span>
+<span class="fc" id="L151">                } catch (ArrayIndexOutOfBoundsException | NumberFormatException ignored) {</span>
+                    // ignore the entry
+<span class="fc" id="L153">                    byte1 = -1;</span>
+<span class="fc" id="L154">                    byte2 = -1;</span>
+<span class="fc" id="L155">                }</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">                if (ok) {</span>
+<span class="fc" id="L157">                    final Entry entry = new Entry(name, Arrays.asList(openSslNames), new ArrayList&lt;String&gt;(0), key, auth, enc, digest, prot, export, level, fips, strBits, algBits);</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">                    if (entriesByStdName.containsKey(name)) {</span>
+<span class="nc" id="L159">                        log.warnInvalidDuplicateMechanismDatabaseEntry(name);</span>
+                    } else {
+<span class="fc" id="L161">                        entriesByStdName.put(name, entry);</span>
+                    }
+<span class="fc bfc" id="L163" title="All 2 branches covered.">                    for (String openSslName : openSslNames) {</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">                        if (entriesByOSSLName.containsKey(openSslName)) {</span>
+<span class="nc" id="L165">                            log.warnInvalidDuplicateOpenSslStyleAliasForMechanismDatabaseEntry(openSslName, name, entriesByOSSLName.get(openSslName).getName());</span>
+                        } else {
+<span class="fc" id="L167">                            entriesByOSSLName.put(openSslName, entry);</span>
+                        }
+<span class="fc bfc" id="L169" title="All 2 branches covered.">                        if (key == KeyAgreement.DHE) {</span>
+<span class="fc" id="L170">                            final String newKey = join(&quot;-&quot;, replaceEdh(openSslName.split(&quot;-&quot;)));</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">                            if (!entriesByOSSLName.containsKey(newKey)) {</span>
+<span class="fc" id="L172">                                entriesByOSSLName.put(newKey, entry);</span>
+                            }
+                        }
+                    }
+
+<span class="fc bfc" id="L177" title="All 2 branches covered.">                    if (! isTLS13) {</span>
+<span class="fc" id="L178">                        addTo(entriesByKeyExchange, key, entry);</span>
+<span class="fc" id="L179">                        addTo(entriesByAuthentication, auth, entry);</span>
+                    }
+<span class="fc" id="L181">                    addTo(entriesByEncryption, enc, entry);</span>
+<span class="fc" id="L182">                    addTo(entriesByDigest, digest, entry);</span>
+<span class="fc" id="L183">                    addTo(entriesByProtocol, prot, entry);</span>
+<span class="fc" id="L184">                    addTo(entriesByLevel, level, entry);</span>
+<span class="pc bpc" id="L185" title="1 of 4 branches missed.">                    if (byte1 != -1 &amp;&amp; byte2 != -1) {</span>
+<span class="fc" id="L186">                        Entry[] row = algorithms[byte1];</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">                        if (row == null) {</span>
+<span class="fc" id="L188">                            row = algorithms[byte1] = new Entry[256];</span>
+                        }
+<span class="fc" id="L190">                        row[byte2] = entry;</span>
+                    }
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">                    if (name.startsWith(&quot;TLS_&quot;)) {</span>
+<span class="fc" id="L193">                        aliases.put(&quot;SSL_&quot; + name.substring(4), name);</span>
+                    }
+                }
+            }
+<span class="fc" id="L197">        }</span>
+
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; entry : aliases.entrySet()) {</span>
+<span class="fc" id="L200">            final String name = entry.getKey();</span>
+<span class="fc" id="L201">            String value = entry.getValue();</span>
+
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">            while (aliases.containsKey(value)) {</span>
+                // Just skip to the end, intermediate aliases will get their own turn in the for loop.
+<span class="nc" id="L205">                value = aliases.get(value);</span>
+            }
+
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">            if (entriesByStdName.containsKey(name)) {</span>
+<span class="nc" id="L209">                log.warnInvalidDuplicateMechanismDatabaseEntry(name);</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">            } else if (! entriesByStdName.containsKey(value)) {</span>
+<span class="nc" id="L211">                log.warnInvalidAliasForMissingMechanismDatabaseEntry(value, name);</span>
+            } else {
+<span class="fc" id="L213">                final Entry dbEntry = entriesByStdName.get(value);</span>
+<span class="fc" id="L214">                dbEntry.getAliases().add(name);</span>
+<span class="fc" id="L215">                entriesByStdName.put(name, dbEntry);</span>
+            }
+<span class="fc" id="L217">        }</span>
+
+<span class="fc" id="L219">        this.entriesByStdName = entriesByStdName;</span>
+<span class="fc" id="L220">        this.entriesByOSSLName = entriesByOSSLName;</span>
+<span class="fc" id="L221">        this.algorithmsById = algorithms;</span>
+<span class="fc" id="L222">    }</span>
+
+    static String[] replaceEdh(String... strings) {
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        for (int i = 0, stringsLength = strings.length; i &lt; stringsLength; i++) {</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">            if (&quot;EDH&quot;.equals(strings[i])) {</span>
+<span class="fc" id="L227">                strings[i] = &quot;DHE&quot;;</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">            } else if (&quot;DHE&quot;.equals(strings[i])) {</span>
+<span class="fc" id="L229">                strings[i] = &quot;EDH&quot;;</span>
+            }
+        }
+<span class="fc" id="L232">        return strings;</span>
+    }
+
+    static String join(String joiner, String... strings) {
+<span class="fc" id="L236">        StringBuilder b = new StringBuilder();</span>
+<span class="fc" id="L237">        final int length = strings.length;</span>
+<span class="fc" id="L238">        int i = 0;</span>
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">        if (length == 0) return &quot;&quot;;</span>
+        for (;;) {
+<span class="fc" id="L241">            b.append(strings[i ++]);</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">            if (i == length) {</span>
+<span class="fc" id="L243">                return b.toString();</span>
+            }
+<span class="fc" id="L245">            b.append(joiner);</span>
+        }
+    }
+
+    static &lt;T&gt; void addTo(Map&lt;T, List&lt;Entry&gt;&gt; map, T item, Entry entry) {
+<span class="fc" id="L250">        List&lt;Entry&gt; list = map.get(item);</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        if (list == null) {</span>
+<span class="fc" id="L252">            list = new ArrayList&lt;&gt;(1);</span>
+<span class="fc" id="L253">            map.put(item, list);</span>
+        }
+<span class="fc" id="L255">        list.add(entry);</span>
+<span class="fc" id="L256">    }</span>
+
+    Entry getCipherSuite(final String cipherSuite) {
+<span class="fc" id="L259">        return entriesByStdName.get(cipherSuite);</span>
+    }
+
+    Entry getCipherSuiteOpenSSLName(final String cipherSuite) {
+<span class="fc" id="L263">        return entriesByOSSLName.get(cipherSuite);</span>
+    }
+
+    Entry getCipherSuiteById(final int byte1, final int byte2) {
+<span class="nc bnc" id="L267" title="All 8 branches missed.">        if (byte1 &lt; 0 || byte1 &gt; 255 || byte2 &lt; 0 || byte2 &gt; 255) {</span>
+<span class="nc" id="L268">            return null;</span>
+        }
+<span class="nc" id="L270">        final Entry[] row = algorithmsById[byte1];</span>
+<span class="nc bnc" id="L271" title="All 2 branches missed.">        if (row == null) {</span>
+<span class="nc" id="L272">            return null;</span>
+        }
+<span class="nc" id="L274">        return row[byte2];</span>
+    }
+
+    boolean isTLS13() {
+<span class="nc" id="L278">        return isTLS13;</span>
+    }
+
+    static final class Entry {
+        private final String name;
+        private final List&lt;String&gt; openSslNames;
+        private final List&lt;String&gt; aliases;
+        private final KeyAgreement keyAgreement;
+        private final Authentication authentication;
+        private final Encryption encryption;
+        private final Digest digest;
+        private final Protocol protocol;
+        private final boolean export;
+        private final SecurityLevel level;
+        private final boolean fips;
+        private final int strengthBits;
+        private final int algorithmBits;
+
+<span class="fc" id="L296">        Entry(final String name, final List&lt;String&gt; openSslNames, final List&lt;String&gt; aliases, final KeyAgreement keyAgreement, final Authentication authentication, final Encryption encryption, final Digest digest, final Protocol protocol, final boolean export, final SecurityLevel level, final boolean fips, final int strengthBits, final int algorithmBits) {</span>
+<span class="fc" id="L297">            this.name = name;</span>
+<span class="fc" id="L298">            this.openSslNames = openSslNames;</span>
+<span class="fc" id="L299">            this.aliases = aliases;</span>
+<span class="fc" id="L300">            this.keyAgreement = keyAgreement;</span>
+<span class="fc" id="L301">            this.authentication = authentication;</span>
+<span class="fc" id="L302">            this.encryption = encryption;</span>
+<span class="fc" id="L303">            this.digest = digest;</span>
+<span class="fc" id="L304">            this.protocol = protocol;</span>
+<span class="fc" id="L305">            this.export = export;</span>
+<span class="fc" id="L306">            this.level = level;</span>
+<span class="fc" id="L307">            this.fips = fips;</span>
+<span class="fc" id="L308">            this.strengthBits = strengthBits;</span>
+<span class="fc" id="L309">            this.algorithmBits = algorithmBits;</span>
+<span class="fc" id="L310">        }</span>
+
+        public String getName() {
+<span class="fc" id="L313">            return name;</span>
+        }
+
+        public List&lt;String&gt; getOpenSslNames() {
+<span class="fc" id="L317">            return openSslNames;</span>
+        }
+
+        public List&lt;String&gt; getAliases() {
+<span class="fc" id="L321">            return aliases;</span>
+        }
+
+        public KeyAgreement getKeyAgreement() {
+<span class="fc" id="L325">            return keyAgreement;</span>
+        }
+
+        public Authentication getAuthentication() {
+<span class="fc" id="L329">            return authentication;</span>
+        }
+
+        public Encryption getEncryption() {
+<span class="fc" id="L333">            return encryption;</span>
+        }
+
+        public Digest getDigest() {
+<span class="nc" id="L337">            return digest;</span>
+        }
+
+        public Protocol getProtocol() {
+<span class="fc" id="L341">            return protocol;</span>
+        }
+
+        public boolean isExport() {
+<span class="fc" id="L345">            return export;</span>
+        }
+
+        public SecurityLevel getLevel() {
+<span class="fc" id="L349">            return level;</span>
+        }
+
+        public boolean isFips() {
+<span class="nc" id="L353">            return fips;</span>
+        }
+
+        public int getStrengthBits() {
+<span class="nc" id="L357">            return strengthBits;</span>
+        }
+
+        public int getAlgorithmBits() {
+<span class="fc" id="L361">            return algorithmBits;</span>
+        }
+
+        public String toString() {
+<span class="fc" id="L365">            return getName() + &quot;/&quot; + String.join(&quot;|&quot;, openSslNames);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SecurityMessages_$logger.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-security-manager</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.manager._private</a> &gt; <span class="el_source">SecurityMessages_$logger.java</span></div><h1>SecurityMessages_$logger.java</h1><pre class="source lang-java linenums">package org.wildfly.security.manager._private;
+
+import java.util.Locale;
+import java.io.Serializable;
+import javax.annotation.Generated;
+import org.jboss.logging.DelegatingBasicLogger;
+import java.security.AccessControlException;
+import java.lang.SecurityException;
+import java.lang.String;
+import org.jboss.logging.Logger;
+import java.security.CodeSource;
+import org.jboss.logging.BasicLogger;
+import java.security.Permission;
+import java.lang.ClassLoader;
+import java.lang.Class;
+import java.util.Arrays;
+import java.lang.IllegalArgumentException;
+
+
+import static org.jboss.logging.Logger.Level.DEBUG;
+
+/**
+ * Warning this class consists of generated code.
+ */
+@Generated(value = &quot;org.jboss.logging.processor.generator.model.MessageLoggerImplementor&quot;, date = &quot;2022-09-02T20:27:34+0200&quot;)
+public class SecurityMessages_$logger extends DelegatingBasicLogger implements SecurityMessages, BasicLogger, Serializable {
+    private static final long serialVersionUID = 1L;
+<span class="nc" id="L28">    private static final String FQCN = SecurityMessages_$logger.class.getName();</span>
+    public SecurityMessages_$logger(final Logger log) {
+<span class="nc" id="L30">        super(log);</span>
+<span class="nc" id="L31">    }</span>
+<span class="nc" id="L32">    private static final Locale LOCALE = Locale.ROOT;</span>
+    protected Locale getLoggingLocale() {
+<span class="nc" id="L34">        return LOCALE;</span>
+    }
+    @Override
+    public final void accessCheckFailed(final Permission permission, final CodeSource codeSource, final ClassLoader classLoader, final String principals) {
+<span class="nc" id="L38">        super.log.logf(FQCN, DEBUG, null, accessCheckFailed4$str(), permission, codeSource, classLoader, principals);</span>
+<span class="nc" id="L39">    }</span>
+    protected String accessCheckFailed4$str() {
+<span class="nc" id="L41">        return &quot;Permission check failed (permission \&quot;%s\&quot; in code source \&quot;%s\&quot; of \&quot;%s\&quot;, principals \&quot;%s\&quot;)&quot;;</span>
+    }
+    @Override
+    public final void accessCheckFailed(final Permission permission, final CodeSource codeSource, final ClassLoader classLoader) {
+<span class="nc" id="L45">        super.log.logf(FQCN, DEBUG, null, accessCheckFailed3$str(), permission, codeSource, classLoader);</span>
+<span class="nc" id="L46">    }</span>
+    protected String accessCheckFailed3$str() {
+<span class="nc" id="L48">        return &quot;Permission check failed (permission \&quot;%s\&quot; in code source \&quot;%s\&quot; of \&quot;%s\&quot;)&quot;;</span>
+    }
+    protected String accessControlException$str() {
+<span class="nc" id="L51">        return &quot;WFSM000001: Permission check failed (permission \&quot;%s\&quot; in code source \&quot;%s\&quot; of \&quot;%s\&quot;)&quot;;</span>
+    }
+    @Override
+    public final AccessControlException accessControlException(final Permission permission, final Permission permission_, final CodeSource codeSource, final ClassLoader classLoader) {
+<span class="nc" id="L55">        final AccessControlException result = new AccessControlException(String.format(getLoggingLocale(), accessControlException$str(), permission_, codeSource, classLoader), permission);</span>
+<span class="nc" id="L56">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L57">        return result;</span>
+    }
+    private static void _copyStackTraceMinusOne(final Throwable e) {
+<span class="nc" id="L60">        final StackTraceElement[] st = e.getStackTrace();</span>
+<span class="nc" id="L61">        e.setStackTrace(Arrays.copyOfRange(st, 1, st.length));</span>
+<span class="nc" id="L62">    }</span>
+    protected String secMgrChange$str() {
+<span class="nc" id="L64">        return &quot;WFSM000002: Security manager may not be changed&quot;;</span>
+    }
+    @Override
+    public final SecurityException secMgrChange() {
+<span class="nc" id="L68">        final SecurityException result = new SecurityException(String.format(getLoggingLocale(), secMgrChange$str()));</span>
+<span class="nc" id="L69">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L70">        return result;</span>
+    }
+    protected String unknownContext$str() {
+<span class="nc" id="L73">        return &quot;WFSM000003: Unknown security context type&quot;;</span>
+    }
+    @Override
+    public final SecurityException unknownContext() {
+<span class="nc" id="L77">        final SecurityException result = new SecurityException(String.format(getLoggingLocale(), unknownContext$str()));</span>
+<span class="nc" id="L78">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L79">        return result;</span>
+    }
+    protected String invalidName$str() {
+<span class="nc" id="L82">        return &quot;WFSM000006: Invalid permission name '%s'&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidName(final String name) {
+<span class="nc" id="L86">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidName$str(), name));</span>
+<span class="nc" id="L87">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L88">        return result;</span>
+    }
+    protected String readOnlyPermCollection$str() {
+<span class="nc" id="L91">        return &quot;WFSM000007: Permission collection is read-only&quot;;</span>
+    }
+    @Override
+    public final SecurityException readOnlyPermCollection() {
+<span class="nc" id="L95">        final SecurityException result = new SecurityException(String.format(getLoggingLocale(), readOnlyPermCollection$str()));</span>
+<span class="nc" id="L96">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L97">        return result;</span>
+    }
+    protected String wrongPermType$str() {
+<span class="nc" id="L100">        return &quot;WFSM000008: Invalid permission (expected an instance of %s, but got %s)&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException wrongPermType(final Class&lt;? extends Permission&gt; expectedType, final Permission permission) {
+<span class="nc" id="L104">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), wrongPermType$str(), expectedType, permission));</span>
+<span class="nc" id="L105">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L106">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

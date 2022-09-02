@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DefaultSingleSignOn.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-sso</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.util.sso</a> &gt; <span class="el_source">DefaultSingleSignOn.java</span></div><h1>DefaultSingleSignOn.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2017 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.http.util.sso;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+
+import java.net.URI;
+import java.util.AbstractMap.SimpleImmutableEntry;
+import java.util.Collections;
+import java.util.Map;
+
+import org.wildfly.security.auth.server.SecurityIdentity;
+import org.wildfly.security.cache.CachedIdentity;
+
+/**
+ * {@link SingleSignOn} implementation backed by a {@link DefaultSingleSignOnEntry}.
+ * @author &lt;a href=&quot;mailto:psilva@redhat.com&quot;&gt;Pedro Igor&lt;/a&gt;
+ * @author Paul Ferraro
+ */
+public class DefaultSingleSignOn implements SingleSignOn {
+    private final String id;
+    private final SingleSignOnEntry entry;
+    private final Runnable mutator;
+    private final Runnable remover;
+
+<span class="nc" id="L41">    public DefaultSingleSignOn(String id, SingleSignOnEntry entry, Runnable mutator, Runnable remover) {</span>
+<span class="nc" id="L42">        this.id = checkNotNullParam(&quot;id&quot;, id);</span>
+<span class="nc" id="L43">        this.entry = checkNotNullParam(&quot;entry&quot;, entry);</span>
+<span class="nc" id="L44">        this.mutator = checkNotNullParam(&quot;mutator&quot;, mutator);</span>
+<span class="nc" id="L45">        this.remover = checkNotNullParam(&quot;remover&quot;, remover);</span>
+<span class="nc" id="L46">    }</span>
+
+    @Override
+    public String getId() {
+<span class="nc" id="L50">        return this.id;</span>
+    }
+
+    @Override
+    public String getMechanism() {
+<span class="nc" id="L55">        return this.entry.getCachedIdentity().getMechanismName();</span>
+    }
+
+    @Override
+    public boolean isProgrammatic() {
+<span class="nc" id="L60">        return this.entry.getCachedIdentity().isProgrammatic();</span>
+    }
+
+    @Override
+    public String getName() {
+<span class="nc" id="L65">        return this.entry.getCachedIdentity().getName();</span>
+    }
+
+    @Override
+    public SecurityIdentity getIdentity() {
+<span class="nc" id="L70">        return this.entry.getCachedIdentity().getSecurityIdentity();</span>
+    }
+
+    @Override
+    public void setIdentity(SecurityIdentity identity) {
+        // Only set cached identity if it has not already been set
+<span class="nc" id="L76">        synchronized (this.entry) {</span>
+<span class="nc" id="L77">            CachedIdentity cached = this.entry.getCachedIdentity();</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">            if (cached.getSecurityIdentity() == null) {</span>
+<span class="nc" id="L79">                this.entry.setCachedIdentity(new CachedIdentity(cached.getMechanismName(), cached.isProgrammatic(), identity));</span>
+            }
+<span class="nc" id="L81">        }</span>
+<span class="nc" id="L82">    }</span>
+
+    @Override
+    public boolean addParticipant(String applicationId, String sessionId, URI participant) {
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        boolean added = this.entry.getParticipants().putIfAbsent(applicationId, new SimpleImmutableEntry&lt;&gt;(sessionId, participant)) == null;</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        if (added) {</span>
+<span class="nc" id="L88">            this.mutator.run();</span>
+        }
+<span class="nc" id="L90">        return added;</span>
+    }
+
+    @Override
+    public Map.Entry&lt;String, URI&gt; removeParticipant(String applicationId) {
+<span class="nc" id="L95">        Map.Entry&lt;String, URI&gt; removed = this.entry.getParticipants().remove(applicationId);</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        if (removed != null) {</span>
+<span class="nc" id="L97">            this.mutator.run();</span>
+        }
+<span class="nc" id="L99">        return removed;</span>
+    }
+
+    @Override
+    public Map&lt;String, Map.Entry&lt;String, URI&gt;&gt; getParticipants() {
+<span class="nc" id="L104">        return Collections.unmodifiableMap(this.entry.getParticipants());</span>
+    }
+
+    @Override
+    public void invalidate() {
+<span class="nc" id="L109">        this.remover.run();</span>
+<span class="nc" id="L110">    }</span>
+
+    @Override
+    public void close() {
+        // Do nothing
+<span class="nc" id="L115">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

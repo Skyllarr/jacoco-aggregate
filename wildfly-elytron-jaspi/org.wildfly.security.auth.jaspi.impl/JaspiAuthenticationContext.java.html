@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>JaspiAuthenticationContext.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-jaspi</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.jaspi.impl</a> &gt; <span class="el_source">JaspiAuthenticationContext.java</span></div><h1>JaspiAuthenticationContext.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2018 Red Hat, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.jaspi.impl;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+import static org.wildfly.security.auth.jaspi._private.ElytronMessages.log;
+import static org.wildfly.security.auth.jaspi.impl.SecurityActions.doPrivileged;
+
+import java.io.IOException;
+import java.security.Principal;
+import java.security.PrivilegedAction;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Set;
+
+import javax.security.auth.Subject;
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.auth.message.callback.CallerPrincipalCallback;
+import javax.security.auth.message.callback.GroupPrincipalCallback;
+import javax.security.auth.message.callback.PasswordValidationCallback;
+
+import org.wildfly.security.auth.callback.CallbackUtil;
+import org.wildfly.security.auth.principal.NamePrincipal;
+import org.wildfly.security.auth.server.SecurityDomain;
+import org.wildfly.security.auth.server.SecurityIdentity;
+import org.wildfly.security.auth.server.ServerAuthenticationContext;
+import org.wildfly.security.authz.RoleMapper;
+import org.wildfly.security.authz.Roles;
+import org.wildfly.security.evidence.Evidence;
+import org.wildfly.security.evidence.PasswordGuessEvidence;
+import org.wildfly.security.permission.ElytronPermission;
+
+/**
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public class JaspiAuthenticationContext {
+
+<span class="fc" id="L58">    static final ElytronPermission CREATE_AUTH_CONTEXT = ElytronPermission.forName(&quot;createServerAuthenticationContext&quot;);</span>
+
+    private final SecurityDomain securityDomain;
+    private final boolean integrated;
+
+<span class="fc" id="L63">    private volatile SecurityIdentity securityIdentity = null;</span>
+<span class="fc" id="L64">    private final Set&lt;String&gt; roles = new HashSet&lt;&gt;();</span>
+
+
+<span class="fc" id="L67">    JaspiAuthenticationContext(SecurityDomain securityDomain, boolean integrated) {</span>
+<span class="fc" id="L68">        this.securityDomain = securityDomain;</span>
+<span class="fc" id="L69">        this.integrated = integrated;</span>
+<span class="fc" id="L70">    }</span>
+
+    /*
+     * Having a few options makes it feel like we should use a Builder, however that would lead to one more object per request.
+     *
+     * For these per-request classes we probably could make them self building with an activation step at the end that allows
+     * their use whilst at the same time prohibits further config changes.
+     */
+
+    // TODO Can we find a way to create this from the SecurityDomain similar to ServerAuthContext?
+
+    public static JaspiAuthenticationContext newInstance(final SecurityDomain securityDomain, final boolean integrated) {
+<span class="fc" id="L82">        final SecurityManager sm = System.getSecurityManager();</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (sm != null) {</span>
+<span class="nc" id="L84">            sm.checkPermission(CREATE_AUTH_CONTEXT);</span>
+        }
+<span class="fc" id="L86">        return new JaspiAuthenticationContext(checkNotNullParam(&quot;securityDomain&quot;, securityDomain), integrated);</span>
+    }
+
+    public CallbackHandler createCallbackHandler() {
+<span class="fc" id="L90">        return createCommonCallbackHandler(integrated);</span>
+    }
+
+    private CallbackHandler createCommonCallbackHandler(final boolean integrated) {
+<span class="fc" id="L94">        return new CallbackHandler() {</span>
+
+            @Override
+            public void handle(Callback[] callbacks) throws IOException, UnsupportedCallbackException {
+                try {
+<span class="fc" id="L99">                    doPrivileged((PrivilegedExceptionAction&lt;Void&gt;) () -&gt; {</span>
+<span class="fc" id="L100">                        handleOne(callbacks, 0);</span>
+<span class="fc" id="L101">                        return null;</span>
+                    });
+<span class="nc" id="L103">                } catch (Exception e) {</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">                    if (e instanceof PrivilegedActionException) {</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">                        if (e.getCause() instanceof UnsupportedCallbackException) {</span>
+<span class="nc" id="L106">                            throw (UnsupportedCallbackException) e.getCause();</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">                        } else if (e.getCause() instanceof IOException) {</span>
+<span class="nc" id="L108">                            throw (IOException) e.getCause();</span>
+                        }
+                    }
+<span class="nc" id="L111">                    throw new IOException(e);</span>
+<span class="fc" id="L112">                }</span>
+<span class="fc" id="L113">            }</span>
+
+            private void handleOne(Callback[] callbacks, int index) throws IOException, UnsupportedCallbackException {
+<span class="fc bfc" id="L116" title="All 2 branches covered.">                if (callbacks.length == index) {</span>
+<span class="fc" id="L117">                    return;</span>
+                }
+
+<span class="fc" id="L120">                final Callback callback = callbacks[index];</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">                if (callback instanceof PasswordValidationCallback) {</span>
+<span class="fc" id="L122">                    PasswordValidationCallback pvc = (PasswordValidationCallback) callback;</span>
+
+<span class="fc" id="L124">                    final String username = pvc.getUsername();</span>
+<span class="fc" id="L125">                    log.tracef(&quot;Handling PasswordValidationCallback for '%s'&quot;, username);</span>
+<span class="fc" id="L126">                    final Evidence evidence = new PasswordGuessEvidence(pvc.getPassword());</span>
+
+                    try {
+                        // Not adding TRACE logging here as the transitions from SecurityDomain are logged.
+<span class="fc" id="L130">                        SecurityIdentity authenticated = securityDomain.authenticate(username, evidence);</span>
+<span class="fc" id="L131">                        pvc.setResult(true);</span>
+<span class="fc" id="L132">                        securityIdentity = authenticated;  // Take a PasswordValidationCallback as always starting authentication again.</span>
+<span class="fc" id="L133">                    } catch (Exception e) {</span>
+<span class="fc" id="L134">                        log.trace(&quot;Authentication failed&quot;, e);</span>
+<span class="fc" id="L135">                        pvc.setResult(false);</span>
+<span class="fc" id="L136">                    }</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">                } else if (callback instanceof CallerPrincipalCallback) {</span>
+<span class="fc" id="L138">                    log.trace(&quot;Handling CallerPrincipalCallback&quot;);</span>
+<span class="fc" id="L139">                    final CallerPrincipalCallback cpc = (CallerPrincipalCallback) callback;</span>
+<span class="fc" id="L140">                    Principal originalPrincipal = cpc.getPrincipal();</span>
+<span class="fc" id="L141">                    final String callerName = cpc.getName();</span>
+<span class="pc bpc" id="L142" title="1 of 4 branches missed.">                    final Principal callerPrincipal = originalPrincipal != null ? originalPrincipal : callerName != null ? new NamePrincipal(callerName) : null;</span>
+
+<span class="fc" id="L144">                    log.tracef(&quot;Original Principal = '%s', Caller Name = '%s', Resulting Principal = '%s'&quot;, originalPrincipal, callerName, callerPrincipal);</span>
+
+<span class="fc" id="L146">                    SecurityIdentity authorizedIdentity = null;</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">                    if (securityIdentity != null) {</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                        if (callerPrincipal != null) {</span>
+<span class="nc bnc" id="L149" title="All 4 branches missed.">                            boolean authorizationRequired = (integrated &amp;&amp; !securityIdentity.getPrincipal().equals(callerPrincipal));</span>
+                         // If we are integrated we want an authorization check.
+<span class="nc" id="L151">                            authorizedIdentity =  securityIdentity.createRunAsIdentity(callerPrincipal, authorizationRequired);</span>
+<span class="pc bfc" id="L152" title="All 2 branches covered.">                        } else if (integrated) {</span>
+                            // Authorize as the authenticated identity.
+<span class="fc" id="L154">                            try (final ServerAuthenticationContext sac = securityDomain.createNewAuthenticationContext()) {</span>
+<span class="fc" id="L155">                                sac.importIdentity(securityIdentity);</span>
+<span class="fc" id="L156">                                sac.authorize();</span>
+<span class="fc" id="L157">                                authorizedIdentity = sac.getAuthorizedIdentity();</span>
+                            }
+                        } else {
+<span class="fc" id="L160">                            authorizedIdentity = securityIdentity;</span>
+                        }
+                    } else {
+<span class="fc bfc" id="L163" title="All 2 branches covered.">                        if (callerPrincipal == null) {</span>
+                            // Do nothing and don't fail.
+<span class="fc" id="L165">                            handleOne(callbacks, index + 1);</span>
+<span class="fc" id="L166">                            return;</span>
+                        } else {
+<span class="fc bfc" id="L168" title="All 2 branches covered.">                            if (integrated) {</span>
+<span class="fc" id="L169">                                try (final ServerAuthenticationContext sac = securityDomain.createNewAuthenticationContext()) {</span>
+<span class="fc" id="L170">                                    sac.setAuthenticationPrincipal(callerPrincipal);</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">                                    if (sac.authorize()) {</span>
+<span class="fc" id="L172">                                        authorizedIdentity = sac.getAuthorizedIdentity();</span>
+                                    }
+                                }
+                            } else {
+<span class="fc" id="L176">                                authorizedIdentity = securityDomain.createAdHocIdentity(callerPrincipal);</span>
+                            }
+                        }
+                    }
+
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">                    if (authorizedIdentity != null) {</span>
+<span class="fc" id="L182">                        securityIdentity = authorizedIdentity;</span>
+<span class="fc" id="L183">                        final Subject subject = cpc.getSubject();</span>
+<span class="pc bpc" id="L184" title="2 of 4 branches missed.">                        if (subject != null &amp;&amp; !subject.isReadOnly()) {</span>
+<span class="fc" id="L185">                            subject.getPrincipals().add(authorizedIdentity.getPrincipal());</span>
+                        }
+<span class="fc" id="L187">                    } else {</span>
+<span class="nc" id="L188">                        throw log.authorizationFailed();</span>
+                    }
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">                } else if (callback instanceof GroupPrincipalCallback) {</span>
+<span class="fc" id="L191">                    log.trace(&quot;Handling GroupPrincipalCallback&quot;);</span>
+<span class="fc" id="L192">                    log.trace(&quot;Handling GroupPrincipalCallback&quot;);</span>
+<span class="fc" id="L193">                    GroupPrincipalCallback gpc = (GroupPrincipalCallback) callback;</span>
+<span class="fc" id="L194">                    String[] groups = gpc.getGroups();</span>
+<span class="pc bpc" id="L195" title="2 of 4 branches missed.">                    if (groups != null &amp;&amp; groups.length &gt; 0) {</span>
+<span class="fc" id="L196">                        roles.addAll(Arrays.asList(groups));</span>
+                    }
+                    // TODO - Add anything to subject?
+<span class="fc" id="L199">                } else {</span>
+<span class="nc" id="L200">                    CallbackUtil.unsupported(callback);</span>
+<span class="nc" id="L201">                    handleOne(callbacks, index + 1);</span>
+                }
+
+<span class="fc" id="L204">                handleOne(callbacks, index + 1);</span>
+<span class="fc" id="L205">            }</span>
+        };
+    }
+
+    /**
+     * Get the authorized identity result of this authentication.
+     *
+     * @return the authorized identity
+     * @throws IllegalStateException if the authentication is incomplete
+     */
+    public SecurityIdentity getAuthorizedIdentity() throws IllegalStateException {
+<span class="fc" id="L216">        SecurityIdentity securityIdentity = this.securityIdentity;</span>
+<span class="pc bpc" id="L217" title="1 of 4 branches missed.">        if (securityIdentity != null &amp;&amp; roles.size() &gt; 0) {</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">            if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L219">                Iterator&lt;String&gt; rolesIterator = roles.iterator();</span>
+<span class="nc" id="L220">                StringBuilder sb = new StringBuilder(rolesIterator.next());</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">                while (rolesIterator.hasNext()) {</span>
+<span class="nc" id="L222">                    sb.append(&quot;,&quot;).append(rolesIterator.next());</span>
+                }
+<span class="nc" id="L224">                log.tracef(&quot;Assigning roles '%s' to resulting SecurityIdentity&quot;, sb.toString());</span>
+            }
+<span class="fc" id="L226">            Roles roles = Roles.fromSet(this.roles);</span>
+<span class="fc" id="L227">            RoleMapper roleMapper = RoleMapper.constant(roles);</span>
+<span class="fc" id="L228">            SecurityIdentity temp = securityIdentity;</span>
+<span class="fc" id="L229">            securityIdentity = doPrivileged((PrivilegedAction&lt;SecurityIdentity&gt;) (() -&gt; temp.withDefaultRoleMapper(roleMapper)));</span>
+<span class="fc" id="L230">        } else {</span>
+<span class="fc" id="L231">            log.trace(&quot;No roles request of CallbackHandler.&quot;);</span>
+        }
+<span class="fc" id="L233">        return securityIdentity;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

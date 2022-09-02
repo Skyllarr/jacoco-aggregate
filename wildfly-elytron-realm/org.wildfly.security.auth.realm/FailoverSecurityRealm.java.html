@@ -1,0 +1,306 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FailoverSecurityRealm.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-realm</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.realm</a> &gt; <span class="el_source">FailoverSecurityRealm.java</span></div><h1>FailoverSecurityRealm.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2019 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.auth.realm;
+
+import static org.wildfly.security.auth.realm.ElytronMessages.log;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.auth.SupportLevel;
+import org.wildfly.security.auth.server.RealmIdentity;
+import org.wildfly.security.auth.server.RealmUnavailableException;
+import org.wildfly.security.auth.server.SecurityRealm;
+import org.wildfly.security.authz.Attributes;
+import org.wildfly.security.authz.AuthorizationIdentity;
+import org.wildfly.security.credential.Credential;
+import org.wildfly.security.evidence.Evidence;
+
+import java.security.Principal;
+import java.security.spec.AlgorithmParameterSpec;
+import java.util.function.Consumer;
+import java.util.function.Function;
+
+/**
+ * A realm which wraps one realm and fails over to another in case the first is unavailable.
+ *
+ * @author &lt;a href=&quot;mailto:mmazanek@redhat.com&quot;&gt;Martin Mazanek&lt;/a&gt;
+ */
+public class FailoverSecurityRealm implements SecurityRealm {
+    protected final SecurityRealm delegateRealm;
+    protected final SecurityRealm failoverRealm;
+    protected final Consumer&lt;RealmUnavailableException&gt; failoverCallback;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param delegateRealm the wrapped realm
+     * @param failoverRealm the realm to use in case delegateRealm is unavailable
+     * @param failoverCallback callback function that gets called in case delegateRealm is unavailable
+     */
+<span class="fc" id="L54">    public FailoverSecurityRealm(final SecurityRealm delegateRealm, final SecurityRealm failoverRealm, final Consumer&lt;RealmUnavailableException&gt; failoverCallback) {</span>
+<span class="fc" id="L55">        Assert.checkNotNullParam(&quot;delegateRealm&quot;, delegateRealm);</span>
+<span class="fc" id="L56">        Assert.checkNotNullParam(&quot;failoverRealm&quot;, failoverRealm);</span>
+
+<span class="fc" id="L58">        this.delegateRealm = delegateRealm;</span>
+<span class="fc" id="L59">        this.failoverRealm = failoverRealm;</span>
+<span class="fc" id="L60">        this.failoverCallback = failoverCallback;</span>
+<span class="fc" id="L61">    }</span>
+
+    @Override
+    public RealmIdentity getRealmIdentity(final Evidence evidence) throws RealmUnavailableException {
+        try {
+<span class="nc" id="L66">            return createFailoverIdentity(delegateRealm.getRealmIdentity(evidence), evidence);</span>
+<span class="nc" id="L67">        } catch (RealmUnavailableException e) {</span>
+<span class="nc" id="L68">            log.realmFailover(e);</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">            if (failoverCallback != null) {</span>
+<span class="nc" id="L70">                failoverCallback.accept(e);</span>
+            }
+<span class="nc" id="L72">            return failoverRealm.getRealmIdentity(evidence);</span>
+        }
+    }
+
+    @Override
+    public RealmIdentity getRealmIdentity(final Principal principal) throws RealmUnavailableException {
+        try {
+<span class="fc" id="L79">            return createFailoverIdentity(delegateRealm.getRealmIdentity(principal), principal);</span>
+<span class="fc" id="L80">        } catch (RealmUnavailableException e) {</span>
+<span class="fc" id="L81">            log.realmFailover(e);</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">            if (failoverCallback != null) {</span>
+<span class="fc" id="L83">                failoverCallback.accept(e);</span>
+            }
+<span class="fc" id="L85">            return failoverRealm.getRealmIdentity(principal);</span>
+        }
+    }
+
+    @Override
+    public SupportLevel getCredentialAcquireSupport(final Class&lt;? extends Credential&gt; credentialType, final String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+        try {
+<span class="nc" id="L92">            return delegateRealm.getCredentialAcquireSupport(credentialType, algorithmName, parameterSpec);</span>
+<span class="nc" id="L93">        } catch (RealmUnavailableException rue) {</span>
+<span class="nc" id="L94">            log.realmFailover(rue);</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">            if (failoverCallback != null) {</span>
+<span class="nc" id="L96">                failoverCallback.accept(rue);</span>
+            }
+<span class="nc" id="L98">            return SupportLevel.POSSIBLY_SUPPORTED;</span>
+        }
+    }
+
+    @Override
+    public SupportLevel getEvidenceVerifySupport(final Class&lt;? extends Evidence&gt; evidenceType, final String algorithmName) throws RealmUnavailableException {
+        try {
+<span class="nc" id="L105">            return delegateRealm.getEvidenceVerifySupport(evidenceType, algorithmName);</span>
+<span class="nc" id="L106">        } catch (RealmUnavailableException rue) {</span>
+<span class="nc" id="L107">            log.realmFailover(rue);</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">            if (failoverCallback != null) {</span>
+<span class="nc" id="L109">                failoverCallback.accept(rue);</span>
+            }
+<span class="nc" id="L111">            return SupportLevel.POSSIBLY_SUPPORTED;</span>
+        }
+    }
+
+    protected RealmIdentity createFailoverIdentity(final RealmIdentity identity, final Evidence evidence) {
+<span class="nc" id="L116">        return new FailoverRealmIdentity(identity) {</span>
+            @Override
+            protected RealmIdentity getFailoverIdentity() throws RealmUnavailableException {
+<span class="nc" id="L119">                return failoverRealm.getRealmIdentity(evidence);</span>
+            }
+        };
+    }
+
+    protected RealmIdentity createFailoverIdentity(final RealmIdentity identity, final Principal principal) {
+<span class="fc" id="L125">        return new FailoverRealmIdentity(identity) {</span>
+            @Override
+            protected RealmIdentity getFailoverIdentity() throws RealmUnavailableException {
+<span class="nc" id="L128">                return failoverRealm.getRealmIdentity(principal);</span>
+            }
+        };
+    }
+
+    protected abstract class FailoverRealmIdentity implements RealmIdentity {
+        protected RealmIdentity delegate;
+<span class="fc" id="L135">        protected boolean failed = false;</span>
+
+<span class="fc" id="L137">        public FailoverRealmIdentity(final RealmIdentity identity) {</span>
+<span class="fc" id="L138">            this.delegate = identity;</span>
+<span class="fc" id="L139">        }</span>
+
+        protected abstract RealmIdentity getFailoverIdentity() throws RealmUnavailableException;
+
+        @Override
+        public SupportLevel getCredentialAcquireSupport(Class&lt;? extends Credential&gt; credentialType, String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+            try {
+<span class="nc" id="L146">                return delegate.getCredentialAcquireSupport(credentialType, algorithmName, parameterSpec);</span>
+<span class="nc" id="L147">            } catch (RealmUnavailableException rue) {</span>
+<span class="nc" id="L148">                return failover(rue).getCredentialAcquireSupport(credentialType, algorithmName, parameterSpec);</span>
+            }
+        }
+
+        @Override
+        public &lt;C extends Credential&gt; C getCredential(Class&lt;C&gt; credentialType) throws RealmUnavailableException {
+            try {
+<span class="nc" id="L155">                return delegate.getCredential(credentialType);</span>
+<span class="nc" id="L156">            } catch (RealmUnavailableException rue) {</span>
+<span class="nc" id="L157">                return failover(rue).getCredential(credentialType);</span>
+            } finally {
+<span class="nc" id="L159">                disableFailover();</span>
+            }
+        }
+
+        @Override
+        public SupportLevel getEvidenceVerifySupport(Class&lt;? extends Evidence&gt; evidenceType, String algorithmName) throws RealmUnavailableException {
+            try {
+<span class="nc" id="L166">                return delegate.getEvidenceVerifySupport(evidenceType, algorithmName);</span>
+<span class="nc" id="L167">            } catch (RealmUnavailableException rue) {</span>
+<span class="nc" id="L168">                return failover(rue).getEvidenceVerifySupport(evidenceType, algorithmName);</span>
+            }
+        }
+
+        @Override
+        public boolean verifyEvidence(Evidence evidence) throws RealmUnavailableException {
+            try {
+<span class="nc" id="L175">                return delegate.verifyEvidence(evidence);</span>
+<span class="nc" id="L176">            } catch (RealmUnavailableException rue) {</span>
+<span class="nc" id="L177">                return failover(rue).verifyEvidence(evidence);</span>
+            } finally {
+<span class="nc" id="L179">                disableFailover();</span>
+            }
+        }
+
+        @Override
+        public boolean exists() throws RealmUnavailableException {
+            try {
+<span class="fc" id="L186">                return delegate.exists();</span>
+<span class="nc" id="L187">            } catch (RealmUnavailableException rue) {</span>
+<span class="nc" id="L188">                return failover(rue).exists();</span>
+            } finally {
+<span class="fc" id="L190">                disableFailover();</span>
+            }
+        }
+
+        @Override
+        public void updateCredential(Credential credential) throws RealmUnavailableException {
+            try {
+<span class="nc" id="L197">                delegate.updateCredential(credential);</span>
+<span class="nc" id="L198">            } catch (RealmUnavailableException rue) {</span>
+<span class="nc" id="L199">                failover(rue).updateCredential(credential);</span>
+            } finally {
+<span class="nc" id="L201">                disableFailover();</span>
+            }
+<span class="nc" id="L203">        }</span>
+
+        @Override
+        public Principal getRealmIdentityPrincipal() {
+<span class="nc" id="L207">            return delegate.getRealmIdentityPrincipal();</span>
+        }
+
+        @Override
+        public &lt;C extends Credential&gt; C getCredential(Class&lt;C&gt; credentialType, String algorithmName) throws RealmUnavailableException {
+            try {
+<span class="nc" id="L213">                return delegate.getCredential(credentialType, algorithmName);</span>
+<span class="nc" id="L214">            } catch (RealmUnavailableException rue) {</span>
+<span class="nc" id="L215">                return failover(rue).getCredential(credentialType, algorithmName);</span>
+            } finally {
+<span class="nc" id="L217">                disableFailover();</span>
+            }
+        }
+
+        @Override
+        public &lt;C extends Credential&gt; C getCredential(final Class&lt;C&gt; credentialType, final String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+            try {
+<span class="nc" id="L224">                return delegate.getCredential(credentialType, algorithmName, parameterSpec);</span>
+<span class="nc" id="L225">            } catch (RealmUnavailableException rue) {</span>
+<span class="nc" id="L226">                return failover(rue).getCredential(credentialType, algorithmName, parameterSpec);</span>
+            } finally {
+<span class="nc" id="L228">                disableFailover();</span>
+            }
+        }
+
+        @Override
+        public &lt;C extends Credential, R&gt; R applyToCredential(Class&lt;C&gt; credentialType, Function&lt;C, R&gt; function) throws RealmUnavailableException {
+            try {
+<span class="nc" id="L235">                return delegate.applyToCredential(credentialType, function);</span>
+<span class="nc" id="L236">            } catch (RealmUnavailableException rue) {</span>
+<span class="nc" id="L237">                return failover(rue).applyToCredential(credentialType, function);</span>
+            } finally {
+<span class="nc" id="L239">                disableFailover();</span>
+            }
+        }
+
+        @Override
+        public &lt;C extends Credential, R&gt; R applyToCredential(Class&lt;C&gt; credentialType, String algorithmName, Function&lt;C, R&gt; function) throws RealmUnavailableException {
+            try {
+<span class="nc" id="L246">                return delegate.applyToCredential(credentialType, algorithmName, function);</span>
+<span class="nc" id="L247">            } catch (RealmUnavailableException rue) {</span>
+<span class="nc" id="L248">                return failover(rue).applyToCredential(credentialType, algorithmName, function);</span>
+            } finally {
+<span class="nc" id="L250">                disableFailover();</span>
+            }
+        }
+
+        @Override
+        public &lt;C extends Credential, R&gt; R applyToCredential(final Class&lt;C&gt; credentialType, final String algorithmName, final AlgorithmParameterSpec parameterSpec, final Function&lt;C, R&gt; function) throws RealmUnavailableException {
+            try {
+<span class="nc" id="L257">                return delegate.applyToCredential(credentialType, algorithmName, parameterSpec, function);</span>
+<span class="nc" id="L258">            } catch (RealmUnavailableException rue) {</span>
+<span class="nc" id="L259">                return failover(rue).applyToCredential(credentialType, algorithmName, parameterSpec, function);</span>
+            } finally {
+<span class="nc" id="L261">                disableFailover();</span>
+            }
+        }
+
+        @Override
+        public void dispose() {
+<span class="nc" id="L267">            delegate.dispose();</span>
+<span class="nc" id="L268">        }</span>
+
+        @Override
+        public AuthorizationIdentity getAuthorizationIdentity() throws RealmUnavailableException {
+            try {
+<span class="nc" id="L273">                return delegate.getAuthorizationIdentity();</span>
+<span class="nc" id="L274">            } catch (RealmUnavailableException rue) {</span>
+<span class="nc" id="L275">                return failover(rue).getAuthorizationIdentity();</span>
+            } finally {
+<span class="nc" id="L277">                disableFailover();</span>
+            }
+        }
+
+        @Override
+        public Attributes getAttributes() throws RealmUnavailableException {
+<span class="nc" id="L283">            return delegate.getAttributes();</span>
+        }
+
+        protected RealmIdentity failover(RealmUnavailableException rue) throws RealmUnavailableException {
+<span class="nc bnc" id="L287" title="All 2 branches missed.">            if (failed) {</span>
+<span class="nc" id="L288">                throw rue;</span>
+            }
+<span class="nc" id="L290">            log.realmFailover(rue);</span>
+<span class="nc bnc" id="L291" title="All 2 branches missed.">            if (FailoverSecurityRealm.this.failoverCallback != null) {</span>
+<span class="nc" id="L292">                FailoverSecurityRealm.this.failoverCallback.accept(rue);</span>
+            }
+<span class="nc" id="L294">            failed = true;</span>
+<span class="nc" id="L295">            delegate.dispose();</span>
+<span class="nc" id="L296">            delegate = getFailoverIdentity();</span>
+<span class="nc" id="L297">            return delegate;</span>
+        }
+
+        // Used to make sure that failover cannot happen in the middle of authentication.
+        protected void disableFailover() {
+<span class="fc" id="L302">            failed = true;</span>
+<span class="fc" id="L303">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

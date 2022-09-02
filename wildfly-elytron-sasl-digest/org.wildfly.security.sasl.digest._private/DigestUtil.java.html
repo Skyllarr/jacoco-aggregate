@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DigestUtil.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl-digest</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.digest._private</a> &gt; <span class="el_source">DigestUtil.java</span></div><h1>DigestUtil.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.sasl.digest._private;
+
+import static org.wildfly.security.mechanism._private.ElytronMessages.saslDigest;
+
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.KeySpec;
+import java.util.Arrays;
+
+import javax.crypto.Mac;
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.DESKeySpec;
+import javax.crypto.spec.DESedeKeySpec;
+import javax.crypto.spec.SecretKeySpec;
+import javax.security.sasl.SaslException;
+
+import org.wildfly.common.bytes.ByteStringBuilder;
+import org.wildfly.common.iteration.ByteIterator;
+import org.wildfly.security.password.interfaces.DigestPassword;
+import org.wildfly.security.sasl.util.SaslMechanismInformation;
+
+/**
+ * @author &lt;a href=&quot;mailto:pskopek@redhat.com&quot;&gt;Peter Skopek&lt;/a&gt;.
+ */
+<span class="nc bnc" id="L47" title="All 2 branches missed.">public final class DigestUtil {</span>
+
+    public static final String QOP_AUTH = &quot;auth&quot;;
+    public static final String QOP_AUTH_INT = &quot;auth-int&quot;;
+    public static final String QOP_AUTH_CONF = &quot;auth-conf&quot;;
+<span class="nc" id="L52">    public static final String[] QOP_VALUES = {QOP_AUTH, QOP_AUTH_INT, QOP_AUTH_CONF};</span>
+
+    public static final String AUTH_METHOD = &quot;AUTHENTICATE&quot;;
+    public static final String SECURITY_MARK = &quot;00000000000000000000000000000000&quot;;   // 32 zeros
+
+    public static final String HASH_algorithm = &quot;MD5&quot;;
+    public static final String HMAC_algorithm = &quot;HmacMD5&quot;;
+
+    public static String passwordAlgorithm(String digestAlgorithm) {
+<span class="nc bnc" id="L61" title="All 7 branches missed.">        switch (digestAlgorithm) {</span>
+<span class="nc" id="L62">            case SaslMechanismInformation.Names.DIGEST_MD5: return DigestPassword.ALGORITHM_DIGEST_MD5;</span>
+<span class="nc" id="L63">            case SaslMechanismInformation.Names.DIGEST_SHA: return DigestPassword.ALGORITHM_DIGEST_SHA;</span>
+<span class="nc" id="L64">            case SaslMechanismInformation.Names.DIGEST_SHA_256: return DigestPassword.ALGORITHM_DIGEST_SHA_256;</span>
+<span class="nc" id="L65">            case SaslMechanismInformation.Names.DIGEST_SHA_384: return DigestPassword.ALGORITHM_DIGEST_SHA_384;</span>
+<span class="nc" id="L66">            case SaslMechanismInformation.Names.DIGEST_SHA_512: return DigestPassword.ALGORITHM_DIGEST_SHA_512;</span>
+<span class="nc" id="L67">            case SaslMechanismInformation.Names.DIGEST_SHA_512_256: return DigestPassword.ALGORITHM_DIGEST_SHA_512_256;</span>
+<span class="nc" id="L68">            default: return null;</span>
+        }
+    }
+
+    public static String messageDigestAlgorithm(String digestAlgorithm) {
+<span class="nc bnc" id="L73" title="All 7 branches missed.">        switch (digestAlgorithm) {</span>
+<span class="nc" id="L74">            case SaslMechanismInformation.Names.DIGEST_MD5: return &quot;MD5&quot;;</span>
+<span class="nc" id="L75">            case SaslMechanismInformation.Names.DIGEST_SHA: return &quot;SHA&quot;;</span>
+<span class="nc" id="L76">            case SaslMechanismInformation.Names.DIGEST_SHA_256: return &quot;SHA-256&quot;;</span>
+<span class="nc" id="L77">            case SaslMechanismInformation.Names.DIGEST_SHA_384: return &quot;SHA-384&quot;;</span>
+<span class="nc" id="L78">            case SaslMechanismInformation.Names.DIGEST_SHA_512: return &quot;SHA-512&quot;;</span>
+<span class="nc" id="L79">            case SaslMechanismInformation.Names.DIGEST_SHA_512_256: return &quot;SHA-512-256&quot;;</span>
+<span class="nc" id="L80">            default: return null;</span>
+        }
+    }
+
+    /**
+     * Calculates H(A1).
+     *
+     *
+     * @param messageDigest
+     * @param digest_urp
+     * @param nonce
+     * @param cnonce
+     * @param authzid
+     * @param responseCharset
+     * @return
+     */
+    public static byte[] H_A1(MessageDigest messageDigest, byte[] digest_urp,
+                       byte[] nonce, byte[] cnonce, String authzid, Charset responseCharset) {
+        // A1
+<span class="nc" id="L99">        ByteStringBuilder A1 = new ByteStringBuilder();</span>
+<span class="nc" id="L100">        A1.append(digest_urp);</span>
+<span class="nc" id="L101">        A1.append(':');</span>
+<span class="nc" id="L102">        A1.append(nonce);</span>
+<span class="nc" id="L103">        A1.append(':');</span>
+<span class="nc" id="L104">        A1.append(cnonce);</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        if (authzid != null) {</span>
+<span class="nc" id="L106">            A1.append(':');</span>
+<span class="nc" id="L107">            A1.append(authzid);</span>
+        }
+<span class="nc" id="L109">        return messageDigest.digest(A1.toArray());</span>
+    }
+
+    /**
+     * Method to produce digest-response:
+     * response-value  =
+     *    HEX( KD ( HEX(H(A1)),
+     *             { nonce-value, &quot;:&quot; nc-value, &quot;:&quot;,
+     *               cnonce-value, &quot;:&quot;, qop-value, &quot;:&quot;, HEX(H(A2)) }))
+     *
+     */
+    public static byte[] digestResponse(MessageDigest messageDigest, byte[] H_A1,
+                                 byte[] nonce, int nonce_count, byte[] cnonce,
+                                 String authzid, String qop, String digest_uri, boolean auth) {
+
+        // QOP
+        String qop_value;
+<span class="nc bnc" id="L126" title="All 4 branches missed.">        if (qop != null &amp;&amp; ! &quot;&quot;.equals(qop)) {</span>
+<span class="nc" id="L127">            qop_value = qop;</span>
+        } else {
+<span class="nc" id="L129">            qop_value = QOP_AUTH;</span>
+        }
+
+        // A2
+<span class="nc" id="L133">        ByteStringBuilder A2 = new ByteStringBuilder();</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        if(auth) A2.append(AUTH_METHOD); // for &quot;response&quot;, but not for &quot;rspauth&quot;</span>
+<span class="nc" id="L135">        A2.append(':');</span>
+<span class="nc" id="L136">        A2.append(digest_uri);</span>
+<span class="nc bnc" id="L137" title="All 4 branches missed.">        if (QOP_AUTH_CONF.equals(qop_value) || QOP_AUTH_INT.equals(qop_value)) {</span>
+<span class="nc" id="L138">            A2.append(':');</span>
+<span class="nc" id="L139">            A2.append(SECURITY_MARK);</span>
+        }
+
+<span class="nc" id="L142">        byte[] digest_A2 = messageDigest.digest(A2.toArray());</span>
+
+<span class="nc" id="L144">        ByteStringBuilder KD = new ByteStringBuilder();</span>
+<span class="nc" id="L145">        KD.append(ByteIterator.ofBytes(H_A1).hexEncode().drainToString().getBytes(StandardCharsets.US_ASCII));</span>
+<span class="nc" id="L146">        KD.append(':');</span>
+<span class="nc" id="L147">        KD.append(nonce);</span>
+<span class="nc" id="L148">        KD.append(':');</span>
+<span class="nc" id="L149">        KD.append(convertToHexBytesWithLeftPadding(nonce_count, 8));</span>
+<span class="nc" id="L150">        KD.append(':');</span>
+<span class="nc" id="L151">        KD.append(cnonce);</span>
+<span class="nc" id="L152">        KD.append(':');</span>
+<span class="nc" id="L153">        KD.append(qop_value);</span>
+<span class="nc" id="L154">        KD.append(':');</span>
+<span class="nc" id="L155">        KD.append(ByteIterator.ofBytes(digest_A2).hexEncode().drainToString().getBytes(StandardCharsets.US_ASCII));</span>
+
+<span class="nc" id="L157">        KD.updateDigest(messageDigest);</span>
+<span class="nc" id="L158">        return ByteIterator.ofBytes(messageDigest.digest()).hexEncode().drainToString().getBytes(StandardCharsets.US_ASCII);</span>
+    }
+
+    /**
+     * Converts input to HEX and pad it from left with zeros to totalLength.
+     *
+     * @param input to be converted to HEX
+     * @param totalLength length of returned array of bytes
+     * @return
+     */
+    public static byte[] convertToHexBytesWithLeftPadding(int input, int totalLength) {
+<span class="nc" id="L169">        byte[] retValue = new byte[totalLength];</span>
+<span class="nc" id="L170">        Arrays.fill(retValue, (byte) '0');</span>
+<span class="nc" id="L171">        byte[] hex = Integer.toString(input, 16).getBytes(StandardCharsets.UTF_8);</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">        if (hex.length &gt; totalLength) {</span>
+<span class="nc" id="L173">            throw saslDigest.requiredNegativePadding(totalLength, hex.length);</span>
+        }
+
+<span class="nc" id="L176">        int from = totalLength - hex.length;</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">        for (int i = 0; i &lt; hex.length; i++) {</span>
+<span class="nc" id="L178">            retValue[from + i] = hex[i];</span>
+        }
+<span class="nc" id="L180">        return retValue;</span>
+    }
+
+    public static byte[] computeHMAC(byte[] kc, int sequenceNumber, Mac mac, byte[] message, int offset, int len) throws SaslException {
+<span class="nc" id="L184">        SecretKeySpec ks = new SecretKeySpec(kc, HMAC_algorithm);</span>
+        try {
+<span class="nc" id="L186">            mac.init(ks);</span>
+<span class="nc" id="L187">        } catch (InvalidKeyException e) {</span>
+<span class="nc" id="L188">            throw saslDigest.mechInvalidKeyForDigestHMAC().toSaslException();</span>
+<span class="nc" id="L189">        }</span>
+<span class="nc" id="L190">        byte[] buffer = new byte[len + 4];</span>
+<span class="nc" id="L191">        integerByteOrdered(sequenceNumber, buffer, 0, 4);</span>
+<span class="nc" id="L192">        System.arraycopy(message, offset, buffer, 4, len);</span>
+<span class="nc" id="L193">        byte[] macBuffer = new byte[10];</span>
+<span class="nc" id="L194">        System.arraycopy(mac.doFinal(buffer), 0, macBuffer, 0, 10);</span>
+<span class="nc" id="L195">        return macBuffer;</span>
+    }
+
+    public static void integerByteOrdered(int num, byte[] buf, int offset, int len) {
+<span class="nc bnc" id="L199" title="All 6 branches missed.">        assert len &gt;= 1 &amp;&amp; len &lt;= 4;</span>
+
+<span class="nc bnc" id="L201" title="All 2 branches missed.">        for (int i = len - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L202">            buf[offset + i] = (byte) (num &amp; 0xff);</span>
+<span class="nc" id="L203">            num &gt;&gt;&gt;= 8;</span>
+        }
+<span class="nc" id="L205">    }</span>
+
+    public static int decodeByteOrderedInteger(byte[] buf, int offset, int len) {
+<span class="nc bnc" id="L208" title="All 6 branches missed.">        assert len &gt;= 1 &amp;&amp; len &lt;= 4;</span>
+
+<span class="nc" id="L210">        int result = buf[offset];</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">        for (int i = 1; i &lt; len; i++) {</span>
+<span class="nc" id="L212">            result &lt;&lt;= 8;</span>
+<span class="nc" id="L213">            result |= (buf[offset + i] &amp; 0xff);</span>
+        }
+<span class="nc" id="L215">        return result;</span>
+    }
+
+    static byte[] create3desSubKey(byte[] keyBits, int offset) {
+<span class="nc bnc" id="L219" title="All 4 branches missed.">        assert keyBits.length &gt;= offset + 7;</span>
+
+<span class="nc" id="L221">        byte[] subkey = new byte[8];</span>
+<span class="nc" id="L222">        subkey[0] = fixParityBit((byte)                          (keyBits[offset]   &amp; 0xFF));</span>
+<span class="nc" id="L223">        subkey[1] = fixParityBit((byte)(keyBits[offset]   &lt;&lt; 7 | (keyBits[offset+1] &amp; 0xFF) &gt;&gt; 1));</span>
+<span class="nc" id="L224">        subkey[2] = fixParityBit((byte)(keyBits[offset+1] &lt;&lt; 6 | (keyBits[offset+2] &amp; 0xFF) &gt;&gt; 2));</span>
+<span class="nc" id="L225">        subkey[3] = fixParityBit((byte)(keyBits[offset+2] &lt;&lt; 5 | (keyBits[offset+3] &amp; 0xFF) &gt;&gt; 3));</span>
+<span class="nc" id="L226">        subkey[4] = fixParityBit((byte)(keyBits[offset+3] &lt;&lt; 4 | (keyBits[offset+4] &amp; 0xFF) &gt;&gt; 4));</span>
+<span class="nc" id="L227">        subkey[5] = fixParityBit((byte)(keyBits[offset+4] &lt;&lt; 3 | (keyBits[offset+5] &amp; 0xFF) &gt;&gt; 5));</span>
+<span class="nc" id="L228">        subkey[6] = fixParityBit((byte)(keyBits[offset+5] &lt;&lt; 2 | (keyBits[offset+6] &amp; 0xFF) &gt;&gt; 6));</span>
+<span class="nc" id="L229">        subkey[7] = fixParityBit((byte)(keyBits[offset+6] &lt;&lt; 1));</span>
+<span class="nc" id="L230">        return subkey;</span>
+    }
+
+    /**
+     * Create DES secret key according to http://www.cryptosys.net/3des.html.
+     *
+     * @param keyBits
+     * @return
+     * @throws NoSuchAlgorithmException
+     * @throws InvalidKeyException
+     * @throws InvalidKeySpecException
+     */
+    public static SecretKey createDesSecretKey(byte[] keyBits) throws NoSuchAlgorithmException, InvalidKeyException, InvalidKeySpecException {
+<span class="nc bnc" id="L243" title="All 4 branches missed.">        assert keyBits.length &gt;= 7;</span>
+
+<span class="nc" id="L245">        KeySpec spec = new DESKeySpec(create3desSubKey(keyBits, 0), 0);</span>
+<span class="nc" id="L246">        SecretKeyFactory desFact = SecretKeyFactory.getInstance(&quot;DES&quot;);</span>
+
+<span class="nc" id="L248">        return desFact.generateSecret(spec);</span>
+    }
+
+    /**
+     * Create 3des secret key according to http://www.cryptosys.net/3des.html.
+     *
+     * @param keyBits
+     * @return
+     * @throws NoSuchAlgorithmException
+     * @throws InvalidKeyException
+     * @throws InvalidKeySpecException
+     */
+    public static SecretKey create3desSecretKey(byte[] keyBits) throws NoSuchAlgorithmException, InvalidKeyException, InvalidKeySpecException {
+<span class="nc bnc" id="L261" title="All 4 branches missed.">        assert keyBits.length &gt;= 14;</span>
+
+<span class="nc" id="L263">        byte[] key = new byte[24];</span>
+<span class="nc" id="L264">        System.arraycopy(create3desSubKey(keyBits, 0), 0, key, 0, 8);   // subkey1</span>
+<span class="nc" id="L265">        System.arraycopy(create3desSubKey(keyBits, 7), 0, key, 8, 8);   // subkey2</span>
+<span class="nc" id="L266">        System.arraycopy(key, 0, key, 16, 8);                           // subkey3 == subkey1 (in option2 of 3des key)</span>
+
+<span class="nc" id="L268">        KeySpec spec = new DESedeKeySpec(key, 0);</span>
+<span class="nc" id="L269">        SecretKeyFactory desFact = SecretKeyFactory.getInstance(&quot;DESede&quot;);</span>
+
+<span class="nc" id="L271">        return desFact.generateSecret(spec);</span>
+    }
+
+    /**
+     * Fix the rightmost bit to maintain odd parity for the whole byte.
+     *
+     * @param toFix - byte to fix
+     * @return fixed byte with odd parity
+     */
+    private static byte fixParityBit(byte toFix) {
+<span class="nc bnc" id="L281" title="All 2 branches missed.">        return (Integer.bitCount(toFix &amp; 0xff) &amp; 1) == 0 ? (byte) (toFix ^ 1) : toFix;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

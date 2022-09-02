@@ -1,0 +1,640 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>HttpAuthenticator.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http</a> &gt; <span class="el_source">HttpAuthenticator.java</span></div><h1>HttpAuthenticator.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.http;
+
+import static java.lang.System.getSecurityManager;
+import static org.wildfly.common.Assert.checkNotNullParam;
+import static org.wildfly.security.http.ElytronMessages.log;
+import static org.wildfly.security.http.HttpConstants.FORBIDDEN;
+import static org.wildfly.security.http.HttpConstants.OK;
+import static org.wildfly.security.http.HttpConstants.SECURITY_IDENTITY;
+
+import java.io.OutputStream;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
+import java.security.cert.Certificate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.auth.server.RealmUnavailableException;
+import org.wildfly.security.auth.server.SecurityDomain;
+import org.wildfly.security.auth.server.SecurityIdentity;
+import org.wildfly.security.auth.server.ServerAuthenticationContext;
+import org.wildfly.security.cache.CachedIdentity;
+import org.wildfly.security.cache.IdentityCache;
+import org.wildfly.security.credential.PasswordCredential;
+import org.wildfly.security.evidence.Evidence;
+import org.wildfly.security.evidence.PasswordGuessEvidence;
+import org.wildfly.security.http.impl.BaseHttpServerRequest;
+import org.wildfly.security.password.interfaces.ClearPassword;
+
+/**
+ * A HTTP based authenticator responsible for performing the authentication of the current request based on the policies of the
+ * associated {@link SecurityDomain}.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public class HttpAuthenticator {
+
+<span class="nc" id="L58">    private static final String MY_AUTHENTICATED_IDENTITY_KEY = HttpAuthenticator.class.getName() + &quot;.authenticated-identity&quot;;</span>
+
+    private final Supplier&lt;List&lt;HttpServerAuthenticationMechanism&gt;&gt; mechanismSupplier;
+    private final Supplier&lt;IdentityCache&gt; identityCacheSupplier;
+    private final SecurityDomain securityDomain;
+    private final HttpExchangeSpi httpExchangeSpi;
+    private final boolean required;
+    private final boolean ignoreOptionalFailures;
+    private final String programmaticMechanismName;
+    private final Consumer&lt;Runnable&gt; logoutHandlerConsumer;
+    private volatile IdentityCache identityCache;
+<span class="nc" id="L69">    private volatile boolean authenticated = false;</span>
+
+<span class="nc" id="L71">    private HttpAuthenticator(final Builder builder) {</span>
+<span class="nc" id="L72">        this.mechanismSupplier = builder.mechanismSupplier;</span>
+<span class="nc" id="L73">        this.securityDomain = builder.securityDomain;</span>
+<span class="nc" id="L74">        this.programmaticMechanismName = builder.programmaticMechanismName;</span>
+<span class="nc" id="L75">        this.logoutHandlerConsumer = builder.logoutHandlerConsumer;</span>
+<span class="nc" id="L76">        this.httpExchangeSpi = builder.httpExchangeSpi;</span>
+<span class="nc" id="L77">        this.required = builder.required;</span>
+<span class="nc" id="L78">        this.ignoreOptionalFailures = builder.ignoreOptionalFailures;</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        this.identityCacheSupplier = builder.identityCacheSupplier != null ? builder.identityCacheSupplier : () -&gt; createIdentityCache(programmaticMechanismName);</span>
+<span class="nc" id="L80">    }</span>
+
+    /**
+     * Perform authentication for the request.
+     *
+     * @return {@code true} if the call should be allowed to continue within the web server, {@code false} if the call should be
+     *         returning to the client.
+     * @throws HttpAuthenticationException
+     */
+    public boolean authenticate() throws HttpAuthenticationException {
+<span class="nc bnc" id="L90" title="All 2 branches missed.">        if (restoreIdentity()) {</span>
+<span class="nc" id="L91">            return true;</span>
+        }
+
+<span class="nc" id="L94">        return new AuthenticationExchange().authenticate();</span>
+    }
+
+    private boolean isAuthenticated() {
+<span class="nc" id="L98">        return authenticated;</span>
+    }
+
+    /**
+     * Perform a login for the supplied username and password using the pre-configured mechanism name.
+     *
+     * @param username the username to use for authentication.
+     * @param password the password to use for authentication.
+     * @return A {@link SecurityIdentity} is authentication and authorization is successful.
+     */
+    public SecurityIdentity login(String username, String password) {
+<span class="nc" id="L109">        final PasswordGuessEvidence evidence = new PasswordGuessEvidence(checkNotNullParam(&quot;password&quot;, password).toCharArray());</span>
+        try {
+<span class="nc" id="L111">            return login(username, evidence, programmaticMechanismName);</span>
+        } finally {
+<span class="nc" id="L113">            evidence.destroy();</span>
+        }
+    }
+
+    /**
+     * Perform a login for the supplied username and password using the specified mechanism name.
+     *
+     * @param username the username to use for authentication.
+     * @param evidence the evidence to use for authentication.
+     * @return A {@link SecurityIdentity} is authentication and authorization is successful.
+     */
+    private SecurityIdentity login(String username, Evidence evidence, String mechanismName) {
+<span class="nc bnc" id="L125" title="All 2 branches missed.">        if (securityDomain == null) {</span>
+<span class="nc" id="L126">            return null;</span>
+        }
+
+<span class="nc" id="L129">        try (ServerAuthenticationContext authenticationContext = createServerAuthenticationContext()) {</span>
+<span class="nc" id="L130">            authenticationContext.setAuthenticationName(username);</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">            if (authenticationContext.verifyEvidence(evidence)) {</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">                if (evidence instanceof PasswordGuessEvidence) {</span>
+<span class="nc" id="L133">                    log.tracef(&quot;Associating credential for '%s' with identity.&quot;, username);</span>
+<span class="nc" id="L134">                    authenticationContext.addPrivateCredential(</span>
+<span class="nc" id="L135">                            new PasswordCredential(ClearPassword.createRaw(ClearPassword.ALGORITHM_CLEAR, ((PasswordGuessEvidence) evidence).getGuess())));</span>
+                }
+<span class="nc bnc" id="L137" title="All 2 branches missed.">                if (authenticationContext.authorize()) {</span>
+<span class="nc" id="L138">                    SecurityIdentity authorizedIdentity = authenticationContext.getAuthorizedIdentity();</span>
+
+<span class="nc" id="L140">                    IdentityCache identityCache = getOrCreateIdentityCache();</span>
+<span class="nc" id="L141">                    identityCache.put(authorizedIdentity);</span>
+<span class="nc" id="L142">                    logoutHandlerConsumer.accept(identityCache::remove);</span>
+
+<span class="nc" id="L144">                    httpExchangeSpi.authenticationComplete(authorizedIdentity, mechanismName);</span>
+
+<span class="nc" id="L146">                    return authorizedIdentity;</span>
+                } else {
+<span class="nc" id="L148">                    httpExchangeSpi.authenticationFailed(&quot;Authorization Failed&quot;, mechanismName);</span>
+                }
+            } else {
+<span class="nc" id="L151">                httpExchangeSpi.authenticationFailed(&quot;Authentication Failed&quot;, mechanismName);</span>
+            }
+<span class="nc bnc" id="L153" title="All 2 branches missed.">        } catch (IllegalArgumentException | RealmUnavailableException | IllegalStateException e) {</span>
+<span class="nc" id="L154">            httpExchangeSpi.authenticationFailed(e.getMessage(), mechanismName);</span>
+<span class="nc" id="L155">        }</span>
+
+<span class="nc" id="L157">        return null;</span>
+    }
+
+    private ServerAuthenticationContext createServerAuthenticationContext() {
+<span class="nc bnc" id="L161" title="All 2 branches missed.">        if (getSecurityManager() != null) {</span>
+<span class="nc" id="L162">            return AccessController.doPrivileged((PrivilegedAction&lt;ServerAuthenticationContext&gt;) () -&gt; securityDomain.createNewAuthenticationContext());</span>
+        }
+
+<span class="nc" id="L165">        return securityDomain.createNewAuthenticationContext();</span>
+    }
+
+    private boolean restoreIdentity() {
+<span class="nc bnc" id="L169" title="All 2 branches missed.">        if (securityDomain == null) {</span>
+<span class="nc" id="L170">            return false;</span>
+        }
+
+<span class="nc" id="L173">        IdentityCache identityCache = getOrCreateIdentityCache();</span>
+
+<span class="nc" id="L175">        CachedIdentity cachedIdentity = identityCache.get();</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        if (cachedIdentity != null) {</span>
+<span class="nc" id="L177">            SecurityIdentity securityIdentity = cachedIdentity.getSecurityIdentity();</span>
+
+<span class="nc" id="L179">            try (final ServerAuthenticationContext authenticationContext = securityDomain.createNewAuthenticationContext()) {</span>
+<span class="nc bnc" id="L180" title="All 4 branches missed.">                boolean authorized = securityIdentity != null &amp;&amp; authenticationContext.importIdentity(securityIdentity);</span>
+<span class="nc" id="L181">                boolean cache = false;</span>
+
+<span class="nc bnc" id="L183" title="All 2 branches missed.">                if (authorized == false) {</span>
+<span class="nc" id="L184">                    log.trace(&quot;Unable to use SecurityIdentity from CachedIdentity - attempting to recreate&quot;);</span>
+
+<span class="nc" id="L186">                    authenticationContext.setAuthenticationName(cachedIdentity.getName());</span>
+<span class="nc" id="L187">                    authorized = authenticationContext.authorize();</span>
+<span class="nc" id="L188">                    cache = true;</span>
+                }
+
+<span class="nc bnc" id="L191" title="All 2 branches missed.">                if (authorized) {</span>
+<span class="nc" id="L192">                    securityIdentity = authenticationContext.getAuthorizedIdentity();</span>
+
+<span class="nc" id="L194">                    httpExchangeSpi.authenticationComplete(securityIdentity, cachedIdentity.getMechanismName());</span>
+<span class="nc" id="L195">                    logoutHandlerConsumer.accept(identityCache::remove);</span>
+
+<span class="nc bnc" id="L197" title="All 2 branches missed.">                    if (cache) {</span>
+<span class="nc" id="L198">                        log.tracef(&quot;Replacing cached identity for '%s' against session scope.&quot;, cachedIdentity.getName());</span>
+<span class="nc" id="L199">                        identityCache.put(securityIdentity);</span>
+                    }
+
+<span class="nc" id="L202">                    return true;</span>
+                }
+<span class="nc bnc" id="L204" title="All 2 branches missed.">            } catch (IllegalArgumentException | RealmUnavailableException | IllegalStateException e) {</span>
+<span class="nc" id="L205">                httpExchangeSpi.authenticationFailed(e.getMessage(), programmaticMechanismName);</span>
+<span class="nc" id="L206">            }</span>
+
+<span class="nc" id="L208">            log.tracef(&quot;Restoring identity '%s' failed, clearing cache from scope.&quot;, cachedIdentity.getName());</span>
+<span class="nc" id="L209">            identityCache.remove(); // Whatever was in there no longer works so just</span>
+                                    // drop it.
+<span class="nc" id="L211">        } else {</span>
+<span class="nc" id="L212">            log.trace(&quot;No CachedIdentity to restore.&quot;);</span>
+        }
+
+<span class="nc" id="L215">        return false;</span>
+    }
+
+    private IdentityCache getOrCreateIdentityCache() {
+<span class="nc bnc" id="L219" title="All 2 branches missed.">        if (identityCache == null) {</span>
+<span class="nc" id="L220">            identityCache = identityCacheSupplier.get();</span>
+        }
+
+<span class="nc" id="L223">        return identityCache;</span>
+    }
+
+    private IdentityCache createIdentityCache(String mechanismName) {
+<span class="nc" id="L227">        return new IdentityCache() {</span>
+
+            @Override
+            public void put(SecurityIdentity identity) {
+<span class="nc" id="L231">                HttpScope session = getAttachableSessionScope(true);</span>
+
+<span class="nc bnc" id="L233" title="All 4 branches missed.">                if (session == null || !session.exists()) {</span>
+<span class="nc bnc" id="L234" title="All 2 branches missed.">                    if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L235">                        log.tracef(&quot;Unable to cache identity for '%s'.&quot;, identity.getPrincipal().getName());</span>
+                    }
+<span class="nc" id="L237">                    return;</span>
+                }
+
+<span class="nc bnc" id="L240" title="All 4 branches missed.">                if (session.supportsChangeID() &amp;&amp; session.getAttachment(MY_AUTHENTICATED_IDENTITY_KEY) == null) {</span>
+<span class="nc" id="L241">                    session.changeID();</span>
+                }
+
+<span class="nc bnc" id="L244" title="All 2 branches missed.">                if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L245">                    log.tracef(&quot;Caching identity for '%s' against session scope.&quot;, identity.getPrincipal().getName());</span>
+                }
+<span class="nc" id="L247">                session.setAttachment(MY_AUTHENTICATED_IDENTITY_KEY, new CachedIdentity(mechanismName, true, identity));</span>
+<span class="nc" id="L248">            }</span>
+
+            @Override
+            public CachedIdentity get() {
+<span class="nc" id="L252">                HttpScope session = getAttachableSessionScope(false);</span>
+
+<span class="nc bnc" id="L254" title="All 4 branches missed.">                if (session == null || session.exists() == false) {</span>
+<span class="nc" id="L255">                    return null;</span>
+                }
+
+<span class="nc" id="L258">                return (CachedIdentity) session.getAttachment(MY_AUTHENTICATED_IDENTITY_KEY);</span>
+            }
+
+            @Override
+            public CachedIdentity remove() {
+<span class="nc" id="L263">                HttpScope session = getAttachableSessionScope(false);</span>
+
+<span class="nc bnc" id="L265" title="All 4 branches missed.">                if (session == null || session.exists() == false) {</span>
+<span class="nc" id="L266">                    return null;</span>
+                }
+
+<span class="nc" id="L269">                CachedIdentity cachedIdentity = get();</span>
+
+<span class="nc" id="L271">                session.setAttachment(MY_AUTHENTICATED_IDENTITY_KEY, null);</span>
+
+<span class="nc" id="L273">                return cachedIdentity;</span>
+            }
+        };
+    }
+
+    private HttpScope getAttachableSessionScope(boolean createSession) {
+<span class="nc" id="L279">        HttpScope scope = httpExchangeSpi.getScope(Scope.SESSION);</span>
+<span class="nc bnc" id="L280" title="All 4 branches missed.">        if (scope == null || scope.supportsAttachments() == false) {</span>
+<span class="nc" id="L281">            return null;</span>
+        }
+
+<span class="nc bnc" id="L284" title="All 6 branches missed.">        if (scope != null &amp;&amp; scope.exists() == false &amp;&amp; createSession) {</span>
+<span class="nc" id="L285">            scope.create();</span>
+        }
+
+<span class="nc" id="L288">        return scope;</span>
+    }
+
+    /**
+     * Construct and return a new {@code Builder} to configure and create an instance of {@code HttpAuthenticator}.
+     *
+     * @return a new {@code Builder} to configure and create an instance of {@code HttpAuthenticator}.
+     */
+    public static Builder builder() {
+<span class="nc" id="L297">        return new Builder();</span>
+    }
+
+    private class AuthenticationExchange extends BaseHttpServerRequest implements HttpServerRequest, HttpServerResponse {
+
+        private volatile HttpServerAuthenticationMechanism currentMechanism;
+
+<span class="nc" id="L304">        private volatile boolean authenticationAttempted = false;</span>
+<span class="nc" id="L305">        private volatile int statusCode = -1;</span>
+<span class="nc" id="L306">        private volatile boolean statusCodeAllowed = false;</span>
+        private volatile List&lt;HttpServerMechanismsResponder&gt; responders;
+        private volatile HttpServerMechanismsResponder successResponder;
+
+<span class="nc" id="L310">        AuthenticationExchange() {</span>
+<span class="nc" id="L311">            super(httpExchangeSpi);</span>
+<span class="nc" id="L312">        }</span>
+
+        private boolean authenticate() throws HttpAuthenticationException {
+<span class="nc" id="L315">            List&lt;HttpServerAuthenticationMechanism&gt; authenticationMechanisms = mechanismSupplier.get();</span>
+<span class="nc bnc" id="L316" title="All 4 branches missed.">            if (required &amp;&amp; authenticationMechanisms.size() == 0) {</span>
+<span class="nc" id="L317">                throw log.httpAuthenticationNoMechanisms();</span>
+            }
+<span class="nc" id="L319">            responders = new ArrayList&lt;&gt;(authenticationMechanisms.size());</span>
+<span class="nc" id="L320">            boolean evaluationFailed = false;</span>
+            try {
+<span class="nc bnc" id="L322" title="All 2 branches missed.">                for (HttpServerAuthenticationMechanism nextMechanism : authenticationMechanisms) {</span>
+<span class="nc" id="L323">                    currentMechanism = nextMechanism;</span>
+                    try {
+<span class="nc" id="L325">                        nextMechanism.evaluateRequest(this);</span>
+<span class="nc" id="L326">                    } catch (HttpAuthenticationException e) {</span>
+                        // Give all mechanisms an opportunity to succeed, where a mechanism fails due to mis-configuration or a transient error
+                        // others may still be able to operate correctly.
+<span class="nc" id="L329">                        evaluationFailed = true;</span>
+<span class="nc" id="L330">                        log.trace(&quot;Request evaluation for mechanism '%s' failed.&quot;, nextMechanism.getMechanismName(), e);</span>
+<span class="nc" id="L331">                    }</span>
+
+<span class="nc bnc" id="L333" title="All 2 branches missed.">                    if (isAuthenticated()) {</span>
+<span class="nc bnc" id="L334" title="All 2 branches missed.">                        if (successResponder != null) {</span>
+<span class="nc" id="L335">                            statusCodeAllowed = true;</span>
+<span class="nc" id="L336">                            successResponder.sendResponse(this);</span>
+<span class="nc bnc" id="L337" title="All 2 branches missed.">                            if (statusCode &gt; 0) {</span>
+<span class="nc" id="L338">                                httpExchangeSpi.setStatusCode(statusCode);</span>
+<span class="nc" id="L339">                                return false;</span>
+                            }
+                        }
+<span class="nc" id="L342">                        return true;</span>
+                    }
+<span class="nc" id="L344">                }</span>
+<span class="nc" id="L345">                currentMechanism = null;</span>
+
+<span class="nc bnc" id="L347" title="All 6 branches missed.">                if (required || (authenticationAttempted &amp;&amp; ignoreOptionalFailures == false)) {</span>
+<span class="nc" id="L348">                    statusCodeAllowed = true;</span>
+<span class="nc bnc" id="L349" title="All 2 branches missed.">                    if (responders.size() &gt; 0) {</span>
+<span class="nc" id="L350">                        boolean atLeastOneChallenge = false;</span>
+
+<span class="nc" id="L352">                        int defaultStatusCode = OK;</span>
+<span class="nc" id="L353">                        boolean statusSet = false;</span>
+<span class="nc bnc" id="L354" title="All 2 branches missed.">                        for (HttpServerMechanismsResponder responder : responders) {</span>
+                            try {
+<span class="nc" id="L356">                                responder.sendResponse(this);</span>
+<span class="nc" id="L357">                                atLeastOneChallenge = true;</span>
+<span class="nc bnc" id="L358" title="All 4 branches missed.">                                if ( ! statusSet &amp;&amp; statusCode &gt; 0) {</span>
+<span class="nc bnc" id="L359" title="All 2 branches missed.">                                    if (statusCode == FORBIDDEN) { // minor status code change default</span>
+<span class="nc" id="L360">                                        defaultStatusCode = statusCode;</span>
+<span class="nc bnc" id="L361" title="All 2 branches missed.">                                    } else if (statusCode != OK) {</span>
+<span class="nc" id="L362">                                        statusSet = true; // other status codes (like UNAUTHORIZED) set status immediately</span>
+<span class="nc" id="L363">                                        httpExchangeSpi.setStatusCode(statusCode);</span>
+                                    }
+                                }
+<span class="nc" id="L366">                            } catch (HttpAuthenticationException e) {</span>
+<span class="nc" id="L367">                                log.trace(&quot;HTTP Authentication mechanism unable to send challenge.&quot;, e);</span>
+<span class="nc" id="L368">                            }</span>
+<span class="nc" id="L369">                        }</span>
+<span class="nc bnc" id="L370" title="All 2 branches missed.">                        if (atLeastOneChallenge == false) {</span>
+<span class="nc" id="L371">                            throw log.httpAuthenticationNoSuccessfulResponder();</span>
+                        }
+<span class="nc bnc" id="L373" title="All 2 branches missed.">                        if ( ! statusSet) {</span>
+<span class="nc" id="L374">                            httpExchangeSpi.setStatusCode(defaultStatusCode);</span>
+                        }
+<span class="nc" id="L376">                    } else { // no responders set</span>
+<span class="nc bnc" id="L377" title="All 2 branches missed.">                        if (evaluationFailed) {</span>
+<span class="nc" id="L378">                            throw log.httpAuthenticationFailedEvaluatingRequest();</span>
+                        }
+<span class="nc" id="L380">                        httpExchangeSpi.setStatusCode(FORBIDDEN);</span>
+                    }
+<span class="nc" id="L382">                    return false;</span>
+                }
+
+                // If authentication was required it should have been picked up in the previous block.
+<span class="nc" id="L386">                return true;</span>
+            } finally {
+<span class="nc bnc" id="L388" title="All 2 branches missed.">                for (HttpServerAuthenticationMechanism current : authenticationMechanisms) {</span>
+<span class="nc" id="L389">                    current.dispose();</span>
+<span class="nc" id="L390">                }</span>
+            }
+        }
+
+        /*
+         * This method is overridden to trigger certificate re-negotiation if authentication
+         * is required.
+         */
+        @Override
+        public Certificate[] getPeerCertificates() {
+<span class="nc" id="L400">            return httpExchangeSpi.getPeerCertificates(required);</span>
+        }
+
+        @Override
+        public void noAuthenticationInProgress(HttpServerMechanismsResponder responder) {
+<span class="nc bnc" id="L405" title="All 2 branches missed.">            if (responder != null) {</span>
+<span class="nc" id="L406">                responders.add(responder);</span>
+            }
+<span class="nc" id="L408">        }</span>
+
+        @Override
+        public void authenticationInProgress(HttpServerMechanismsResponder responder) {
+<span class="nc" id="L412">            authenticationAttempted = true;</span>
+<span class="nc bnc" id="L413" title="All 2 branches missed.">            if (responder != null) {</span>
+<span class="nc" id="L414">                responders.add(responder);</span>
+            }
+<span class="nc" id="L416">        }</span>
+
+        @Override
+        public void authenticationComplete(HttpServerMechanismsResponder responder) {
+<span class="nc" id="L420">            authenticated = true;</span>
+<span class="nc" id="L421">            httpExchangeSpi.authenticationComplete(</span>
+<span class="nc" id="L422">                    currentMechanism.getNegotiationProperty(SECURITY_IDENTITY, SecurityIdentity.class),</span>
+<span class="nc" id="L423">                    currentMechanism.getMechanismName());</span>
+<span class="nc" id="L424">            successResponder = responder;</span>
+<span class="nc" id="L425">        }</span>
+
+        @Override
+        public void authenticationComplete(HttpServerMechanismsResponder responder, Runnable logoutHandler) {
+<span class="nc" id="L429">            authenticationComplete(responder);</span>
+<span class="nc bnc" id="L430" title="All 2 branches missed.">            if (logoutHandlerConsumer != null) {</span>
+<span class="nc" id="L431">                logoutHandlerConsumer.accept(logoutHandler);</span>
+            }
+<span class="nc" id="L433">        }</span>
+
+        @Override
+        public void authenticationFailed(String message, HttpServerMechanismsResponder responder) {
+<span class="nc" id="L437">            authenticationAttempted = true;</span>
+<span class="nc" id="L438">            httpExchangeSpi.authenticationFailed(message, currentMechanism.getMechanismName());</span>
+<span class="nc bnc" id="L439" title="All 2 branches missed.">            if (responder != null) {</span>
+<span class="nc" id="L440">                responders.add(responder);</span>
+            }
+<span class="nc" id="L442">        }</span>
+
+        @Override
+        public void badRequest(HttpAuthenticationException failure, HttpServerMechanismsResponder responder) {
+<span class="nc" id="L446">            authenticationAttempted = true;</span>
+<span class="nc" id="L447">            httpExchangeSpi.badRequest(failure, currentMechanism.getMechanismName());</span>
+<span class="nc bnc" id="L448" title="All 2 branches missed.">            if (responder != null) {</span>
+<span class="nc" id="L449">                responders.add(responder);</span>
+            }
+<span class="nc" id="L451">        }</span>
+
+        @Override
+        public void addResponseHeader(String headerName, String headerValue) {
+<span class="nc" id="L455">            httpExchangeSpi.addResponseHeader(headerName, headerValue);</span>
+<span class="nc" id="L456">        }</span>
+
+        @Override
+        public void setStatusCode(int statusCode) {
+<span class="nc bnc" id="L460" title="All 2 branches missed.">            if (statusCodeAllowed == false) {</span>
+<span class="nc" id="L461">                throw log.statusCodeNotNow();</span>
+            }
+
+<span class="nc bnc" id="L464" title="All 4 branches missed.">            if (this.statusCode &lt; 0 || statusCode != OK) {</span>
+<span class="nc" id="L465">                this.statusCode = statusCode;</span>
+            }
+<span class="nc" id="L467">        }</span>
+
+        @Override
+        public OutputStream getOutputStream() {
+<span class="nc" id="L471">            return httpExchangeSpi.getResponseOutputStream();</span>
+        }
+
+        @Override
+        public void setResponseCookie(HttpServerCookie cookie) {
+<span class="nc" id="L476">            httpExchangeSpi.setResponseCookie(cookie);</span>
+<span class="nc" id="L477">        }</span>
+
+        @Override
+        public boolean forward(String path) {
+<span class="nc" id="L481">            int statusCode = httpExchangeSpi.forward(path);</span>
+<span class="nc bnc" id="L482" title="All 2 branches missed.">            if (statusCode &gt; 0) {</span>
+<span class="nc" id="L483">                setStatusCode(statusCode);</span>
+
+<span class="nc" id="L485">                return true;</span>
+            }
+
+<span class="nc" id="L488">            return false;</span>
+        }
+
+        @Override
+        public boolean suspendRequest() {
+<span class="nc" id="L493">            return httpExchangeSpi.suspendRequest();</span>
+        }
+
+        @Override
+        public boolean resumeRequest() {
+<span class="nc" id="L498">            return httpExchangeSpi.resumeRequest();</span>
+        }
+
+    }
+
+    /**
+     * A {@code Builder} to configure and create an instance of {@code HttpAuthenticator}.
+     */
+    public static class Builder {
+
+        private Supplier&lt;List&lt;HttpServerAuthenticationMechanism&gt;&gt; mechanismSupplier;
+        private SecurityDomain securityDomain;
+        private HttpExchangeSpi httpExchangeSpi;
+        private boolean required;
+        private boolean ignoreOptionalFailures;
+        private Consumer&lt;Runnable&gt; logoutHandlerConsumer;
+        private String programmaticMechanismName;
+        private Supplier&lt;IdentityCache&gt; identityCacheSupplier;
+
+<span class="nc" id="L517">        Builder() {</span>
+<span class="nc" id="L518">        }</span>
+
+        /**
+         * Set the supplier to use to obtain list of {@link HttpServerAuthenticationMechanism} implementations
+         * instances to use, based on the configured policy.
+         *
+         * @param mechanismSupplier the {@link Supplier} with the configured authentication policy
+         * @return the {@link Builder} to allow method call chaining.
+         */
+        public Builder setMechanismSupplier(Supplier&lt;List&lt;HttpServerAuthenticationMechanism&gt;&gt; mechanismSupplier) {
+<span class="nc" id="L528">            this.mechanismSupplier = mechanismSupplier;</span>
+
+<span class="nc" id="L530">            return this;</span>
+        }
+
+        /**
+         * Set the {@link SecurityDomain} to use for programmatic authentication.
+         *
+         * @param securityDomain the {@link SecurityDomain} to use for programmatic authentication.
+         * @return the {@link Builder} to allow method call chaining.
+         */
+        public Builder setSecurityDomain(final SecurityDomain securityDomain) {
+<span class="nc" id="L540">            this.securityDomain = securityDomain;</span>
+
+<span class="nc" id="L542">            return this;</span>
+        }
+
+        /**
+         * Set the {@link HttpExchangeSpi} instance for the current request to allow integration with the Elytron APIs.
+         *
+         * @param httpExchangeSpi the {@link HttpExchangeSpi} instance for the current request
+         * @return the {@link Builder} to allow method call chaining.
+         */
+        public Builder setHttpExchangeSpi(final HttpExchangeSpi httpExchangeSpi) {
+<span class="nc" id="L552">            this.httpExchangeSpi = httpExchangeSpi;</span>
+
+<span class="nc" id="L554">            return this;</span>
+        }
+
+
+        /**
+         * Sets if authentication is required for the current request, if not required mechanisms will be called to be given the
+         * opportunity to authenticate
+         *
+         * @param required is authentication required for the current request?
+         * @return the {@link Builder} to allow method call chaining.
+         */
+        public Builder setRequired(final boolean required) {
+<span class="nc" id="L566">            this.required = required;</span>
+
+<span class="nc" id="L568">            return this;</span>
+        }
+
+        /**
+         * Where authentication is not required but is still attempted a failure of an authentication mechanism will cause the
+         * challenges to be sent and the current request returned to the client, setting this value to true will allow the
+         * failure to be ignored.
+         *
+         * This setting has no effect when required is set to {@code true}, in that case all failures will result in a client
+         *
+         * @param ignoreOptionalFailures should mechanism failures be ignored if authentication is optional.
+         * @return the {@link Builder} to allow method call chaining.
+         */
+        public Builder setIgnoreOptionalFailures(final boolean ignoreOptionalFailures) {
+<span class="nc" id="L582">            this.ignoreOptionalFailures = ignoreOptionalFailures;</span>
+
+<span class="nc" id="L584">            return this;</span>
+        }
+
+        /**
+         * &lt;p&gt;A {@link Consumer} responsible for registering a {@link Runnable} emitted by one of the mechanisms during the evaluation
+         * of a request and representing some action to be taken during logout.
+         *
+         * &lt;p&gt;This method is mainly targeted for programmatic logout where logout requests are send by the application after the
+         * authentication. Although, integration code is free to register the logout handler whatever they want in order to support
+         * different logout scenarios.
+         *
+         * @param logoutHandlerConsumer the consumer responsible for registering the logout handler (not {@code null})
+         * @return the {@link Builder} to allow method call chaining.
+         */
+        public Builder registerLogoutHandler(Consumer&lt;Runnable&gt; logoutHandlerConsumer) {
+<span class="nc" id="L599">            this.logoutHandlerConsumer = Assert.checkNotNullParam(&quot;logoutHandlerConsumer&quot;, logoutHandlerConsumer);</span>
+<span class="nc" id="L600">            return this;</span>
+        }
+
+        /**
+         * Set the mechanism name that should be used for programmatic authentication if one is not provided at the time of the call.
+         *
+         * @param programmaticMechanismName the name of the mechanism to use for programmatic authentication.
+         * @return the {@link Builder} to allow method call chaining.
+         */
+        public Builder setProgrammaticMechanismName(final String programmaticMechanismName) {
+<span class="nc" id="L610">            this.programmaticMechanismName = programmaticMechanismName;</span>
+
+<span class="nc" id="L612">            return this;</span>
+        }
+
+        /**
+         * Set a {@code Supplier} which acts as a factory to return a new {@link IdentityCache} instance for the current request, this allows
+         * alternative caching strategies to be provided.
+         *
+         * @param identityCacheSupplier - a factory which returns new {@link IdentityCache} instances for the current request.
+         * @return the {@link Builder} to allow method call chaining.
+         */
+        public Builder setIdentityCacheSupplier(final Supplier&lt;IdentityCache&gt; identityCacheSupplier) {
+<span class="nc" id="L623">            this.identityCacheSupplier = identityCacheSupplier;</span>
+
+<span class="nc" id="L625">            return this;</span>
+        }
+
+        /**
+         * Build the new {@code HttpAuthenticator} instance.
+         *
+         * @return the new {@code HttpAuthenticator} instance.
+         */
+        public HttpAuthenticator build() {
+<span class="nc" id="L634">            return new HttpAuthenticator(this);</span>
+        }
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

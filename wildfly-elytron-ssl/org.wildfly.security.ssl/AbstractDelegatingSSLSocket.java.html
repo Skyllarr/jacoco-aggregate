@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractDelegatingSSLSocket.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-ssl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.ssl</a> &gt; <span class="el_source">AbstractDelegatingSSLSocket.java</span></div><h1>AbstractDelegatingSSLSocket.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.ssl;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.SocketAddress;
+import java.net.SocketException;
+import java.nio.channels.SocketChannel;
+import java.util.List;
+import java.util.function.BiFunction;
+
+import javax.net.ssl.HandshakeCompletedListener;
+import javax.net.ssl.SSLParameters;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.SSLSocket;
+
+/**
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+abstract class AbstractDelegatingSSLSocket extends SSLSocket {
+
+    private final SSLSocket delegate;
+
+<span class="nc" id="L43">    AbstractDelegatingSSLSocket(final SSLSocket delegate) {</span>
+<span class="nc" id="L44">        this.delegate = delegate;</span>
+<span class="nc" id="L45">    }</span>
+
+    public String getApplicationProtocol() {
+<span class="nc" id="L48">        return JDKSpecific.getApplicationProtocol(delegate);</span>
+    }
+
+    public String getHandshakeApplicationProtocol() {
+<span class="nc" id="L52">        return JDKSpecific.getHandshakeApplicationProtocol(delegate);</span>
+    }
+
+    public void setHandshakeApplicationProtocolSelector(BiFunction&lt;SSLSocket, List&lt;String&gt;, String&gt; selector) {
+<span class="nc" id="L56">        JDKSpecific.setHandshakeApplicationProtocolSelector(delegate, selector);</span>
+<span class="nc" id="L57">    }</span>
+
+    public BiFunction&lt;SSLSocket, List&lt;String&gt;, String&gt; getHandshakeApplicationProtocolSelector() {
+<span class="nc" id="L60">        return JDKSpecific.getHandshakeApplicationProtocolSelector(delegate);</span>
+    }
+
+    public String[] getSupportedCipherSuites() {
+<span class="nc" id="L64">        return delegate.getSupportedCipherSuites();</span>
+    }
+
+    public String[] getEnabledCipherSuites() {
+<span class="nc" id="L68">        return delegate.getEnabledCipherSuites();</span>
+    }
+
+    public void setEnabledCipherSuites(final String[] suites) {
+<span class="nc" id="L72">        delegate.setEnabledCipherSuites(suites);</span>
+<span class="nc" id="L73">    }</span>
+
+    public String[] getSupportedProtocols() {
+<span class="nc" id="L76">        return delegate.getSupportedProtocols();</span>
+    }
+
+    public String[] getEnabledProtocols() {
+<span class="nc" id="L80">        return delegate.getEnabledProtocols();</span>
+    }
+
+    public void setEnabledProtocols(final String[] protocols) {
+<span class="nc" id="L84">        delegate.setEnabledProtocols(protocols);</span>
+<span class="nc" id="L85">    }</span>
+
+    public SSLSession getSession() {
+<span class="nc" id="L88">        return delegate.getSession();</span>
+    }
+
+    public SSLSession getHandshakeSession() {
+<span class="nc" id="L92">        return delegate.getHandshakeSession();</span>
+    }
+
+    public void addHandshakeCompletedListener(final HandshakeCompletedListener listener) {
+<span class="nc" id="L96">        delegate.addHandshakeCompletedListener(listener);</span>
+<span class="nc" id="L97">    }</span>
+
+    public void removeHandshakeCompletedListener(final HandshakeCompletedListener listener) {
+<span class="nc" id="L100">        delegate.removeHandshakeCompletedListener(listener);</span>
+<span class="nc" id="L101">    }</span>
+
+    public void startHandshake() throws IOException {
+<span class="nc" id="L104">        delegate.startHandshake();</span>
+<span class="nc" id="L105">    }</span>
+
+    public void setUseClientMode(final boolean mode) {
+<span class="nc" id="L108">        delegate.setUseClientMode(mode);</span>
+<span class="nc" id="L109">    }</span>
+
+    public boolean getUseClientMode() {
+<span class="nc" id="L112">        return delegate.getUseClientMode();</span>
+    }
+
+    public void setNeedClientAuth(final boolean need) {
+<span class="nc" id="L116">        delegate.setNeedClientAuth(need);</span>
+<span class="nc" id="L117">    }</span>
+
+    public boolean getNeedClientAuth() {
+<span class="nc" id="L120">        return delegate.getNeedClientAuth();</span>
+    }
+
+    public void setWantClientAuth(final boolean want) {
+<span class="nc" id="L124">        delegate.setWantClientAuth(want);</span>
+<span class="nc" id="L125">    }</span>
+
+    public boolean getWantClientAuth() {
+<span class="nc" id="L128">        return delegate.getWantClientAuth();</span>
+    }
+
+    public void setEnableSessionCreation(final boolean flag) {
+<span class="nc" id="L132">        delegate.setEnableSessionCreation(flag);</span>
+<span class="nc" id="L133">    }</span>
+
+    public boolean getEnableSessionCreation() {
+<span class="nc" id="L136">        return delegate.getEnableSessionCreation();</span>
+    }
+
+    public SSLParameters getSSLParameters() {
+<span class="nc" id="L140">        return delegate.getSSLParameters();</span>
+    }
+
+    public void setSSLParameters(final SSLParameters params) {
+<span class="nc" id="L144">        delegate.setSSLParameters(params);</span>
+<span class="nc" id="L145">    }</span>
+
+    public void connect(final SocketAddress endpoint) throws IOException {
+<span class="nc" id="L148">        delegate.connect(endpoint);</span>
+<span class="nc" id="L149">    }</span>
+
+    public void connect(final SocketAddress endpoint, final int timeout) throws IOException {
+<span class="nc" id="L152">        delegate.connect(endpoint, timeout);</span>
+<span class="nc" id="L153">    }</span>
+
+    public void bind(final SocketAddress bindpoint) throws IOException {
+<span class="nc" id="L156">        delegate.bind(bindpoint);</span>
+<span class="nc" id="L157">    }</span>
+
+    public InetAddress getInetAddress() {
+<span class="nc" id="L160">        return delegate.getInetAddress();</span>
+    }
+
+    public InetAddress getLocalAddress() {
+<span class="nc" id="L164">        return delegate.getLocalAddress();</span>
+    }
+
+    public int getPort() {
+<span class="nc" id="L168">        return delegate.getPort();</span>
+    }
+
+    public int getLocalPort() {
+<span class="nc" id="L172">        return delegate.getLocalPort();</span>
+    }
+
+    public SocketAddress getRemoteSocketAddress() {
+<span class="nc" id="L176">        return delegate.getRemoteSocketAddress();</span>
+    }
+
+    public SocketAddress getLocalSocketAddress() {
+<span class="nc" id="L180">        return delegate.getLocalSocketAddress();</span>
+    }
+
+    public SocketChannel getChannel() {
+<span class="nc" id="L184">        return delegate.getChannel();</span>
+    }
+
+    public InputStream getInputStream() throws IOException {
+<span class="nc" id="L188">        return delegate.getInputStream();</span>
+    }
+
+    public OutputStream getOutputStream() throws IOException {
+<span class="nc" id="L192">        return delegate.getOutputStream();</span>
+    }
+
+    public void setTcpNoDelay(final boolean on) throws SocketException {
+<span class="nc" id="L196">        delegate.setTcpNoDelay(on);</span>
+<span class="nc" id="L197">    }</span>
+
+    public boolean getTcpNoDelay() throws SocketException {
+<span class="nc" id="L200">        return delegate.getTcpNoDelay();</span>
+    }
+
+    public void setSoLinger(final boolean on, final int linger) throws SocketException {
+<span class="nc" id="L204">        delegate.setSoLinger(on, linger);</span>
+<span class="nc" id="L205">    }</span>
+
+    public int getSoLinger() throws SocketException {
+<span class="nc" id="L208">        return delegate.getSoLinger();</span>
+    }
+
+    public void sendUrgentData(final int data) throws IOException {
+<span class="nc" id="L212">        delegate.sendUrgentData(data);</span>
+<span class="nc" id="L213">    }</span>
+
+    public void setOOBInline(final boolean on) throws SocketException {
+<span class="nc" id="L216">        delegate.setOOBInline(on);</span>
+<span class="nc" id="L217">    }</span>
+
+    public boolean getOOBInline() throws SocketException {
+<span class="nc" id="L220">        return delegate.getOOBInline();</span>
+    }
+
+    public void setSoTimeout(final int timeout) throws SocketException {
+<span class="nc" id="L224">        delegate.setSoTimeout(timeout);</span>
+<span class="nc" id="L225">    }</span>
+
+    public int getSoTimeout() throws SocketException {
+<span class="nc" id="L228">        return delegate.getSoTimeout();</span>
+    }
+
+    public void setSendBufferSize(final int size) throws SocketException {
+<span class="nc" id="L232">        delegate.setSendBufferSize(size);</span>
+<span class="nc" id="L233">    }</span>
+
+    public int getSendBufferSize() throws SocketException {
+<span class="nc" id="L236">        return delegate.getSendBufferSize();</span>
+    }
+
+    public void setReceiveBufferSize(final int size) throws SocketException {
+<span class="nc" id="L240">        delegate.setReceiveBufferSize(size);</span>
+<span class="nc" id="L241">    }</span>
+
+    public int getReceiveBufferSize() throws SocketException {
+<span class="nc" id="L244">        return delegate.getReceiveBufferSize();</span>
+    }
+
+    public void setKeepAlive(final boolean on) throws SocketException {
+<span class="nc" id="L248">        delegate.setKeepAlive(on);</span>
+<span class="nc" id="L249">    }</span>
+
+    public boolean getKeepAlive() throws SocketException {
+<span class="nc" id="L252">        return delegate.getKeepAlive();</span>
+    }
+
+    public void setTrafficClass(final int tc) throws SocketException {
+<span class="nc" id="L256">        delegate.setTrafficClass(tc);</span>
+<span class="nc" id="L257">    }</span>
+
+    public int getTrafficClass() throws SocketException {
+<span class="nc" id="L260">        return delegate.getTrafficClass();</span>
+    }
+
+    public void setReuseAddress(final boolean on) throws SocketException {
+<span class="nc" id="L264">        delegate.setReuseAddress(on);</span>
+<span class="nc" id="L265">    }</span>
+
+    public boolean getReuseAddress() throws SocketException {
+<span class="nc" id="L268">        return delegate.getReuseAddress();</span>
+    }
+
+    public void close() throws IOException {
+<span class="nc" id="L272">        delegate.close();</span>
+<span class="nc" id="L273">    }</span>
+
+    public void shutdownInput() throws IOException {
+<span class="nc" id="L276">        delegate.shutdownInput();</span>
+<span class="nc" id="L277">    }</span>
+
+    public void shutdownOutput() throws IOException {
+<span class="nc" id="L280">        delegate.shutdownOutput();</span>
+<span class="nc" id="L281">    }</span>
+
+    public String toString() {
+<span class="nc" id="L284">        return delegate.toString();</span>
+    }
+
+    public boolean isConnected() {
+<span class="nc" id="L288">        return delegate.isConnected();</span>
+    }
+
+    public boolean isBound() {
+<span class="nc" id="L292">        return delegate.isBound();</span>
+    }
+
+    public boolean isClosed() {
+<span class="nc" id="L296">        return delegate.isClosed();</span>
+    }
+
+    public boolean isInputShutdown() {
+<span class="nc" id="L300">        return delegate.isInputShutdown();</span>
+    }
+
+    public boolean isOutputShutdown() {
+<span class="nc" id="L304">        return delegate.isOutputShutdown();</span>
+    }
+
+    public void setPerformancePreferences(final int connectionTime, final int latency, final int bandwidth) {
+<span class="nc" id="L308">        delegate.setPerformancePreferences(connectionTime, latency, bandwidth);</span>
+<span class="nc" id="L309">    }</span>
+
+    protected SSLSocket getDelegate() {
+<span class="nc" id="L312">        return delegate;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

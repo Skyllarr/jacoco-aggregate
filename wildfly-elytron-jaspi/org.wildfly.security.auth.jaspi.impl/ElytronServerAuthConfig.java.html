@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronServerAuthConfig.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-jaspi</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.jaspi.impl</a> &gt; <span class="el_source">ElytronServerAuthConfig.java</span></div><h1>ElytronServerAuthConfig.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2018 Red Hat, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.jaspi.impl;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+import static org.wildfly.security.auth.jaspi._private.ElytronMessages.log;
+
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+import javax.security.auth.Subject;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.message.AuthException;
+import javax.security.auth.message.MessageInfo;
+import javax.security.auth.message.config.ServerAuthConfig;
+import javax.security.auth.message.config.ServerAuthContext;
+
+/**
+ * The WildFly Elytron implementation of {@link ServerAuthConfig}.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+class ElytronServerAuthConfig implements ServerAuthConfig {
+
+    /*
+     * The instance of ServerAuthConfig can be obtained once per deployment, for this reason it is important not to cache
+     * per-request state long term.
+     */
+
+    /*
+     * This is the configured messageLayer so could be 'null'.
+     */
+    private final String messageLayer;
+
+    /*
+     * This is the configured appContext so could be 'null'.
+     */
+    private final String appContext;
+    private final CallbackHandler callbackHandler;
+    private final List&lt;AuthenticationModuleDefinition&gt; serverAuthModuleDefinitions;
+
+<span class="fc" id="L58">    private final Map&lt;String, ElytronServerAuthContext&gt; contextMap = new ConcurrentHashMap&lt;&gt;();</span>
+
+<span class="fc" id="L60">    ElytronServerAuthConfig(final String messageLayer, final String appContext, final CallbackHandler callbackHander, final List&lt;AuthenticationModuleDefinition&gt; serverAuthModuleDefinitions) {</span>
+<span class="fc" id="L61">        this.messageLayer = messageLayer;</span>
+<span class="fc" id="L62">        this.appContext = appContext;</span>
+<span class="fc" id="L63">        this.callbackHandler = callbackHander;</span>
+<span class="fc" id="L64">        this.serverAuthModuleDefinitions = serverAuthModuleDefinitions;</span>
+<span class="fc" id="L65">    }</span>
+
+    @Override
+    public String getMessageLayer() {
+<span class="nc" id="L69">        return messageLayer;</span>
+    }
+
+    @Override
+    public String getAppContext() {
+<span class="nc" id="L74">        return appContext;</span>
+    }
+
+    @Override
+    public String getAuthContextID(MessageInfo messageInfo) {
+<span class="fc" id="L79">        checkNotNullParam(&quot;messageInfo&quot;, messageInfo);</span>
+<span class="fc" id="L80">        checkNotNullParam(&quot;messageInfo.requestMessage&quot;, messageInfo.getRequestMessage());</span>
+<span class="fc" id="L81">        checkNotNullParam(&quot;messageInfo.responseMessage&quot;, messageInfo.getResponseMessage());</span>
+
+<span class="fc" id="L83">        ElytronServerAuthContext serverAuthContext = new ElytronServerAuthContext(serverAuthModuleDefinitions);</span>
+<span class="fc" id="L84">        serverAuthContext.testMessageInfo(messageInfo);</span>
+
+<span class="fc" id="L86">        String identifier = UUID.randomUUID().toString();</span>
+<span class="fc" id="L87">        contextMap.put(identifier, serverAuthContext);</span>
+
+<span class="fc" id="L89">        return identifier;</span>
+    }
+
+    @Override
+    public ServerAuthContext getAuthContext(String authContextId, Subject serviceSubject, Map properties) throws AuthException {
+        // The runtime is required to call this method immediately after getAuthContextID.
+<span class="fc" id="L95">        ElytronServerAuthContext serverAuthContext = contextMap.remove(authContextId);</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (serverAuthContext == null) throw log.unrecognisedAuthContextId(authContextId);</span>
+<span class="fc" id="L97">        serverAuthContext.initialise(serviceSubject, callbackHandler, properties);</span>
+<span class="fc" id="L98">        return serverAuthContext;</span>
+    }
+
+    @Override
+    public boolean isProtected() {
+        // TODO What is the definition of a protected ServerAuthContext?  Currently assuming as ours are 'managed' they are protected.
+<span class="nc" id="L104">        return true;</span>
+    }
+
+    @Override
+    public void refresh() {
+        // [ELY-1538] We do not currently support dynamic persistence so nothing to refresh here.
+<span class="nc" id="L110">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

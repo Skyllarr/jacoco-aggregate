@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>JaccDelegatingPolicy.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-jacc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.authz.jacc</a> &gt; <span class="el_source">JaccDelegatingPolicy.java</span></div><h1>JaccDelegatingPolicy.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source
+ *
+ * Copyright 2015 Red Hat, Inc. and/or its affiliates.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.authz.jacc;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.auth.server.SecurityDomain;
+import org.wildfly.security.auth.server.SecurityIdentity;
+import org.wildfly.security.authz.Roles;
+
+import javax.security.jacc.EJBMethodPermission;
+import javax.security.jacc.EJBRoleRefPermission;
+import javax.security.jacc.PolicyContext;
+import javax.security.jacc.PolicyContextException;
+import javax.security.jacc.WebResourcePermission;
+import javax.security.jacc.WebRoleRefPermission;
+import javax.security.jacc.WebUserDataPermission;
+import java.security.CodeSource;
+import java.security.Permission;
+import java.security.PermissionCollection;
+import java.security.Permissions;
+import java.security.Policy;
+import java.security.Principal;
+import java.security.PrivilegedAction;
+import java.security.ProtectionDomain;
+import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+import static java.lang.System.getSecurityManager;
+import static java.security.AccessController.doPrivileged;
+import static org.wildfly.security.authz.jacc.ElytronMessages.log;
+
+/**
+ * &lt;p&gt;A {@link Policy} implementation that knows how to process JACC permissions.
+ *
+ * &lt;p&gt;Elytron's JACC implementation is fully integrated with the Permission Mapping API, which allows users to specify custom permissions
+ * for a {@link SecurityDomain} and its identities by configuring a {@link org.wildfly.security.authz.PermissionMapper}. In this case,
+ * the permissions are evaluated considering both JACC-specific permissions (as defined by the specs) and also the ones associated with the current
+ * and authorized {@link SecurityIdentity}.
+ *
+ * @author &lt;a href=&quot;mailto:psilva@redhat.com&quot;&gt;Pedro Igor&lt;/a&gt;
+ */
+public class JaccDelegatingPolicy extends Policy {
+
+<span class="fc" id="L61">    private static final PrivilegedAction&lt;Policy&gt; GET_POLICY_ACTION = Policy::getPolicy;</span>
+    private static final String ANY_AUTHENTICATED_USER_ROLE = &quot;**&quot;;
+
+    private final Policy delegate;
+<span class="fc" id="L65">    private final Set&lt;Class&lt;? extends Permission&gt;&gt; supportedPermissionTypes = new HashSet&lt;&gt;();</span>
+
+    /**
+     * Create a new instance. In this case, the current policy will be automatically obtained and used to delegate method
+     * calls.
+     */
+    public JaccDelegatingPolicy() {
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        this(getSecurityManager() != null ? doPrivileged(GET_POLICY_ACTION) : Policy.getPolicy());</span>
+<span class="fc" id="L73">    }</span>
+
+    /**
+     * Create a new instance based on the given {@code delegate}.
+     *
+     * @param delegate the policy that will be used to delegate method calls
+     */
+<span class="fc" id="L80">    public JaccDelegatingPolicy(Policy delegate) {</span>
+<span class="fc" id="L81">        this.delegate = Assert.checkNotNullParam(&quot;delegate&quot;, delegate);</span>
+<span class="fc" id="L82">        this.supportedPermissionTypes.add(WebResourcePermission.class);</span>
+<span class="fc" id="L83">        this.supportedPermissionTypes.add(WebRoleRefPermission.class);</span>
+<span class="fc" id="L84">        this.supportedPermissionTypes.add(WebUserDataPermission.class);</span>
+<span class="fc" id="L85">        this.supportedPermissionTypes.add(EJBMethodPermission.class);</span>
+<span class="fc" id="L86">        this.supportedPermissionTypes.add(EJBRoleRefPermission.class);</span>
+<span class="fc" id="L87">    }</span>
+
+    @Override
+    public boolean implies(ProtectionDomain domain, Permission permission) {
+        try {
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">            if (isJaccPermission(permission)) {</span>
+<span class="fc" id="L93">                ElytronPolicyConfiguration policyConfiguration = ElytronPolicyConfigurationFactory.getCurrentPolicyConfiguration();</span>
+
+<span class="fc bfc" id="L95" title="All 2 branches covered.">                if (impliesExcludedPermission(permission, policyConfiguration)) {</span>
+<span class="fc" id="L96">                    return false;</span>
+                }
+
+<span class="fc bfc" id="L99" title="All 2 branches covered.">                if (impliesUncheckedPermission(permission, policyConfiguration)) {</span>
+<span class="fc" id="L100">                    return true;</span>
+                }
+
+<span class="fc bfc" id="L103" title="All 2 branches covered.">                if (impliesRolePermission(domain, permission, policyConfiguration)) {</span>
+<span class="fc" id="L104">                    return true;</span>
+                }
+
+                // Here we check the permissions mapped to the current identity.
+                // We only perform this check for JACC permissions otherwise we intercept all
+                // SecurityManager checks.
+<span class="fc bfc" id="L110" title="All 2 branches covered.">                if (impliesIdentityPermission(permission)) {</span>
+<span class="fc" id="L111">                    return true;</span>
+                }
+            }
+
+<span class="fc" id="L115">        } catch (Exception e) {</span>
+<span class="fc" id="L116">            log.authzFailedToCheckPermission(domain, permission, e);</span>
+<span class="fc" id="L117">        }</span>
+
+<span class="fc" id="L119">        return this.delegate.implies(domain, permission);</span>
+    }
+
+    @Override
+    public PermissionCollection getPermissions(ProtectionDomain domain) {
+<span class="fc" id="L124">        final PermissionCollection delegatePermissions = delegate.getPermissions(domain);</span>
+<span class="fc" id="L125">        return new PermissionCollection() {</span>
+            @Override
+            public void add(Permission permission) {
+<span class="nc bnc" id="L128" title="All 2 branches missed.">                if (isJaccPermission(permission)) {</span>
+<span class="nc" id="L129">                    throw ElytronMessages.log.readOnlyPermissionCollection();</span>
+                } else {
+<span class="nc" id="L131">                    delegatePermissions.add(permission);</span>
+                }
+<span class="nc" id="L133">            }</span>
+
+            @Override
+            public boolean implies(Permission permission) {
+<span class="pc bpc" id="L137" title="3 of 4 branches missed.">                if (!isJaccPermission(permission) &amp;&amp; delegatePermissions.implies(permission)) {</span>
+<span class="nc" id="L138">                    return true;</span>
+                }
+
+<span class="fc" id="L141">                return JaccDelegatingPolicy.this.implies(domain, permission);</span>
+            }
+
+            @Override
+            public Enumeration&lt;Permission&gt; elements() {
+<span class="fc" id="L146">                return delegatePermissions.elements();</span>
+            }
+        };
+    }
+
+    @Override
+    public PermissionCollection getPermissions(CodeSource codeSource) {
+<span class="nc bnc" id="L153" title="All 2 branches missed.">        return codeSource == null ? Policy.UNSUPPORTED_EMPTY_COLLECTION : getPermissions(new ProtectionDomain(codeSource, null));</span>
+    }
+
+    @Override
+    public void refresh() {
+        //TODO: we can probably provide some caching for permissions and checks. In this case, we can use this method to refresh the cache.
+<span class="nc" id="L159">        this.delegate.refresh();</span>
+<span class="nc" id="L160">    }</span>
+
+    private boolean impliesIdentityPermission(Permission permission) {
+<span class="fc" id="L163">        SecurityIdentity actualIdentity = getCurrentSecurityIdentity();</span>
+<span class="fc bfc" id="L164" title="All 4 branches covered.">        return actualIdentity != null &amp;&amp; actualIdentity.implies(permission);</span>
+    }
+
+    private SecurityIdentity getCurrentSecurityIdentity() {
+        try {
+<span class="fc" id="L169">            return (SecurityIdentity) PolicyContext.getContext(SecurityIdentityHandler.KEY);</span>
+<span class="fc" id="L170">        } catch (Exception cause) {</span>
+<span class="fc" id="L171">            log.authzCouldNotObtainSecurityIdentity(cause);</span>
+        }
+
+<span class="fc" id="L174">        return null;</span>
+    }
+
+    private void extractRolesFromCurrentIdentity(Set&lt;String&gt; roles) throws PolicyContextException, ClassNotFoundException {
+<span class="fc" id="L178">        SecurityIdentity identity = getCurrentSecurityIdentity();</span>
+
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (identity != null) {</span>
+<span class="fc" id="L181">            Roles identityRoles = identity.getRoles();</span>
+
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">            if (identityRoles != null) {</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">                for (String roleName : identityRoles) {</span>
+<span class="fc" id="L185">                    roles.add(roleName);</span>
+<span class="fc" id="L186">                }</span>
+            }
+        }
+<span class="fc" id="L189">    }</span>
+
+    private void extractRolesFromProtectionDomain(ProtectionDomain domain, Set&lt;String&gt; roles) {
+<span class="fc" id="L192">        Principal[] domainPrincipals = domain.getPrincipals();</span>
+
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">        if (domainPrincipals != null) {</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">            for (Principal principal : domainPrincipals) {</span>
+<span class="fc" id="L196">                roles.add(principal.getName());</span>
+            }
+        }
+<span class="fc" id="L199">    }</span>
+
+    private boolean impliesRolePermission(ProtectionDomain domain, Permission permission, ElytronPolicyConfiguration policyConfiguration) throws PolicyContextException, ClassNotFoundException {
+<span class="fc" id="L202">        Set&lt;String&gt; roles = new HashSet&lt;&gt;();</span>
+
+        // keep JACC behavior where roles are obtained as Principal instances from a ProtectionDomain
+<span class="fc" id="L205">        extractRolesFromProtectionDomain(domain, roles);</span>
+
+        // obtain additional roles from the current authenticated identity.
+        // in this case the a RoleMapper will be used to map roles from the authenticated identity
+<span class="fc" id="L209">        extractRolesFromCurrentIdentity(roles);</span>
+
+<span class="fc" id="L211">        roles.add(ANY_AUTHENTICATED_USER_ROLE);</span>
+
+<span class="fc" id="L213">        Map&lt;String, Permissions&gt; rolePermissions = policyConfiguration.getRolePermissions();</span>
+
+<span class="fc" id="L215">        synchronized (rolePermissions) {</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">            for (String roleName : roles) {</span>
+<span class="fc" id="L217">                Permissions permissions = rolePermissions.get(roleName);</span>
+
+<span class="fc bfc" id="L219" title="All 2 branches covered.">                if (permissions != null) {</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">                    if (permissions.implies(permission)) {</span>
+<span class="fc" id="L221">                        return true;</span>
+                    }
+                }
+<span class="fc" id="L224">            }</span>
+<span class="fc" id="L225">        }</span>
+
+<span class="fc" id="L227">        return false;</span>
+    }
+
+    private boolean impliesUncheckedPermission(Permission permission, ElytronPolicyConfiguration policyConfiguration) {
+<span class="fc" id="L231">        Permissions uncheckedPermissions = policyConfiguration.getUncheckedPermissions();</span>
+
+<span class="fc" id="L233">        synchronized (uncheckedPermissions) {</span>
+<span class="fc" id="L234">            return uncheckedPermissions.implies(permission);</span>
+        }
+    }
+
+    private boolean impliesExcludedPermission(Permission permission, ElytronPolicyConfiguration policyConfiguration) {
+<span class="fc" id="L239">        Permissions excludedPermissions = policyConfiguration.getExcludedPermissions();</span>
+
+<span class="fc" id="L241">        synchronized (excludedPermissions) {</span>
+<span class="fc" id="L242">            return excludedPermissions.implies(permission);</span>
+        }
+    }
+
+    private boolean isJaccPermission(Permission permission) {
+<span class="fc" id="L247">        return this.supportedPermissionTypes.contains(permission.getClass());</span>
+    }
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

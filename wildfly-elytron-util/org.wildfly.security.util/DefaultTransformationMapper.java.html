@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DefaultTransformationMapper.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-util</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.util</a> &gt; <span class="el_source">DefaultTransformationMapper.java</span></div><h1>DefaultTransformationMapper.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.util;
+
+import org.wildfly.common.Assert;
+
+import static org.wildfly.security.util.ElytronMessages.log;
+import static org.wildfly.security.util.TransformationSpec.HIGH_STRENGTH;
+import static org.wildfly.security.util.TransformationSpec.MEDIUM_STRENGTH;
+import static org.wildfly.security.util.TransformationSpec.LOW_STRENGTH;
+import static org.wildfly.security.util.TransformationSpec.NO_KEY;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+
+/**
+ * Default implementation of TransformationMapper interface.
+ *
+ * @author &lt;a href=&quot;mailto:pskopek@redhat.com&quot;&gt;Peter Skopek&lt;/a&gt;
+ *
+ */
+public class DefaultTransformationMapper implements TransformationMapper {
+
+<span class="nc" id="L41">    protected HashMap&lt;String, TransformationSpec[]&gt; transformations = new HashMap&lt;String, TransformationSpec[]&gt;();</span>
+
+<span class="nc" id="L43">    public DefaultTransformationMapper() {</span>
+
+<span class="nc" id="L45">        transformations.put(&quot;DIGEST-MD5&quot;, new TransformationSpec[] { // TODO: once digest-md5 PR will be merged change this to</span>
+                                                                     // JBOSS_DIGEST_MD5
+                new TransformationSpec(&quot;3des&quot;, &quot;DESede/CBC/NoPadding&quot;, NO_KEY, HIGH_STRENGTH + 1, &quot;SunJCA&quot;),
+                        new TransformationSpec(&quot;rc4&quot;, &quot;RC4&quot;, 128, HIGH_STRENGTH, &quot;SunJCA&quot;),
+                        new TransformationSpec(&quot;des&quot;, &quot;DES/CBC/NoPadding&quot;, NO_KEY, MEDIUM_STRENGTH + 1, &quot;SunJCA&quot;),
+                        new TransformationSpec(&quot;rc4-56&quot;, &quot;RC4&quot;, 56, MEDIUM_STRENGTH, &quot;SunJCA&quot;),
+                        new TransformationSpec(&quot;rc4-40&quot;, &quot;RC4&quot;, 40, LOW_STRENGTH, &quot;SunJCA&quot;) });
+
+        // sort all transformation arrays descending by strength
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        for (String mech : transformations.keySet()) {</span>
+<span class="nc" id="L55">            Arrays.sort(transformations.get(mech), (o1, o2) -&gt; {</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">                if (o1.getStrength() &lt; o2.getStrength()) {</span>
+<span class="nc" id="L57">                    return 1;</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">                } else if (o1.getStrength() &gt; o2.getStrength()) {</span>
+<span class="nc" id="L59">                    return -1;</span>
+                } else {
+<span class="nc" id="L61">                    return 0;</span>
+                }
+            });
+<span class="nc" id="L64">        }</span>
+
+<span class="nc" id="L66">    }</span>
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see org.wildfly.security.util.TransformationMapper#getTransformationSpec(java.lang.String, java.lang.String)
+     */
+    @Override
+    public TransformationSpec getTransformationSpec(String mechanism, String token) throws IllegalArgumentException {
+<span class="nc" id="L75">        return getTransformationSpec(null, mechanism, token);</span>
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see org.wildfly.security.util.TransformationMapper#getTransformationSpec(java.lang.String, java.lang.String,
+     * java.lang.String)
+     */
+    @Override
+    public TransformationSpec getTransformationSpec(String provider, String mechanism, String token)
+            throws IllegalArgumentException {
+<span class="nc" id="L87">        Assert.checkNotNullParam(&quot;token&quot;, token);</span>
+<span class="nc" id="L88">        TransformationSpec[] ts = transformations.get(mechanism);</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        if (ts == null) {</span>
+<span class="nc" id="L90">            throw log.mechanismNotSupported(mechanism);</span>
+        }
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        for (TransformationSpec t : ts) {</span>
+<span class="nc bnc" id="L93" title="All 6 branches missed.">            if (token.equals(t.getToken()) &amp;&amp; (provider == null || provider.equals(t.getProvider()))) {</span>
+<span class="nc" id="L94">                return t;</span>
+            }
+        }
+<span class="nc" id="L97">        return null;</span>
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see org.wildfly.security.util.TransformationMapper#getTransformationSpecByStrength(java.lang.String, java.lang.String[])
+     */
+    @Override
+    public TransformationSpec[] getTransformationSpecByStrength(String mechanism, String... tokens)
+            throws IllegalArgumentException {
+<span class="nc" id="L108">        return getTransformationSpecByStrength(null, mechanism, tokens);</span>
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see org.wildfly.security.util.TransformationMapper#getTransformationSpecByStrength(java.lang.String, java.lang.String,
+     * java.lang.String[])
+     */
+    @Override
+    public TransformationSpec[] getTransformationSpecByStrength(String provider, String mechanism, String... tokens)
+            throws IllegalArgumentException {
+
+<span class="nc" id="L121">        Assert.checkNotNullParam(&quot;tokens&quot;, tokens);</span>
+<span class="nc" id="L122">        TransformationSpec[] ts = transformations.get(mechanism);</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        if (ts == null) {</span>
+<span class="nc" id="L124">            throw log.mechanismNotSupported(mechanism);</span>
+        }
+
+<span class="nc" id="L127">        ArrayList&lt;TransformationSpec&gt; tf = new ArrayList&lt;TransformationSpec&gt;(ts.length);</span>
+
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        for (TransformationSpec t : ts) {</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">            for (String token : tokens) {</span>
+<span class="nc bnc" id="L131" title="All 6 branches missed.">                if (token.equals(t.getToken()) &amp;&amp; (provider == null || provider.equals(t.getProvider()))) {</span>
+<span class="nc" id="L132">                    tf.add(t);</span>
+                }
+            }
+        }
+<span class="nc" id="L136">        return tf.toArray(new TransformationSpec[tf.size()]);</span>
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see org.wildfly.security.util.TransformationMapper#getTransformationSpecWithStrength(java.lang.String, int,
+     * java.lang.String[])
+     */
+    @Override
+    public TransformationSpec[] getTransformationSpecWithStrength(String mechanism, int strength, String... tokens)
+            throws IllegalArgumentException {
+<span class="nc" id="L148">        return getTransformationSpecWithStrength(null, mechanism, strength, tokens);</span>
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see org.wildfly.security.util.TransformationMapper#getTransformationSpecWithStrength(java.lang.String, java.lang.String,
+     * int, java.lang.String[])
+     */
+    @Override
+    public TransformationSpec[] getTransformationSpecWithStrength(String provider, String mechanism, int strength,
+            String... tokens) throws IllegalArgumentException {
+
+<span class="nc" id="L161">        Assert.checkNotNullParam(&quot;tokens&quot;, tokens);</span>
+<span class="nc" id="L162">        TransformationSpec[] ts = transformations.get(mechanism);</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        if (ts == null) {</span>
+<span class="nc" id="L164">            throw log.mechanismNotSupported(mechanism);</span>
+        }
+
+<span class="nc" id="L167">        ArrayList&lt;TransformationSpec&gt; tf = new ArrayList&lt;TransformationSpec&gt;(ts.length);</span>
+
+<span class="nc bnc" id="L169" title="All 2 branches missed.">        for (TransformationSpec t : ts) {</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">            for (String token : tokens) {</span>
+<span class="nc bnc" id="L171" title="All 4 branches missed.">                if (token.equals(t.getToken())</span>
+<span class="nc bnc" id="L172" title="All 4 branches missed.">                        &amp;&amp; (provider == null || provider.equals(t.getProvider()) &amp;&amp; (strength &lt;= t.getStrength()))) {</span>
+<span class="nc" id="L173">                    tf.add(t);</span>
+                }
+            }
+        }
+<span class="nc" id="L177">        return tf.toArray(new TransformationSpec[tf.size()]);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

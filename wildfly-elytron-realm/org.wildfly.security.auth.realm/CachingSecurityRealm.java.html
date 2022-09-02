@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CachingSecurityRealm.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-realm</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.realm</a> &gt; <span class="el_source">CachingSecurityRealm.java</span></div><h1>CachingSecurityRealm.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.realm;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+import static org.wildfly.security.auth.realm.ElytronMessages.log;
+import static org.wildfly.security.provider.util.ProviderUtil.INSTALLED_PROVIDERS;
+
+import java.security.Principal;
+import java.security.Provider;
+import java.security.spec.AlgorithmParameterSpec;
+import java.util.function.Supplier;
+
+import org.wildfly.security.auth.SupportLevel;
+import org.wildfly.security.auth.server.IdentityCredentials;
+import org.wildfly.security.auth.server.RealmIdentity;
+import org.wildfly.security.auth.server.RealmUnavailableException;
+import org.wildfly.security.auth.server.SecurityRealm;
+import org.wildfly.security.auth.server.event.RealmEvent;
+import org.wildfly.security.authz.Attributes;
+import org.wildfly.security.authz.AuthorizationIdentity;
+import org.wildfly.security.cache.RealmIdentityCache;
+import org.wildfly.security.credential.Credential;
+import org.wildfly.security.credential.PasswordCredential;
+import org.wildfly.security.evidence.Evidence;
+import org.wildfly.security.evidence.PasswordGuessEvidence;
+import org.wildfly.security.password.Password;
+import org.wildfly.security.password.interfaces.ClearPassword;
+
+/**
+ * &lt;p&gt;A wrapper class that provides caching capabilities for a {@link SecurityRealm} and its identities.
+ *
+ * @author &lt;a href=&quot;mailto:psilva@redhat.com&quot;&gt;Pedro Igor&lt;/a&gt;
+ */
+public class CachingSecurityRealm implements SecurityRealm {
+
+    private final Supplier&lt;Provider[]&gt; providerSupplier;
+    private final SecurityRealm realm;
+    private final RealmIdentityCache cache;
+
+    /**
+     * Creates a new instance.
+     *
+     * @param realm the {@link SecurityRealm} whose {@link RealmIdentity} should be cached.
+     * @param cache the {@link RealmIdentityCache} instance
+     */
+    public CachingSecurityRealm(SecurityRealm realm, RealmIdentityCache cache) {
+<span class="nc" id="L64">        this(realm, cache, INSTALLED_PROVIDERS);</span>
+<span class="nc" id="L65">    }</span>
+
+    /**
+     * Creates a new instance.
+     *
+     * @param realm the {@link SecurityRealm} whose {@link RealmIdentity} should be cached.
+     * @param cache the {@link RealmIdentityCache} instance
+     * @param providerSupplier the provider supplier to use for verification purposes (must not be {@code null})
+     */
+<span class="nc" id="L74">    public CachingSecurityRealm(SecurityRealm realm, RealmIdentityCache cache, Supplier&lt;Provider[]&gt; providerSupplier) {</span>
+<span class="nc" id="L75">        this.realm = checkNotNullParam(&quot;realm&quot;, realm);</span>
+<span class="nc" id="L76">        this.cache = checkNotNullParam(&quot;cache&quot;, cache);</span>
+<span class="nc" id="L77">        this.providerSupplier = checkNotNullParam(&quot;providers&quot;, providerSupplier);</span>
+
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        if (realm instanceof CacheableSecurityRealm) {</span>
+<span class="nc" id="L80">            CacheableSecurityRealm cacheable = CacheableSecurityRealm.class.cast(realm);</span>
+<span class="nc" id="L81">            cacheable.registerIdentityChangeListener(this::removeFromCache);</span>
+<span class="nc" id="L82">        } else {</span>
+<span class="nc" id="L83">            throw ElytronMessages.log.realmCacheUnexpectedType(realm, CacheableSecurityRealm.class);</span>
+        }
+<span class="nc" id="L85">    }</span>
+
+    @Override
+    public RealmIdentity getRealmIdentity(Principal principal) throws RealmUnavailableException {
+<span class="nc" id="L89">        RealmIdentity cached = cache.get(principal);</span>
+
+<span class="nc bnc" id="L91" title="All 2 branches missed.">        if (cached != null) {</span>
+<span class="nc" id="L92">            log.tracef(&quot;Returning cached RealmIdentity for '%s'&quot;, principal);</span>
+<span class="nc" id="L93">            return cached;</span>
+        }
+
+<span class="nc" id="L96">        RealmIdentity realmIdentity = getCacheableRealm().getRealmIdentity(principal);</span>
+
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        if (!realmIdentity.exists()) {</span>
+<span class="nc" id="L99">            log.tracef(&quot;RealmIdentity for '%s' does not exist, skipping cache.'&quot;, principal);</span>
+<span class="nc" id="L100">            return realmIdentity;</span>
+        }
+
+<span class="nc" id="L103">        RealmIdentity cachedIdentity = new RealmIdentity() {</span>
+<span class="nc" id="L104">            final RealmIdentity identity = realmIdentity;</span>
+
+<span class="nc" id="L106">            AuthorizationIdentity authorizationIdentity = null;</span>
+<span class="nc" id="L107">            Attributes attributes = null;</span>
+<span class="nc" id="L108">            IdentityCredentials credentials = IdentityCredentials.NONE;</span>
+
+            @Override
+            public Principal getRealmIdentityPrincipal() {
+<span class="nc" id="L112">                return identity.getRealmIdentityPrincipal();</span>
+            }
+
+            @Override
+            public SupportLevel getCredentialAcquireSupport(Class&lt;? extends Credential&gt; credentialType, String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc bnc" id="L117" title="All 2 branches missed.">                if (credentials.contains(credentialType, algorithmName, parameterSpec)) {</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">                    if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L119">                        log.tracef(&quot;getCredentialAcquireSupport credentialType='%s' with algorithmName='%' known for pincipal='%s'&quot;, credentialType.getName(), algorithmName, principal.getName());</span>
+                    }
+<span class="nc" id="L121">                    return credentials.getCredentialAcquireSupport(credentialType, algorithmName, parameterSpec);</span>
+                }
+<span class="nc" id="L123">                Credential credential = identity.getCredential(credentialType, algorithmName, parameterSpec);</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">                if (credential != null) {</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">                    if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L126">                        log.tracef(&quot;getCredentialAcquireSupport Credential for credentialType='%s' with algorithmName='%' obtained from identity - caching for principal='%s'&quot;,</span>
+<span class="nc" id="L127">                                credentialType.getName(), algorithmName, principal.getName());</span>
+                    }
+<span class="nc" id="L129">                    credentials = credentials.withCredential(credential);</span>
+                }
+<span class="nc" id="L131">                return credentials.getCredentialAcquireSupport(credentialType, algorithmName, parameterSpec);</span>
+            }
+
+            @Override
+            public &lt;C extends Credential&gt; C getCredential(Class&lt;C&gt; credentialType) throws RealmUnavailableException {
+<span class="nc bnc" id="L136" title="All 2 branches missed.">                if (credentials.contains(credentialType)) {</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">                    if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L138">                        log.tracef(&quot;getCredential credentialType='%s' cached, returning cached credential for principal='%s'&quot;, credentialType.getName(), principal.getName());</span>
+                    }
+<span class="nc" id="L140">                    return credentials.getCredential(credentialType);</span>
+                }
+<span class="nc" id="L142">                Credential credential = identity.getCredential(credentialType);</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">                if (credential != null) {</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">                    if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L145">                        log.tracef(&quot;getCredential credentialType='%s' obtained from identity - caching for principal='%s'&quot;, credentialType.getName(), principal.getName());</span>
+                    }
+<span class="nc" id="L147">                    credentials = credentials.withCredential(credential);</span>
+                }
+<span class="nc" id="L149">                return credentials.getCredential(credentialType);</span>
+            }
+
+            @Override
+            public &lt;C extends Credential&gt; C getCredential(Class&lt;C&gt; credentialType, String algorithmName) throws RealmUnavailableException {
+<span class="nc bnc" id="L154" title="All 2 branches missed.">                if (credentials.contains(credentialType, algorithmName)) {</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">                    if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L156">                        log.tracef(&quot;getCredential credentialType='%s' with algorithmName='%' cached, returning cached credential for principal='%s'&quot;, credentialType.getName(), algorithmName, principal.getName());</span>
+                    }
+<span class="nc" id="L158">                    return credentials.getCredential(credentialType, algorithmName);</span>
+                }
+<span class="nc" id="L160">                Credential credential = identity.getCredential(credentialType, algorithmName);</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">                if (credential != null) {</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">                    if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L163">                        log.tracef(&quot;getCredential credentialType='%s' with algorithmName='%' obtained from identity - caching.&quot;, credentialType.getName(), algorithmName);</span>
+                    }
+<span class="nc" id="L165">                    credentials = credentials.withCredential(credential);</span>
+                }
+<span class="nc" id="L167">                return credentials.getCredential(credentialType, algorithmName);</span>
+            }
+
+            @Override
+            public &lt;C extends Credential&gt; C getCredential(final Class&lt;C&gt; credentialType, final String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc bnc" id="L172" title="All 2 branches missed.">                if (credentials.contains(credentialType, algorithmName, parameterSpec)) {</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">                    if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L174">                        log.tracef(&quot;getCredential credentialType='%s' with algorithmName='%' cached, returning cached credential for principal='%s'&quot;, credentialType.getName(), algorithmName, principal.getName());</span>
+                    }
+<span class="nc" id="L176">                    return credentials.getCredential(credentialType, algorithmName, parameterSpec);</span>
+                }
+<span class="nc" id="L178">                Credential credential = identity.getCredential(credentialType, algorithmName, parameterSpec);</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">                if (credential != null) {</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">                    if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L181">                        log.tracef(&quot;getCredential credentialType='%s' with algorithmName='%' obtained from identity - caching for principal='%s'&quot;, credentialType.getName(), algorithmName, principal.getName());</span>
+                    }
+<span class="nc" id="L183">                    credentials = credentials.withCredential(credential);</span>
+                }
+<span class="nc" id="L185">                return credentials.getCredential(credentialType, algorithmName, parameterSpec);</span>
+            }
+
+            @Override
+            public void updateCredential(Credential credential) throws RealmUnavailableException {
+<span class="nc" id="L190">                log.tracef(&quot;updateCredential For principal='%s'&quot;, principal);</span>
+                try {
+<span class="nc" id="L192">                    identity.updateCredential(credential);</span>
+                } finally {
+<span class="nc" id="L194">                    removeFromCache(identity.getRealmIdentityPrincipal());</span>
+                }
+<span class="nc" id="L196">            }</span>
+
+            @Override
+            public SupportLevel getEvidenceVerifySupport(Class&lt;? extends Evidence&gt; evidenceType, String algorithmName) throws RealmUnavailableException {
+<span class="nc bnc" id="L200" title="All 2 branches missed.">                if (PasswordGuessEvidence.class.isAssignableFrom(evidenceType)) {</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">                    if (credentials.canVerify(evidenceType, algorithmName)) {</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">                        if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L203">                            log.tracef(&quot;getEvidenceVerifySupport evidenceType='%s' with algorithmName='%' can verify from cache for principal='%s'&quot;, evidenceType.getName(), algorithmName, principal.getName());</span>
+                        }
+<span class="nc" id="L205">                        return SupportLevel.SUPPORTED;</span>
+                    }
+<span class="nc" id="L207">                    Credential credential = identity.getCredential(PasswordCredential.class);</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">                    if (credential != null) {</span>
+<span class="nc bnc" id="L209" title="All 2 branches missed.">                        if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L210">                            log.tracef(&quot;getEvidenceVerifySupport evidenceType='%s' with algorithmName='%' credential obtained from identity and cached for principal='%s'&quot;,</span>
+<span class="nc" id="L211">                                    evidenceType.getName(), algorithmName, principal.getName());</span>
+                        }
+<span class="nc" id="L213">                        credentials = credentials.withCredential(credential);</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">                        if (credential.canVerify(evidenceType, algorithmName)) {</span>
+<span class="nc" id="L215">                            return SupportLevel.SUPPORTED;</span>
+                        }
+                    }
+                }
+<span class="nc bnc" id="L219" title="All 2 branches missed.">                if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L220">                    log.tracef(&quot;getEvidenceVerifySupport evidenceType='%s' with algorithmName='%' falling back to direct support of identity for principal='%s'&quot;,</span>
+<span class="nc" id="L221">                            evidenceType.getName(), algorithmName, principal.getName());</span>
+                }
+<span class="nc" id="L223">                return identity.getEvidenceVerifySupport(evidenceType, algorithmName);</span>
+            }
+
+            @Override
+            public boolean verifyEvidence(Evidence evidence) throws RealmUnavailableException {
+<span class="nc bnc" id="L228" title="All 2 branches missed.">                if (evidence instanceof PasswordGuessEvidence) {</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">                    if (credentials.canVerify(evidence)) {</span>
+<span class="nc" id="L230">                        log.tracef(&quot;verifyEvidence For principal='%s' using cached credential&quot;, principal);</span>
+<span class="nc" id="L231">                        return credentials.verify(providerSupplier, evidence);</span>
+                    }
+<span class="nc" id="L233">                    Credential credential = identity.getCredential(PasswordCredential.class);</span>
+<span class="nc bnc" id="L234" title="All 2 branches missed.">                    if (credential != null) {</span>
+<span class="nc" id="L235">                        log.tracef(&quot;verifyEvidence Credential obtained from identity and cached for principal='%s'&quot;, principal);</span>
+<span class="nc" id="L236">                        credentials = credentials.withCredential(credential);</span>
+<span class="nc bnc" id="L237" title="All 2 branches missed.">                        if (credential.canVerify(evidence)) {</span>
+<span class="nc" id="L238">                            return credential.verify(providerSupplier, evidence);</span>
+                        }
+                    }
+<span class="nc" id="L241">                    char[] guess = ((PasswordGuessEvidence) evidence).getGuess();</span>
+<span class="nc" id="L242">                    Password password = ClearPassword.createRaw(ClearPassword.ALGORITHM_CLEAR, guess);</span>
+<span class="nc" id="L243">                    log.tracef(&quot;verifyEvidence Falling back to direct support of identity for principal='%s'&quot;, principal);</span>
+<span class="nc bnc" id="L244" title="All 2 branches missed.">                    if (identity.verifyEvidence(evidence)) {</span>
+<span class="nc" id="L245">                        credentials = credentials.withCredential(new PasswordCredential(password));</span>
+<span class="nc" id="L246">                        return true;</span>
+                    }
+<span class="nc" id="L248">                    return false;</span>
+                }
+<span class="nc" id="L250">                return identity.verifyEvidence(evidence);</span>
+            }
+
+            @Override
+            public boolean exists() throws RealmUnavailableException {
+<span class="nc" id="L255">                return true; // non-existing identities will not be wrapped</span>
+            }
+
+            @Override
+            public AuthorizationIdentity getAuthorizationIdentity() throws RealmUnavailableException {
+<span class="nc bnc" id="L260" title="All 2 branches missed.">                if (authorizationIdentity == null) {</span>
+<span class="nc" id="L261">                    log.tracef(&quot;getAuthorizationIdentity Caching AuthorizationIdentity for principal='%s'&quot;, principal);</span>
+<span class="nc" id="L262">                    authorizationIdentity = identity.getAuthorizationIdentity();</span>
+                }
+<span class="nc" id="L264">                return authorizationIdentity;</span>
+            }
+
+            @Override
+            public Attributes getAttributes() throws RealmUnavailableException {
+<span class="nc bnc" id="L269" title="All 2 branches missed.">                if (attributes == null) {</span>
+<span class="nc" id="L270">                    log.tracef(&quot;getAttributes Caching Attributes for principal='%s'&quot;, principal);</span>
+<span class="nc" id="L271">                    attributes = identity.getAttributes();</span>
+                }
+<span class="nc" id="L273">                return attributes;</span>
+            }
+
+            @Override
+            public void dispose() {
+<span class="nc" id="L278">                identity.dispose();</span>
+<span class="nc" id="L279">            }</span>
+        };
+
+<span class="nc" id="L282">        log.tracef(&quot;Created wrapper RealmIdentity for '%s' and placing in cache.&quot;, principal);</span>
+<span class="nc" id="L283">        cache.put(principal, cachedIdentity);</span>
+
+<span class="nc" id="L285">        return cachedIdentity;</span>
+    }
+
+    @Override
+    public SupportLevel getCredentialAcquireSupport(Class&lt;? extends Credential&gt; credentialType, String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc" id="L290">        return getCacheableRealm().getCredentialAcquireSupport(credentialType, algorithmName, parameterSpec);</span>
+    }
+
+    @Override
+    public SupportLevel getEvidenceVerifySupport(Class&lt;? extends Evidence&gt; evidenceType, String algorithmName) throws RealmUnavailableException {
+<span class="nc" id="L295">        return getCacheableRealm().getEvidenceVerifySupport(evidenceType, algorithmName);</span>
+    }
+
+    @Override
+    public void handleRealmEvent(RealmEvent event) {
+<span class="nc" id="L300">        getCacheableRealm().handleRealmEvent(event);</span>
+<span class="nc" id="L301">    }</span>
+
+    /**
+     * Removes a {@link RealmIdentity} referenced by the specified {@link Principal} from the cache.
+     *
+     * @param principal the {@link Principal} that references a previously cached realm identity
+     */
+    public void removeFromCache(Principal principal) {
+<span class="nc" id="L309">        cache.remove(principal);</span>
+<span class="nc" id="L310">    }</span>
+
+    /**
+     * Removes all cached identities from the cache.
+     */
+    public void removeAllFromCache() {
+<span class="nc" id="L316">        cache.clear();</span>
+<span class="nc" id="L317">    }</span>
+
+    /**
+     * Gets wrapped backing realm.
+     *
+     * @return the wrapped backing realm
+     */
+    protected SecurityRealm getCacheableRealm() {
+<span class="nc" id="L325">        return realm;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

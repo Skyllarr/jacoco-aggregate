@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RealmEventVisitor.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.server.event</a> &gt; <span class="el_source">RealmEventVisitor.java</span></div><h1>RealmEventVisitor.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.server.event;
+
+/**
+ * A class which provides an easy way to handle realm events based on the type of the event.  The visitor can accept
+ * a parameter and return a value.  To invoke the appropriate visitor method based on the event type, use the
+ * {@link RealmEvent#accept(RealmEventVisitor, Object) &amp;lt;P,&amp;nbsp;R&amp;gt;&amp;nbsp;R&amp;nbsp;RealmEvent.accept(RealmEventVisitor&amp;lt;P,&amp;nbsp;R&amp;gt;,&amp;nbsp;P)} method.
+ *
+ * @param &lt;P&gt; the visitor's parameter type (may be {@link Void})
+ * @param &lt;R&gt; the visitor's return type (may be {@link Void})
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public abstract class RealmEventVisitor&lt;P, R&gt; {
+    /**
+     * Construct a new instance.
+     */
+<span class="nc" id="L34">    protected RealmEventVisitor() {</span>
+<span class="nc" id="L35">    }</span>
+
+    /**
+     * Handle any unhandled realm event.
+     *
+     * @param event the realm event
+     * @param param the visitor parameter
+     * @return the visitor return value
+     */
+    public R handleUnknownEvent(final RealmEvent event, final P param) {
+<span class="nc" id="L45">        return null;</span>
+    }
+
+    /**
+     * Handle any authentication-related realm event.
+     *
+     * @param event the realm event
+     * @param param the visitor parameter
+     * @return the visitor return value
+     */
+    public R handleAuthenticationEvent(final RealmAuthenticationEvent event, final P param) {
+<span class="nc" id="L56">        return handleUnknownEvent(event, param);</span>
+    }
+
+    /**
+     * Handle an abandoned authentication realm event.
+     *
+     * @param event the realm event
+     * @param param the visitor parameter
+     * @return the visitor return value
+     */
+    public R handleAbandonedAuthenticationEvent(final RealmAbandonedAuthenticationEvent event, final P param) {
+<span class="nc" id="L67">        return handleAuthenticationEvent(event, param);</span>
+    }
+
+    /**
+     * Handle a definite-outcome authentication realm event.
+     *
+     * @param event the realm event
+     * @param param the visitor parameter
+     * @return the visitor return value
+     */
+    public R handleDefiniteOutcomeAuthenticationEvent(final RealmDefiniteOutcomeAuthenticationEvent event, final P param) {
+<span class="nc" id="L78">        return handleAuthenticationEvent(event, param);</span>
+    }
+
+    /**
+     * Handle a successful authentication realm event.
+     *
+     * @param event the realm event
+     * @param param the visitor parameter
+     * @return the visitor return value
+     */
+    public R handleSuccessfulAuthenticationEvent(final RealmSuccessfulAuthenticationEvent event, final P param) {
+<span class="nc" id="L89">        return handleDefiniteOutcomeAuthenticationEvent(event, param);</span>
+    }
+
+    /**
+     * Handle a failed authentication realm event.
+     *
+     * @param event the realm event
+     * @param param the visitor parameter
+     * @return the visitor return value
+     */
+    public R handleFailedAuthenticationEvent(final RealmFailedAuthenticationEvent event, final P param) {
+<span class="nc" id="L100">        return handleDefiniteOutcomeAuthenticationEvent(event, param);</span>
+    }
+
+    /**
+     * Handle any authorization-related realm event.
+     *
+     * @param event the realm event
+     * @param param the visitor parameter
+     * @return the visitor return value
+     */
+    public R handleAuthorizationEvent(final RealmAuthorizationEvent event, final P param) {
+<span class="nc" id="L111">        return handleUnknownEvent(event, param);</span>
+    }
+
+    /**
+     * Handle an identity authorization realm event.
+     *
+     * @param event the realm event
+     * @param param the visitor parameter
+     * @return the visitor return value
+     */
+    public R handleIdentityAuthorizationEvent(final RealmIdentityAuthorizationEvent event, final P param) {
+<span class="nc" id="L122">        return handleAuthorizationEvent(event, param);</span>
+    }
+
+    /**
+     * Handle an identity successful authorization realm event.
+     *
+     * @param event the realm event
+     * @param param the visitor parameter
+     * @return the visitor return value
+     */
+    public R handleIdentitySuccessfulAuthorizationEvent(final RealmIdentitySuccessfulAuthorizationEvent event, final P param) {
+<span class="nc" id="L133">        return handleIdentityAuthorizationEvent(event, param);</span>
+    }
+
+    /**
+     * Handle an identity failed authorization realm event.
+     *
+     * @param event the realm event
+     * @param param the visitor parameter
+     * @return the visitor return value
+     */
+    public R handleIdentityFailedAuthorizationEvent(final RealmIdentityFailedAuthorizationEvent event, final P param) {
+<span class="nc" id="L144">        return handleIdentityAuthorizationEvent(event, param);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DigestUtil.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-mechanism-digest</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.mechanism.digest</a> &gt; <span class="el_source">DigestUtil.java</span></div><h1>DigestUtil.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.mechanism.digest;
+
+import static org.wildfly.security.mechanism._private.ElytronMessages.log;
+
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetEncoder;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.Provider;
+import java.security.spec.InvalidKeySpecException;
+import java.util.HashMap;
+import java.util.function.Supplier;
+
+import javax.security.sasl.SaslException;
+
+import org.wildfly.common.bytes.ByteStringBuilder;
+import org.wildfly.security.mechanism._private.ElytronMessages;
+import org.wildfly.security.mechanism.AuthenticationMechanismException;
+import org.wildfly.security.password.PasswordFactory;
+import org.wildfly.security.password.TwoWayPassword;
+import org.wildfly.security.password.spec.ClearPasswordSpec;
+
+/**
+ * Common utility functions used by Digest authentication mechanisms.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:pskopek@redhat.com&quot;&gt;Peter Skopek&lt;/a&gt;.
+ */
+<span class="nc" id="L48">public class DigestUtil {</span>
+
+    private static final int MAX_PARSED_RESPONSE_SIZE = 13;
+
+    /**
+     * Client side method to parse challenge sent by server.
+     *
+     * @param challenge
+     * @return
+     * @throws AuthenticationMechanismException
+     */
+    public static HashMap&lt;String, byte[]&gt; parseResponse(byte [] challenge, Charset charset, boolean multiRealm, ElytronMessages log) throws AuthenticationMechanismException {
+
+<span class="nc" id="L61">        HashMap&lt;String, byte[]&gt; response = new HashMap&lt;String, byte[]&gt; (MAX_PARSED_RESPONSE_SIZE);</span>
+<span class="nc" id="L62">        int i = skipWhiteSpace(challenge, 0);</span>
+
+<span class="nc" id="L64">        StringBuilder key = new StringBuilder(10);</span>
+<span class="nc" id="L65">        ByteStringBuilder value = new ByteStringBuilder();</span>
+
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        int realmNumber = multiRealm ? 0 : -1;</span>
+
+<span class="nc" id="L69">        boolean insideKey = true;</span>
+<span class="nc" id="L70">        boolean insideQuotedValue = false;</span>
+<span class="nc" id="L71">        boolean expectSeparator = false;</span>
+
+        byte b;
+<span class="nc bnc" id="L74" title="All 2 branches missed.">        while (i &lt; challenge.length) {</span>
+<span class="nc" id="L75">            b = challenge[i];</span>
+            // parsing keyword
+<span class="nc bnc" id="L77" title="All 2 branches missed.">            if (insideKey) {</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">                if (b == ',') {</span>
+<span class="nc" id="L79">                    throw log.mechKeywordNotFollowedByEqual(key.toString());</span>
+                }
+<span class="nc bnc" id="L81" title="All 2 branches missed.">                else if (b == '=') {</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">                    if (key.length() == 0) {</span>
+<span class="nc" id="L83">                        throw log.mechKeywordCannotBeEmpty();</span>
+                    }
+<span class="nc" id="L85">                    insideKey = false;</span>
+<span class="nc" id="L86">                    i = skipWhiteSpace(challenge, i + 1);</span>
+
+<span class="nc bnc" id="L88" title="All 2 branches missed.">                    if (i &lt; challenge.length) {</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">                        if (challenge[i] == '&quot;') {</span>
+<span class="nc" id="L90">                            insideQuotedValue = true;</span>
+<span class="nc" id="L91">                            ++i; // Skip quote</span>
+                        }
+                    }
+                    else {
+<span class="nc" id="L95">                        throw log.mechNoValueFoundForKeyword(key.toString());</span>
+                    }
+                }
+<span class="nc bnc" id="L98" title="All 2 branches missed.">                else if (isWhiteSpace(b)) {</span>
+<span class="nc" id="L99">                    i = skipWhiteSpace(challenge, i + 1);</span>
+
+<span class="nc bnc" id="L101" title="All 2 branches missed.">                    if (key.length() &gt; 0) {</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">                        if (i &lt; challenge.length) {</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">                            if (challenge[i] != '=') {</span>
+<span class="nc" id="L104">                                throw log.mechKeywordNotFollowedByEqual(key.toString());</span>
+                            }
+                        } else {
+<span class="nc" id="L107">                            throw log.mechKeywordNotFollowedByEqual(key.toString());</span>
+                        }
+                    }
+                }
+                else {
+<span class="nc" id="L112">                    key.append((char)(b &amp; 0xff));</span>
+<span class="nc" id="L113">                    i++;</span>
+                }
+            }
+            // parsing quoted value
+<span class="nc bnc" id="L117" title="All 2 branches missed.">            else if (insideQuotedValue) {</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">                if (b == '\\') {</span>
+<span class="nc" id="L119">                    i++; // skip the escape char</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">                    if (i &lt; challenge.length) {</span>
+<span class="nc" id="L121">                        value.append(challenge[i]);</span>
+<span class="nc" id="L122">                        i++;</span>
+                    }
+                    else {
+<span class="nc" id="L125">                        throw log.mechUnmatchedQuoteFoundForValue(value.toString());</span>
+                    }
+                }
+<span class="nc bnc" id="L128" title="All 2 branches missed.">                else if (b == '&quot;') {</span>
+                    // closing quote
+<span class="nc" id="L130">                    i++;</span>
+<span class="nc" id="L131">                    insideQuotedValue = false;</span>
+<span class="nc" id="L132">                    expectSeparator = true;</span>
+                }
+                else {
+<span class="nc" id="L135">                    value.append(b);</span>
+<span class="nc" id="L136">                    i++;</span>
+                }
+            }
+            // terminated value
+<span class="nc bnc" id="L140" title="All 4 branches missed.">            else if (isWhiteSpace(b) || b == ',') {</span>
+<span class="nc" id="L141">                realmNumber = addToParsedChallenge(response, key, value, realmNumber);</span>
+<span class="nc" id="L142">                key = new StringBuilder();</span>
+<span class="nc" id="L143">                value = new ByteStringBuilder();</span>
+<span class="nc" id="L144">                i = skipWhiteSpace(challenge, i);</span>
+<span class="nc bnc" id="L145" title="All 4 branches missed.">                if (i &lt; challenge.length &amp;&amp; challenge[i] == ',') {</span>
+<span class="nc" id="L146">                    expectSeparator = false;</span>
+<span class="nc" id="L147">                    insideKey = true;</span>
+<span class="nc" id="L148">                    i++;</span>
+                }
+            }
+            // expect separator
+<span class="nc bnc" id="L152" title="All 2 branches missed.">            else if (expectSeparator) {</span>
+<span class="nc" id="L153">                String val = new String(value.toArray(), charset);</span>
+<span class="nc" id="L154">                throw log.mechExpectingCommaOrLinearWhitespaceAfterQuoted(val);</span>
+            }
+            else {
+<span class="nc" id="L157">                value.append(b);</span>
+<span class="nc" id="L158">                i++;</span>
+            }
+        }
+
+<span class="nc bnc" id="L162" title="All 2 branches missed.">        if (insideQuotedValue) {</span>
+<span class="nc" id="L163">            throw log.mechUnmatchedQuoteFoundForValue(value.toString());</span>
+        }
+
+<span class="nc bnc" id="L166" title="All 2 branches missed.">        if (key.length() &gt; 0) {</span>
+<span class="nc" id="L167">            addToParsedChallenge(response, key, value, realmNumber);</span>
+        }
+
+<span class="nc" id="L170">        return response;</span>
+    }
+
+    private static int addToParsedChallenge(HashMap&lt;String, byte[]&gt; response, StringBuilder keyBuilder, ByteStringBuilder valueBuilder, int realmNumber) {
+<span class="nc" id="L174">        String k = keyBuilder.toString();</span>
+<span class="nc" id="L175">        byte[] v = valueBuilder.toArray();</span>
+<span class="nc bnc" id="L176" title="All 4 branches missed.">        if (realmNumber &gt;= 0 &amp;&amp; &quot;realm&quot;.equals(k)) {</span>
+<span class="nc" id="L177">            response.put(k + &quot;:&quot; + String.valueOf(realmNumber), v);</span>
+<span class="nc" id="L178">            realmNumber++;</span>
+        }
+        else {
+<span class="nc" id="L181">            response.put(k, v);</span>
+        }
+<span class="nc" id="L183">        return realmNumber;</span>
+    }
+
+    private static int skipWhiteSpace(byte[] buffer, int startPoint) {
+<span class="nc" id="L187">        int i = startPoint;</span>
+<span class="nc bnc" id="L188" title="All 4 branches missed.">        while (i &lt; buffer.length &amp;&amp; isWhiteSpace(buffer[i])) {</span>
+<span class="nc" id="L189">            i++;</span>
+        }
+<span class="nc" id="L191">        return i;</span>
+    }
+
+    private static boolean isWhiteSpace(byte b) {
+<span class="nc bnc" id="L195" title="All 2 branches missed.">        if (b == 13)   // CR</span>
+<span class="nc" id="L196">            return true;</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">        else if (b == 10) // LF</span>
+<span class="nc" id="L198">            return true;</span>
+<span class="nc bnc" id="L199" title="All 2 branches missed.">        else if (b == 9) // TAB</span>
+<span class="nc" id="L200">            return true;</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">        else if (b == 32) // SPACE</span>
+<span class="nc" id="L202">            return true;</span>
+        else
+<span class="nc" id="L204">            return false;</span>
+    }
+
+    public static byte[] userRealmPasswordDigest(MessageDigest messageDigest, String username, String realm, char[] password) {
+<span class="nc" id="L208">        CharsetEncoder latin1Encoder = StandardCharsets.ISO_8859_1.newEncoder();</span>
+<span class="nc" id="L209">        latin1Encoder.reset();</span>
+<span class="nc" id="L210">        boolean bothLatin1 = latin1Encoder.canEncode(username);</span>
+<span class="nc" id="L211">        latin1Encoder.reset();</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">        if (bothLatin1) {</span>
+<span class="nc bnc" id="L213" title="All 2 branches missed.">            for (char c: password) {</span>
+<span class="nc bnc" id="L214" title="All 4 branches missed.">                bothLatin1 = bothLatin1 &amp;&amp; latin1Encoder.canEncode(c);</span>
+            }
+        }
+
+<span class="nc" id="L218">        Charset chosenCharset = StandardCharsets.UTF_8; // bothLatin1 ? StandardCharsets.ISO_8859_1 : StandardCharsets.UTF_8;</span>
+
+<span class="nc" id="L220">        ByteStringBuilder urp = new ByteStringBuilder(); // username:realm:password</span>
+<span class="nc" id="L221">        urp.append(username.getBytes(chosenCharset));</span>
+<span class="nc" id="L222">        urp.append(':');</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">        if (realm != null) {</span>
+<span class="nc" id="L224">            urp.append(realm.getBytes((chosenCharset)));</span>
+        } else {
+<span class="nc" id="L226">            urp.append(&quot;&quot;);</span>
+        }
+<span class="nc" id="L228">        urp.append(':');</span>
+<span class="nc" id="L229">        urp.append(new String(password).getBytes((chosenCharset)));</span>
+
+<span class="nc" id="L231">        return messageDigest.digest(urp.toArray());</span>
+    }
+
+    /**
+     * Get array of password chars from TwoWayPassword
+     *
+     * @return
+     * @throws SaslException
+     */
+    public static char[] getTwoWayPasswordChars(TwoWayPassword password, Supplier&lt;Provider[]&gt; providers, ElytronMessages log) throws AuthenticationMechanismException {
+<span class="nc bnc" id="L241" title="All 2 branches missed.">        if (password == null) {</span>
+<span class="nc" id="L242">            throw log.mechNoPasswordGiven();</span>
+        }
+        try {
+<span class="nc" id="L245">            PasswordFactory pf = PasswordFactory.getInstance(password.getAlgorithm(), providers);</span>
+<span class="nc" id="L246">            return pf.getKeySpec(pf.translate(password), ClearPasswordSpec.class).getEncodedPassword();</span>
+<span class="nc" id="L247">        } catch (NoSuchAlgorithmException | InvalidKeySpecException | InvalidKeyException e) {</span>
+<span class="nc" id="L248">            throw log.mechCannotGetTwoWayPasswordChars(e);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

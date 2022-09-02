@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>HttpServerAuthenticationMechanism.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http</a> &gt; <span class="el_source">HttpServerAuthenticationMechanism.java</span></div><h1>HttpServerAuthenticationMechanism.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.http;
+
+/**
+ * Definition of a server side HTTP authentication mechanism.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public interface HttpServerAuthenticationMechanism {
+
+    /**
+     * Get the name of this mechanism, where appropriate this should be the IANA registered name.
+     *
+     * @return the name of the mechanism.
+     */
+    String getMechanismName();
+
+    /**
+     * Evaluate the current request and attempt to authenticate if appropriate.
+     *
+     * The mechanism should call the appropriate callback methods on the {link HttpServerResponse} to both indicate the outcome
+     * of the evaluation and to register any {@link HttpServerMechanismsResponder} as required.
+     *
+     * @param request representation of the HTTP request.
+     * @throws HttpAuthenticationException if there is an internal failure handling the authentication.
+     */
+    void evaluateRequest(HttpServerRequest request) throws HttpAuthenticationException;
+
+    /**
+     * Get the property negotiated as a result of authentication.
+     *
+     * Mechanisms only make properties available after indicating a successful authentication has completed.
+     *
+     * @param propertyName the name of the property.
+     * @return the value of the property or {@code null} if the specified property is not available.
+     */
+    default Object getNegotiatedProperty(String propertyName) {
+<span class="nc" id="L55">        return null;</span>
+    }
+
+    /**
+     * Get the strongly typed property negotiated as a result of authentication.
+     *
+     * Mechanisms only make properties available after indicating a successful authentication has completed.
+     *
+     * Note: This form of the mechanism will also return {@code null} if the property is set but is of a different type.
+     *
+     * @param propertyName the name of the property.
+     * @param type the expected type of the property.
+     * @return the value of the property or {@code null} if the specified property is not available or is of a different type..
+     */
+    default &lt;T&gt; T getNegotiationProperty(String propertyName, Class&lt;T&gt; type) {
+<span class="nc" id="L70">        Object property = getNegotiatedProperty(propertyName);</span>
+<span class="nc bnc" id="L71" title="All 4 branches missed.">        if (property != null &amp;&amp; type.isInstance(property)) {</span>
+<span class="nc" id="L72">            return type.cast(property);</span>
+        }
+<span class="nc" id="L74">        return null;</span>
+    }
+
+    /**
+     * Dispose of any resources currently held by this authentication mechanism.
+     */
+    default void dispose() {
+<span class="nc" id="L81">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

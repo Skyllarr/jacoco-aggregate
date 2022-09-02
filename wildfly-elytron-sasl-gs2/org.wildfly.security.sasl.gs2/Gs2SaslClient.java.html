@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Gs2SaslClient.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl-gs2</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.gs2</a> &gt; <span class="el_source">Gs2SaslClient.java</span></div><h1>Gs2SaslClient.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.gs2;
+
+import static org.wildfly.security.asn1.ASN1.APPLICATION_SPECIFIC_MASK;
+import static org.wildfly.security.mechanism._private.ElytronMessages.saslGs2;
+import static org.wildfly.security.sasl.gs2.Gs2Util.TOKEN_HEADER_TAG;
+
+import java.security.AccessController;
+import java.security.PrivilegedAction;
+import java.util.Map;
+
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.sasl.SaslException;
+
+import org.ietf.jgss.ChannelBinding;
+import org.ietf.jgss.GSSContext;
+import org.ietf.jgss.GSSCredential;
+import org.ietf.jgss.GSSException;
+import org.ietf.jgss.GSSManager;
+import org.ietf.jgss.GSSName;
+import org.ietf.jgss.Oid;
+import org.wildfly.common.Assert;
+import org.wildfly.common.bytes.ByteStringBuilder;
+import org.wildfly.security.asn1.DERDecoder;
+import org.wildfly.security.auth.callback.CredentialCallback;
+import org.wildfly.security.credential.GSSKerberosCredential;
+import org.wildfly.security.manager.action.SetContextClassLoaderAction;
+import org.wildfly.security.manager.action.SetContextClassLoaderFromClassAction;
+import org.wildfly.security.sasl.WildFlySasl;
+import org.wildfly.security.sasl.util.AbstractSaslClient;
+import org.wildfly.security.sasl.util.StringPrep;
+
+/**
+ * SaslClient for the GS2 mechanism family as defined by
+ * &lt;a href=&quot;https://tools.ietf.org/html/rfc5801&quot;&gt;RFC 5801&lt;/a&gt;.
+ *
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+<span class="nc bnc" id="L57" title="All 2 branches missed.">final class Gs2SaslClient extends AbstractSaslClient {</span>
+
+    private static final int ST_INITIAL_CHALLENGE = 1;
+    private static final int ST_CHALLENGE_RESPONSE = 2;
+
+    private final boolean plus;
+    private final byte[] bindingData;
+    private final String bindingType;
+    private final Oid mechanism;
+    private GSSContext gssContext;
+    private ByteStringBuilder gs2HeaderExcludingNonStdFlag;
+
+    Gs2SaslClient(final String mechanismName, final String protocol, final String serverName, final CallbackHandler callbackHandler, final String authorizationId,
+            final Map&lt;String, ?&gt; props, final GSSManager gssManager, final boolean plus, final String bindingType, final byte[] bindingData) throws SaslException {
+<span class="nc" id="L71">        super(mechanismName, protocol, serverName, callbackHandler, authorizationId, true, saslGs2);</span>
+<span class="nc" id="L72">        this.bindingType = bindingType;</span>
+<span class="nc" id="L73">        this.plus = plus;</span>
+<span class="nc" id="L74">        this.bindingData = bindingData;</span>
+
+        try {
+<span class="nc" id="L77">            mechanism = Gs2.getMechanismForSaslName(gssManager, mechanismName);</span>
+<span class="nc" id="L78">        } catch (GSSException e) {</span>
+<span class="nc" id="L79">            throw saslGs2.mechMechanismToOidMappingFailed(e).toSaslException();</span>
+<span class="nc" id="L80">        }</span>
+
+        // Create a GSSContext
+<span class="nc" id="L83">        String acceptorNameStr = protocol + &quot;@&quot; + serverName;</span>
+        final GSSName acceptorName;
+        try {
+<span class="nc" id="L86">            acceptorName = gssManager.createName(acceptorNameStr, GSSName.NT_HOSTBASED_SERVICE, mechanism);</span>
+<span class="nc" id="L87">        } catch (GSSException e) {</span>
+<span class="nc" id="L88">            throw saslGs2.mechUnableToCreateNameForAcceptor(e).toSaslException();</span>
+<span class="nc" id="L89">        }</span>
+
+        // Attempt to obtain a credential
+<span class="nc" id="L92">        GSSCredential credential = null;</span>
+<span class="nc" id="L93">        CredentialCallback credentialCallback = new CredentialCallback(GSSKerberosCredential.class);</span>
+
+        try {
+<span class="nc" id="L96">            tryHandleCallbacks(credentialCallback);</span>
+<span class="nc" id="L97">            credential = credentialCallback.applyToCredential(GSSKerberosCredential.class, GSSKerberosCredential::getGssCredential);</span>
+<span class="nc" id="L98">        } catch (UnsupportedCallbackException e) {</span>
+<span class="nc" id="L99">            saslGs2.trace(&quot;Unable to obtain GSSCredential, ignored (act as the default initiator principal instead)&quot;, e);</span>
+<span class="nc" id="L100">        }</span>
+        try {
+<span class="nc" id="L102">            gssContext = gssManager.createContext(acceptorName, mechanism, credential, GSSContext.INDEFINITE_LIFETIME);</span>
+<span class="nc" id="L103">        } catch (GSSException e) {</span>
+<span class="nc" id="L104">            throw saslGs2.mechUnableToCreateGssContext(e).toSaslException();</span>
+<span class="nc" id="L105">        }</span>
+
+        try {
+            // Set flags
+<span class="nc bnc" id="L109" title="All 2 branches missed.">            boolean delegateCredential = (credential != null);</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">            if (props.containsKey(WildFlySasl.GS2_DELEGATE_CREDENTIAL)) {</span>
+<span class="nc" id="L111">                delegateCredential = Boolean.parseBoolean((String) props.get(WildFlySasl.GS2_DELEGATE_CREDENTIAL));</span>
+            }
+<span class="nc" id="L113">            gssContext.requestCredDeleg(delegateCredential);</span>
+<span class="nc" id="L114">            gssContext.requestMutualAuth(true); // Required</span>
+<span class="nc" id="L115">        } catch (GSSException e) {</span>
+<span class="nc" id="L116">            throw saslGs2.mechUnableToSetGssContextRequestFlags(e).toSaslException();</span>
+<span class="nc" id="L117">        }</span>
+
+<span class="nc" id="L119">        gs2HeaderExcludingNonStdFlag = createGs2HeaderExcludingNonStdFlag();</span>
+        try {
+<span class="nc bnc" id="L121" title="All 4 branches missed.">            boolean gs2CbFlagPUsed = ((bindingData != null) &amp;&amp; plus);</span>
+<span class="nc" id="L122">            ChannelBinding channelBinding = Gs2Util.createChannelBinding(gs2HeaderExcludingNonStdFlag.toArray(), gs2CbFlagPUsed, bindingData);</span>
+<span class="nc" id="L123">            gssContext.setChannelBinding(channelBinding);</span>
+<span class="nc" id="L124">        } catch (GSSException e) {</span>
+<span class="nc" id="L125">            throw saslGs2.mechUnableToSetChannelBinding(e).toSaslException();</span>
+<span class="nc" id="L126">        }</span>
+<span class="nc" id="L127">    }</span>
+
+    public void dispose() throws SaslException {
+        try {
+<span class="nc" id="L131">            gssContext.dispose();</span>
+<span class="nc" id="L132">        } catch (GSSException e) {</span>
+<span class="nc" id="L133">            throw saslGs2.mechUnableToDisposeGssContext(e).toSaslException();</span>
+        } finally {
+<span class="nc" id="L135">            gssContext = null;</span>
+        }
+<span class="nc" id="L137">    }</span>
+
+    public void init() {
+<span class="nc" id="L140">        setNegotiationState(ST_INITIAL_CHALLENGE);</span>
+<span class="nc" id="L141">    }</span>
+
+    protected byte[] evaluateMessage(final int state, final byte[] challenge) throws SaslException {
+<span class="nc bnc" id="L144" title="All 3 branches missed.">        switch (state) {</span>
+            case ST_INITIAL_CHALLENGE: {
+<span class="nc bnc" id="L146" title="All 4 branches missed.">                assert gssContext.isEstablished() == false;</span>
+<span class="nc bnc" id="L147" title="All 4 branches missed.">                if ((challenge != null) &amp;&amp; (challenge.length != 0)) {</span>
+<span class="nc" id="L148">                    throw saslGs2.mechInitialChallengeMustBeEmpty().toSaslException();</span>
+                }
+                try {
+<span class="nc" id="L151">                    byte[] response = initSecContext(gssContext, NO_BYTES, 0, 0);</span>
+                    // Expect at least one subsequent exchange
+<span class="nc bnc" id="L153" title="All 4 branches missed.">                    assert gssContext.isEstablished() == false;</span>
+<span class="nc" id="L154">                    setNegotiationState(ST_CHALLENGE_RESPONSE);</span>
+<span class="nc" id="L155">                    return modifyInitialContextToken(response);</span>
+<span class="nc" id="L156">                } catch (GSSException e) {</span>
+<span class="nc" id="L157">                    throw saslGs2.mechUnableToCreateResponseTokenWithCause(e).toSaslException();</span>
+                }
+            }
+            case ST_CHALLENGE_RESPONSE: {
+<span class="nc bnc" id="L161" title="All 4 branches missed.">                assert gssContext.isEstablished() == false;</span>
+                try {
+<span class="nc" id="L163">                    byte[] response = initSecContext(gssContext, challenge, 0, challenge.length);</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">                    if (gssContext.isEstablished()) {</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">                        if (!gssContext.getMutualAuthState()) {</span>
+<span class="nc" id="L166">                            throw saslGs2.mechMutualAuthenticationNotEnabled().toSaslException();</span>
+                        }
+<span class="nc" id="L168">                        negotiationComplete();</span>
+                    }
+<span class="nc" id="L170">                    return response;</span>
+<span class="nc" id="L171">                } catch (GSSException e) {</span>
+<span class="nc" id="L172">                    throw saslGs2.mechUnableToCreateResponseTokenWithCause(e).toSaslException();</span>
+                }
+            }
+        }
+<span class="nc" id="L176">        throw Assert.impossibleSwitchCase(state);</span>
+    }
+
+    /**
+     * Create a GS2 header, excluding the initial gs2-nonstd-flag, where:
+     *
+     *    gs2-header = [gs2-nonstd-flag &quot;,&quot; ] gs2-cb-flag &quot;,&quot; [gs2-authzid] &quot;,&quot;
+     *
+     *  UTF8-1-safe    = %x01-2B / %x2D-3C / %x3E-7F
+     *  UTF8-2         = &amp;lt;as defined in RFC 3629 (STD 63)&amp;gt;
+     *  UTF8-3         = &amp;lt;as defined in RFC 3629 (STD 63)&amp;gt;
+     *  UTF8-4         = &amp;lt;as defined in RFC 3629 (STD 63)&amp;gt;
+     *  UTF8-char-safe = UTF8-1-safe / UTF8-2 / UTF8-3 / UTF8-4
+     *  saslname       = 1*(UTF8-char-safe / &quot;=2C&quot; / &quot;=3D&quot;)
+     *  gs2-authzid    = &quot;a=&quot; saslname
+     *  gs2-nonstd-flag = &quot;F&quot;
+     *  cb-name         = 1*(ALPHA / DIGIT / &quot;.&quot; / &quot;-&quot;)
+     *  gs2-cb-flag     = (&quot;p=&quot; cb-name) / &quot;n&quot; / &quot;y&quot;
+     *
+     * @return the GS2 header, excluding the initial gs2-nonstd-flag
+     */
+    private ByteStringBuilder createGs2HeaderExcludingNonStdFlag() {
+<span class="nc" id="L198">        ByteStringBuilder header = new ByteStringBuilder();</span>
+
+        // gs2-cb-flag
+<span class="nc bnc" id="L201" title="All 2 branches missed.">        if (bindingData != null) {</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">            if (plus) {</span>
+<span class="nc" id="L203">                header.append(&quot;p=&quot;);</span>
+<span class="nc" id="L204">                header.append(bindingType);</span>
+<span class="nc" id="L205">                header.append(',');</span>
+            } else {
+<span class="nc" id="L207">                header.append(&quot;y,&quot;);</span>
+            }
+        } else {
+<span class="nc" id="L210">            header.append(&quot;n,&quot;);</span>
+        }
+
+        // gs2-authzid
+<span class="nc" id="L214">        final String authorizationId = getAuthorizationId();</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">        if (authorizationId != null) {</span>
+<span class="nc" id="L216">            header.append(&quot;a=&quot;);</span>
+<span class="nc" id="L217">            StringPrep.encode(authorizationId, header, StringPrep.PROFILE_SASL_STORED | StringPrep.MAP_GS2_LOGIN_CHARS);</span>
+        }
+<span class="nc" id="L219">        header.append(&quot;,&quot;);</span>
+<span class="nc" id="L220">        return header;</span>
+    }
+
+    /**
+     * Modify the given token by removing the initial context token header, if present, and
+     * prefix the resulting token with a GS2 header.
+     *
+     * @param token the initial context token
+     * @return the modified token
+     * @throws GSSException if the given initial context token is invalid
+     */
+    private byte[] modifyInitialContextToken(byte[] token) throws GSSException {
+<span class="nc" id="L232">        boolean nonStandard = false;</span>
+<span class="nc bnc" id="L233" title="All 2 branches missed.">        if (token[0] == TOKEN_HEADER_TAG) {</span>
+            // Remove the initial context token header, where:
+            // InitialContextToken ::=
+            //      [APPLICATION 0] IMPLICIT SEQUENCE {
+            //              thisMech MechType,
+            //              innerContextToken ANY DEFINED BY thisMech
+            //              -- contents mechanism-specific
+            //              -- ASN.1 structure not required
+            //      }
+            // MechType ::= OBJECT IDENTIFIER
+<span class="nc" id="L243">            final DERDecoder decoder = new DERDecoder(token);</span>
+<span class="nc" id="L244">            decoder.decodeImplicit(APPLICATION_SPECIFIC_MASK, 0);</span>
+<span class="nc" id="L245">            decoder.startSequence();</span>
+<span class="nc" id="L246">            String decodedOid = decoder.decodeObjectIdentifier();</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">            if (! mechanism.equals(new Oid(decodedOid))) {</span>
+<span class="nc" id="L248">                throw new GSSException(GSSException.DEFECTIVE_TOKEN);</span>
+            }
+<span class="nc" id="L250">            token = decoder.drain();</span>
+<span class="nc" id="L251">        } else {</span>
+            // Set gs2-nonstd-flag
+<span class="nc" id="L253">            nonStandard = true;</span>
+        }
+<span class="nc" id="L255">        ByteStringBuilder modifiedToken = new ByteStringBuilder();</span>
+<span class="nc bnc" id="L256" title="All 2 branches missed.">        if (nonStandard) {</span>
+<span class="nc" id="L257">            modifiedToken.append(&quot;F,&quot;);</span>
+        }
+<span class="nc" id="L259">        modifiedToken.append(gs2HeaderExcludingNonStdFlag);</span>
+<span class="nc" id="L260">        modifiedToken.append(token);</span>
+<span class="nc" id="L261">        return modifiedToken.toArray();</span>
+    }
+
+    private static byte[] initSecContext(final GSSContext gssContext, final byte[] inputBuf, final int offset, final int len) throws GSSException {
+<span class="nc" id="L265">        final ClassLoader old = doPrivileged(new SetContextClassLoaderFromClassAction(Gs2SaslClient.class));</span>
+        try {
+<span class="nc" id="L267">            return gssContext.initSecContext(inputBuf, offset, len);</span>
+        } finally {
+<span class="nc" id="L269">            doPrivileged(new SetContextClassLoaderAction(old));</span>
+        }
+    }
+
+    private static &lt;T&gt; T doPrivileged(final PrivilegedAction&lt;T&gt; action) {
+<span class="nc bnc" id="L274" title="All 2 branches missed.">        return System.getSecurityManager() != null ? AccessController.doPrivileged(action) : action.run();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

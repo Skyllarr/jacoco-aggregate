@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NoPermission.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-permission</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.permission</a> &gt; <span class="el_source">NoPermission.java</span></div><h1>NoPermission.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.permission;
+
+/**
+ * A permission which implies nothing, not even itself.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class NoPermission extends AbstractPermission&lt;NoPermission&gt; {
+    private static final long serialVersionUID = 2339781690941885693L;
+
+<span class="nc" id="L29">    private static final NoPermission INSTANCE = new NoPermission();</span>
+
+    /**
+     * Construct a new instance.
+     */
+    public NoPermission() {
+<span class="nc" id="L35">        super(&quot;&lt;no permissions&gt;&quot;);</span>
+<span class="nc" id="L36">    }</span>
+
+    /**
+     * Construct a new instance.  The name parameter is ignored.
+     *
+     * @param ignored ignored
+     */
+    public NoPermission(final String ignored) {
+<span class="nc" id="L44">        this();</span>
+<span class="nc" id="L45">    }</span>
+
+    /**
+     * Construct a new instance.  The name and actions parameters are ignored.
+     *
+     * @param ignored1 ignored
+     * @param ignored2 ignored
+     */
+    public NoPermission(final String ignored1, final String ignored2) {
+<span class="nc" id="L54">        this();</span>
+<span class="nc" id="L55">    }</span>
+
+    /**
+     * Get the no-permission instance.
+     *
+     * @return the no-permission instance (not {@code null})
+     */
+    public static NoPermission getInstance() {
+<span class="nc" id="L63">        return INSTANCE;</span>
+    }
+
+    /**
+     * Always returns {@code false}.
+     *
+     * @param permission ignored
+     * @return {@code false}
+     */
+    public boolean implies(final NoPermission permission) {
+<span class="nc" id="L73">        return false;</span>
+    }
+
+    /**
+     * Always returns {@code true} if the argument is not {@code null}.
+     *
+     * @param other the permission to compare to
+     * @return {@code true} if {@code other} is not {@code null}; {@code false} otherwise
+     */
+    public boolean equals(final NoPermission other) {
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        return other != null;</span>
+    }
+
+    /**
+     * Get the constant hash code.
+     *
+     * @return the constant hash code
+     */
+    public int hashCode() {
+<span class="nc" id="L92">        return getClass().hashCode();</span>
+    }
+
+    public AbstractPermissionCollection newPermissionCollection() {
+<span class="nc" id="L96">        return NoPermissionCollection.getInstance();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages_$logger.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-password-impl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.password.impl</a> &gt; <span class="el_source">ElytronMessages_$logger.java</span></div><h1>ElytronMessages_$logger.java</h1><pre class="source lang-java linenums">package org.wildfly.security.password.impl;
+
+import java.util.Locale;
+import java.io.Serializable;
+import javax.annotation.Generated;
+import org.jboss.logging.DelegatingBasicLogger;
+import java.lang.String;
+import java.security.NoSuchAlgorithmException;
+import org.jboss.logging.Logger;
+import javax.security.sasl.SaslException;
+import java.security.InvalidKeyException;
+import org.jboss.logging.BasicLogger;
+import java.lang.Throwable;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.InvalidParameterSpecException;
+import java.util.Arrays;
+import java.lang.IllegalArgumentException;
+
+/**
+ * Warning this class consists of generated code.
+ */
+@Generated(value = &quot;org.jboss.logging.processor.generator.model.MessageLoggerImplementor&quot;, date = &quot;2022-09-02T20:20:40+0200&quot;)
+public class ElytronMessages_$logger extends DelegatingBasicLogger implements ElytronMessages, BasicLogger, Serializable {
+    private static final long serialVersionUID = 1L;
+<span class="fc" id="L25">    private static final String FQCN = ElytronMessages_$logger.class.getName();</span>
+    public ElytronMessages_$logger(final Logger log) {
+<span class="fc" id="L27">        super(log);</span>
+<span class="fc" id="L28">    }</span>
+<span class="fc" id="L29">    private static final Locale LOCALE = Locale.ROOT;</span>
+    protected Locale getLoggingLocale() {
+<span class="fc" id="L31">        return LOCALE;</span>
+    }
+    protected String emptyParameter$str() {
+<span class="nc" id="L34">        return &quot;ELY00002: Parameter %s is empty&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException emptyParameter(final String parameter) {
+<span class="nc" id="L38">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), emptyParameter$str(), parameter));</span>
+<span class="nc" id="L39">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L40">        return result;</span>
+    }
+    private static void _copyStackTraceMinusOne(final Throwable e) {
+<span class="fc" id="L43">        final StackTraceElement[] st = e.getStackTrace();</span>
+<span class="fc" id="L44">        e.setStackTrace(Arrays.copyOfRange(st, 1, st.length));</span>
+<span class="fc" id="L45">    }</span>
+    protected String unrecognizedAlgorithm$str() {
+<span class="nc" id="L47">        return &quot;ELY00004: Unrecognized algorithm \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException unrecognizedAlgorithm(final String algorithm) {
+<span class="nc" id="L51">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), unrecognizedAlgorithm$str(), algorithm));</span>
+<span class="nc" id="L52">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L53">        return result;</span>
+    }
+    protected String mechInvalidOTPAlgorithm$str() {
+<span class="nc" id="L56">        return &quot;ELY05151: Invalid OTP algorithm \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final SaslException mechInvalidOTPAlgorithm(final String algorithm) {
+<span class="nc" id="L60">        final SaslException result = new SaslException(String.format(getLoggingLocale(), mechInvalidOTPAlgorithm$str(), algorithm));</span>
+<span class="nc" id="L61">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L62">        return result;</span>
+    }
+    protected String invalidKeySpecNoSuchMessageDigestAlgorithm$str() {
+<span class="nc" id="L65">        return &quot;ELY08013: No such MessageDigest algorithm for \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final InvalidKeySpecException invalidKeySpecNoSuchMessageDigestAlgorithm(final String algorithm) {
+<span class="nc" id="L69">        final InvalidKeySpecException result = new InvalidKeySpecException(String.format(getLoggingLocale(), invalidKeySpecNoSuchMessageDigestAlgorithm$str(), algorithm));</span>
+<span class="nc" id="L70">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L71">        return result;</span>
+    }
+    protected String invalidKeyNoSuchMessageDigestAlgorithm$str() {
+<span class="nc" id="L74">        return &quot;ELY08014: No such MessageDigest algorithm for \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final InvalidKeyException invalidKeyNoSuchMessageDigestAlgorithm(final String algorithm) {
+<span class="nc" id="L78">        final InvalidKeyException result = new InvalidKeyException(String.format(getLoggingLocale(), invalidKeyNoSuchMessageDigestAlgorithm$str(), algorithm));</span>
+<span class="nc" id="L79">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L80">        return result;</span>
+    }
+    protected String invalidKeyCannotVerifyPassword$str() {
+<span class="nc" id="L83">        return &quot;ELY08015: Cannot verify password&quot;;</span>
+    }
+    @Override
+    public final InvalidKeyException invalidKeyCannotVerifyPassword(final Throwable cause) {
+<span class="nc" id="L87">        final InvalidKeyException result = new InvalidKeyException(String.format(getLoggingLocale(), invalidKeyCannotVerifyPassword$str()), cause);</span>
+<span class="nc" id="L88">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L89">        return result;</span>
+    }
+    protected String invalidKeyDesCryptPasswordHashMustBeBytes$str() {
+<span class="nc" id="L92">        return &quot;ELY08017: DES crypt password hash must be %d bytes&quot;;</span>
+    }
+    @Override
+    public final InvalidKeyException invalidKeyDesCryptPasswordHashMustBeBytes(final int bytes) {
+<span class="nc" id="L96">        final InvalidKeyException result = new InvalidKeyException(String.format(getLoggingLocale(), invalidKeyDesCryptPasswordHashMustBeBytes$str(), bytes));</span>
+<span class="nc" id="L97">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L98">        return result;</span>
+    }
+    protected String invalidParameterSpecSaltMustBeBytesBits$str() {
+<span class="nc" id="L101">        return &quot;ELY08018: Salt must be %d bytes (%d bits)&quot;;</span>
+    }
+    @Override
+    public final InvalidParameterSpecException invalidParameterSpecSaltMustBeBytesBits(final int bytes, final int bits) {
+<span class="nc" id="L105">        final InvalidParameterSpecException result = new InvalidParameterSpecException(String.format(getLoggingLocale(), invalidParameterSpecSaltMustBeBytesBits$str(), bytes, bits));</span>
+<span class="nc" id="L106">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L107">        return result;</span>
+    }
+    protected String invalidNumberOfRoundsMustBeIntBetween$str() {
+<span class="fc" id="L110">        return &quot;ELY08020: Invalid number of rounds. Must be an integer between %d and %d, inclusive&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidNumberOfRoundsMustBeIntBetween(final int min, final int max) {
+<span class="fc" id="L114">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidNumberOfRoundsMustBeIntBetween$str(), min, max));</span>
+<span class="fc" id="L115">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L116">        return result;</span>
+    }
+    protected String invalidSaltMustBeBytesLong$str() {
+<span class="nc" id="L119">        return &quot;ELY08021: Invalid salt: must be %d bytes long&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidSaltMustBeBytesLong(final int length) {
+<span class="nc" id="L123">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidSaltMustBeBytesLong$str(), length));</span>
+<span class="nc" id="L124">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L125">        return result;</span>
+    }
+    protected String invalidKeySpecBsdDesCryptPasswordHashMustBeBytes$str() {
+<span class="fc" id="L128">        return &quot;ELY08022: BSD DES crypt password hash must be %d bytes&quot;;</span>
+    }
+    @Override
+    public final InvalidKeySpecException invalidKeySpecBsdDesCryptPasswordHashMustBeBytes(final int bytes) {
+<span class="fc" id="L132">        final InvalidKeySpecException result = new InvalidKeySpecException(String.format(getLoggingLocale(), invalidKeySpecBsdDesCryptPasswordHashMustBeBytes$str(), bytes));</span>
+<span class="fc" id="L133">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L134">        return result;</span>
+    }
+    protected String invalidParameterSpecSaltMustBeBytes$str() {
+<span class="fc" id="L137">        return &quot;ELY08023: Salt must be %d bytes&quot;;</span>
+    }
+    @Override
+    public final InvalidParameterSpecException invalidParameterSpecSaltMustBeBytes(final int bytes) {
+<span class="fc" id="L141">        final InvalidParameterSpecException result = new InvalidParameterSpecException(String.format(getLoggingLocale(), invalidParameterSpecSaltMustBeBytes$str(), bytes));</span>
+<span class="fc" id="L142">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L143">        return result;</span>
+    }
+    protected String invalidKeyBsdDesCryptPasswordHashMustBeBytes$str() {
+<span class="nc" id="L146">        return &quot;ELY08024: BSD DES crypt password hash must be %d bytes&quot;;</span>
+    }
+    @Override
+    public final InvalidKeyException invalidKeyBsdDesCryptPasswordHashMustBeBytes(final int bytes) {
+<span class="nc" id="L150">        final InvalidKeyException result = new InvalidKeyException(String.format(getLoggingLocale(), invalidKeyBsdDesCryptPasswordHashMustBeBytes$str(), bytes));</span>
+<span class="nc" id="L151">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L152">        return result;</span>
+    }
+    protected String invalidKeySpecExpectedSpecGotSpec$str() {
+<span class="nc" id="L155">        return &quot;ELY08025: Expected to get a \&quot;%s\&quot; as spec, got \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final InvalidKeySpecException invalidKeySpecExpectedSpecGotSpec(final String expected, final String got) {
+<span class="nc" id="L159">        final InvalidKeySpecException result = new InvalidKeySpecException(String.format(getLoggingLocale(), invalidKeySpecExpectedSpecGotSpec$str(), expected, got));</span>
+<span class="nc" id="L160">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L161">        return result;</span>
+    }
+    protected String invalidKeySpecUnknownAlgorithmOrIncompatiblePasswordSpec$str() {
+<span class="nc" id="L164">        return &quot;ELY08026: Unknown algorithm \&quot;%s\&quot; or incompatible PasswordSpec \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final InvalidKeySpecException invalidKeySpecUnknownAlgorithmOrIncompatiblePasswordSpec(final String algorithm, final String passwordSpec) {
+<span class="nc" id="L168">        final InvalidKeySpecException result = new InvalidKeySpecException(String.format(getLoggingLocale(), invalidKeySpecUnknownAlgorithmOrIncompatiblePasswordSpec$str(), algorithm, passwordSpec));</span>
+<span class="nc" id="L169">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L170">        return result;</span>
+    }
+    protected String invalidKeyUnknownUnknownPasswordTypeOrAlgorithm$str() {
+<span class="nc" id="L173">        return &quot;ELY08027: Unknown password type or algorithm&quot;;</span>
+    }
+    @Override
+    public final InvalidKeyException invalidKeyUnknownUnknownPasswordTypeOrAlgorithm() {
+<span class="nc" id="L177">        final InvalidKeyException result = new InvalidKeyException(String.format(getLoggingLocale(), invalidKeyUnknownUnknownPasswordTypeOrAlgorithm$str()));</span>
+<span class="nc" id="L178">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L179">        return result;</span>
+    }
+    protected String noSuchAlgorithmInvalidAlgorithm$str() {
+<span class="nc" id="L182">        return &quot;ELY08028: Invalid algorithm \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final NoSuchAlgorithmException noSuchAlgorithmInvalidAlgorithm(final String algorithm) {
+<span class="nc" id="L186">        final NoSuchAlgorithmException result = new NoSuchAlgorithmException(String.format(getLoggingLocale(), noSuchAlgorithmInvalidAlgorithm$str(), algorithm));</span>
+<span class="nc" id="L187">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L188">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,398 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages_$logger.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-ssl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.ssl</a> &gt; <span class="el_source">ElytronMessages_$logger.java</span></div><h1>ElytronMessages_$logger.java</h1><pre class="source lang-java linenums">package org.wildfly.security.ssl;
+
+import java.util.Locale;
+import java.lang.IllegalStateException;
+import java.io.Serializable;
+import javax.annotation.Generated;
+import org.jboss.logging.DelegatingBasicLogger;
+import java.security.cert.CertificateException;
+import org.wildfly.security.auth.server.RealmUnavailableException;
+import java.lang.String;
+import java.security.NoSuchAlgorithmException;
+import org.jboss.logging.Logger;
+import javax.net.ssl.SSLException;
+import javax.net.ssl.SSLHandshakeException;
+import javax.net.ssl.SSLProtocolException;
+import org.jboss.logging.BasicLogger;
+import java.lang.Throwable;
+import java.util.Arrays;
+import java.security.Principal;
+import java.lang.IllegalArgumentException;
+
+
+import static org.jboss.logging.Logger.Level.WARN;
+
+/**
+ * Warning this class consists of generated code.
+ */
+@Generated(value = &quot;org.jboss.logging.processor.generator.model.MessageLoggerImplementor&quot;, date = &quot;2022-09-02T20:21:37+0200&quot;)
+public class ElytronMessages_$logger extends DelegatingBasicLogger implements ElytronMessages, BasicLogger, Serializable {
+    private static final long serialVersionUID = 1L;
+<span class="fc" id="L31">    private static final String FQCN = ElytronMessages_$logger.class.getName();</span>
+    public ElytronMessages_$logger(final Logger log) {
+<span class="fc" id="L33">        super(log);</span>
+<span class="fc" id="L34">    }</span>
+<span class="fc" id="L35">    private static final Locale LOCALE = Locale.ROOT;</span>
+    protected Locale getLoggingLocale() {
+<span class="fc" id="L37">        return LOCALE;</span>
+    }
+    @Override
+    public final void warnInvalidStringCountForMechanismDatabaseEntry(final String name) {
+<span class="nc" id="L41">        super.log.logf(FQCN, WARN, null, warnInvalidStringCountForMechanismDatabaseEntry$str(), name);</span>
+<span class="nc" id="L42">    }</span>
+    protected String warnInvalidStringCountForMechanismDatabaseEntry$str() {
+<span class="nc" id="L44">        return &quot;ELY01066: Invalid string count for mechanism database entry \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final void warnInvalidKeyExchangeForMechanismDatabaseEntry(final String value, final String name) {
+<span class="nc" id="L48">        super.log.logf(FQCN, WARN, null, warnInvalidKeyExchangeForMechanismDatabaseEntry$str(), value, name);</span>
+<span class="nc" id="L49">    }</span>
+    protected String warnInvalidKeyExchangeForMechanismDatabaseEntry$str() {
+<span class="nc" id="L51">        return &quot;ELY01067: Invalid key exchange \&quot;%s\&quot; for mechanism database entry \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final void warnInvalidAuthenticationForMechanismDatabaseEntry(final String value, final String name) {
+<span class="nc" id="L55">        super.log.logf(FQCN, WARN, null, warnInvalidAuthenticationForMechanismDatabaseEntry$str(), value, name);</span>
+<span class="nc" id="L56">    }</span>
+    protected String warnInvalidAuthenticationForMechanismDatabaseEntry$str() {
+<span class="nc" id="L58">        return &quot;ELY01068: Invalid authentication \&quot;%s\&quot; for mechanism database entry \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final void warnInvalidEncryptionForMechanismDatabaseEntry(final String value, final String name) {
+<span class="nc" id="L62">        super.log.logf(FQCN, WARN, null, warnInvalidEncryptionForMechanismDatabaseEntry$str(), value, name);</span>
+<span class="nc" id="L63">    }</span>
+    protected String warnInvalidEncryptionForMechanismDatabaseEntry$str() {
+<span class="nc" id="L65">        return &quot;ELY01069: Invalid encryption \&quot;%s\&quot; for mechanism database entry \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final void warnInvalidDigestForMechanismDatabaseEntry(final String value, final String name) {
+<span class="nc" id="L69">        super.log.logf(FQCN, WARN, null, warnInvalidDigestForMechanismDatabaseEntry$str(), value, name);</span>
+<span class="nc" id="L70">    }</span>
+    protected String warnInvalidDigestForMechanismDatabaseEntry$str() {
+<span class="nc" id="L72">        return &quot;ELY01070: Invalid digest \&quot;%s\&quot; for mechanism database entry \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final void warnInvalidProtocolForMechanismDatabaseEntry(final String value, final String name) {
+<span class="nc" id="L76">        super.log.logf(FQCN, WARN, null, warnInvalidProtocolForMechanismDatabaseEntry$str(), value, name);</span>
+<span class="nc" id="L77">    }</span>
+    protected String warnInvalidProtocolForMechanismDatabaseEntry$str() {
+<span class="nc" id="L79">        return &quot;ELY01071: Invalid protocol \&quot;%s\&quot; for mechanism database entry \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final void warnInvalidLevelForMechanismDatabaseEntry(final String value, final String name) {
+<span class="nc" id="L83">        super.log.logf(FQCN, WARN, null, warnInvalidLevelForMechanismDatabaseEntry$str(), value, name);</span>
+<span class="nc" id="L84">    }</span>
+    protected String warnInvalidLevelForMechanismDatabaseEntry$str() {
+<span class="nc" id="L86">        return &quot;ELY01072: Invalid level \&quot;%s\&quot; for mechanism database entry \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final void warnInvalidStrengthBitsForMechanismDatabaseEntry(final String value, final String name) {
+<span class="nc" id="L90">        super.log.logf(FQCN, WARN, null, warnInvalidStrengthBitsForMechanismDatabaseEntry$str(), value, name);</span>
+<span class="nc" id="L91">    }</span>
+    protected String warnInvalidStrengthBitsForMechanismDatabaseEntry$str() {
+<span class="nc" id="L93">        return &quot;ELY01073: Invalid strength bits \&quot;%s\&quot; for mechanism database entry \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final void warnInvalidAlgorithmBitsForMechanismDatabaseEntry(final String value, final String name) {
+<span class="nc" id="L97">        super.log.logf(FQCN, WARN, null, warnInvalidAlgorithmBitsForMechanismDatabaseEntry$str(), value, name);</span>
+<span class="nc" id="L98">    }</span>
+    protected String warnInvalidAlgorithmBitsForMechanismDatabaseEntry$str() {
+<span class="nc" id="L100">        return &quot;ELY01074: Invalid algorithm bits \&quot;%s\&quot; for mechanism database entry \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final void warnInvalidDuplicateMechanismDatabaseEntry(final String name) {
+<span class="nc" id="L104">        super.log.logf(FQCN, WARN, null, warnInvalidDuplicateMechanismDatabaseEntry$str(), name);</span>
+<span class="nc" id="L105">    }</span>
+    protected String warnInvalidDuplicateMechanismDatabaseEntry$str() {
+<span class="nc" id="L107">        return &quot;ELY01075: Invalid duplicate mechanism database entry \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final void warnInvalidDuplicateOpenSslStyleAliasForMechanismDatabaseEntry(final String alias, final String name, final String originalName) {
+<span class="nc" id="L111">        super.log.logf(FQCN, WARN, null, warnInvalidDuplicateOpenSslStyleAliasForMechanismDatabaseEntry$str(), alias, name, originalName);</span>
+<span class="nc" id="L112">    }</span>
+    protected String warnInvalidDuplicateOpenSslStyleAliasForMechanismDatabaseEntry$str() {
+<span class="nc" id="L114">        return &quot;ELY01076: Invalid duplicate OpenSSL-style alias \&quot;%s\&quot; for mechanism database entry \&quot;%s\&quot; (original is \&quot;%s\&quot;)&quot;;</span>
+    }
+    @Override
+    public final void warnInvalidAliasForMissingMechanismDatabaseEntry(final String value, final String name) {
+<span class="nc" id="L118">        super.log.logf(FQCN, WARN, null, warnInvalidAliasForMissingMechanismDatabaseEntry$str(), value, name);</span>
+<span class="nc" id="L119">    }</span>
+    protected String warnInvalidAliasForMissingMechanismDatabaseEntry$str() {
+<span class="nc" id="L121">        return &quot;ELY01077: Invalid alias \&quot;%s\&quot; for missing mechanism database entry \&quot;%s\&quot;&quot;;</span>
+    }
+    protected String noAlgorithmForSslProtocol$str() {
+<span class="nc" id="L124">        return &quot;ELY04001: No algorithm found matching TLS/SSL protocol selection criteria&quot;;</span>
+    }
+    @Override
+    public final NoSuchAlgorithmException noAlgorithmForSslProtocol() {
+<span class="nc" id="L128">        final NoSuchAlgorithmException result = new NoSuchAlgorithmException(String.format(getLoggingLocale(), noAlgorithmForSslProtocol$str()));</span>
+<span class="nc" id="L129">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L130">        return result;</span>
+    }
+    private static void _copyStackTraceMinusOne(final Throwable e) {
+<span class="fc" id="L133">        final StackTraceElement[] st = e.getStackTrace();</span>
+<span class="fc" id="L134">        e.setStackTrace(Arrays.copyOfRange(st, 1, st.length));</span>
+<span class="fc" id="L135">    }</span>
+    protected String emptyChainNotTrusted$str() {
+<span class="nc" id="L137">        return &quot;ELY04002: Empty certificate chain is not trusted&quot;;</span>
+    }
+    @Override
+    public final CertificateException emptyChainNotTrusted() {
+<span class="nc" id="L141">        final CertificateException result = new CertificateException(String.format(getLoggingLocale(), emptyChainNotTrusted$str()));</span>
+<span class="nc" id="L142">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L143">        return result;</span>
+    }
+    protected String notTrustedRealmProblem$str() {
+<span class="nc" id="L146">        return &quot;ELY04003: Certificate not trusted due to realm failure for principal [%s]&quot;;</span>
+    }
+    @Override
+    public final CertificateException notTrustedRealmProblem(final RealmUnavailableException e, final Principal principal) {
+<span class="nc" id="L150">        final CertificateException result = new CertificateException(String.format(getLoggingLocale(), notTrustedRealmProblem$str(), principal), e);</span>
+<span class="nc" id="L151">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L152">        return result;</span>
+    }
+    protected String notTrusted$str() {
+<span class="nc" id="L155">        return &quot;ELY04004: Credential validation failed: certificate is not trusted for principal [%s]&quot;;</span>
+    }
+    @Override
+    public final CertificateException notTrusted(final Principal principal) {
+<span class="nc" id="L159">        final CertificateException result = new CertificateException(String.format(getLoggingLocale(), notTrusted$str(), principal));</span>
+<span class="nc" id="L160">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L161">        return result;</span>
+    }
+    protected String noDefaultTrustManager$str() {
+<span class="nc" id="L164">        return &quot;ELY04005: No default trust manager available&quot;;</span>
+    }
+    @Override
+    public final NoSuchAlgorithmException noDefaultTrustManager() {
+<span class="nc" id="L168">        final NoSuchAlgorithmException result = new NoSuchAlgorithmException(String.format(getLoggingLocale(), noDefaultTrustManager$str()));</span>
+<span class="nc" id="L169">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L170">        return result;</span>
+    }
+    protected String noContextForSslConnection$str() {
+<span class="nc" id="L173">        return &quot;ELY04006: No context for SSL connection&quot;;</span>
+    }
+    @Override
+    public final SSLHandshakeException noContextForSslConnection() {
+<span class="nc" id="L177">        final SSLHandshakeException result = new SSLHandshakeException(String.format(getLoggingLocale(), noContextForSslConnection$str()));</span>
+<span class="nc" id="L178">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L179">        return result;</span>
+    }
+    protected String sslClosed$str() {
+<span class="nc" id="L182">        return &quot;ELY04007: SSL channel is closed&quot;;</span>
+    }
+    @Override
+    public final SSLException sslClosed() {
+<span class="nc" id="L186">        final SSLException result = new SSLException(String.format(getLoggingLocale(), sslClosed$str()));</span>
+<span class="nc" id="L187">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L188">        return result;</span>
+    }
+    protected String notHandshakeRecord$str() {
+<span class="nc" id="L191">        return &quot;ELY04008: Initial SSL/TLS data is not a handshake record&quot;;</span>
+    }
+    @Override
+    public final SSLHandshakeException notHandshakeRecord() {
+<span class="nc" id="L195">        final SSLHandshakeException result = new SSLHandshakeException(String.format(getLoggingLocale(), notHandshakeRecord$str()));</span>
+<span class="nc" id="L196">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L197">        return result;</span>
+    }
+    protected String invalidHandshakeRecord$str() {
+<span class="nc" id="L200">        return &quot;ELY04009: Initial SSL/TLS handshake record is invalid&quot;;</span>
+    }
+    @Override
+    public final SSLHandshakeException invalidHandshakeRecord() {
+<span class="nc" id="L204">        final SSLHandshakeException result = new SSLHandshakeException(String.format(getLoggingLocale(), invalidHandshakeRecord$str()));</span>
+<span class="nc" id="L205">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L206">        return result;</span>
+    }
+    protected String multiRecordSSLHandshake$str() {
+<span class="nc" id="L209">        return &quot;ELY04010: Initial SSL/TLS handshake spans multiple records&quot;;</span>
+    }
+    @Override
+    public final SSLHandshakeException multiRecordSSLHandshake() {
+<span class="nc" id="L213">        final SSLHandshakeException result = new SSLHandshakeException(String.format(getLoggingLocale(), multiRecordSSLHandshake$str()));</span>
+<span class="nc" id="L214">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L215">        return result;</span>
+    }
+    protected String expectedClientHello$str() {
+<span class="nc" id="L218">        return &quot;ELY04011: Expected \&quot;client hello\&quot; record&quot;;</span>
+    }
+    @Override
+    public final SSLHandshakeException expectedClientHello() {
+<span class="nc" id="L222">        final SSLHandshakeException result = new SSLHandshakeException(String.format(getLoggingLocale(), expectedClientHello$str()));</span>
+<span class="nc" id="L223">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L224">        return result;</span>
+    }
+    protected String unsupportedSslRecord$str() {
+<span class="nc" id="L227">        return &quot;ELY04012: Unsupported SSL/TLS record&quot;;</span>
+    }
+    @Override
+    public final SSLHandshakeException unsupportedSslRecord() {
+<span class="nc" id="L231">        final SSLHandshakeException result = new SSLHandshakeException(String.format(getLoggingLocale(), unsupportedSslRecord$str()));</span>
+<span class="nc" id="L232">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L233">        return result;</span>
+    }
+    protected String invalidTlsExt$str() {
+<span class="nc" id="L236">        return &quot;ELY04013: Invalid TLS extension data&quot;;</span>
+    }
+    @Override
+    public final SSLProtocolException invalidTlsExt() {
+<span class="nc" id="L240">        final SSLProtocolException result = new SSLProtocolException(String.format(getLoggingLocale(), invalidTlsExt$str()));</span>
+<span class="nc" id="L241">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L242">        return result;</span>
+    }
+    protected String notEnoughData$str() {
+<span class="nc" id="L245">        return &quot;ELY04014: Not enough data in record to fill declared item size&quot;;</span>
+    }
+    @Override
+    public final SSLProtocolException notEnoughData() {
+<span class="nc" id="L249">        final SSLProtocolException result = new SSLProtocolException(String.format(getLoggingLocale(), notEnoughData$str()));</span>
+<span class="nc" id="L250">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L251">        return result;</span>
+    }
+    protected String emptyHostNameSni$str() {
+<span class="nc" id="L254">        return &quot;ELY04015: Empty host name in SNI record data&quot;;</span>
+    }
+    @Override
+    public final SSLProtocolException emptyHostNameSni() {
+<span class="nc" id="L258">        final SSLProtocolException result = new SSLProtocolException(String.format(getLoggingLocale(), emptyHostNameSni$str()));</span>
+<span class="nc" id="L259">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L260">        return result;</span>
+    }
+    protected String duplicatedSniServerName$str() {
+<span class="nc" id="L263">        return &quot;ELY04016: Duplicated SNI server name of type %d&quot;;</span>
+    }
+    @Override
+    public final SSLProtocolException duplicatedSniServerName(final int type) {
+<span class="nc" id="L267">        final SSLProtocolException result = new SSLProtocolException(String.format(getLoggingLocale(), duplicatedSniServerName$str(), type));</span>
+<span class="nc" id="L268">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L269">        return result;</span>
+    }
+    protected String unknownAuthenticationName$str() {
+<span class="nc" id="L272">        return &quot;ELY04017: Unknown authentication name \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException unknownAuthenticationName(final String name) {
+<span class="nc" id="L276">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), unknownAuthenticationName$str(), name));</span>
+<span class="nc" id="L277">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L278">        return result;</span>
+    }
+    protected String unknownEncryptionName$str() {
+<span class="nc" id="L281">        return &quot;ELY04018: Unknown encryption name \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException unknownEncryptionName(final String name) {
+<span class="nc" id="L285">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), unknownEncryptionName$str(), name));</span>
+<span class="nc" id="L286">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L287">        return result;</span>
+    }
+    protected String unknownKeyExchangeName$str() {
+<span class="nc" id="L290">        return &quot;ELY04019: Unknown key exchange name \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException unknownKeyExchangeName(final String name) {
+<span class="nc" id="L294">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), unknownKeyExchangeName$str(), name));</span>
+<span class="nc" id="L295">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L296">        return result;</span>
+    }
+    protected String invalidClientMode$str() {
+<span class="nc" id="L299">        return &quot;ELY04024: Invalid client mode, expected %s, got %s&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidClientMode(final boolean expectedMode, final boolean givenMode) {
+<span class="nc" id="L303">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidClientMode$str(), expectedMode, givenMode));</span>
+<span class="nc" id="L304">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L305">        return result;</span>
+    }
+    protected String sslErrorCreatingTrustManager$str() {
+<span class="nc" id="L308">        return &quot;ELY04026: Could not create trust manager [%s]&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException sslErrorCreatingTrustManager(final String name, final Throwable cause) {
+<span class="nc" id="L312">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), sslErrorCreatingTrustManager$str(), name), cause);</span>
+<span class="nc" id="L313">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L314">        return result;</span>
+    }
+    protected String securityDomainOfSSLContextDoesNotSupportX509$str() {
+<span class="nc" id="L317">        return &quot;ELY04027: SecurityDomain of SSLContext does not support X509PeerCertificateChainEvidence verification&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException securityDomainOfSSLContextDoesNotSupportX509() {
+<span class="nc" id="L321">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), securityDomainOfSSLContextDoesNotSupportX509$str()));</span>
+<span class="nc" id="L322">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L323">        return result;</span>
+    }
+    protected String defaultContextCannotBeNull$str() {
+<span class="nc" id="L326">        return &quot;ELY04029: Default context cannot be null&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException defaultContextCannotBeNull() {
+<span class="nc" id="L330">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), defaultContextCannotBeNull$str()));</span>
+<span class="nc" id="L331">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L332">        return result;</span>
+    }
+    protected String noSNIContextForSslConnection$str() {
+<span class="nc" id="L335">        return &quot;ELY04030: No context for SSL connection&quot;;</span>
+    }
+    @Override
+    public final SSLException noSNIContextForSslConnection() {
+<span class="nc" id="L339">        final SSLException result = new SSLException(String.format(getLoggingLocale(), noSNIContextForSslConnection$str()));</span>
+<span class="nc" id="L340">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L341">        return result;</span>
+    }
+    protected String sslErrorCreatingRevocationTrustManager$str() {
+<span class="nc" id="L344">        return &quot;ELY04031: TrustManagerFactory algorithm [%s] does not support certificate revocation&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException sslErrorCreatingRevocationTrustManager(final String name, final Throwable cause) {
+<span class="nc" id="L348">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), sslErrorCreatingRevocationTrustManager$str(), name), cause);</span>
+<span class="nc" id="L349">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L350">        return result;</span>
+    }
+    protected String mechSelectorUnexpectedChar$str() {
+<span class="nc" id="L353">        return &quot;ELY05015: Unexpected character U+%04x at offset %d of mechanism selection string \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException mechSelectorUnexpectedChar(final int codePoint, final long offset, final String string) {
+<span class="nc" id="L357">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), mechSelectorUnexpectedChar$str(), codePoint, offset, string));</span>
+<span class="nc" id="L358">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L359">        return result;</span>
+    }
+    protected String mechSelectorUnknownToken$str() {
+<span class="fc" id="L362">        return &quot;ELY05016: Unrecognized token \&quot;%s\&quot; in mechanism selection string \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException mechSelectorUnknownToken(final String word, final String string) {
+<span class="fc" id="L366">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), mechSelectorUnknownToken$str(), word, string));</span>
+<span class="fc" id="L367">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L368">        return result;</span>
+    }
+    protected String mechSelectorTokenNotAllowed$str() {
+<span class="nc" id="L371">        return &quot;ELY05017: Token \&quot;%s\&quot; not allowed at offset %d of mechanism selection string \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException mechSelectorTokenNotAllowed(final String token, final long offset, final String string) {
+<span class="nc" id="L375">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), mechSelectorTokenNotAllowed$str(), token, offset, string));</span>
+<span class="nc" id="L376">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L377">        return result;</span>
+    }
+    protected String unknownCipherSuiteName$str() {
+<span class="fc" id="L380">        return &quot;ELY15000: Unknown cipher suite name '%s' in names string '%s'&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException unknownCipherSuiteName(final String name, final String string) {
+<span class="fc" id="L384">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), unknownCipherSuiteName$str(), name, string));</span>
+<span class="fc" id="L385">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L386">        return result;</span>
+    }
+    protected String noSslContextProvided$str() {
+<span class="nc" id="L389">        return &quot;ELY15001: No '%s' provided by the configured providers&quot;;</span>
+    }
+    @Override
+    public final NoSuchAlgorithmException noSslContextProvided(final String type) {
+<span class="nc" id="L393">        final NoSuchAlgorithmException result = new NoSuchAlgorithmException(String.format(getLoggingLocale(), noSslContextProvided$str(), type));</span>
+<span class="nc" id="L394">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L395">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

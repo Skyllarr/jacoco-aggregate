@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DelegatingAuthConfigFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-jaspi</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.jaspi</a> &gt; <span class="el_source">DelegatingAuthConfigFactory.java</span></div><h1>DelegatingAuthConfigFactory.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2018 Red Hat, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.jaspi;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+
+import java.util.Map;
+import java.util.function.Supplier;
+
+import javax.security.auth.message.config.AuthConfigFactory;
+import javax.security.auth.message.config.AuthConfigProvider;
+import javax.security.auth.message.config.RegistrationListener;
+
+import org.wildfly.security.auth.server.SecurityDomain;
+
+/**
+ * An {@link AuthConfigFactory} implementation that can delegate to a backup AuthConfigFactory if the Elytron factory is unable
+ * to return a provider.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public class DelegatingAuthConfigFactory extends AuthConfigFactory {
+
+    private final ElytronAuthConfigFactory elytronAuthConfigFactory;
+    private final AuthConfigFactory backupAuthConfigFactory;
+    private final Supplier&lt;Boolean&gt; delegationAllowed;
+
+<span class="nc" id="L42">    public DelegatingAuthConfigFactory(final ElytronAuthConfigFactory elytronAuthConfigFactory, final AuthConfigFactory backupAuthConfigFactory, final Supplier&lt;Boolean&gt; delegationAllowed) {</span>
+<span class="nc" id="L43">        this.elytronAuthConfigFactory = checkNotNullParam(&quot;elytronAuthConfigFactory&quot;, elytronAuthConfigFactory);</span>
+<span class="nc" id="L44">        this.backupAuthConfigFactory = checkNotNullParam(&quot;backupAuthConfigFactory&quot;, backupAuthConfigFactory);</span>
+<span class="nc" id="L45">        this.delegationAllowed = delegationAllowed;</span>
+
+<span class="nc" id="L47">    }</span>
+
+    public DelegatingAuthConfigFactory(final ElytronAuthConfigFactory elytronAuthConfigFactory, final AuthConfigFactory backupAuthConfigFactory) {
+<span class="nc bnc" id="L50" title="All 2 branches missed.">        this(elytronAuthConfigFactory, backupAuthConfigFactory, () -&gt; SecurityDomain.getCurrent() == null);</span>
+<span class="nc" id="L51">    }</span>
+
+    @Override
+    public AuthConfigProvider getConfigProvider(String layer, String appContext, RegistrationListener listener) {
+<span class="nc" id="L55">        AuthConfigProvider authConfigProvider = elytronAuthConfigFactory.getConfigProvider(layer, appContext, listener);</span>
+<span class="nc bnc" id="L56" title="All 6 branches missed.">        if (authConfigProvider != null || elytronAuthConfigFactory.matchesRegistration(layer, appContext) || !delegationAllowed.get()) {</span>
+<span class="nc" id="L57">            return authConfigProvider;</span>
+        }
+
+<span class="nc" id="L60">        return backupAuthConfigFactory.getConfigProvider(layer, appContext, listener);</span>
+    }
+
+    @Override
+    public String[] getRegistrationIDs(AuthConfigProvider provider) {
+<span class="nc" id="L65">        String[] elytronRegistrationIds = elytronAuthConfigFactory.getRegistrationIDs(provider);</span>
+<span class="nc" id="L66">        String[] backupRegistrationIds = backupAuthConfigFactory.getRegistrationIDs(provider);</span>
+
+<span class="nc" id="L68">        return combine(elytronRegistrationIds, backupRegistrationIds);</span>
+    }
+
+    @Override
+    public String[] detachListener(RegistrationListener listener, String layer, String appContext) {
+<span class="nc" id="L73">        String[] elytronRegistrationIds = elytronAuthConfigFactory.detachListener(listener, layer, appContext);</span>
+<span class="nc" id="L74">        String[] backupRegistrationIds = backupAuthConfigFactory.detachListener(listener, layer, appContext);</span>
+
+<span class="nc" id="L76">        return combine(elytronRegistrationIds, backupRegistrationIds);</span>
+    }
+
+    @Override
+    public RegistrationContext getRegistrationContext(String registrationID) {
+<span class="nc" id="L81">        RegistrationContext registrationContext = elytronAuthConfigFactory.getRegistrationContext(registrationID);</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        if (registrationContext == null) {</span>
+<span class="nc" id="L83">            registrationContext = backupAuthConfigFactory.getRegistrationContext(registrationID);</span>
+        }
+<span class="nc" id="L85">        return registrationContext;</span>
+    }
+
+    @Override
+    public void refresh() {
+<span class="nc" id="L90">        elytronAuthConfigFactory.refresh();</span>
+<span class="nc" id="L91">        backupAuthConfigFactory.refresh();</span>
+<span class="nc" id="L92">    }</span>
+
+    @Override
+    public String registerConfigProvider(String className, Map properties, String layer, String appContext, String description) {
+<span class="nc" id="L96">        return elytronAuthConfigFactory.registerConfigProvider(className, properties, layer, appContext, description);</span>
+    }
+
+    @Override
+    public String registerConfigProvider(AuthConfigProvider provider, String layer, String appContext, String description) {
+<span class="nc" id="L101">        return elytronAuthConfigFactory.registerConfigProvider(provider, layer, appContext, description);</span>
+    }
+
+    @Override
+    public boolean removeRegistration(String registrationID) {
+<span class="nc bnc" id="L106" title="All 4 branches missed.">        return elytronAuthConfigFactory.removeRegistration(registrationID) || backupAuthConfigFactory.removeRegistration(registrationID);</span>
+    }
+
+    private static String[] combine(String[] left, String[] right) {
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        if (left == null) return right;</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        if (right == null) return left;</span>
+
+<span class="nc" id="L113">        String[] result = new String[left.length + right.length];</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        if (left.length &gt; 0) {</span>
+<span class="nc" id="L115">            System.arraycopy(left, 0, result, 0, left.length);</span>
+        }
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        if (right.length &gt; 0) {</span>
+<span class="nc" id="L118">            System.arraycopy(right, 0, result, left.length, right.length);</span>
+        }
+
+<span class="nc" id="L121">        return result;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

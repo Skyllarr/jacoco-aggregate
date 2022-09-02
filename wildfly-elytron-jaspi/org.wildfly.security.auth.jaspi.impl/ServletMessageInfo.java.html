@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ServletMessageInfo.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-jaspi</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.jaspi.impl</a> &gt; <span class="el_source">ServletMessageInfo.java</span></div><h1>ServletMessageInfo.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2018 Red Hat, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.jaspi.impl;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+import static org.wildfly.security.auth.jaspi._private.ElytronMessages.log;
+
+import javax.security.auth.message.MessageInfo;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletRequestWrapper;
+import javax.servlet.ServletResponse;
+import javax.servlet.ServletResponseWrapper;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+/**
+ * A servlet profile specific {@link MessageInfo} that ensures the request and response types remain valid and allows wrapping
+ * an existing message info during validateRequest and unwrapping during secureResponse.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+<span class="nc" id="L36">public class ServletMessageInfo extends ElytronMessageInfo {</span>
+
+    /*
+     * Referenced in the Elytron Web Integration.
+     */
+
+    /**
+     * Set the request message ensuring that it is an instance of {@link HttpServletRequest}, also ensure wrapping only occurs
+     * during calls to validateRequest and unwrapping occurs during calls to secureResponse.
+     *
+     * @param requestMessage the request message.
+     */
+    @Override
+    public void setRequestMessage(Object requestMessage) {
+<span class="nc" id="L50">        checkNotNullParam(&quot;requestMessage&quot;, requestMessage);</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        if (requestMessage instanceof HttpServletRequest == false) {</span>
+<span class="nc" id="L52">            throw log.invalidMessageType(requestMessage.getClass().getName(), HttpServletRequest.class.getName());</span>
+        }
+
+<span class="nc bnc" id="L55" title="All 4 branches missed.">        switch (getState()) {</span>
+            case NEW:
+<span class="nc" id="L57">                super.setRequestMessage(requestMessage);</span>
+<span class="nc" id="L58">                break;</span>
+            case VALIDATE: {
+<span class="nc" id="L60">                ServletRequest current = (ServletRequest) getRequestMessage();</span>
+<span class="nc" id="L61">                ServletRequest unwrapped = (HttpServletRequest) requestMessage;</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">                while (unwrapped != null) {</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">                    if (unwrapped == current) {</span>
+<span class="nc" id="L64">                        super.setRequestMessage(requestMessage);</span>
+<span class="nc" id="L65">                        return;</span>
+                    }
+<span class="nc" id="L67">                    unwrapped = unwrap(unwrapped);</span>
+                }
+<span class="nc" id="L69">                throw log.messageDoesNotWrapExistingMessage(HttpServletRequest.class.getName());</span>
+            }
+            case SECURE: {
+<span class="nc" id="L72">                ServletRequest unwrapped = (ServletRequest) getRequestMessage();</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">                while (unwrapped != null) {</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">                    if (requestMessage == unwrapped) {</span>
+<span class="nc" id="L75">                        super.setRequestMessage(requestMessage);</span>
+<span class="nc" id="L76">                        return;</span>
+                    }
+<span class="nc" id="L78">                    unwrapped = unwrap(unwrapped);</span>
+                }
+<span class="nc" id="L80">                throw log.messageDoesNotUnWrapExistingMessage(HttpServletRequest.class.getName());</span>
+            }
+            default:
+<span class="nc" id="L83">                throw log.messageSettingNotAllowed(HttpServletRequest.class.getName());</span>
+        }
+<span class="nc" id="L85">    }</span>
+
+    /**
+     * Set the response message ensuring that it is an instance of {@link HttpServletResponse}, also ensure wrapping only occurs
+     * during calls to validateRequest and unwrapping occurs during calls to secureResponse.
+     *
+     * @param responseMessage the response message.
+     */
+    @Override
+    public void setResponseMessage(Object responseMessage) {
+<span class="nc" id="L95">        checkNotNullParam(&quot;responseMessage&quot;, responseMessage);</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        if (responseMessage instanceof HttpServletResponse == false) {</span>
+<span class="nc" id="L97">            throw log.invalidMessageType(responseMessage.getClass().getName(), HttpServletResponse.class.getName());</span>
+        }
+
+<span class="nc bnc" id="L100" title="All 4 branches missed.">        switch (getState()) {</span>
+            case NEW:
+<span class="nc" id="L102">                super.setResponseMessage(responseMessage);</span>
+<span class="nc" id="L103">                break;</span>
+            case VALIDATE: {
+<span class="nc" id="L105">                ServletResponse current = (ServletResponse) getResponseMessage();</span>
+<span class="nc" id="L106">                ServletResponse unwrapped = (HttpServletResponse) responseMessage;</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">                while (unwrapped != null) {</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">                    if (unwrapped == current) {</span>
+<span class="nc" id="L109">                        super.setResponseMessage(responseMessage);</span>
+<span class="nc" id="L110">                        return;</span>
+                    }
+<span class="nc" id="L112">                    unwrapped = unwrap(unwrapped);</span>
+                }
+<span class="nc" id="L114">                throw log.messageDoesNotWrapExistingMessage(HttpServletResponse.class.getName());</span>
+            }
+            case SECURE: {
+<span class="nc" id="L117">                ServletResponse unwrapped = (ServletResponse) getRequestMessage();</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">                while (unwrapped != null) {</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">                    if (responseMessage == unwrapped) {</span>
+<span class="nc" id="L120">                        super.setResponseMessage(responseMessage);</span>
+<span class="nc" id="L121">                        return;</span>
+                    }
+<span class="nc" id="L123">                    unwrapped = unwrap(unwrapped);</span>
+                }
+<span class="nc" id="L125">                throw log.messageDoesNotUnWrapExistingMessage(HttpServletResponse.class.getName());</span>
+            }
+            default:
+<span class="nc" id="L128">                throw log.messageSettingNotAllowed(HttpServletResponse.class.getName());</span>
+        }
+<span class="nc" id="L130">    }</span>
+
+    private ServletRequest unwrap(ServletRequest servletRequest) {
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        if (servletRequest instanceof ServletRequestWrapper) {</span>
+<span class="nc" id="L134">            return ((ServletRequestWrapper) servletRequest).getRequest();</span>
+        }
+
+<span class="nc" id="L137">        return null;</span>
+    }
+
+    private ServletResponse unwrap(ServletResponse servletResponse) {
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        if (servletResponse instanceof ServletResponseWrapper) {</span>
+<span class="nc" id="L142">            return ((ServletResponseWrapper) servletResponse).getResponse();</span>
+        }
+
+<span class="nc" id="L145">        return null;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

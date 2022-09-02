@@ -1,0 +1,2007 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AuthenticationConfiguration.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-client</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.client</a> &gt; <span class="el_source">AuthenticationConfiguration.java</span></div><h1>AuthenticationConfiguration.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.client;
+
+import static java.security.AccessController.doPrivileged;
+import static java.security.AccessController.getContext;
+import static org.wildfly.security.auth.client._private.ElytronMessages.log;
+import static org.wildfly.security.provider.util.ProviderUtil.INSTALLED_PROVIDERS;
+
+import java.io.IOException;
+import java.net.URI;
+import java.security.AccessControlContext;
+import java.security.AccessController;
+import java.security.GeneralSecurityException;
+import java.security.KeyStore;
+import java.security.NoSuchAlgorithmException;
+import java.security.Principal;
+import java.security.PrivateKey;
+import java.security.PrivilegedAction;
+import java.security.Provider;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
+import java.security.spec.AlgorithmParameterSpec;
+import java.security.spec.InvalidKeySpecException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.BiPredicate;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
+
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.X509KeyManager;
+import javax.net.ssl.X509TrustManager;
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.ChoiceCallback;
+import javax.security.auth.callback.NameCallback;
+import javax.security.auth.callback.PasswordCallback;
+import javax.security.auth.callback.TextInputCallback;
+import javax.security.auth.callback.TextOutputCallback;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.auth.x500.X500Principal;
+import javax.security.sasl.RealmCallback;
+import javax.security.sasl.RealmChoiceCallback;
+import javax.security.sasl.SaslClient;
+import javax.security.sasl.SaslClientFactory;
+import javax.security.sasl.SaslException;
+
+import org.ietf.jgss.GSSCredential;
+import org.ietf.jgss.Oid;
+import org.wildfly.common.Assert;
+import org.wildfly.common.annotation.NotNull;
+import org.wildfly.common.array.Arrays2;
+import org.wildfly.common.iteration.CodePointIterator;
+import org.wildfly.security.FixedSecurityFactory;
+import org.wildfly.security.SecurityFactory;
+import org.wildfly.security.auth.callback.CallbackUtil;
+import org.wildfly.security.auth.callback.ChannelBindingCallback;
+import org.wildfly.security.auth.callback.CredentialCallback;
+import org.wildfly.security.auth.callback.EvidenceVerifyCallback;
+import org.wildfly.security.auth.callback.ParameterCallback;
+import org.wildfly.security.auth.callback.PasswordResetCallback;
+import org.wildfly.security.auth.callback.SSLCallback;
+import org.wildfly.security.auth.callback.TrustedAuthoritiesCallback;
+import org.wildfly.security.auth.principal.AnonymousPrincipal;
+import org.wildfly.security.auth.principal.NamePrincipal;
+import org.wildfly.security.auth.server.IdentityCredentials;
+import org.wildfly.security.auth.server.NameRewriter;
+import org.wildfly.security.auth.server.SecurityDomain;
+import org.wildfly.security.credential.AlgorithmCredential;
+import org.wildfly.security.credential.BearerTokenCredential;
+import org.wildfly.security.credential.Credential;
+import org.wildfly.security.credential.GSSKerberosCredential;
+import org.wildfly.security.credential.PasswordCredential;
+import org.wildfly.security.credential.X509CertificateChainPrivateCredential;
+import org.wildfly.security.credential.source.CredentialSource;
+import org.wildfly.security.credential.source.impl.CredentialStoreCredentialSource;
+import org.wildfly.security.credential.source.impl.FactoryCredentialSource;
+import org.wildfly.security.credential.source.impl.KeyStoreCredentialSource;
+import org.wildfly.security.credential.source.impl.LocalKerberosCredentialSource;
+import org.wildfly.security.credential.store.CredentialStore;
+import org.wildfly.security.evidence.X509PeerCertificateChainEvidence;
+import org.wildfly.security.password.Password;
+import org.wildfly.security.password.PasswordFactory;
+import org.wildfly.security.password.TwoWayPassword;
+import org.wildfly.security.password.interfaces.ClearPassword;
+import org.wildfly.security.password.interfaces.MaskedPassword;
+import org.wildfly.security.password.spec.ClearPasswordSpec;
+import org.wildfly.security.password.spec.MaskedPasswordSpec;
+import org.wildfly.security.provider.util.ProviderFactory;
+import org.wildfly.security.provider.util.ProviderServiceLoaderSupplier;
+import org.wildfly.security.sasl.SaslMechanismSelector;
+import org.wildfly.security.sasl.util.FilterMechanismSaslClientFactory;
+import org.wildfly.security.sasl.util.LocalPrincipalSaslClientFactory;
+import org.wildfly.security.sasl.util.PrivilegedSaslClientFactory;
+import org.wildfly.security.sasl.util.PropertiesSaslClientFactory;
+import org.wildfly.security.sasl.util.ProtocolSaslClientFactory;
+import org.wildfly.security.sasl.util.SSLSaslClientFactory;
+import org.wildfly.security.sasl.util.SaslMechanismInformation;
+import org.wildfly.security.sasl.util.SecurityProviderSaslClientFactory;
+import org.wildfly.security.sasl.util.ServerNameSaslClientFactory;
+import org.wildfly.security.ssl.SSLConnection;
+import org.wildfly.security.ssl.SSLUtils;
+import org.wildfly.security.x500.TrustedAuthority;
+
+/**
+ * A configuration which controls how authentication is performed.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public final class AuthenticationConfiguration {
+    // constants
+
+<span class="fc" id="L140">    private static final Principal[] NO_PRINCIPALS = new Principal[0];</span>
+<span class="fc" id="L141">    private static final Callback[] NO_CALLBACKS = new Callback[0];</span>
+<span class="fc" id="L142">    private static final String[] NO_STRINGS = new String[0];</span>
+
+<span class="fc" id="L144">    private static final EnumSet&lt;CallbackKind&gt; NO_CALLBACK_KINDS = EnumSet.noneOf(CallbackKind.class);</span>
+
+    private static final int SET_PRINCIPAL = 0;
+    private static final int SET_HOST = 1;
+    private static final int SET_PROTOCOL = 2;
+    private static final int SET_REALM = 3;
+    private static final int SET_AUTHZ_PRINCIPAL = 4;
+    private static final int SET_FWD_AUTH_NAME_DOMAIN = 5;
+    private static final int SET_USER_CBH = 6;
+    private static final int SET_USER_CB_KINDS = 7;
+    private static final int SET_CRED_SOURCE = 8;
+    private static final int SET_PROVIDER_SUPPLIER = 9;
+    private static final int SET_KEY_MGR_FAC = 10;
+    private static final int SET_SASL_SELECTOR = 11;
+    private static final int SET_FWD_AUTH_CRED_DOMAIN = 12;
+    private static final int SET_PRINCIPAL_RW = 13;
+    private static final int SET_SASL_FAC_SUP = 14;
+    private static final int SET_PARAM_SPECS = 15;
+    private static final int SET_TRUST_MGR_FAC = 16;
+    private static final int SET_SASL_MECH_PROPS = 17;
+    private static final int SET_ACCESS_CTXT = 18;
+    private static final int SET_CALLBACK_INTERCEPT = 19;
+    private static final int SET_SASL_PROTOCOL = 20;
+    private static final int SET_FWD_AUTHZ_NAME_DOMAIN = 21;
+    private static final int SET_WEBSERVICES_PROPS = 22;
+
+    private static final String JBOSS_LOCAL_USER_QUIET_AUTH = &quot;wildfly.sasl.local-user.quiet-auth&quot;;
+    private static final String JBOSS_LOCAL_USER_LEGACY_QUIET_AUTH = &quot;jboss.sasl.local-user.quiet-auth&quot;;
+
+
+<span class="fc" id="L174">    private static final Supplier&lt;Provider[]&gt; DEFAULT_PROVIDER_SUPPLIER = ProviderFactory.getDefaultProviderSupplier(AuthenticationConfiguration.class.getClassLoader());</span>
+
+    static final String WILDFLY_ELYTRON_CAPTURE_ACCESS_CONTROL_CONTEXT_PROPERTY_NAME = &quot;wildfly.elytron.capture.access.control.context&quot;;
+    static final boolean WILDFLY_ELYTRON_CAPTURE_ACCESS_CONTROL_CONTEXT_PROPERTY;
+
+    static {
+<span class="fc" id="L180">        WILDFLY_ELYTRON_CAPTURE_ACCESS_CONTROL_CONTEXT_PROPERTY = AccessController.doPrivileged(new PrivilegedAction&lt;Boolean&gt;() {</span>
+            @Override
+            public Boolean run() {
+<span class="fc" id="L183">                return Boolean.parseBoolean(System.getProperty(WILDFLY_ELYTRON_CAPTURE_ACCESS_CONTROL_CONTEXT_PROPERTY_NAME, &quot;true&quot;));</span>
+            }
+        });
+    }
+
+    /**
+     * An empty configuration which can be used as the basis for any configuration.  This configuration supports no
+     * remapping of any kind, and always uses an anonymous principal.
+     * @deprecated to obtain empty configuration use {@link #empty()} method instead
+     */
+    @Deprecated
+<span class="fc" id="L194">    public static final AuthenticationConfiguration EMPTY = new AuthenticationConfiguration();</span>
+
+    /**
+     * An empty configuration which can be used as the basis for any configuration.  This configuration supports no
+     * remapping of any kind, and always uses an anonymous principal.
+     */
+    public static AuthenticationConfiguration empty() {
+<span class="fc" id="L201">        return EMPTY;</span>
+    }
+
+<span class="pc" id="L204">    private volatile SaslClientFactory saslClientFactory = null;</span>
+    private int hashCode;
+    private String toString;
+
+    final AccessControlContext capturedAccessContext;
+    @NotNull final Principal principal;
+    final String setHost;
+    final String setProtocol;
+    final String setRealm;
+    final Principal setAuthzPrincipal;
+    final SecurityDomain authenticationNameForwardSecurityDomain;
+    final SecurityDomain authenticationCredentialsForwardSecurityDomain;
+    final SecurityDomain authorizationNameForwardSecurityDomain;
+    final CallbackHandler userCallbackHandler;
+    final EnumSet&lt;CallbackKind&gt; userCallbackKinds;
+    final CredentialSource credentialSource;
+    final int setPort;
+    final Supplier&lt;Provider[]&gt; providerSupplier;
+    final SecurityFactory&lt;X509KeyManager&gt; keyManagerFactory;
+    final SaslMechanismSelector saslMechanismSelector;
+    final Function&lt;Principal, Principal&gt; principalRewriter;
+    final Supplier&lt;SaslClientFactory&gt; saslClientFactorySupplier;
+    final List&lt;AlgorithmParameterSpec&gt; parameterSpecs;
+    final SecurityFactory&lt;X509TrustManager&gt; trustManagerFactory;
+    final Map&lt;String, ?&gt; saslMechanismProperties;
+    final Predicate&lt;Callback&gt; callbackIntercept;
+    final String saslProtocol;
+    final Map&lt;String, ?&gt; webServicesProperties;
+
+    // constructors
+
+    /**
+     * Construct the empty configuration instance.
+     */
+<span class="fc" id="L238">    private AuthenticationConfiguration() {</span>
+<span class="fc" id="L239">        this.capturedAccessContext = null;</span>
+<span class="fc" id="L240">        this.principal = AnonymousPrincipal.getInstance();</span>
+<span class="fc" id="L241">        this.setHost = null;</span>
+<span class="fc" id="L242">        this.setProtocol = null;</span>
+<span class="fc" id="L243">        this.setRealm = null;</span>
+<span class="fc" id="L244">        this.setAuthzPrincipal = null;</span>
+<span class="fc" id="L245">        this.authenticationNameForwardSecurityDomain = null;</span>
+<span class="fc" id="L246">        this.authenticationCredentialsForwardSecurityDomain = null;</span>
+<span class="fc" id="L247">        this.authorizationNameForwardSecurityDomain = null;</span>
+<span class="fc" id="L248">        this.userCallbackHandler = null;</span>
+<span class="fc" id="L249">        this.userCallbackKinds = NO_CALLBACK_KINDS;</span>
+<span class="fc" id="L250">        this.credentialSource = IdentityCredentials.NONE;</span>
+<span class="fc" id="L251">        this.setPort = -1;</span>
+<span class="fc" id="L252">        this.providerSupplier = DEFAULT_PROVIDER_SUPPLIER;</span>
+<span class="fc" id="L253">        this.keyManagerFactory = null;</span>
+<span class="fc" id="L254">        this.saslMechanismSelector = null;</span>
+<span class="fc" id="L255">        this.principalRewriter = null;</span>
+<span class="fc" id="L256">        this.saslClientFactorySupplier = null;</span>
+<span class="fc" id="L257">        this.parameterSpecs = Collections.emptyList();</span>
+<span class="fc" id="L258">        this.trustManagerFactory = null;</span>
+<span class="fc" id="L259">        this.saslMechanismProperties = Collections.singletonMap(JBOSS_LOCAL_USER_QUIET_AUTH, &quot;true&quot;);</span>
+<span class="fc" id="L260">        this.callbackIntercept = null;</span>
+<span class="fc" id="L261">        this.saslProtocol = null;</span>
+<span class="fc" id="L262">        this.webServicesProperties = null;</span>
+<span class="fc" id="L263">    }</span>
+
+    /**
+     * Copy constructor for mutating one object field.  It's not pretty but the alternative (many constructors) is much
+     * worse.
+     *
+     * @param original the original configuration (must not be {@code null})
+     * @param what the field to mutate
+     * @param value the field value to set
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L274">    private AuthenticationConfiguration(final AuthenticationConfiguration original, final int what, final Object value) {</span>
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">        this.capturedAccessContext = what == SET_ACCESS_CTXT ? (AccessControlContext) value : original.capturedAccessContext;</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        this.principal = what == SET_PRINCIPAL ? (Principal) value : original.principal;</span>
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">        this.setHost = what == SET_HOST ? (String) value : original.setHost;</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">        this.setProtocol = what == SET_PROTOCOL ? (String) value : original.setProtocol;</span>
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">        this.setRealm = what == SET_REALM ? (String) value : original.setRealm;</span>
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">        this.setAuthzPrincipal = what == SET_AUTHZ_PRINCIPAL ? (Principal) value : original.setAuthzPrincipal;</span>
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">        this.authenticationNameForwardSecurityDomain = what == SET_FWD_AUTH_NAME_DOMAIN ? (SecurityDomain) value : original.authenticationNameForwardSecurityDomain;</span>
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">        this.authenticationCredentialsForwardSecurityDomain = what == SET_FWD_AUTH_CRED_DOMAIN ? (SecurityDomain) value : original.authenticationCredentialsForwardSecurityDomain;</span>
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">        this.authorizationNameForwardSecurityDomain = what == SET_FWD_AUTHZ_NAME_DOMAIN ? (SecurityDomain) value : original.authorizationNameForwardSecurityDomain;</span>
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">        this.userCallbackHandler = what == SET_USER_CBH ? (CallbackHandler) value : original.userCallbackHandler;</span>
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">        this.userCallbackKinds = (what == SET_USER_CB_KINDS ? (EnumSet&lt;CallbackKind&gt;) value : original.userCallbackKinds).clone();</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">        this.credentialSource = what == SET_CRED_SOURCE ? (CredentialSource) value : original.credentialSource;</span>
+<span class="fc" id="L287">        this.setPort = original.setPort;</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">        this.providerSupplier = what == SET_PROVIDER_SUPPLIER ? (Supplier&lt;Provider[]&gt;) value : original.providerSupplier;</span>
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">        this.keyManagerFactory = what == SET_KEY_MGR_FAC ? (SecurityFactory&lt;X509KeyManager&gt;) value : original.keyManagerFactory;</span>
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">        this.saslMechanismSelector = what == SET_SASL_SELECTOR ? (SaslMechanismSelector) value : original.saslMechanismSelector;</span>
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">        this.principalRewriter = what == SET_PRINCIPAL_RW ? (Function&lt;Principal, Principal&gt;) value : original.principalRewriter;</span>
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">        this.saslClientFactorySupplier = what == SET_SASL_FAC_SUP ? (Supplier&lt;SaslClientFactory&gt;) value : original.saslClientFactorySupplier;</span>
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">        this.parameterSpecs = what == SET_PARAM_SPECS ? (List&lt;AlgorithmParameterSpec&gt;) value : original.parameterSpecs;</span>
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">        this.trustManagerFactory = what == SET_TRUST_MGR_FAC ? (SecurityFactory&lt;X509TrustManager&gt;) value : original.trustManagerFactory;</span>
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">        this.saslMechanismProperties = what == SET_SASL_MECH_PROPS ? (Map&lt;String, ?&gt;) value : original.saslMechanismProperties;</span>
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">        this.callbackIntercept = what == SET_CALLBACK_INTERCEPT ? (Predicate&lt;Callback&gt;) value : original.callbackIntercept;</span>
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">        this.saslProtocol = what == SET_SASL_PROTOCOL ? (String) value : original.saslProtocol;</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">        this.webServicesProperties = what == SET_WEBSERVICES_PROPS ? (Map&lt;String, ?&gt;) value : original.webServicesProperties;</span>
+<span class="fc" id="L299">        sanitazeOnMutation(what);</span>
+<span class="fc" id="L300">    }</span>
+
+    /**
+     * Copy constructor for mutating two object fields.  It's not pretty but the alternative (many constructors) is much
+     * worse.
+     *
+     * @param original the original configuration (must not be {@code null})
+     * @param what1 the field to mutate
+     * @param value1 the field value to set
+     * @param what2 the field to mutate
+     * @param value2 the field value to set
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+<span class="nc" id="L313">    private AuthenticationConfiguration(final AuthenticationConfiguration original, final int what1, final Object value1, final int what2, final Object value2) {</span>
+<span class="nc bnc" id="L314" title="All 4 branches missed.">        this.capturedAccessContext = what1 == SET_ACCESS_CTXT ? (AccessControlContext) value1 : what2 == SET_ACCESS_CTXT ? (AccessControlContext) value2 : original.capturedAccessContext;</span>
+<span class="nc bnc" id="L315" title="All 4 branches missed.">        this.principal = what1 == SET_PRINCIPAL ? (Principal) value1 : what2 == SET_PRINCIPAL ? (Principal) value2 : original.principal;</span>
+<span class="nc bnc" id="L316" title="All 4 branches missed.">        this.setHost = what1 == SET_HOST ? (String) value1 : what2 == SET_HOST ? (String) value2 : original.setHost;</span>
+<span class="nc bnc" id="L317" title="All 4 branches missed.">        this.setProtocol = what1 == SET_PROTOCOL ? (String) value1 : what2 == SET_PROTOCOL ? (String) value2 : original.setProtocol;</span>
+<span class="nc bnc" id="L318" title="All 4 branches missed.">        this.setRealm = what1 == SET_REALM ? (String) value1 : what2 == SET_REALM ? (String) value2 : original.setRealm;</span>
+<span class="nc bnc" id="L319" title="All 4 branches missed.">        this.setAuthzPrincipal = what1 == SET_AUTHZ_PRINCIPAL ? (Principal) value1 : what2 == SET_AUTHZ_PRINCIPAL ? (Principal) value2 : original.setAuthzPrincipal;</span>
+<span class="nc bnc" id="L320" title="All 4 branches missed.">        this.authenticationNameForwardSecurityDomain = what1 == SET_FWD_AUTH_NAME_DOMAIN ? (SecurityDomain) value1 : what2 == SET_FWD_AUTH_NAME_DOMAIN ? (SecurityDomain) value2 : original.authenticationNameForwardSecurityDomain;</span>
+<span class="nc bnc" id="L321" title="All 4 branches missed.">        this.authenticationCredentialsForwardSecurityDomain = what1 == SET_FWD_AUTH_CRED_DOMAIN ? (SecurityDomain) value1 : what2 == SET_FWD_AUTH_CRED_DOMAIN ? (SecurityDomain) value2 : original.authenticationCredentialsForwardSecurityDomain;</span>
+<span class="nc bnc" id="L322" title="All 4 branches missed.">        this.authorizationNameForwardSecurityDomain = what1 == SET_FWD_AUTHZ_NAME_DOMAIN ? (SecurityDomain) value1 : what2 == SET_FWD_AUTHZ_NAME_DOMAIN ? (SecurityDomain) value2 : original.authorizationNameForwardSecurityDomain;</span>
+<span class="nc bnc" id="L323" title="All 4 branches missed.">        this.userCallbackHandler = what1 == SET_USER_CBH ? (CallbackHandler) value1 : what2 == SET_USER_CBH ? (CallbackHandler) value2 : original.userCallbackHandler;</span>
+<span class="nc bnc" id="L324" title="All 4 branches missed.">        this.userCallbackKinds = (what1 == SET_USER_CB_KINDS ? (EnumSet&lt;CallbackKind&gt;) value1 : what2 == SET_USER_CB_KINDS ? (EnumSet&lt;CallbackKind&gt;) value2 : original.userCallbackKinds).clone();</span>
+<span class="nc bnc" id="L325" title="All 4 branches missed.">        this.credentialSource = what1 == SET_CRED_SOURCE ? (CredentialSource) value1 : what2 == SET_CRED_SOURCE ? (CredentialSource) value2 : original.credentialSource;</span>
+<span class="nc" id="L326">        this.setPort = original.setPort;</span>
+<span class="nc bnc" id="L327" title="All 4 branches missed.">        this.providerSupplier = what1 == SET_PROVIDER_SUPPLIER ? (Supplier&lt;Provider[]&gt;) value1 : what2 == SET_PROVIDER_SUPPLIER ? (Supplier&lt;Provider[]&gt;) value2 : original.providerSupplier;</span>
+<span class="nc bnc" id="L328" title="All 4 branches missed.">        this.keyManagerFactory = what1 == SET_KEY_MGR_FAC ? (SecurityFactory&lt;X509KeyManager&gt;) value1 : what2 == SET_KEY_MGR_FAC ? (SecurityFactory&lt;X509KeyManager&gt;) value2 : original.keyManagerFactory;</span>
+<span class="nc bnc" id="L329" title="All 4 branches missed.">        this.saslMechanismSelector = what1 == SET_SASL_SELECTOR ? (SaslMechanismSelector) value1 : what2 == SET_SASL_SELECTOR ? (SaslMechanismSelector) value2 : original.saslMechanismSelector;</span>
+<span class="nc bnc" id="L330" title="All 4 branches missed.">        this.principalRewriter = what1 == SET_PRINCIPAL_RW ? (Function&lt;Principal, Principal&gt;) value1 : what2 == SET_PRINCIPAL_RW ? (Function&lt;Principal, Principal&gt;) value2 : original.principalRewriter;</span>
+<span class="nc bnc" id="L331" title="All 4 branches missed.">        this.saslClientFactorySupplier = what1 == SET_SASL_FAC_SUP ? (Supplier&lt;SaslClientFactory&gt;) value1 : what2 == SET_SASL_FAC_SUP ? (Supplier&lt;SaslClientFactory&gt;) value2 : original.saslClientFactorySupplier;</span>
+<span class="nc bnc" id="L332" title="All 4 branches missed.">        this.parameterSpecs = what1 == SET_PARAM_SPECS ? (List&lt;AlgorithmParameterSpec&gt;) value1 : what2 == SET_PARAM_SPECS ? (List&lt;AlgorithmParameterSpec&gt;) value2 : original.parameterSpecs;</span>
+<span class="nc bnc" id="L333" title="All 4 branches missed.">        this.trustManagerFactory = what1 == SET_TRUST_MGR_FAC ? (SecurityFactory&lt;X509TrustManager&gt;) value1 : what2 == SET_TRUST_MGR_FAC ? (SecurityFactory&lt;X509TrustManager&gt;) value2 : original.trustManagerFactory;</span>
+<span class="nc bnc" id="L334" title="All 4 branches missed.">        this.saslMechanismProperties = what1 == SET_SASL_MECH_PROPS ? (Map&lt;String, ?&gt;) value1 : what2 == SET_SASL_MECH_PROPS ? (Map&lt;String, ?&gt;) value2 : original.saslMechanismProperties;</span>
+<span class="nc bnc" id="L335" title="All 4 branches missed.">        this.callbackIntercept = what1 == SET_CALLBACK_INTERCEPT ? (Predicate&lt;Callback&gt;) value1 : what2 == SET_CALLBACK_INTERCEPT ? (Predicate&lt;Callback&gt;) value2 : original.callbackIntercept;</span>
+<span class="nc bnc" id="L336" title="All 4 branches missed.">        this.saslProtocol = what1 == SET_SASL_PROTOCOL ? (String) value1 : what2 == SET_SASL_PROTOCOL ? (String) value2 : original.saslProtocol;</span>
+<span class="nc bnc" id="L337" title="All 4 branches missed.">        this.webServicesProperties = what1 == SET_WEBSERVICES_PROPS ? (Map&lt;String, ?&gt;) value1 : what2 == SET_WEBSERVICES_PROPS ? (Map&lt;String, ?&gt;) value2 : original.webServicesProperties;</span>
+<span class="nc" id="L338">        sanitazeOnMutation(what1);</span>
+<span class="nc" id="L339">        sanitazeOnMutation(what2);</span>
+<span class="nc" id="L340">    }</span>
+
+    /**
+     * Copy constructor for mutating three object fields.
+     *
+     * @param original the original configuration (must not be {@code null})
+     * @param what1 the field to mutate
+     * @param value1 the field value to set
+     * @param what2 the field to mutate
+     * @param value2 the field value to set
+     * @param what3 the field to mutate
+     * @param value3 the field value to set
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+<span class="nc" id="L354">    private AuthenticationConfiguration(final AuthenticationConfiguration original, final int what1, final Object value1, final int what2, final Object value2, final int what3, final Object value3) {</span>
+<span class="nc bnc" id="L355" title="All 6 branches missed.">        this.capturedAccessContext = what1 == SET_ACCESS_CTXT ? (AccessControlContext) value1 : what2 == SET_ACCESS_CTXT ? (AccessControlContext) value2 : what3 == SET_ACCESS_CTXT ? (AccessControlContext) value3 : original.capturedAccessContext;</span>
+<span class="nc bnc" id="L356" title="All 6 branches missed.">        this.principal = what1 == SET_PRINCIPAL ? (Principal) value1 : what2 == SET_PRINCIPAL ? (Principal) value2 : what3 == SET_PRINCIPAL ? (Principal) value3 : original.principal;</span>
+<span class="nc bnc" id="L357" title="All 6 branches missed.">        this.setHost = what1 == SET_HOST ? (String) value1 : what2 == SET_HOST ? (String) value2 : what3 == SET_HOST ? (String) value3 :original.setHost;</span>
+<span class="nc bnc" id="L358" title="All 6 branches missed.">        this.setProtocol = what1 == SET_PROTOCOL ? (String) value1 : what2 == SET_PROTOCOL ? (String) value2 : what3 == SET_PROTOCOL ? (String) value3 : original.setProtocol;</span>
+<span class="nc bnc" id="L359" title="All 6 branches missed.">        this.setRealm = what1 == SET_REALM ? (String) value1 : what2 == SET_REALM ? (String) value2 : what3 == SET_REALM ? (String) value3 : original.setRealm;</span>
+<span class="nc bnc" id="L360" title="All 6 branches missed.">        this.setAuthzPrincipal = what1 == SET_AUTHZ_PRINCIPAL ? (Principal) value1 : what2 == SET_AUTHZ_PRINCIPAL ? (Principal) value2 : what3 == SET_AUTHZ_PRINCIPAL ? (Principal) value3 : original.setAuthzPrincipal;</span>
+<span class="nc bnc" id="L361" title="All 6 branches missed.">        this.authenticationNameForwardSecurityDomain = what1 == SET_FWD_AUTH_NAME_DOMAIN ? (SecurityDomain) value1 : what2 == SET_FWD_AUTH_NAME_DOMAIN ? (SecurityDomain) value2 : what3 == SET_FWD_AUTH_NAME_DOMAIN ? (SecurityDomain) value3 : original.authenticationNameForwardSecurityDomain;</span>
+<span class="nc bnc" id="L362" title="All 6 branches missed.">        this.authenticationCredentialsForwardSecurityDomain = what1 == SET_FWD_AUTH_CRED_DOMAIN ? (SecurityDomain) value1 : what2 == SET_FWD_AUTH_CRED_DOMAIN ? (SecurityDomain) value2 : what3 == SET_FWD_AUTH_CRED_DOMAIN ? (SecurityDomain) value3 : original.authenticationCredentialsForwardSecurityDomain;</span>
+<span class="nc bnc" id="L363" title="All 6 branches missed.">        this.authorizationNameForwardSecurityDomain = what1 == SET_FWD_AUTHZ_NAME_DOMAIN ? (SecurityDomain) value1 : what2 == SET_FWD_AUTHZ_NAME_DOMAIN ? (SecurityDomain) value2 : what3 == SET_FWD_AUTHZ_NAME_DOMAIN ? (SecurityDomain) value3 : original.authorizationNameForwardSecurityDomain;</span>
+<span class="nc bnc" id="L364" title="All 6 branches missed.">        this.userCallbackHandler = what1 == SET_USER_CBH ? (CallbackHandler) value1 : what2 == SET_USER_CBH ? (CallbackHandler) value2 : what3 == SET_USER_CBH ? (CallbackHandler) value3 : original.userCallbackHandler;</span>
+<span class="nc bnc" id="L365" title="All 6 branches missed.">        this.userCallbackKinds = (what1 == SET_USER_CB_KINDS ? (EnumSet&lt;CallbackKind&gt;) value1 : what2 == SET_USER_CB_KINDS ? (EnumSet&lt;CallbackKind&gt;) value2 : what3 == SET_USER_CB_KINDS ? (EnumSet&lt;CallbackKind&gt;) value3 : original.userCallbackKinds).clone();</span>
+<span class="nc bnc" id="L366" title="All 6 branches missed.">        this.credentialSource = what1 == SET_CRED_SOURCE ? (CredentialSource) value1 : what2 == SET_CRED_SOURCE ? (CredentialSource) value2 : what3 == SET_CRED_SOURCE ? (CredentialSource) value3 : original.credentialSource;</span>
+<span class="nc" id="L367">        this.setPort = original.setPort;</span>
+<span class="nc bnc" id="L368" title="All 6 branches missed.">        this.providerSupplier = what1 == SET_PROVIDER_SUPPLIER ? (Supplier&lt;Provider[]&gt;) value1 : what2 == SET_PROVIDER_SUPPLIER ? (Supplier&lt;Provider[]&gt;) value2 : what3 == SET_PROVIDER_SUPPLIER ? (Supplier&lt;Provider[]&gt;) value3 : original.providerSupplier;</span>
+<span class="nc bnc" id="L369" title="All 6 branches missed.">        this.keyManagerFactory = what1 == SET_KEY_MGR_FAC ? (SecurityFactory&lt;X509KeyManager&gt;) value1 : what2 == SET_KEY_MGR_FAC ? (SecurityFactory&lt;X509KeyManager&gt;) value2 : what3 == SET_KEY_MGR_FAC ? (SecurityFactory&lt;X509KeyManager&gt;) value3 : original.keyManagerFactory;</span>
+<span class="nc bnc" id="L370" title="All 6 branches missed.">        this.saslMechanismSelector = what1 == SET_SASL_SELECTOR ? (SaslMechanismSelector) value1 : what2 == SET_SASL_SELECTOR ? (SaslMechanismSelector) value2 : what3 == SET_SASL_SELECTOR ? (SaslMechanismSelector) value3 : original.saslMechanismSelector;</span>
+<span class="nc bnc" id="L371" title="All 6 branches missed.">        this.principalRewriter = what1 == SET_PRINCIPAL_RW ? (Function&lt;Principal, Principal&gt;) value1 : what2 == SET_PRINCIPAL_RW ? (Function&lt;Principal, Principal&gt;) value2 : what3 == SET_PRINCIPAL_RW ? (Function&lt;Principal, Principal&gt;) value3 : original.principalRewriter;</span>
+<span class="nc bnc" id="L372" title="All 6 branches missed.">        this.saslClientFactorySupplier = what1 == SET_SASL_FAC_SUP ? (Supplier&lt;SaslClientFactory&gt;) value1 : what2 == SET_SASL_FAC_SUP ? (Supplier&lt;SaslClientFactory&gt;) value2 : what3 == SET_SASL_FAC_SUP ? (Supplier&lt;SaslClientFactory&gt;) value3 : original.saslClientFactorySupplier;</span>
+<span class="nc bnc" id="L373" title="All 6 branches missed.">        this.parameterSpecs = what1 == SET_PARAM_SPECS ? (List&lt;AlgorithmParameterSpec&gt;) value1 : what2 == SET_PARAM_SPECS ? (List&lt;AlgorithmParameterSpec&gt;) value2 : what3 == SET_PARAM_SPECS ? (List&lt;AlgorithmParameterSpec&gt;) value3 : original.parameterSpecs;</span>
+<span class="nc bnc" id="L374" title="All 6 branches missed.">        this.trustManagerFactory = what1 == SET_TRUST_MGR_FAC ? (SecurityFactory&lt;X509TrustManager&gt;) value1 : what2 == SET_TRUST_MGR_FAC ? (SecurityFactory&lt;X509TrustManager&gt;) value2 : what3 == SET_TRUST_MGR_FAC ? (SecurityFactory&lt;X509TrustManager&gt;) value3 : original.trustManagerFactory;</span>
+<span class="nc bnc" id="L375" title="All 6 branches missed.">        this.saslMechanismProperties = what1 == SET_SASL_MECH_PROPS ? (Map&lt;String, ?&gt;) value1 : what2 == SET_SASL_MECH_PROPS ? (Map&lt;String, ?&gt;) value2 : what3 == SET_SASL_MECH_PROPS ? (Map&lt;String, ?&gt;) value3 : original.saslMechanismProperties;</span>
+<span class="nc bnc" id="L376" title="All 6 branches missed.">        this.callbackIntercept = what1 == SET_CALLBACK_INTERCEPT ? (Predicate&lt;Callback&gt;) value1 : what2 == SET_CALLBACK_INTERCEPT ? (Predicate&lt;Callback&gt;) value2 : what3 == SET_CALLBACK_INTERCEPT ? (Predicate&lt;Callback&gt;) value3 : original.callbackIntercept;</span>
+<span class="nc bnc" id="L377" title="All 6 branches missed.">        this.saslProtocol = what1 == SET_SASL_PROTOCOL ? (String) value1 : what2 == SET_SASL_PROTOCOL ? (String) value2 : what3 == SET_SASL_PROTOCOL ? (String) value3 : original.saslProtocol;</span>
+<span class="nc bnc" id="L378" title="All 6 branches missed.">        this.webServicesProperties = what1 == SET_WEBSERVICES_PROPS ? (Map&lt;String, ?&gt;) value1 : what2 == SET_WEBSERVICES_PROPS ? (Map&lt;String, ?&gt;) value2 : what3 == SET_WEBSERVICES_PROPS ? (Map&lt;String, ?&gt;) value3 : original.webServicesProperties;</span>
+<span class="nc" id="L379">        sanitazeOnMutation(what1);</span>
+<span class="nc" id="L380">        sanitazeOnMutation(what2);</span>
+<span class="nc" id="L381">        sanitazeOnMutation(what3);</span>
+<span class="nc" id="L382">    }</span>
+
+    /**
+     * Copy constructor for mutating the port number.
+     *
+     * @param original the original configuration (must not be {@code null})
+     * @param port the port number
+     */
+<span class="fc" id="L390">    private AuthenticationConfiguration(final AuthenticationConfiguration original, final int port) {</span>
+<span class="fc" id="L391">        this.capturedAccessContext = original.capturedAccessContext;</span>
+<span class="fc" id="L392">        this.principal = original.principal;</span>
+<span class="fc" id="L393">        this.setHost = original.setHost;</span>
+<span class="fc" id="L394">        this.setProtocol = original.setProtocol;</span>
+<span class="fc" id="L395">        this.setRealm = original.setRealm;</span>
+<span class="fc" id="L396">        this.setAuthzPrincipal = original.setAuthzPrincipal;</span>
+<span class="fc" id="L397">        this.authenticationNameForwardSecurityDomain = original.authenticationNameForwardSecurityDomain;</span>
+<span class="fc" id="L398">        this.authenticationCredentialsForwardSecurityDomain = original.authenticationCredentialsForwardSecurityDomain;</span>
+<span class="fc" id="L399">        this.authorizationNameForwardSecurityDomain = original.authorizationNameForwardSecurityDomain;</span>
+<span class="fc" id="L400">        this.userCallbackHandler = original.userCallbackHandler;</span>
+<span class="fc" id="L401">        this.userCallbackKinds = original.userCallbackKinds;</span>
+<span class="fc" id="L402">        this.credentialSource = original.credentialSource;</span>
+<span class="fc" id="L403">        this.setPort = port;</span>
+<span class="fc" id="L404">        this.providerSupplier = original.providerSupplier;</span>
+<span class="fc" id="L405">        this.keyManagerFactory = original.keyManagerFactory;</span>
+<span class="fc" id="L406">        this.saslMechanismSelector = original.saslMechanismSelector;</span>
+<span class="fc" id="L407">        this.principalRewriter = original.principalRewriter;</span>
+<span class="fc" id="L408">        this.saslClientFactorySupplier = original.saslClientFactorySupplier;</span>
+<span class="fc" id="L409">        this.parameterSpecs = original.parameterSpecs;</span>
+<span class="fc" id="L410">        this.trustManagerFactory = original.trustManagerFactory;</span>
+<span class="fc" id="L411">        this.saslMechanismProperties = original.saslMechanismProperties;</span>
+<span class="fc" id="L412">        this.callbackIntercept = original.callbackIntercept;</span>
+<span class="fc" id="L413">        this.saslProtocol = original.saslProtocol;</span>
+<span class="fc" id="L414">        this.webServicesProperties = original.webServicesProperties;</span>
+<span class="fc" id="L415">    }</span>
+
+<span class="fc" id="L417">    private AuthenticationConfiguration(final AuthenticationConfiguration original, final AuthenticationConfiguration other) {</span>
+<span class="fc" id="L418">        this.capturedAccessContext = getOrDefault(other.capturedAccessContext, original.capturedAccessContext);</span>
+<span class="fc bfc" id="L419" title="All 2 branches covered.">        this.principal = other.principal instanceof AnonymousPrincipal ? original.principal : other.principal;</span>
+<span class="fc" id="L420">        this.setHost = getOrDefault(other.setHost, original.setHost);</span>
+<span class="fc" id="L421">        this.setProtocol = getOrDefault(other.setProtocol, original.setProtocol);</span>
+<span class="fc" id="L422">        this.setRealm = getOrDefault(other.setRealm, original.setRealm);</span>
+<span class="fc" id="L423">        this.setAuthzPrincipal = getOrDefault(other.setAuthzPrincipal, original.setAuthzPrincipal);</span>
+<span class="fc" id="L424">        this.authenticationNameForwardSecurityDomain = getOrDefault(other.authenticationNameForwardSecurityDomain, original.authenticationNameForwardSecurityDomain);</span>
+<span class="fc" id="L425">        this.authenticationCredentialsForwardSecurityDomain = getOrDefault(other.authenticationCredentialsForwardSecurityDomain, original.authenticationCredentialsForwardSecurityDomain);</span>
+<span class="fc" id="L426">        this.authorizationNameForwardSecurityDomain = getOrDefault(other.authorizationNameForwardSecurityDomain, original.authorizationNameForwardSecurityDomain);</span>
+<span class="fc" id="L427">        this.userCallbackHandler = getOrDefault(other.userCallbackHandler, original.userCallbackHandler);</span>
+<span class="fc" id="L428">        this.userCallbackKinds = getOrDefault(other.userCallbackKinds, original.userCallbackKinds).clone();</span>
+<span class="fc bfc" id="L429" title="All 2 branches covered.">        this.credentialSource = other.credentialSource == IdentityCredentials.NONE ? original.credentialSource : other.credentialSource;</span>
+<span class="fc" id="L430">        this.setPort = getOrDefault(other.setPort, original.setPort);</span>
+<span class="fc" id="L431">        this.providerSupplier = getOrDefault(other.providerSupplier, original.providerSupplier);</span>
+<span class="fc" id="L432">        this.keyManagerFactory = getOrDefault(other.keyManagerFactory, original.keyManagerFactory);</span>
+<span class="fc" id="L433">        this.saslMechanismSelector = getOrDefault(other.saslMechanismSelector, original.saslMechanismSelector);</span>
+<span class="fc" id="L434">        this.principalRewriter = getOrDefault(other.principalRewriter, original.principalRewriter);</span>
+<span class="fc" id="L435">        this.saslClientFactorySupplier = getOrDefault(other.saslClientFactorySupplier, original.saslClientFactorySupplier);</span>
+<span class="fc" id="L436">        this.parameterSpecs = getOrDefault(other.parameterSpecs, original.parameterSpecs);</span>
+<span class="fc" id="L437">        this.trustManagerFactory = getOrDefault(other.trustManagerFactory, original.trustManagerFactory);</span>
+<span class="fc" id="L438">        this.saslMechanismProperties = getOrDefault(other.saslMechanismProperties, original.saslMechanismProperties);</span>
+<span class="pc bpc" id="L439" title="3 of 4 branches missed.">        this.callbackIntercept = other.callbackIntercept == null ? original.callbackIntercept : original.callbackIntercept == null ? other.callbackIntercept : other.callbackIntercept.or(original.callbackIntercept);</span>
+<span class="fc" id="L440">        this.saslProtocol =  getOrDefault(other.saslProtocol, original.saslProtocol);</span>
+<span class="fc" id="L441">        this.webServicesProperties =  getOrDefault(other.webServicesProperties, original.webServicesProperties);</span>
+<span class="fc" id="L442">        sanitazeOnMutation(SET_USER_CBH);</span>
+<span class="fc" id="L443">    }</span>
+
+    private static &lt;T&gt; T getOrDefault(T value, T defVal) {
+<span class="fc bfc" id="L446" title="All 2 branches covered.">        return value != null ? value : defVal;</span>
+    }
+
+    private static int getOrDefault(int value, int defVal) {
+<span class="pc bpc" id="L450" title="1 of 2 branches missed.">        return value != -1 ? value : defVal;</span>
+    }
+
+    // test method
+
+    Principal getPrincipal() {
+<span class="nc bnc" id="L456" title="All 2 branches missed.">        return authenticationNameForwardSecurityDomain != null ? authenticationNameForwardSecurityDomain.getCurrentSecurityIdentity().getPrincipal() : principal;</span>
+    }
+
+    @Deprecated
+    String getHost() {
+<span class="nc" id="L461">        return setHost;</span>
+    }
+
+    @Deprecated
+    String getProtocol() {
+<span class="nc" id="L466">        return setProtocol;</span>
+    }
+
+    String getSaslProtocol() {
+<span class="nc" id="L470">        return saslProtocol;</span>
+    }
+
+    @Deprecated
+    int getPort() {
+<span class="nc" id="L475">        return setPort;</span>
+    }
+
+    String getWsHttpMechanism() {
+<span class="fc bfc" id="L479" title="All 2 branches covered.">        if (webServicesProperties != null) {</span>
+<span class="fc" id="L480">            Object wsHttpMechanism = webServicesProperties.get(&quot;http-mechanism&quot;);</span>
+<span class="pc bpc" id="L481" title="1 of 2 branches missed.">            if (wsHttpMechanism != null) {</span>
+<span class="fc" id="L482">                return wsHttpMechanism.toString();</span>
+            }
+        }
+<span class="fc" id="L485">        return null;</span>
+    }
+
+    String getWsSecurityType() {
+<span class="fc bfc" id="L489" title="All 2 branches covered.">        if (webServicesProperties != null) {</span>
+<span class="fc" id="L490">            Object wsSecurityType = webServicesProperties.get(&quot;ws-security-type&quot;);</span>
+<span class="pc bpc" id="L491" title="1 of 2 branches missed.">            if (wsSecurityType != null) {</span>
+<span class="fc" id="L492">                return wsSecurityType.toString();</span>
+            }
+        }
+<span class="fc" id="L495">        return null;</span>
+    }
+
+    // internal actions
+
+    /**
+     * Determine if this SASL mechanism is supported by this configuration (not policy).  Implementations must
+     * combine using boolean-OR operations.
+     *
+     * @param mechanismName the mech name (must not be {@code null})
+     * @return {@code true} if supported, {@code false} otherwise
+     */
+    boolean saslSupportedByConfiguration(String mechanismName) {
+        // special case for local, quiet auth
+        // anonymous is only supported if the principal is anonymous.  If the principal is anonymous, only anonymous or principal-less mechanisms are supported.
+<span class="nc bnc" id="L510" title="All 4 branches missed.">        if (! userCallbackKinds.contains(CallbackKind.PRINCIPAL) &amp;&amp; principal != AnonymousPrincipal.getInstance()) {</span>
+            // no callback which can handle a principal.
+<span class="nc bnc" id="L512" title="All 4 branches missed.">            if (! (mechanismName.equals(SaslMechanismInformation.Names.JBOSS_LOCAL_USER) || SaslMechanismInformation.doesNotUsePrincipal(mechanismName))) {</span>
+                // the mechanism requires a principal.
+<span class="nc bnc" id="L514" title="All 2 branches missed.">                if (getPrincipal() instanceof AnonymousPrincipal != mechanismName.equals(SaslMechanismInformation.Names.ANONYMOUS)) {</span>
+                    // either we have no principal &amp; the mech requires one, or we have a principal but the mech is anonymous.
+<span class="nc" id="L516">                    return false;</span>
+                }
+            }
+        }
+        // if we have a credential-providing callback handler, we support any mechanism from here on out
+<span class="nc bnc" id="L521" title="All 6 branches missed.">        if (userCallbackKinds.contains(CallbackKind.CREDENTIAL) || (credentialSource != null &amp;&amp; ! credentialSource.equals(IdentityCredentials.NONE))) {</span>
+<span class="nc" id="L522">            return true;</span>
+        }
+        // mechanisms that do not need credentials are probably supported
+<span class="nc bnc" id="L525" title="All 2 branches missed.">        if (SaslMechanismInformation.doesNotRequireClientCredentials(mechanismName)) {</span>
+<span class="nc" id="L526">            return true;</span>
+        }
+        // if we have a key manager factory, we definitely support IEC/ISO 9798
+<span class="nc bnc" id="L529" title="All 4 branches missed.">        if (keyManagerFactory != null &amp;&amp; SaslMechanismInformation.IEC_ISO_9798.test(mechanismName)) {</span>
+<span class="nc" id="L530">            return true;</span>
+        }
+        // otherwise, use mechanism information and our credential set
+<span class="nc bnc" id="L533" title="All 2 branches missed.">        if (credentialSource != null) {</span>
+<span class="nc" id="L534">            Set&lt;Class&lt;? extends Credential&gt;&gt; types = SaslMechanismInformation.getSupportedClientCredentialTypes(mechanismName);</span>
+<span class="nc" id="L535">            final CredentialSource credentials = credentialSource;</span>
+<span class="nc bnc" id="L536" title="All 2 branches missed.">            for (Class&lt;? extends Credential&gt; type : types) {</span>
+<span class="nc bnc" id="L537" title="All 2 branches missed.">                if (AlgorithmCredential.class.isAssignableFrom(type)) {</span>
+<span class="nc" id="L538">                    Set&lt;String&gt; algorithms = SaslMechanismInformation.getSupportedClientCredentialAlgorithms(mechanismName, type);</span>
+<span class="nc bnc" id="L539" title="All 2 branches missed.">                    if (algorithms.contains(&quot;*&quot;)) {</span>
+                        try {
+<span class="nc bnc" id="L541" title="All 2 branches missed.">                            if (credentials.getCredentialAcquireSupport(type, null).mayBeSupported()) {</span>
+<span class="nc" id="L542">                                return true;</span>
+                            }
+<span class="nc" id="L544">                        } catch (IOException e) {</span>
+                            // no match
+<span class="nc" id="L546">                        }</span>
+                    } else {
+<span class="nc bnc" id="L548" title="All 2 branches missed.">                        for (String algorithm : algorithms) {</span>
+                            try {
+<span class="nc bnc" id="L550" title="All 2 branches missed.">                                if (credentials.getCredentialAcquireSupport(type, algorithm).mayBeSupported()) {</span>
+<span class="nc" id="L551">                                    return true;</span>
+                                }
+<span class="nc" id="L553">                            } catch (IOException e) {</span>
+                                // no match
+<span class="nc" id="L555">                            }</span>
+<span class="nc" id="L556">                        }</span>
+                    }
+<span class="nc" id="L558">                } else {</span>
+                    try {
+<span class="nc bnc" id="L560" title="All 2 branches missed.">                        if (credentials.getCredentialAcquireSupport(type).mayBeSupported()) {</span>
+<span class="nc" id="L561">                            return true;</span>
+                        }
+<span class="nc" id="L563">                    } catch (IOException e) {</span>
+                        // no match
+<span class="nc" id="L565">                    }</span>
+                }
+<span class="nc" id="L567">            }</span>
+        }
+        // no apparent way to support the mechanism
+<span class="nc" id="L570">        return false;</span>
+    }
+
+    Principal doRewriteUser(Principal original) {
+<span class="nc" id="L574">        final Function&lt;Principal, Principal&gt; principalRewriter = this.principalRewriter;</span>
+<span class="nc bnc" id="L575" title="All 2 branches missed.">        final Principal rewritten = principalRewriter == null ? original : principalRewriter.apply(original);</span>
+<span class="nc bnc" id="L576" title="All 2 branches missed.">        if (rewritten == null) {</span>
+<span class="nc" id="L577">            throw log.invalidName();</span>
+        }
+<span class="nc" id="L579">        return rewritten;</span>
+    }
+
+    Principal getAuthorizationPrincipal() {
+<span class="nc bnc" id="L583" title="All 2 branches missed.">        return authorizationNameForwardSecurityDomain != null ? authorizationNameForwardSecurityDomain.getCurrentSecurityIdentity().getPrincipal() : setAuthzPrincipal;</span>
+    }
+
+    Supplier&lt;Provider[]&gt; getProviderSupplier() {
+<span class="nc" id="L587">        final Supplier&lt;Provider[]&gt; providerSupplier = this.providerSupplier;</span>
+<span class="nc bnc" id="L588" title="All 2 branches missed.">        return providerSupplier == null ? INSTALLED_PROVIDERS : providerSupplier;</span>
+    }
+
+    SaslClientFactory getSaslClientFactory(Supplier&lt;Provider[]&gt; providers) {
+<span class="nc" id="L592">        final Supplier&lt;SaslClientFactory&gt; supplier = saslClientFactorySupplier;</span>
+<span class="nc bnc" id="L593" title="All 2 branches missed.">        return supplier != null ? supplier.get() : new SecurityProviderSaslClientFactory(providers);</span>
+    }
+
+    SecurityFactory&lt;X509TrustManager&gt; getX509TrustManagerFactory() {
+<span class="nc bnc" id="L597" title="All 2 branches missed.">        return trustManagerFactory == null ? SSLUtils.getDefaultX509TrustManagerSecurityFactory() : trustManagerFactory;</span>
+    }
+
+    SecurityFactory&lt;X509KeyManager&gt; getX509KeyManagerFactory() {
+<span class="nc" id="L601">        return keyManagerFactory;</span>
+    }
+
+    CredentialSource getCredentialSource() {
+<span class="pc bpc" id="L605" title="1 of 2 branches missed.">        if (authenticationCredentialsForwardSecurityDomain != null) {</span>
+<span class="nc" id="L606">            return doPrivileged((PrivilegedAction&lt;IdentityCredentials&gt;) () -&gt; authenticationCredentialsForwardSecurityDomain.getCurrentSecurityIdentity().getPrivateCredentials(), capturedAccessContext);</span>
+        } else {
+<span class="fc" id="L608">            return credentialSource;</span>
+        }
+    }
+
+    // assembly methods - rewrite
+
+    /**
+     * Create a new configuration which is the same as this configuration, but rewrites the user name using the given
+     * name rewriter.  The name rewriter is appended to the the existing name rewrite function.
+     *
+     * @param rewriter the name rewriter
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration rewriteUser(NameRewriter rewriter) {
+<span class="nc bnc" id="L622" title="All 2 branches missed.">        if (rewriter == null) {</span>
+<span class="nc" id="L623">            return this;</span>
+        }
+
+<span class="nc bnc" id="L626" title="All 2 branches missed.">        if (this.principalRewriter == null) {</span>
+<span class="nc" id="L627">            return new AuthenticationConfiguration(this, SET_PRINCIPAL_RW, rewriter.asPrincipalRewriter());</span>
+        }
+
+<span class="nc" id="L630">        return new AuthenticationConfiguration(this, SET_PRINCIPAL_RW, principalRewriter.andThen(rewriter.asPrincipalRewriter()));</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but rewrites the user name using &lt;em&gt;only&lt;/em&gt;
+     * the given name rewriter.  Any name rewriters on this configuration are ignored for the new configuration.
+     *
+     * @param rewriter the name rewriter
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration rewriteUserOnlyWith(NameRewriter rewriter) {
+<span class="nc bnc" id="L641" title="All 2 branches missed.">        if (rewriter == null) {</span>
+<span class="nc" id="L642">            return this;</span>
+        }
+<span class="nc" id="L644">        return new AuthenticationConfiguration(this, SET_PRINCIPAL_RW, rewriter.asPrincipalRewriter());</span>
+    }
+
+    // assembly methods - filter
+
+    // assembly methods - configuration
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses an anonymous login.
+     *
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useAnonymous() {
+<span class="fc" id="L657">        return usePrincipal(AnonymousPrincipal.getInstance());</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses the given principal to authenticate.
+     *
+     * @param principal the principal to use (must not be {@code null})
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration usePrincipal(NamePrincipal principal) {
+<span class="fc" id="L667">        return usePrincipal((Principal) principal);</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses the given principal to authenticate.
+     *
+     * @param principal the principal to use (must not be {@code null})
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration usePrincipal(Principal principal) {
+<span class="fc" id="L677">        Assert.checkNotNullParam(&quot;principal&quot;, principal);</span>
+<span class="fc bfc" id="L678" title="All 2 branches covered.">        if (Objects.equals(this.principal, principal)) {</span>
+<span class="fc" id="L679">            return this;</span>
+        }
+<span class="fc" id="L681">        return new AuthenticationConfiguration(this, SET_PRINCIPAL, principal);</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses the given login name to authenticate.
+     *
+     * @param name the principal to use (must not be {@code null})
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useName(String name) {
+<span class="fc" id="L691">        Assert.checkNotNullParam(&quot;name&quot;, name);</span>
+<span class="fc" id="L692">        return usePrincipal(new NamePrincipal(name));</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which attempts to authorize to the given
+     * name after authentication.  Only mechanisms which support an authorization name principal will be selected.
+     *
+     * @param name the name to use, or {@code null} to not request authorization in the new configuration
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useAuthorizationName(String name) {
+<span class="nc bnc" id="L703" title="All 2 branches missed.">        return useAuthorizationPrincipal(name == null ? null : new NamePrincipal(name));</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which attempts to authorize to the given
+     * principal after authentication.  Only mechanisms which support an authorization principal of the given type will
+     * be selected.
+     *
+     * @param principal the principal to use, or {@code null} to not request authorization in the new configuration
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useAuthorizationPrincipal(Principal principal) {
+<span class="nc bnc" id="L715" title="All 2 branches missed.">        if (Objects.equals(principal, setAuthzPrincipal)) {</span>
+<span class="nc" id="L716">            return this;</span>
+        } else {
+<span class="nc" id="L718">            return new AuthenticationConfiguration(this, SET_AUTHZ_PRINCIPAL, principal);</span>
+        }
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses the given credential to authenticate.
+     *
+     * @param credential the credential to authenticate
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useCredential(Credential credential) {
+<span class="pc bpc" id="L729" title="1 of 2 branches missed.">        if (credential == null) return this;</span>
+<span class="fc" id="L730">        final CredentialSource credentialSource = this.credentialSource;</span>
+<span class="pc bpc" id="L731" title="1 of 2 branches missed.">        if (credentialSource == CredentialSource.NONE) {</span>
+<span class="nc" id="L732">            return new AuthenticationConfiguration(this, SET_CRED_SOURCE, IdentityCredentials.NONE.withCredential(credential));</span>
+<span class="pc bpc" id="L733" title="1 of 2 branches missed.">        } else if (credentialSource instanceof IdentityCredentials) {</span>
+<span class="fc" id="L734">            return new AuthenticationConfiguration(this, SET_CRED_SOURCE, ((IdentityCredentials) credentialSource).withCredential(credential));</span>
+        } else {
+<span class="nc" id="L736">            return new AuthenticationConfiguration(this, SET_CRED_SOURCE, credentialSource.with(IdentityCredentials.NONE.withCredential(credential)));</span>
+        }
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses the given password to authenticate.
+     *
+     * @param password the password to use
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration usePassword(Password password) {
+<span class="fc" id="L747">        final CredentialSource filtered = getCredentialSource().without(PasswordCredential.class);</span>
+<span class="pc bpc" id="L748" title="1 of 2 branches missed.">        return password == null ? useCredentials(filtered) : useCredentials(filtered).useCredential(new PasswordCredential(password));</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses the given password to authenticate.
+     *
+     * @param password the password to use
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration usePassword(char[] password) {
+<span class="nc bnc" id="L758" title="All 2 branches missed.">        return usePassword(password == null ? null : ClearPassword.createRaw(ClearPassword.ALGORITHM_CLEAR, password));</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses the given password to authenticate.
+     *
+     * @param password the password to use
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration usePassword(String password) {
+<span class="pc bpc" id="L768" title="1 of 2 branches missed.">        return usePassword(password == null ? null : ClearPassword.createRaw(ClearPassword.ALGORITHM_CLEAR, password.toCharArray()));</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but converts the given masked password to a
+     * clear password and uses the clear password to authenticate.
+     *
+     * @param password the password to use
+     * @return the new configuration
+     * @throws NoSuchAlgorithmException if algorithm used to get PasswordFactory instance is invalid
+     * @throws InvalidKeySpecException if invalid spec is used to generate password
+     */
+    public AuthenticationConfiguration useMaskedPassword(MaskedPassword password) throws NoSuchAlgorithmException, InvalidKeySpecException {
+<span class="nc" id="L781">        Assert.assertNotNull(password);</span>
+<span class="nc" id="L782">        final PasswordFactory passwordFactory = PasswordFactory.getInstance(password.getAlgorithm());</span>
+<span class="nc" id="L783">        final ClearPasswordSpec spec = passwordFactory.getKeySpec(password, ClearPasswordSpec.class);</span>
+<span class="nc" id="L784">        final char[] clearPassword = spec.getEncodedPassword();</span>
+
+<span class="nc" id="L786">        PasswordFactory factory = PasswordFactory.getInstance(ClearPassword.ALGORITHM_CLEAR);</span>
+<span class="nc" id="L787">        Password finalPassword = factory.generatePassword(new ClearPasswordSpec(clearPassword)).castAs(ClearPassword.class);</span>
+<span class="nc" id="L788">        final CredentialSource filtered = getCredentialSource().without(PasswordCredential.class);</span>
+<span class="nc bnc" id="L789" title="All 2 branches missed.">        return finalPassword == null ? useCredentials(filtered) : useCredentials(filtered).useCredential(new PasswordCredential(finalPassword));</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses the given masked password to authenticate.
+     *
+     * @param maskedPasswordBytes the masked password bytes (must not be {@code null})
+     * @param algorithm the algorithm (can be {@code null}, default:&quot;masked-MD5-DES&quot;)
+     * @param initialKeyMaterial the initial key material (can be {@code null}, default:&quot;somearbitrarycrazystringthatdoesnotmatter&quot;)
+     * @param iterationCount the iteration count (must not be less than 1)
+     * @param salt the salt bytes (must not be {@code null})
+     * @param initializationVector the initialization vector (can be {@code null})
+     * @return the new configuration
+     * @throws NoSuchAlgorithmException if algorithm used to get PasswordFactory instance is invalid
+     * @throws InvalidKeySpecException if invalid spec is used to generate password
+     */
+    public AuthenticationConfiguration useMaskedPassword(byte[] maskedPasswordBytes, String algorithm, char[] initialKeyMaterial, int iterationCount, byte[] salt, byte[] initializationVector) throws NoSuchAlgorithmException, InvalidKeySpecException {
+<span class="nc" id="L806">        Assert.checkMinimumParameter(&quot;iterationCount&quot;, 1, iterationCount);</span>
+<span class="nc" id="L807">        Assert.assertNotNull(salt);</span>
+<span class="nc" id="L808">        Assert.assertNotNull(maskedPasswordBytes);</span>
+<span class="nc bnc" id="L809" title="All 2 branches missed.">        if (algorithm == null) algorithm = MaskedPassword.ALGORITHM_MASKED_MD5_DES;</span>
+<span class="nc bnc" id="L810" title="All 2 branches missed.">        if (initialKeyMaterial == null) initialKeyMaterial = &quot;somearbitrarycrazystringthatdoesnotmatter&quot;.toCharArray();</span>
+<span class="nc" id="L811">        final MaskedPasswordSpec spec = new MaskedPasswordSpec(initialKeyMaterial, iterationCount, salt, maskedPasswordBytes, initializationVector);</span>
+
+<span class="nc" id="L813">        PasswordFactory factory = PasswordFactory.getInstance(algorithm);</span>
+<span class="nc" id="L814">        MaskedPassword password = factory.generatePassword(spec).castAs(MaskedPassword.class);</span>
+<span class="nc" id="L815">        return useMaskedPassword(password);</span>
+    }
+
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses the given masked password to authenticate.
+     *
+     * @param maskedPassword the masked password, as a string (must not be {@code null})
+     * @param algorithm the algorithm (can be {@code null}, default:&quot;masked-MD5-DES&quot;)
+     * @param initialKeyMaterial the initial key material, as a string(can be {@code null}, default:&quot;somearbitrarycrazystringthatdoesnotmatter&quot;)
+     * @param iterationCount the iteration count, as an integer (must not be less than 1)
+     * @param salt the salt, as a string (must not be {@code null})
+     * @param initializationVector the initialization vector, as a string (can be {@code null})
+     * @return the new configuration
+     * @throws NoSuchAlgorithmException if algorithm used to get PasswordFactory instance is invalid
+     * @throws InvalidKeySpecException if invalid spec is used to generate password
+     */
+    public AuthenticationConfiguration useMaskedPassword(String maskedPassword, String algorithm, String initialKeyMaterial, int iterationCount, String salt, String initializationVector) throws InvalidKeySpecException, NoSuchAlgorithmException {
+<span class="nc bnc" id="L833" title="All 2 branches missed.">        byte[] finalMaskedPasswordBytes = maskedPassword == null ? null : CodePointIterator.ofString(maskedPassword).base64Decode().drain();</span>
+<span class="nc bnc" id="L834" title="All 2 branches missed.">        char[] finalInitialKeyMaterial = initialKeyMaterial == null ? null : initialKeyMaterial.toCharArray();</span>
+<span class="nc bnc" id="L835" title="All 2 branches missed.">        byte[] finalSalt = salt == null ? null : CodePointIterator.ofString(salt).asUtf8().drain();</span>
+<span class="nc bnc" id="L836" title="All 2 branches missed.">        byte[] finalInitializationVector = initializationVector == null ? null : CodePointIterator.ofString(initializationVector).base64Decode().drain();</span>
+
+<span class="nc" id="L838">        return useMaskedPassword(finalMaskedPasswordBytes, algorithm, finalInitialKeyMaterial, iterationCount, finalSalt, finalInitializationVector);</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses the given callback handler to
+     * acquire a password with which to authenticate, when a password-based authentication algorithm is in use.
+     *
+     * @param callbackHandler the password callback handler
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useCredentialCallbackHandler(CallbackHandler callbackHandler) {
+<span class="nc" id="L849">        return useCallbackHandler(callbackHandler, EnumSet.of(CallbackKind.CREDENTIAL));</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses the given callback handler
+     * to authenticate.
+     * &lt;p&gt;
+     * &lt;em&gt;Important notes:&lt;/em&gt; It is important to ensure that each distinct client identity uses a distinct {@code CallbackHandler}
+     * instance in order to avoid mis-pooling of connections, identity crossovers, and other potentially serious problems.
+     * It is not recommended that a {@code CallbackHandler} implement {@code equals()} and {@code hashCode()}, however if it does,
+     * it is important to ensure that these methods consider equality based on an authenticating identity that does not
+     * change between instances.  In particular, a callback handler which requests user input on each usage is likely to cause
+     * a problem if the user name can change on each authentication request.
+     * &lt;p&gt;
+     * Because {@code CallbackHandler} instances are unique per identity, it is often useful for instances to cache
+     * identity information, credentials, and/or other authentication-related information in order to facilitate fast
+     * re-authentication.
+     *
+     * @param callbackHandler the callback handler to use
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useCallbackHandler(CallbackHandler callbackHandler) {
+<span class="nc bnc" id="L871" title="All 2 branches missed.">        return callbackHandler == null ? this : new AuthenticationConfiguration(this, SET_USER_CBH, callbackHandler, SET_USER_CB_KINDS, EnumSet.allOf(CallbackKind.class));</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses the given callback handler
+     * to authenticate.
+     * &lt;p&gt;
+     * &lt;em&gt;Important notes:&lt;/em&gt; It is important to ensure that each distinct client identity uses a distinct {@code CallbackHandler}
+     * instance in order to avoid mis-pooling of connections, identity crossovers, and other potentially serious problems.
+     * It is not recommended that a {@code CallbackHandler} implement {@code equals()} and {@code hashCode()}, however if it does,
+     * it is important to ensure that these methods consider equality based on an authenticating identity that does not
+     * change between instances.  In particular, a callback handler which requests user input on each usage is likely to cause
+     * a problem if the user name can change on each authentication request.
+     * &lt;p&gt;
+     * Because {@code CallbackHandler} instances are unique per identity, it is often useful for instances to cache
+     * identity information, credentials, and/or other authentication-related information in order to facilitate fast
+     * re-authentication.
+     *
+     * @param callbackHandler the callback handler to use
+     * @param callbackKinds the kinds of callbacks that the handler should use
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useCallbackHandler(CallbackHandler callbackHandler, Set&lt;CallbackKind&gt; callbackKinds) {
+<span class="nc bnc" id="L894" title="All 2 branches missed.">        return callbackHandler == null ? this : new AuthenticationConfiguration(this, SET_USER_CBH, callbackHandler, SET_USER_CB_KINDS, EnumSet.copyOf(callbackKinds));</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses the given GSS-API credential to authenticate.
+     *
+     * @param credential the GSS-API credential to use
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useGSSCredential(GSSCredential credential) {
+<span class="nc bnc" id="L904" title="All 2 branches missed.">        return credential == null ? this : useCredential(new GSSKerberosCredential(credential));</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses the given key store and alias
+     * to acquire the credential required for authentication.
+     *
+     * @param keyStoreEntry the key store entry to use
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useKeyStoreCredential(KeyStore.Entry keyStoreEntry) {
+<span class="nc bnc" id="L915" title="All 2 branches missed.">        return keyStoreEntry == null ? this : useCredentials(getCredentialSource().with(new KeyStoreCredentialSource(new FixedSecurityFactory&lt;&gt;(keyStoreEntry))));</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses the given key store and alias
+     * to acquire the credential required for authentication.
+     *
+     * @param keyStore the key store to use
+     * @param alias the key store alias
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useKeyStoreCredential(KeyStore keyStore, String alias) {
+<span class="nc bnc" id="L927" title="All 4 branches missed.">        return keyStore == null || alias == null ? this : useCredentials(getCredentialSource().with(new KeyStoreCredentialSource(keyStore, alias, null)));</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses the given key store and alias
+     * to acquire the credential required for authentication.
+     *
+     * @param keyStore the key store to use
+     * @param alias the key store alias
+     * @param protectionParameter the protection parameter to use to access the key store entry
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useKeyStoreCredential(KeyStore keyStore, String alias, KeyStore.ProtectionParameter protectionParameter) {
+<span class="nc bnc" id="L940" title="All 4 branches missed.">        return keyStore == null || alias == null ? this : useCredentials(getCredentialSource().with(new KeyStoreCredentialSource(keyStore, alias, protectionParameter)));</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses the given private key and X.509
+     * certificate chain to authenticate.
+     *
+     * @param privateKey the client private key
+     * @param certificateChain the client certificate chain
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useCertificateCredential(PrivateKey privateKey, X509Certificate... certificateChain) {
+<span class="nc bnc" id="L952" title="All 6 branches missed.">        return certificateChain == null || certificateChain.length == 0 || privateKey == null ? this : useCertificateCredential(new X509CertificateChainPrivateCredential(privateKey, certificateChain));</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses the given private key and X.509
+     * certificate chain to authenticate.
+     *
+     * @param credential the credential containing the private key and certificate chain
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useCertificateCredential(X509CertificateChainPrivateCredential credential) {
+<span class="nc bnc" id="L963" title="All 2 branches missed.">        return credential == null ? this : useCredential(credential);</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but uses credentials found at the given
+     * alias and credential store.
+     *
+     * @param credentialStore the credential store (must not be {@code null})
+     * @param alias the alias within the store (must not be {@code null})
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useCredentialStoreEntry(CredentialStore credentialStore, String alias) {
+<span class="nc" id="L975">        Assert.checkNotNullParam(&quot;credentialStore&quot;, credentialStore);</span>
+<span class="nc" id="L976">        Assert.checkNotNullParam(&quot;alias&quot;, alias);</span>
+<span class="nc" id="L977">        CredentialStoreCredentialSource csCredentialSource = new CredentialStoreCredentialSource(credentialStore, alias);</span>
+<span class="nc" id="L978">        return useCredentials(getCredentialSource().with(csCredentialSource));</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses the given key manager
+     * to acquire the credential required for authentication.
+     *
+     * @param keyManager the key manager to use
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useKeyManagerCredential(X509KeyManager keyManager) {
+<span class="nc" id="L989">        return new AuthenticationConfiguration(this, SET_KEY_MGR_FAC, new FixedSecurityFactory&lt;&gt;(keyManager));</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses local kerberos ticket cache
+     * to acquire the credential required for authentication.
+     *
+     * @param mechanismOids array of oid's indicating the mechanisms over which the credential is to be acquired
+     * @return the new configuration
+     *
+     * @since 1.2.0
+     * @deprecated can be ommited - kerberos based authentication mechanism obtains credential himself
+     */
+    @Deprecated
+    public AuthenticationConfiguration useLocalKerberosCredential(Oid[] mechanismOids) {
+<span class="nc" id="L1004">        return useCredentials(getCredentialSource().with(LocalKerberosCredentialSource.builder().setMechanismOids(mechanismOids).build()));</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses the given identity
+     * credentials to acquire the credential required for authentication.
+     *
+     * @param credentials the credentials to use
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useCredentials(CredentialSource credentials) {
+<span class="pc bpc" id="L1015" title="1 of 2 branches missed.">        return new AuthenticationConfiguration(this, SET_CRED_SOURCE, credentials == null ? CredentialSource.NONE : credentials);</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses the given choice if the given
+     * predicate evaluates to {@code true}.
+     *
+     * @param matchPredicate the predicate that should be used to determine if a choice callback type and prompt are
+     *                       relevant for the given choice
+     * @param choice the choice to use if the given predicate evaluates to {@code true}
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useChoice(BiPredicate&lt;Class&lt;? extends ChoiceCallback&gt;, String&gt; matchPredicate, String choice) {
+<span class="nc" id="L1028">        Assert.checkNotNullParam(&quot;matchPredicate&quot;, matchPredicate);</span>
+<span class="nc" id="L1029">        Assert.checkNotNullParam(&quot;choice&quot;, choice);</span>
+<span class="nc" id="L1030">        final Predicate&lt;Callback&gt; callbackIntercept = this.callbackIntercept;</span>
+<span class="nc" id="L1031">        Predicate&lt;Callback&gt; newIntercept = cb -&gt; {</span>
+<span class="nc bnc" id="L1032" title="All 2 branches missed.">            if (! (cb instanceof ChoiceCallback)) {</span>
+<span class="nc" id="L1033">                return false;</span>
+            }
+<span class="nc" id="L1035">            final ChoiceCallback choiceCallback = (ChoiceCallback) cb;</span>
+<span class="nc bnc" id="L1036" title="All 2 branches missed.">            if (matchPredicate.test(choiceCallback.getClass(), choiceCallback.getPrompt())) {</span>
+<span class="nc" id="L1037">                final String[] choices = choiceCallback.getChoices();</span>
+<span class="nc" id="L1038">                final int choicesLength = choices.length;</span>
+<span class="nc bnc" id="L1039" title="All 2 branches missed.">                for (int i = 0; i &lt; choicesLength; i++) {</span>
+<span class="nc bnc" id="L1040" title="All 2 branches missed.">                    if (choices[i].equals(choice)) {</span>
+<span class="nc" id="L1041">                        choiceCallback.setSelectedIndex(i);</span>
+<span class="nc" id="L1042">                        return true;</span>
+                    }
+                }
+            }
+<span class="nc" id="L1046">            return false;</span>
+        };
+<span class="nc bnc" id="L1048" title="All 2 branches missed.">        if (callbackIntercept == null) {</span>
+<span class="nc" id="L1049">            return new AuthenticationConfiguration(this, SET_CALLBACK_INTERCEPT, newIntercept);</span>
+        } else {
+<span class="nc" id="L1051">            return new AuthenticationConfiguration(this, SET_CALLBACK_INTERCEPT, newIntercept.or(callbackIntercept));</span>
+        }
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses the given parameter specification.
+     *
+     * @param parameterSpec the algorithm parameter specification to use
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useParameterSpec(AlgorithmParameterSpec parameterSpec) {
+<span class="nc bnc" id="L1062" title="All 2 branches missed.">        if (parameterSpec == null) {</span>
+<span class="nc" id="L1063">            return this;</span>
+        }
+<span class="nc" id="L1065">        final List&lt;AlgorithmParameterSpec&gt; specs = parameterSpecs;</span>
+<span class="nc bnc" id="L1066" title="All 2 branches missed.">        if (specs.isEmpty()) {</span>
+<span class="nc" id="L1067">            return new AuthenticationConfiguration(this, SET_PARAM_SPECS, Collections.singletonList(parameterSpec));</span>
+        } else {
+<span class="nc" id="L1069">            ArrayList&lt;AlgorithmParameterSpec&gt; newList = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L1070" title="All 2 branches missed.">            for (AlgorithmParameterSpec spec : specs) {</span>
+<span class="nc bnc" id="L1071" title="All 2 branches missed.">                if (spec.getClass() == parameterSpec.getClass()) continue;</span>
+<span class="nc" id="L1072">                newList.add(spec);</span>
+<span class="nc" id="L1073">            }</span>
+<span class="nc bnc" id="L1074" title="All 2 branches missed.">            if (newList.isEmpty()) {</span>
+<span class="nc" id="L1075">                return new AuthenticationConfiguration(this, SET_PARAM_SPECS, Collections.singletonList(parameterSpec));</span>
+            } else {
+<span class="nc" id="L1077">                newList.add(parameterSpec);</span>
+<span class="nc" id="L1078">                return new AuthenticationConfiguration(this, SET_PARAM_SPECS, newList);</span>
+            }
+        }
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses the given trust manager
+     * for trust verification.
+     *
+     * @param trustManager the trust manager to use or {@code null} if the default trust manager should be used
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useTrustManager(X509TrustManager trustManager) {
+<span class="nc bnc" id="L1091" title="All 2 branches missed.">        return trustManager == null ? new AuthenticationConfiguration(this, SET_TRUST_MGR_FAC, null) : new AuthenticationConfiguration(this, SET_TRUST_MGR_FAC, new FixedSecurityFactory&lt;&gt;(trustManager));</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which connects to a different host name.
+     *
+     * @param hostName the host name to connect to
+     * @return the new configuration
+     * @deprecated This configuration is not supported by most providers and will be removed in a future release.
+     */
+    @Deprecated
+    public AuthenticationConfiguration useHost(String hostName) {
+<span class="nc bnc" id="L1103" title="All 4 branches missed.">        if (hostName == null || hostName.isEmpty()) {</span>
+<span class="nc" id="L1104">            hostName = null;</span>
+        }
+<span class="nc bnc" id="L1106" title="All 2 branches missed.">        if (Objects.equals(this.setHost, hostName)) {</span>
+<span class="nc" id="L1107">            return this;</span>
+        } else {
+<span class="nc" id="L1109">            return new AuthenticationConfiguration(this, SET_HOST, hostName);</span>
+        }
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which specifies a different protocol to be used for outgoing connection.
+     *
+     * @param protocol the protocol to be used for outgoing connection.
+     * @return the new configuration
+     * @deprecated This configuration is not supported by most providers and will be removed in a future release.
+     */
+    @Deprecated
+    public AuthenticationConfiguration useProtocol(String protocol) {
+<span class="pc bpc" id="L1122" title="2 of 4 branches missed.">        if (protocol == null || protocol.isEmpty()) {</span>
+<span class="nc" id="L1123">            protocol = null;</span>
+        }
+<span class="pc bpc" id="L1125" title="1 of 2 branches missed.">        if (Objects.equals(this.setProtocol, protocol)) {</span>
+<span class="nc" id="L1126">            return this;</span>
+        } else {
+<span class="fc" id="L1128">            return new AuthenticationConfiguration(this, SET_PROTOCOL, protocol);</span>
+        }
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which specifies a different protocol to be passed to the authentication mechanisms.
+     *
+     * @param saslProtocol the protocol to pass to the authentication mechanisms.
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useSaslProtocol(String saslProtocol) {
+<span class="nc bnc" id="L1139" title="All 4 branches missed.">        if (saslProtocol == null || saslProtocol.isEmpty()) {</span>
+<span class="nc" id="L1140">            saslProtocol = null;</span>
+        }
+<span class="nc bnc" id="L1142" title="All 2 branches missed.">        if (Objects.equals(this.saslProtocol, saslProtocol)) {</span>
+<span class="nc" id="L1143">            return this;</span>
+        } else {
+<span class="nc" id="L1145">            return new AuthenticationConfiguration(this, SET_SASL_PROTOCOL, saslProtocol);</span>
+        }
+    }
+
+    public AuthenticationConfiguration useWebServices(Map&lt;String, ?&gt; webservicesProperties) {
+<span class="fc" id="L1150">        final HashMap&lt;String, Object&gt; newMap = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L1151">        newMap.putAll(webservicesProperties);</span>
+<span class="fc" id="L1152">        newMap.values().removeIf(Objects::isNull);</span>
+<span class="fc" id="L1153">        return new AuthenticationConfiguration(this, SET_WEBSERVICES_PROPS, optimizeMap(newMap));</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which connects to a different port.
+     *
+     * @param port the port to connect to, or -1 to not override the port
+     * @return the new configuration
+     * @deprecated This configuration is not supported by most providers and will be removed in a future release.
+     */
+    @Deprecated
+    public AuthenticationConfiguration usePort(int port) {
+<span class="pc bpc" id="L1165" title="2 of 4 branches missed.">        if (port &lt; -1 || port &gt; 65535) throw log.invalidPortNumber(port);</span>
+<span class="pc bpc" id="L1166" title="1 of 2 branches missed.">        if (port == setPort) return this;</span>
+<span class="fc" id="L1167">        return new AuthenticationConfiguration(this, port);</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which forwards the authentication name
+     * and credentials from the current identity of the given security domain.
+     *
+     * @param securityDomain the security domain
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useForwardedIdentity(SecurityDomain securityDomain) {
+<span class="nc" id="L1178">        return useForwardedAuthenticationIdentity(securityDomain).useForwardedAuthenticationCredentials(securityDomain);</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which forwards the authentication name
+     * from the current identity of the given security domain.
+     *
+     * @param securityDomain the security domain
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useForwardedAuthenticationIdentity(SecurityDomain securityDomain) {
+<span class="nc bnc" id="L1189" title="All 2 branches missed.">        if (Objects.equals(authenticationNameForwardSecurityDomain, securityDomain)) {</span>
+<span class="nc" id="L1190">            return this;</span>
+        } else {
+<span class="nc bnc" id="L1192" title="All 2 branches missed.">            return new AuthenticationConfiguration(this, SET_ACCESS_CTXT, securityDomain != null ? getContext() : null, SET_FWD_AUTH_NAME_DOMAIN, securityDomain);</span>
+        }
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which forwards the authentication
+     * credentials from the current identity of the given security domain.
+     *
+     * @param securityDomain the security domain
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useForwardedAuthenticationCredentials(SecurityDomain securityDomain) {
+<span class="nc bnc" id="L1204" title="All 2 branches missed.">        if (Objects.equals(authenticationCredentialsForwardSecurityDomain, securityDomain)) {</span>
+<span class="nc" id="L1205">            return this;</span>
+        } else {
+<span class="nc bnc" id="L1207" title="All 2 branches missed.">            return new AuthenticationConfiguration(this, SET_ACCESS_CTXT, securityDomain != null ? getContext() : null, SET_FWD_AUTH_CRED_DOMAIN, securityDomain);</span>
+        }
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which forwards the authorization name
+     * from the current identity of the given security domain.
+     *
+     * @param securityDomain the security domain
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useForwardedAuthorizationIdentity(SecurityDomain securityDomain) {
+<span class="nc bnc" id="L1219" title="All 2 branches missed.">        if (Objects.equals(authorizationNameForwardSecurityDomain, securityDomain)) {</span>
+<span class="nc" id="L1220">            return this;</span>
+        } else {
+<span class="nc bnc" id="L1222" title="All 2 branches missed.">            return new AuthenticationConfiguration(this, SET_ACCESS_CTXT, securityDomain != null ? getContext() : null, SET_FWD_AUTHZ_NAME_DOMAIN, securityDomain);</span>
+        }
+    }
+
+    // Providers
+
+    /**
+     * Use the given security provider supplier to locate security implementations.
+     *
+     * @param providerSupplier the provider supplier
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useProviders(Supplier&lt;Provider[]&gt; providerSupplier) {
+<span class="pc bpc" id="L1235" title="1 of 2 branches missed.">        if (Objects.equals(this.providerSupplier, providerSupplier)) {</span>
+<span class="nc" id="L1236">            return this;</span>
+        }
+<span class="fc" id="L1238">        return new AuthenticationConfiguration(this, SET_PROVIDER_SUPPLIER, providerSupplier);</span>
+    }
+
+    /**
+     * Use the default provider discovery behaviour of combining service loader discovered providers with the system default
+     * security providers when locating security implementations.
+     *
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useDefaultProviders() {
+<span class="nc" id="L1248">        return useProviders(DEFAULT_PROVIDER_SUPPLIER);</span>
+    }
+
+    /**
+     * Use security providers from the given class loader.
+     *
+     * @param classLoader the class loader to search for security providers
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useProvidersFromClassLoader(ClassLoader classLoader) {
+<span class="nc" id="L1258">        return useProviders(new ProviderServiceLoaderSupplier(classLoader));</span>
+    }
+
+    // SASL Mechanisms
+
+    /**
+     * Use a pre-existing {@link SaslClientFactory} instead of discovery.
+     *
+     * @param saslClientFactory the pre-existing {@link SaslClientFactory} to use.
+     * @return the new configuration.
+     */
+    public AuthenticationConfiguration useSaslClientFactory(final SaslClientFactory saslClientFactory) {
+<span class="nc" id="L1270">        return useSaslClientFactory(() -&gt; saslClientFactory);</span>
+    }
+
+    /**
+     * Use the given sasl client factory supplier to obtain the {@link SaslClientFactory} to use.
+     *
+     * @param saslClientFactory the sasl client factory supplier to use.
+     * @return the new configuration.
+     */
+    public AuthenticationConfiguration useSaslClientFactory(final Supplier&lt;SaslClientFactory&gt; saslClientFactory) {
+<span class="nc" id="L1280">        return new AuthenticationConfiguration(this, SET_SASL_FAC_SUP, saslClientFactory);</span>
+    }
+
+    /**
+     * Use provider based discovery to load available {@link SaslClientFactory} implementations.
+     *
+     * @return the new configuration.
+     */
+    public AuthenticationConfiguration useSaslClientFactoryFromProviders() {
+<span class="nc" id="L1289">        return new AuthenticationConfiguration(this, SET_SASL_FAC_SUP, null);</span>
+    }
+
+    // SASL Configuration
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which sets the properties that will be passed to
+     * the {@code SaslClientFactory} when the mechanism is created.
+     *
+     * Existing properties defined on this authentication context will be retained unless overridden by new properties, any
+     * properties resulting with a value of {@code null} will be removed.
+     *
+     * @param mechanismProperties the properties to be passed to the {@code SaslClientFactory} to create the mechanism.
+     * @return the new configuration.
+     * @deprecated use {@link #useSaslMechanismProperties(Map)}
+     */
+    @Deprecated
+    public AuthenticationConfiguration useMechanismProperties(Map&lt;String, ?&gt; mechanismProperties) {
+<span class="nc" id="L1307">        return useSaslMechanismProperties(mechanismProperties);</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which sets the properties that will be passed to
+     * the {@code SaslClientFactory} when the mechanism is created.
+     *
+     * Existing properties defined on this authentication context will be retained unless overridden by new properties, any
+     * properties resulting with a value of {@code null} will be removed.
+     *
+     * @param mechanismProperties the properties to be passed to the {@code SaslClientFactory} to create the mechanism.
+     * @return the new configuration.
+     */
+    public AuthenticationConfiguration useSaslMechanismProperties(Map&lt;String, ?&gt; mechanismProperties) {
+<span class="nc" id="L1321">        return useSaslMechanismProperties(mechanismProperties, false);</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which sets the properties that will be passed to
+     * the {@code SaslClientFactory} when the mechanism is created.
+     *
+     * If exclusive the existing properties will be discarded and replaced with the new properties otherwise existing properties
+     * defined on this authentication context will be retained unless overridden by new properties, any properties resulting
+     * with a value of {@code null} will be removed.
+     *
+     * @param mechanismProperties the properties to be passed to the {@code SaslClientFactory} to create the mechanism.
+     * @param exclusive should the provided properties be used exclusively or merged with the existing properties?
+     * @return the new configuration.
+     * @deprecated use {@link #useSaslMechanismProperties(Map, boolean)}
+     */
+    @Deprecated
+    public AuthenticationConfiguration useMechanismProperties(Map&lt;String, ?&gt; mechanismProperties, boolean exclusive) {
+<span class="nc" id="L1339">        return useSaslMechanismProperties(mechanismProperties, exclusive);</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which sets the properties that will be passed to
+     * the {@code SaslClientFactory} when the mechanism is created.
+     *
+     * If exclusive the existing properties will be discarded and replaced with the new properties otherwise existing properties
+     * defined on this authentication context will be retained unless overridden by new properties, any properties resulting
+     * with a value of {@code null} will be removed.
+     *
+     * @param mechanismProperties the properties to be passed to the {@code SaslClientFactory} to create the mechanism.
+     * @param exclusive should the provided properties be used exclusively or merged with the existing properties?
+     * @return the new configuration.
+     */
+    public AuthenticationConfiguration useSaslMechanismProperties(Map&lt;String, ?&gt; mechanismProperties, boolean exclusive) {
+<span class="nc bnc" id="L1355" title="All 6 branches missed.">        if (!exclusive &amp;&amp; (mechanismProperties == null || mechanismProperties.isEmpty())) return this;</span>
+<span class="nc bnc" id="L1356" title="All 2 branches missed.">        final HashMap&lt;String, Object&gt; newMap = exclusive ? new HashMap&lt;&gt;() : new HashMap&lt;&gt;(this.saslMechanismProperties);</span>
+<span class="nc" id="L1357">        newMap.putAll(mechanismProperties);</span>
+<span class="nc" id="L1358">        newMap.values().removeIf(Objects::isNull);</span>
+<span class="nc" id="L1359">        return new AuthenticationConfiguration(this, SET_SASL_MECH_PROPS, optimizeMap(newMap));</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which sets the properties that can be used by
+     * WebServices client.
+     *
+     * @param webServicesProperties the properties that can be used by WS client.
+     * @return the new configuration.
+     */
+    public AuthenticationConfiguration useWebServicesProperties(Map&lt;String, ?&gt; webServicesProperties) {
+<span class="nc" id="L1370">        final HashMap&lt;String, Object&gt; newMap = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L1371">        newMap.putAll(webServicesProperties);</span>
+<span class="nc" id="L1372">        newMap.values().removeIf(Objects::isNull);</span>
+<span class="nc" id="L1373">        return new AuthenticationConfiguration(this, SET_WEBSERVICES_PROPS, optimizeMap(newMap));</span>
+    }
+
+    private static &lt;K, V&gt; Map&lt;K, V&gt; optimizeMap(Map&lt;K, V&gt; orig) {
+<span class="pc bpc" id="L1377" title="1 of 2 branches missed.">        if (orig.isEmpty()) return Collections.emptyMap();</span>
+<span class="pc bpc" id="L1378" title="1 of 2 branches missed.">        if (orig.size() == 1) {</span>
+<span class="nc" id="L1379">            final Map.Entry&lt;K, V&gt; entry = orig.entrySet().iterator().next();</span>
+<span class="nc" id="L1380">            return Collections.singletonMap(entry.getKey(), entry.getValue());</span>
+        }
+<span class="fc" id="L1382">        return orig;</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses the given kerberos security
+     * factory to acquire the GSS credential required for authentication.
+     *
+     * @param kerberosSecurityFactory a reference to the kerberos security factory to be use
+     * @return the new configuration
+     */
+    @Deprecated
+    public AuthenticationConfiguration useKerberosSecurityFactory(SecurityFactory&lt;? extends Credential&gt; kerberosSecurityFactory) {
+<span class="nc" id="L1394">        CredentialSource cs = getCredentialSource();</span>
+<span class="nc bnc" id="L1395" title="All 2 branches missed.">        if (kerberosSecurityFactory != null) {</span>
+<span class="nc bnc" id="L1396" title="All 2 branches missed.">            return cs != null ? new AuthenticationConfiguration(this, SET_CRED_SOURCE, cs.with(new FactoryCredentialSource(kerberosSecurityFactory))) : new AuthenticationConfiguration(this, SET_CRED_SOURCE, new FactoryCredentialSource(kerberosSecurityFactory));</span>
+        }
+<span class="nc" id="L1398">        return this;</span>
+    }
+
+    /**
+     * Set the SASL mechanism selector for this authentication configuration.
+     *
+     * @param saslMechanismSelector the SASL mechanism selector, or {@code null} to clear the current selector
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration setSaslMechanismSelector(SaslMechanismSelector saslMechanismSelector) {
+<span class="nc bnc" id="L1408" title="All 2 branches missed.">        if (Objects.equals(this.saslMechanismSelector, saslMechanismSelector)) {</span>
+<span class="nc" id="L1409">            return this;</span>
+        }
+<span class="nc" id="L1411">        return new AuthenticationConfiguration(this, SET_SASL_SELECTOR, saslMechanismSelector);</span>
+    }
+
+    // other
+
+    /**
+     * Create a new configuration which is the same as this configuration, but uses the given realm for authentication.
+     *
+     * @param realm the realm to use, or {@code null} to accept the default realm always
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useRealm(String realm) {
+<span class="nc bnc" id="L1423" title="All 2 branches missed.">        if (Objects.equals(realm, this.setRealm)) {</span>
+<span class="nc" id="L1424">            return this;</span>
+        } else {
+<span class="nc" id="L1426">            return new AuthenticationConfiguration(this, SET_REALM, realm);</span>
+        }
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which uses the given {@link BearerTokenCredential} to authenticate.
+     *
+     * @param credential the bearer token credential to use
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration useBearerTokenCredential(BearerTokenCredential credential) {
+<span class="nc bnc" id="L1437" title="All 2 branches missed.">        return credential == null ? this : useCredentials(getCredentialSource().with(IdentityCredentials.NONE.withCredential(credential)));</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which captures the caller's access
+     * control context to be used in authentication decisions.
+     *
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration withCapturedAccessControlContext() {
+<span class="nc" id="L1447">        return new AuthenticationConfiguration(this, SET_ACCESS_CTXT, getContext());</span>
+    }
+
+    // merging
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which adds or replaces every item in the
+     * {@code other} configuration with that item, overwriting any corresponding such item in this configuration.
+     *
+     * @param other the other authentication configuration
+     * @return the merged authentication configuration
+     */
+    public AuthenticationConfiguration with(AuthenticationConfiguration other) {
+<span class="fc" id="L1460">        return new AuthenticationConfiguration(this, other);</span>
+    }
+
+    /**
+     * Create a new configuration which is the same as this configuration, but which attempts to authorize to the
+     * principal from the current identity from the configured security domain.
+     *
+     * @return the new configuration
+     */
+    public AuthenticationConfiguration captureAuthorizationIdentity() {
+<span class="nc bnc" id="L1470" title="All 2 branches missed.">        if (authorizationNameForwardSecurityDomain == null) {</span>
+<span class="nc" id="L1471">            return this;</span>
+        }
+<span class="nc" id="L1473">        return new AuthenticationConfiguration(this, SET_ACCESS_CTXT, null, SET_FWD_AUTHZ_NAME_DOMAIN, null, SET_AUTHZ_PRINCIPAL, authorizationNameForwardSecurityDomain.getCurrentSecurityIdentity().getPrincipal());</span>
+    }
+
+    // client methods
+
+    CallbackHandler getUserCallbackHandler() {
+<span class="nc" id="L1479">        return userCallbackHandler;</span>
+    }
+
+    EnumSet&lt;CallbackKind&gt; getUserCallbackKinds() {
+<span class="nc" id="L1483">        return userCallbackKinds;</span>
+    }
+
+    private SaslClientFactory getSaslClientFactory() {
+<span class="nc bnc" id="L1487" title="All 2 branches missed.">        if (saslClientFactory == null) {</span>
+<span class="nc" id="L1488">            synchronized (this) {</span>
+<span class="nc bnc" id="L1489" title="All 2 branches missed.">                if (saslClientFactory == null) {</span>
+<span class="nc" id="L1490">                    saslClientFactory = getSaslClientFactory(getProviderSupplier());</span>
+                }
+<span class="nc" id="L1492">            }</span>
+        }
+<span class="nc" id="L1494">        return saslClientFactory;</span>
+    }
+
+    SaslClient createSaslClient(URI uri, Collection&lt;String&gt; serverMechanisms, UnaryOperator&lt;SaslClientFactory&gt; factoryOperator, SSLSession sslSession) throws SaslException {
+<span class="nc" id="L1498">        SaslClientFactory saslClientFactory = factoryOperator.apply(getSaslClientFactory());</span>
+<span class="nc" id="L1499">        final SaslMechanismSelector selector = this.saslMechanismSelector;</span>
+<span class="nc bnc" id="L1500" title="All 2 branches missed.">        serverMechanisms = (selector == null ? SaslMechanismSelector.DEFAULT : selector).apply(serverMechanisms, sslSession);</span>
+<span class="nc bnc" id="L1501" title="All 2 branches missed.">        if (serverMechanisms.isEmpty()) {</span>
+<span class="nc" id="L1502">            return null;</span>
+        }
+<span class="nc" id="L1504">        final Principal authorizationPrincipal = getAuthorizationPrincipal();</span>
+        final Predicate&lt;String&gt; filter;
+        final String authzName;
+<span class="nc bnc" id="L1507" title="All 2 branches missed.">        if (authorizationPrincipal == null) {</span>
+<span class="nc" id="L1508">            filter = this::saslSupportedByConfiguration;</span>
+<span class="nc" id="L1509">            authzName = null;</span>
+<span class="nc bnc" id="L1510" title="All 2 branches missed.">        } else if (authorizationPrincipal instanceof NamePrincipal) {</span>
+<span class="nc" id="L1511">            filter = this::saslSupportedByConfiguration;</span>
+<span class="nc" id="L1512">            authzName = authorizationPrincipal.getName();</span>
+<span class="nc bnc" id="L1513" title="All 2 branches missed.">        } else if (authorizationPrincipal instanceof AnonymousPrincipal) {</span>
+<span class="nc" id="L1514">            filter = ((Predicate&lt;String&gt;) this::saslSupportedByConfiguration).and(&quot;ANONYMOUS&quot;::equals);</span>
+<span class="nc" id="L1515">            authzName = null;</span>
+        } else {
+<span class="nc" id="L1517">            return null;</span>
+        }
+<span class="nc" id="L1519">        Map&lt;String, ?&gt; mechanismProperties = this.saslMechanismProperties;</span>
+<span class="nc bnc" id="L1520" title="All 2 branches missed.">        if (! mechanismProperties.isEmpty()) {</span>
+<span class="nc" id="L1521">            mechanismProperties = new HashMap&lt;&gt;(mechanismProperties);</span>
+            // special handling for JBOSS-LOCAL-USER quiet auth... only pass it through if we have a user callback
+<span class="nc bnc" id="L1523" title="All 4 branches missed.">            if (! userCallbackKinds.contains(CallbackKind.PRINCIPAL) &amp;&amp; principal != AnonymousPrincipal.getInstance()) {</span>
+<span class="nc" id="L1524">                mechanismProperties.remove(JBOSS_LOCAL_USER_QUIET_AUTH);</span>
+<span class="nc" id="L1525">                mechanismProperties.remove(JBOSS_LOCAL_USER_LEGACY_QUIET_AUTH);</span>
+            }
+<span class="nc bnc" id="L1527" title="All 2 branches missed.">            if (! mechanismProperties.isEmpty()) {</span>
+<span class="nc" id="L1528">                saslClientFactory = new PropertiesSaslClientFactory(saslClientFactory, mechanismProperties);</span>
+            }
+        }
+<span class="nc" id="L1531">        String host = uri.getHost();</span>
+<span class="nc bnc" id="L1532" title="All 2 branches missed.">        if (host != null) {</span>
+<span class="nc" id="L1533">            saslClientFactory = new ServerNameSaslClientFactory(saslClientFactory, host);</span>
+        }
+<span class="nc" id="L1535">        String protocol = getSaslProtocol();</span>
+<span class="nc bnc" id="L1536" title="All 2 branches missed.">        if (protocol != null) {</span>
+<span class="nc" id="L1537">            saslClientFactory = new ProtocolSaslClientFactory(saslClientFactory, protocol);</span>
+        }
+<span class="nc bnc" id="L1539" title="All 2 branches missed.">        if (sslSession != null) {</span>
+<span class="nc" id="L1540">            saslClientFactory = new SSLSaslClientFactory(() -&gt; SSLConnection.forSession(sslSession, true), saslClientFactory);</span>
+        }
+<span class="nc" id="L1542">        saslClientFactory = new LocalPrincipalSaslClientFactory(new FilterMechanismSaslClientFactory(saslClientFactory, filter));</span>
+<span class="nc" id="L1543">        final SaslClientFactory finalSaslClientFactory = saslClientFactory;</span>
+<span class="nc bnc" id="L1544" title="All 2 branches missed.">        saslClientFactory = WILDFLY_ELYTRON_CAPTURE_ACCESS_CONTROL_CONTEXT_PROPERTY ? doPrivileged((PrivilegedAction&lt;PrivilegedSaslClientFactory&gt;) () -&gt; new PrivilegedSaslClientFactory(finalSaslClientFactory), capturedAccessContext) :</span>
+<span class="nc" id="L1545">                new PrivilegedSaslClientFactory(finalSaslClientFactory);</span>
+
+<span class="nc" id="L1547">        SaslClient saslClient = saslClientFactory.createSaslClient(serverMechanisms.toArray(NO_STRINGS),</span>
+<span class="nc" id="L1548">                authzName, uri.getScheme(), uri.getHost(), Collections.emptyMap(), createCallbackHandler());</span>
+
+<span class="nc bnc" id="L1550" title="All 2 branches missed.">        if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L1551">            log.tracef(&quot;Created SaslClient [%s] for mechanisms %s&quot;, saslClient, Arrays2.objectToString(serverMechanisms));</span>
+        }
+<span class="nc" id="L1553">        return saslClient;</span>
+    }
+
+    CallbackHandler createCallbackHandler() {
+<span class="nc" id="L1557">        return new ClientCallbackHandler(this);</span>
+    }
+
+    // equality
+
+    /**
+     * Determine whether this configuration is equal to another object.  Two configurations are equal if they
+     * apply the same items.
+     *
+     * @param obj the other object
+     * @return {@code true} if they are equal, {@code false} otherwise
+     */
+    public boolean equals(final Object obj) {
+<span class="pc bpc" id="L1570" title="2 of 4 branches missed.">        return obj instanceof AuthenticationConfiguration &amp;&amp; equals((AuthenticationConfiguration) obj);</span>
+    }
+
+    /**
+     * Determine whether this configuration is equal to another object.  Two configurations are equal if they
+     * apply the same items.
+     *
+     * @param other the other object
+     * @return {@code true} if they are equal, {@code false} otherwise
+     */
+    public boolean equals(final AuthenticationConfiguration other) {
+<span class="pc bpc" id="L1581" title="1 of 2 branches missed.">        return hashCode() == other.hashCode()</span>
+<span class="pc bpc" id="L1582" title="1 of 2 branches missed.">            &amp;&amp; Objects.equals(principal, other.principal)</span>
+<span class="pc bpc" id="L1583" title="1 of 2 branches missed.">            &amp;&amp; Objects.equals(setHost, other.setHost)</span>
+<span class="pc bpc" id="L1584" title="1 of 2 branches missed.">            &amp;&amp; Objects.equals(setProtocol, other.setProtocol)</span>
+<span class="pc bpc" id="L1585" title="1 of 2 branches missed.">            &amp;&amp; Objects.equals(setRealm, other.setRealm)</span>
+<span class="pc bpc" id="L1586" title="1 of 2 branches missed.">            &amp;&amp; Objects.equals(setAuthzPrincipal, other.setAuthzPrincipal)</span>
+<span class="pc bpc" id="L1587" title="1 of 2 branches missed.">            &amp;&amp; Objects.equals(authenticationNameForwardSecurityDomain, other.authenticationNameForwardSecurityDomain)</span>
+<span class="pc bpc" id="L1588" title="1 of 2 branches missed.">            &amp;&amp; Objects.equals(authenticationCredentialsForwardSecurityDomain, other.authenticationCredentialsForwardSecurityDomain)</span>
+<span class="pc bpc" id="L1589" title="1 of 2 branches missed.">            &amp;&amp; Objects.equals(authorizationNameForwardSecurityDomain, other.authorizationNameForwardSecurityDomain)</span>
+<span class="pc bpc" id="L1590" title="1 of 2 branches missed.">            &amp;&amp; Objects.equals(userCallbackHandler, other.userCallbackHandler)</span>
+<span class="pc bpc" id="L1591" title="1 of 2 branches missed.">            &amp;&amp; Objects.equals(userCallbackKinds, other.userCallbackKinds)</span>
+<span class="pc bpc" id="L1592" title="2 of 4 branches missed.">            &amp;&amp; Objects.equals(credentialSource, other.credentialSource)</span>
+            &amp;&amp; this.setPort == other.setPort
+<span class="pc bpc" id="L1594" title="1 of 2 branches missed.">            &amp;&amp; Objects.equals(providerSupplier, other.providerSupplier)</span>
+<span class="pc bpc" id="L1595" title="1 of 2 branches missed.">            &amp;&amp; Objects.equals(keyManagerFactory, other.keyManagerFactory)</span>
+<span class="pc bpc" id="L1596" title="1 of 2 branches missed.">            &amp;&amp; Objects.equals(saslMechanismSelector, other.saslMechanismSelector)</span>
+<span class="pc bpc" id="L1597" title="1 of 2 branches missed.">            &amp;&amp; Objects.equals(principalRewriter, other.principalRewriter)</span>
+<span class="pc bpc" id="L1598" title="1 of 2 branches missed.">            &amp;&amp; Objects.equals(saslClientFactorySupplier, other.saslClientFactorySupplier)</span>
+<span class="pc bpc" id="L1599" title="1 of 2 branches missed.">            &amp;&amp; Objects.equals(parameterSpecs, other.parameterSpecs)</span>
+<span class="pc bpc" id="L1600" title="1 of 2 branches missed.">            &amp;&amp; Objects.equals(trustManagerFactory, other.trustManagerFactory)</span>
+<span class="pc bpc" id="L1601" title="1 of 2 branches missed.">            &amp;&amp; Objects.equals(saslMechanismProperties, other.saslMechanismProperties)</span>
+<span class="pc bpc" id="L1602" title="1 of 2 branches missed.">            &amp;&amp; Objects.equals(saslProtocol, other.saslProtocol)</span>
+<span class="pc bpc" id="L1603" title="1 of 2 branches missed.">            &amp;&amp; Objects.equals(webServicesProperties, other.webServicesProperties);</span>
+    }
+
+    /**
+     * Get the hash code of this authentication configuration.
+     *
+     * @return the hash code of this authentication configuration
+     */
+    public int hashCode() {
+<span class="fc" id="L1612">        int hashCode = this.hashCode;</span>
+<span class="fc bfc" id="L1613" title="All 2 branches covered.">        if (hashCode == 0) {</span>
+<span class="fc" id="L1614">            hashCode = Objects.hash(</span>
+                principal, setHost, setProtocol, setRealm, setAuthzPrincipal, authenticationNameForwardSecurityDomain,
+                authenticationCredentialsForwardSecurityDomain, authorizationNameForwardSecurityDomain, userCallbackHandler, credentialSource,
+                providerSupplier, keyManagerFactory, saslMechanismSelector, principalRewriter, saslClientFactorySupplier, parameterSpecs, trustManagerFactory,
+                saslMechanismProperties, saslProtocol, webServicesProperties) * 19 + setPort;
+<span class="pc bpc" id="L1619" title="1 of 2 branches missed.">            if (hashCode == 0) {</span>
+<span class="nc" id="L1620">                hashCode = 1;</span>
+            }
+<span class="fc" id="L1622">            this.hashCode = hashCode;</span>
+        }
+<span class="fc" id="L1624">        return hashCode;</span>
+    }
+
+    // String Representation
+
+    @Override
+    public String toString() {
+<span class="nc" id="L1631">        String toString = this.toString;</span>
+<span class="nc bnc" id="L1632" title="All 2 branches missed.">        if (toString == null) {</span>
+<span class="nc" id="L1633">            StringBuilder b = new StringBuilder(64);</span>
+<span class="nc" id="L1634">            b.append(&quot;AuthenticationConfiguration:&quot;);</span>
+<span class="nc" id="L1635">            b.append(&quot;principal=&quot;).append(principal).append(',');</span>
+<span class="nc bnc" id="L1636" title="All 2 branches missed.">            if (setAuthzPrincipal != null) b.append(&quot;authorization-id=&quot;).append(setAuthzPrincipal).append(',');</span>
+<span class="nc bnc" id="L1637" title="All 2 branches missed.">            if (setHost != null) b.append(&quot;set-host=&quot;).append(setHost).append(',');</span>
+<span class="nc bnc" id="L1638" title="All 2 branches missed.">            if (setProtocol != null) b.append(&quot;set-protocol=&quot;).append(setProtocol).append(',');</span>
+<span class="nc bnc" id="L1639" title="All 2 branches missed.">            if (saslProtocol != null) b.append(&quot;sasl-protocol-name=&quot;).append(saslProtocol).append(',');</span>
+<span class="nc bnc" id="L1640" title="All 2 branches missed.">            if (setPort != -1) b.append(&quot;set-port=&quot;).append(setPort).append(',');</span>
+<span class="nc bnc" id="L1641" title="All 2 branches missed.">            if (setRealm != null) b.append(&quot;set-realm=&quot;).append(setRealm).append(',');</span>
+<span class="nc bnc" id="L1642" title="All 2 branches missed.">            if (authenticationNameForwardSecurityDomain != null) b.append(&quot;forwarding-authentication-name,&quot;);</span>
+<span class="nc bnc" id="L1643" title="All 2 branches missed.">            if (authenticationCredentialsForwardSecurityDomain != null) b.append(&quot;forwarding-authentication-credentials,&quot;);</span>
+<span class="nc bnc" id="L1644" title="All 2 branches missed.">            if (authorizationNameForwardSecurityDomain != null) b.append(&quot;forwarding-authorization-name,&quot;);</span>
+<span class="nc bnc" id="L1645" title="All 2 branches missed.">            if (userCallbackHandler != null) b.append(&quot;user-callback-handler=&quot;).append(userCallbackHandler).append(',');</span>
+<span class="nc bnc" id="L1646" title="All 2 branches missed.">            if (! userCallbackKinds.isEmpty()) b.append(&quot;user-callback-kinds=&quot;).append(userCallbackKinds).append(',');</span>
+<span class="nc bnc" id="L1647" title="All 6 branches missed.">            if (credentialSource != null &amp;&amp; credentialSource != CredentialSource.NONE &amp;&amp; credentialSource != IdentityCredentials.NONE) b.append(&quot;credentials-present,&quot;);</span>
+<span class="nc bnc" id="L1648" title="All 2 branches missed.">            if (providerSupplier != null) b.append(&quot;providers-supplier=&quot;).append(providerSupplier).append(',');</span>
+<span class="nc bnc" id="L1649" title="All 2 branches missed.">            if (keyManagerFactory != null) b.append(&quot;key-manager-factory=&quot;).append(keyManagerFactory).append(',');</span>
+<span class="nc bnc" id="L1650" title="All 2 branches missed.">            if (saslMechanismSelector != null) b.append(&quot;sasl-mechanism-selector=&quot;).append(saslMechanismSelector).append(',');</span>
+<span class="nc bnc" id="L1651" title="All 2 branches missed.">            if (principalRewriter != null) b.append(&quot;principal-rewriter=&quot;).append(principalRewriter).append(',');</span>
+<span class="nc bnc" id="L1652" title="All 2 branches missed.">            if (saslClientFactorySupplier != null) b.append(&quot;sasl-client-factory-supplier=&quot;).append(saslClientFactorySupplier).append(',');</span>
+<span class="nc bnc" id="L1653" title="All 2 branches missed.">            if (! parameterSpecs.isEmpty()) b.append(&quot;parameter-specifications=&quot;).append(parameterSpecs).append(',');</span>
+<span class="nc bnc" id="L1654" title="All 2 branches missed.">            if (trustManagerFactory != null) b.append(&quot;trust-manager-factory=&quot;).append(trustManagerFactory).append(',');</span>
+<span class="nc bnc" id="L1655" title="All 2 branches missed.">            if (! saslMechanismProperties.isEmpty()) b.append(&quot;mechanism-properties=&quot;).append(saslMechanismProperties).append(',');</span>
+<span class="nc bnc" id="L1656" title="All 4 branches missed.">            if (webServicesProperties != null &amp;&amp; ! webServicesProperties.isEmpty()) b.append(&quot;webservices-properties=&quot;).append(webServicesProperties).append(',');</span>
+<span class="nc" id="L1657">            b.setLength(b.length() - 1);</span>
+<span class="nc" id="L1658">            return this.toString = b.toString();</span>
+        }
+<span class="nc" id="L1660">        return toString;</span>
+    }
+    //user callback sanitation
+    private void sanitazeOnMutation(final int what) {
+<span class="pc bpc" id="L1664" title="4 of 7 branches missed.">        switch (what) {</span>
+            case SET_PRINCIPAL:
+                // CallbackKind.PRINCIPAL
+<span class="pc bpc" id="L1667" title="2 of 4 branches missed.">                if (this.principal != null &amp;&amp; ! this.principal.equals(AnonymousPrincipal.getInstance())) {</span>
+<span class="fc" id="L1668">                    this.userCallbackKinds.remove(CallbackKind.PRINCIPAL);</span>
+                }
+                break;
+            case SET_CRED_SOURCE:
+                // CallbackKind.CREDENTIAL
+<span class="pc bpc" id="L1673" title="1 of 4 branches missed.">                if (this.credentialSource != null &amp;&amp; ! this.credentialSource.equals(IdentityCredentials.NONE)) {</span>
+<span class="fc" id="L1674">                    this.userCallbackKinds.remove(CallbackKind.CREDENTIAL);</span>
+                }
+                break;
+            case SET_REALM:
+                // CallbackKind.REALM
+<span class="nc" id="L1679">                this.userCallbackKinds.remove(CallbackKind.REALM);</span>
+<span class="nc" id="L1680">                break;</span>
+            case SET_PARAM_SPECS:
+                // CallbackKind.PARAMETERS
+<span class="nc" id="L1683">                this.userCallbackKinds.remove(CallbackKind.PARAMETERS);</span>
+<span class="nc" id="L1684">                break;</span>
+            case SET_KEY_MGR_FAC:
+                // CallbackKind.PEER_CREDENTIAL
+<span class="nc" id="L1687">                this.userCallbackKinds.remove(CallbackKind.PEER_CREDENTIAL);</span>
+<span class="nc" id="L1688">                break;</span>
+            case SET_USER_CB_KINDS:
+                // SANITAZE on above content
+<span class="nc bnc" id="L1691" title="All 2 branches missed.">                if (this.principal != null) {</span>
+<span class="nc" id="L1692">                    sanitazeOnMutation(SET_PRINCIPAL);</span>
+                }
+
+<span class="nc bnc" id="L1695" title="All 2 branches missed.">                if (this.credentialSource != null) {</span>
+<span class="nc" id="L1696">                    sanitazeOnMutation(SET_CRED_SOURCE);</span>
+                }
+
+<span class="nc bnc" id="L1699" title="All 2 branches missed.">                if (this.setRealm != null) {</span>
+<span class="nc" id="L1700">                    sanitazeOnMutation(SET_REALM);</span>
+                }
+
+<span class="nc bnc" id="L1703" title="All 2 branches missed.">                if (this.parameterSpecs != null) {</span>
+<span class="nc" id="L1704">                    sanitazeOnMutation(SET_PARAM_SPECS);</span>
+                }
+
+<span class="nc bnc" id="L1707" title="All 2 branches missed.">                if (this.keyManagerFactory != null) {</span>
+<span class="nc" id="L1708">                    sanitazeOnMutation(SET_KEY_MGR_FAC);</span>
+                }
+                break;
+        }
+<span class="fc" id="L1712">    }</span>
+
+    AccessControlContext getCapturedContext() {
+<span class="nc" id="L1715">        return capturedAccessContext;</span>
+    }
+
+    // delegates for equality tests
+
+    // interfaces
+
+<span class="nc bnc" id="L1722" title="All 2 branches missed.">    static class ClientCallbackHandler implements CallbackHandler {</span>
+        private final AuthenticationConfiguration config;
+        private final CallbackHandler userCallbackHandler;
+        private List&lt;TrustedAuthority&gt; trustedAuthorities;
+        private SSLConnection sslConnection;
+
+<span class="nc" id="L1728">        ClientCallbackHandler(final AuthenticationConfiguration config) {</span>
+<span class="nc" id="L1729">            this.config = config;</span>
+<span class="nc" id="L1730">            userCallbackHandler = config.getUserCallbackHandler();</span>
+<span class="nc" id="L1731">        }</span>
+
+        @SuppressWarnings(&quot;UnnecessaryContinue&quot;)
+        public void handle(final Callback[] callbacks) throws IOException, UnsupportedCallbackException {
+<span class="nc" id="L1735">            final AuthenticationConfiguration config = this.config;</span>
+<span class="nc" id="L1736">            final Predicate&lt;Callback&gt; callbackIntercept = config.callbackIntercept;</span>
+<span class="nc" id="L1737">            final ArrayList&lt;Callback&gt; userCallbacks = new ArrayList&lt;&gt;(callbacks.length);</span>
+<span class="nc bnc" id="L1738" title="All 2 branches missed.">            for (final Callback callback : callbacks) {</span>
+<span class="nc bnc" id="L1739" title="All 4 branches missed.">                if (callbackIntercept != null &amp;&amp; callbackIntercept.test(callback)) {</span>
+<span class="nc" id="L1740">                    continue;</span>
+<span class="nc bnc" id="L1741" title="All 2 branches missed.">                } else if (callback instanceof NameCallback) {</span>
+<span class="nc bnc" id="L1742" title="All 2 branches missed.">                    if (config.getUserCallbackKinds().contains(CallbackKind.PRINCIPAL)) {</span>
+<span class="nc" id="L1743">                        userCallbacks.add(callback);</span>
+<span class="nc" id="L1744">                        continue;</span>
+                    }
+<span class="nc" id="L1746">                    final NameCallback nameCallback = (NameCallback) callback;</span>
+                    // populate with our authentication name
+<span class="nc" id="L1748">                    final Principal principal = config.getPrincipal();</span>
+<span class="nc bnc" id="L1749" title="All 2 branches missed.">                    if (principal instanceof AnonymousPrincipal) {</span>
+<span class="nc" id="L1750">                        final String defaultName = nameCallback.getDefaultName();</span>
+<span class="nc bnc" id="L1751" title="All 2 branches missed.">                        if (defaultName != null) {</span>
+<span class="nc" id="L1752">                            nameCallback.setName(defaultName);</span>
+                        }
+                        // otherwise set nothing; the mech can decide if that's OK or not
+                        continue;
+                    } else {
+<span class="nc" id="L1757">                        nameCallback.setName(config.doRewriteUser(principal).getName());</span>
+<span class="nc" id="L1758">                        continue;</span>
+                    }
+<span class="nc bnc" id="L1760" title="All 2 branches missed.">                } else if (callback instanceof PasswordCallback) {</span>
+<span class="nc bnc" id="L1761" title="All 2 branches missed.">                    if (config.getUserCallbackKinds().contains(CallbackKind.CREDENTIAL)) {</span>
+<span class="nc" id="L1762">                        userCallbacks.add(callback);</span>
+<span class="nc" id="L1763">                        continue;</span>
+                    }
+<span class="nc" id="L1765">                    final PasswordCallback passwordCallback = (PasswordCallback) callback;</span>
+<span class="nc" id="L1766">                    final CredentialSource credentials = config.getCredentialSource();</span>
+<span class="nc bnc" id="L1767" title="All 2 branches missed.">                    if (credentials != null) {</span>
+<span class="nc" id="L1768">                        final TwoWayPassword password = credentials.applyToCredential(PasswordCredential.class, ClearPassword.ALGORITHM_CLEAR, c -&gt; c.getPassword(TwoWayPassword.class));</span>
+<span class="nc bnc" id="L1769" title="All 2 branches missed.">                        if (password instanceof ClearPassword) {</span>
+                            // shortcut
+<span class="nc" id="L1771">                            passwordCallback.setPassword(((ClearPassword) password).getPassword());</span>
+<span class="nc" id="L1772">                            continue;</span>
+<span class="nc bnc" id="L1773" title="All 2 branches missed.">                        } else if (password != null) try {</span>
+<span class="nc" id="L1774">                            PasswordFactory passwordFactory = PasswordFactory.getInstance(password.getAlgorithm());</span>
+<span class="nc" id="L1775">                            ClearPasswordSpec clearPasswordSpec = passwordFactory.getKeySpec(passwordFactory.translate(password), ClearPasswordSpec.class);</span>
+<span class="nc" id="L1776">                            passwordCallback.setPassword(clearPasswordSpec.getEncodedPassword());</span>
+<span class="nc" id="L1777">                            continue;</span>
+<span class="nc" id="L1778">                        } catch (GeneralSecurityException e) {</span>
+                            // not supported
+<span class="nc" id="L1780">                            CallbackUtil.unsupported(passwordCallback);</span>
+<span class="nc" id="L1781">                            continue;</span>
+                        }
+                        else {
+                            // supported but no credentials
+                            continue;
+                        }
+                    } else {
+                        // supported but no credentials
+                        continue;
+                    }
+<span class="nc bnc" id="L1791" title="All 2 branches missed.">                } else if (callback instanceof PasswordResetCallback) {</span>
+<span class="nc bnc" id="L1792" title="All 2 branches missed.">                    if (config.getUserCallbackKinds().contains(CallbackKind.CREDENTIAL_RESET)) {</span>
+<span class="nc" id="L1793">                        userCallbacks.add(callback);</span>
+<span class="nc" id="L1794">                        continue;</span>
+                    }
+                    // not supported
+<span class="nc" id="L1797">                    CallbackUtil.unsupported(callback);</span>
+<span class="nc" id="L1798">                    continue;</span>
+<span class="nc bnc" id="L1799" title="All 2 branches missed.">                } else if (callback instanceof CredentialCallback) {</span>
+<span class="nc bnc" id="L1800" title="All 2 branches missed.">                    if (config.getUserCallbackKinds().contains(CallbackKind.CREDENTIAL)) {</span>
+<span class="nc" id="L1801">                        userCallbacks.add(callback);</span>
+<span class="nc" id="L1802">                        continue;</span>
+                    }
+<span class="nc" id="L1804">                    final CredentialCallback credentialCallback = (CredentialCallback) callback;</span>
+                    // special handling for X.509 when a key manager factory is set
+<span class="nc" id="L1806">                    final SecurityFactory&lt;X509KeyManager&gt; keyManagerFactory = config.getX509KeyManagerFactory();</span>
+<span class="nc bnc" id="L1807" title="All 2 branches missed.">                    if (keyManagerFactory != null) {</span>
+<span class="nc" id="L1808">                        final String allowedAlgorithm = credentialCallback.getAlgorithm();</span>
+<span class="nc bnc" id="L1809" title="All 4 branches missed.">                        if (allowedAlgorithm != null &amp;&amp; credentialCallback.isCredentialTypeSupported(X509CertificateChainPrivateCredential.class, allowedAlgorithm)) {</span>
+                            final X509KeyManager keyManager;
+                            try {
+<span class="nc" id="L1812">                                keyManager = keyManagerFactory.create();</span>
+<span class="nc" id="L1813">                            } catch (GeneralSecurityException e) {</span>
+<span class="nc" id="L1814">                                throw log.unableToCreateKeyManager(e);</span>
+<span class="nc" id="L1815">                            }</span>
+                            Principal[] acceptableIssuers;
+<span class="nc bnc" id="L1817" title="All 2 branches missed.">                            if (trustedAuthorities != null) {</span>
+<span class="nc" id="L1818">                                List&lt;Principal&gt; issuers = new ArrayList&lt;Principal&gt;();</span>
+<span class="nc bnc" id="L1819" title="All 2 branches missed.">                                for (TrustedAuthority trustedAuthority : trustedAuthorities) {</span>
+<span class="nc bnc" id="L1820" title="All 2 branches missed.">                                    if (trustedAuthority instanceof TrustedAuthority.CertificateTrustedAuthority) {</span>
+<span class="nc" id="L1821">                                        final X509Certificate authorityCertificate = ((TrustedAuthority.CertificateTrustedAuthority) trustedAuthority).getIdentifier();</span>
+<span class="nc" id="L1822">                                        issuers.add(authorityCertificate.getSubjectX500Principal());</span>
+<span class="nc bnc" id="L1823" title="All 2 branches missed.">                                    } else if (trustedAuthority instanceof TrustedAuthority.NameTrustedAuthority) {</span>
+<span class="nc" id="L1824">                                        final String authorityName = ((TrustedAuthority.NameTrustedAuthority) trustedAuthority).getIdentifier();</span>
+<span class="nc" id="L1825">                                        issuers.add(new X500Principal(authorityName));</span>
+                                    }
+<span class="nc" id="L1827">                                }</span>
+<span class="nc" id="L1828">                                acceptableIssuers = issuers.toArray(NO_PRINCIPALS);</span>
+<span class="nc" id="L1829">                            } else {</span>
+<span class="nc" id="L1830">                                acceptableIssuers = null;</span>
+                            }
+<span class="nc" id="L1832">                            final String alias = keyManager.chooseClientAlias(new String[] { allowedAlgorithm }, acceptableIssuers, null);</span>
+<span class="nc bnc" id="L1833" title="All 2 branches missed.">                            if (alias != null) {</span>
+<span class="nc" id="L1834">                                final X509Certificate[] certificateChain = keyManager.getCertificateChain(alias);</span>
+<span class="nc" id="L1835">                                final PrivateKey privateKey = keyManager.getPrivateKey(alias);</span>
+<span class="nc" id="L1836">                                credentialCallback.setCredential(new X509CertificateChainPrivateCredential(privateKey, certificateChain));</span>
+<span class="nc" id="L1837">                                continue;</span>
+                            }
+                            // otherwise fall out to normal handling
+                        }
+                    }
+                    // normal handling
+<span class="nc" id="L1843">                    final Credential credential = config.getCredentialSource().getCredential(credentialCallback.getCredentialType(), credentialCallback.getAlgorithm(), credentialCallback.getParameterSpec());</span>
+<span class="nc bnc" id="L1844" title="All 4 branches missed.">                    if (credential != null &amp;&amp; credentialCallback.isCredentialSupported(credential)) {</span>
+<span class="nc" id="L1845">                        credentialCallback.setCredential(credential);</span>
+<span class="nc" id="L1846">                        continue;</span>
+                    } else {
+                        // supported but no credentials
+                        continue;
+                    }
+<span class="nc bnc" id="L1851" title="All 2 branches missed.">                } else if (callback instanceof RealmChoiceCallback) {</span>
+<span class="nc bnc" id="L1852" title="All 2 branches missed.">                    if (config.getUserCallbackKinds().contains(CallbackKind.REALM)) {</span>
+<span class="nc" id="L1853">                        userCallbacks.add(callback);</span>
+<span class="nc" id="L1854">                        continue;</span>
+                    }
+<span class="nc" id="L1856">                    final RealmChoiceCallback realmChoiceCallback = (RealmChoiceCallback) callback;</span>
+                    // find our realm
+<span class="nc" id="L1858">                    final String realm = config.setRealm;</span>
+<span class="nc bnc" id="L1859" title="All 2 branches missed.">                    if (realm == null) {</span>
+<span class="nc" id="L1860">                        realmChoiceCallback.setSelectedIndex(realmChoiceCallback.getDefaultChoice());</span>
+<span class="nc" id="L1861">                        continue;</span>
+                    } else {
+<span class="nc" id="L1863">                        String[] choices = realmChoiceCallback.getChoices();</span>
+<span class="nc bnc" id="L1864" title="All 2 branches missed.">                        for (int i = 0; i &lt; choices.length; i++) {</span>
+<span class="nc bnc" id="L1865" title="All 2 branches missed.">                            if (realm.equals(choices[i])) {</span>
+<span class="nc" id="L1866">                                realmChoiceCallback.setSelectedIndex(i);</span>
+<span class="nc" id="L1867">                                break;</span>
+                            }
+                        }
+                        // no choice matches, so just fall out and choose nothing
+<span class="nc" id="L1871">                        continue;</span>
+                    }
+<span class="nc bnc" id="L1873" title="All 2 branches missed.">                } else if (callback instanceof RealmCallback) {</span>
+<span class="nc bnc" id="L1874" title="All 2 branches missed.">                    if (config.getUserCallbackKinds().contains(CallbackKind.REALM)) {</span>
+<span class="nc" id="L1875">                        userCallbacks.add(callback);</span>
+<span class="nc" id="L1876">                        continue;</span>
+                    }
+<span class="nc" id="L1878">                    RealmCallback realmCallback = (RealmCallback) callback;</span>
+<span class="nc" id="L1879">                    final String realm = config.setRealm;</span>
+<span class="nc bnc" id="L1880" title="All 2 branches missed.">                    realmCallback.setText(realm != null ? realm : realmCallback.getDefaultText());</span>
+<span class="nc" id="L1881">                    continue;</span>
+<span class="nc bnc" id="L1882" title="All 2 branches missed.">                } else if (callback instanceof ParameterCallback) {</span>
+<span class="nc bnc" id="L1883" title="All 2 branches missed.">                    if (config.getUserCallbackKinds().contains(CallbackKind.PARAMETERS)) {</span>
+<span class="nc" id="L1884">                        userCallbacks.add(callback);</span>
+<span class="nc" id="L1885">                        continue;</span>
+                    }
+<span class="nc" id="L1887">                    ParameterCallback parameterCallback = (ParameterCallback) callback;</span>
+<span class="nc bnc" id="L1888" title="All 2 branches missed.">                    if (parameterCallback.getParameterSpec() == null) {</span>
+<span class="nc bnc" id="L1889" title="All 2 branches missed.">                        for (AlgorithmParameterSpec parameterSpec : config.parameterSpecs) {</span>
+<span class="nc bnc" id="L1890" title="All 2 branches missed.">                            if (parameterCallback.isParameterSupported(parameterSpec)) {</span>
+<span class="nc" id="L1891">                                parameterCallback.setParameterSpec(parameterSpec);</span>
+<span class="nc" id="L1892">                                break; // inner loop break</span>
+                            }
+<span class="nc" id="L1894">                        }</span>
+                    }
+                    continue;
+<span class="nc bnc" id="L1897" title="All 2 branches missed.">                } else if (callback instanceof SSLCallback) {</span>
+<span class="nc bnc" id="L1898" title="All 2 branches missed.">                    if (config.getUserCallbackKinds().contains(CallbackKind.SSL)) {</span>
+<span class="nc" id="L1899">                        userCallbacks.add(callback);</span>
+<span class="nc" id="L1900">                        continue;</span>
+                    }
+<span class="nc" id="L1902">                    SSLCallback sslCallback = (SSLCallback) callback;</span>
+<span class="nc" id="L1903">                    this.sslConnection = sslCallback.getSslConnection();</span>
+<span class="nc" id="L1904">                    continue;</span>
+<span class="nc bnc" id="L1905" title="All 2 branches missed.">                } else if (callback instanceof ChannelBindingCallback) {</span>
+<span class="nc bnc" id="L1906" title="All 2 branches missed.">                    if (config.getUserCallbackKinds().contains(CallbackKind.CHANNEL_BINDING)) {</span>
+<span class="nc" id="L1907">                        userCallbacks.add(callback);</span>
+<span class="nc" id="L1908">                        continue;</span>
+                    }
+<span class="nc" id="L1910">                    final SSLConnection sslConnection = this.sslConnection;</span>
+<span class="nc bnc" id="L1911" title="All 2 branches missed.">                    if (sslConnection != null) {</span>
+<span class="nc" id="L1912">                        sslConnection.handleChannelBindingCallback((ChannelBindingCallback) callback);</span>
+                    }
+                    continue;
+<span class="nc bnc" id="L1915" title="All 2 branches missed.">                } else if (callback instanceof ChoiceCallback) { // Must come AFTER RealmChoiceCallback</span>
+<span class="nc bnc" id="L1916" title="All 2 branches missed.">                    if (config.getUserCallbackKinds().contains(CallbackKind.CHOICE)) {</span>
+<span class="nc" id="L1917">                        userCallbacks.add(callback);</span>
+<span class="nc" id="L1918">                        continue;</span>
+                    }
+<span class="nc" id="L1920">                    final ChoiceCallback choiceCallback = (ChoiceCallback) callback;</span>
+<span class="nc" id="L1921">                    choiceCallback.setSelectedIndex(choiceCallback.getDefaultChoice());</span>
+<span class="nc" id="L1922">                    continue;</span>
+<span class="nc bnc" id="L1923" title="All 2 branches missed.">                } else if (callback instanceof TrustedAuthoritiesCallback) {</span>
+<span class="nc bnc" id="L1924" title="All 2 branches missed.">                    if (config.getUserCallbackKinds().contains(CallbackKind.SERVER_TRUSTED_AUTHORITIES)) {</span>
+<span class="nc" id="L1925">                        userCallbacks.add(callback);</span>
+<span class="nc" id="L1926">                        continue;</span>
+                    }
+<span class="nc" id="L1928">                    final TrustedAuthoritiesCallback trustedAuthoritiesCallback = (TrustedAuthoritiesCallback) callback;</span>
+<span class="nc" id="L1929">                    final List&lt;TrustedAuthority&gt; trustedAuthoritiesHolder = trustedAuthoritiesCallback.getTrustedAuthorities();</span>
+<span class="nc bnc" id="L1930" title="All 2 branches missed.">                    if (trustedAuthoritiesHolder != null) {</span>
+<span class="nc bnc" id="L1931" title="All 2 branches missed.">                        if (trustedAuthorities == null) {</span>
+<span class="nc" id="L1932">                            trustedAuthorities = new ArrayList&lt;&gt;(trustedAuthoritiesHolder);</span>
+                        } else {
+<span class="nc" id="L1934">                            final List&lt;TrustedAuthority&gt; authorities = new ArrayList&lt;&gt;(trustedAuthoritiesHolder);</span>
+<span class="nc" id="L1935">                            authorities.removeIf(trustedAuthorities::contains);</span>
+<span class="nc" id="L1936">                            trustedAuthorities.addAll(authorities);</span>
+<span class="nc" id="L1937">                        }</span>
+                    }
+                    continue;
+<span class="nc bnc" id="L1940" title="All 2 branches missed.">                } else if (callback instanceof EvidenceVerifyCallback) {</span>
+<span class="nc bnc" id="L1941" title="All 2 branches missed.">                    if (config.getUserCallbackKinds().contains(CallbackKind.PEER_CREDENTIAL)) {</span>
+<span class="nc" id="L1942">                        userCallbacks.add(callback);</span>
+<span class="nc" id="L1943">                        continue;</span>
+                    }
+<span class="nc" id="L1945">                    final EvidenceVerifyCallback evidenceVerifyCallback = (EvidenceVerifyCallback) callback;</span>
+                    // special handling for X.509
+<span class="nc" id="L1947">                    final SecurityFactory&lt;X509TrustManager&gt; trustManagerFactory = config.getX509TrustManagerFactory();</span>
+<span class="nc bnc" id="L1948" title="All 2 branches missed.">                    if (trustManagerFactory != null) {</span>
+<span class="nc" id="L1949">                        final X509PeerCertificateChainEvidence peerCertificateChainEvidence = evidenceVerifyCallback.getEvidence(X509PeerCertificateChainEvidence.class);</span>
+<span class="nc bnc" id="L1950" title="All 2 branches missed.">                        if (peerCertificateChainEvidence != null) {</span>
+                            X509TrustManager trustManager;
+                            try {
+<span class="nc" id="L1953">                                trustManager = trustManagerFactory.create();</span>
+<span class="nc" id="L1954">                            } catch (GeneralSecurityException e) {</span>
+<span class="nc" id="L1955">                                throw log.unableToCreateTrustManager(e);</span>
+<span class="nc" id="L1956">                            }</span>
+                            try {
+<span class="nc" id="L1958">                                trustManager.checkServerTrusted(peerCertificateChainEvidence.getPeerCertificateChain(), peerCertificateChainEvidence.getAlgorithm());</span>
+<span class="nc" id="L1959">                                evidenceVerifyCallback.setVerified(true);</span>
+<span class="nc" id="L1960">                            } catch (CertificateException e) {</span>
+<span class="nc" id="L1961">                            }</span>
+<span class="nc" id="L1962">                            continue;</span>
+                        }
+<span class="nc" id="L1964">                    }</span>
+                    continue;
+<span class="nc bnc" id="L1966" title="All 2 branches missed.">                } else if (callback instanceof TextOutputCallback) {</span>
+<span class="nc bnc" id="L1967" title="All 2 branches missed.">                    if (config.getUserCallbackKinds().contains(CallbackKind.GENERAL_OUTPUT)) {</span>
+<span class="nc" id="L1968">                        userCallbacks.add(callback);</span>
+<span class="nc" id="L1969">                        continue;</span>
+                    }
+                    // ignore
+                    continue;
+<span class="nc bnc" id="L1973" title="All 2 branches missed.">                } else if (callback instanceof TextInputCallback) { // must come after RealmCallback</span>
+<span class="nc bnc" id="L1974" title="All 2 branches missed.">                    if (config.getUserCallbackKinds().contains(CallbackKind.GENERAL_INPUT)) {</span>
+<span class="nc" id="L1975">                        userCallbacks.add(callback);</span>
+<span class="nc" id="L1976">                        continue;</span>
+                    }
+                    // always choose the default
+<span class="nc" id="L1979">                    final TextInputCallback inputCallback = (TextInputCallback) callback;</span>
+<span class="nc" id="L1980">                    final String text = inputCallback.getText();</span>
+<span class="nc bnc" id="L1981" title="All 2 branches missed.">                    if (text == null) {</span>
+<span class="nc" id="L1982">                        final String defaultText = inputCallback.getDefaultText();</span>
+<span class="nc bnc" id="L1983" title="All 2 branches missed.">                        if (defaultText != null) {</span>
+<span class="nc" id="L1984">                            inputCallback.setText(defaultText);</span>
+                        } else {
+<span class="nc" id="L1986">                            CallbackUtil.unsupported(callback);</span>
+<span class="nc" id="L1987">                            continue;</span>
+                        }
+<span class="nc" id="L1989">                    }</span>
+                    continue;
+<span class="nc bnc" id="L1991" title="All 2 branches missed.">                } else if (userCallbackHandler != null) {</span>
+<span class="nc" id="L1992">                    userCallbacks.add(callback);</span>
+                } else {
+<span class="nc" id="L1994">                    CallbackUtil.unsupported(callback);</span>
+<span class="nc" id="L1995">                    continue;</span>
+                }
+            }
+<span class="nc bnc" id="L1998" title="All 2 branches missed.">            if (! userCallbacks.isEmpty()) {</span>
+                // pass on to the user callback handler
+<span class="nc bnc" id="L2000" title="All 4 branches missed.">                assert userCallbackHandler != null; // otherwise userCallbacks would be empty</span>
+<span class="nc" id="L2001">                final Callback[] userCallbackArray = userCallbacks.toArray(NO_CALLBACKS);</span>
+<span class="nc" id="L2002">                userCallbackHandler.handle(userCallbackArray);</span>
+            }
+<span class="nc" id="L2004">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

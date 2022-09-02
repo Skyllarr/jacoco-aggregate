@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ASN1Encodable.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-asn1</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.asn1</a> &gt; <span class="el_source">ASN1Encodable.java</span></div><h1>ASN1Encodable.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.asn1;
+
+import java.math.BigInteger;
+
+import org.wildfly.common.Assert;
+
+/**
+ * An object which can be encoded into an {@linkplain ASN1Encoder ASN.1 encoder}.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public interface ASN1Encodable {
+    /**
+     * Encode this object.
+     *
+     * @param encoder the encoder (must not be {@code null})
+     */
+    void encodeTo(ASN1Encoder encoder);
+
+    /**
+     * Create an instance that will encode the given string as UTF-8.
+     *
+     * @param string the string to encode (must not be {@code null})
+     * @return the instance
+     */
+    static ASN1Encodable ofUtf8String(String string) {
+<span class="fc" id="L45">        Assert.checkNotNullParam(&quot;string&quot;, string);</span>
+<span class="fc" id="L46">        return e -&gt; e.encodeUTF8String(string);</span>
+    }
+
+    /**
+     * Create an instance that will encode the given string as BMP (UTF-16BE).
+     *
+     * @param string the string to encode (must not be {@code null})
+     * @return the instance
+     */
+    static ASN1Encodable ofBMPString(String string) {
+<span class="fc" id="L56">        Assert.checkNotNullParam(&quot;string&quot;, string);</span>
+<span class="fc" id="L57">        return e -&gt; e.encodeBMPString(string);</span>
+    }
+
+    /**
+     * Create an instance that will encode the given string as universal (UTF-32BE).
+     *
+     * @param string the string to encode (must not be {@code null})
+     * @return the instance
+     */
+    static ASN1Encodable ofUniversalString(String string) {
+<span class="fc" id="L67">        Assert.checkNotNullParam(&quot;string&quot;, string);</span>
+<span class="fc" id="L68">        return e -&gt; e.encodeUniversalString(string);</span>
+    }
+
+    /**
+     * Create an instance that will encode the given string in IA5 form.
+     *
+     * @param string the string to encode (must not be {@code null})
+     * @return the instance
+     */
+    static ASN1Encodable ofIA5String(String string) {
+<span class="fc" id="L78">        Assert.checkNotNullParam(&quot;string&quot;, string);</span>
+<span class="fc" id="L79">        return e -&gt; e.encodeIA5String(string);</span>
+    }
+
+    /**
+     * Create an instance that will encode the given string in &quot;printable&quot; form.
+     *
+     * @param string the string to encode (must not be {@code null})
+     * @return the instance
+     */
+    static ASN1Encodable ofPrintableString(String string) {
+<span class="fc" id="L89">        Assert.checkNotNullParam(&quot;string&quot;, string);</span>
+<span class="fc" id="L90">        return e -&gt; e.encodePrintableString(string);</span>
+    }
+
+    /**
+     * Create an instance that will encode the given integer.
+     *
+     * @param value the integer to encode
+     * @return the instance
+     */
+    static ASN1Encodable ofInteger(int value) {
+<span class="nc" id="L100">        return e -&gt; e.encodeInteger(value);</span>
+    }
+
+    /**
+     * Create an instance that will encode the given integer.
+     *
+     * @param value the integer to encode (must not be {@code null})
+     * @return the instance
+     */
+    static ASN1Encodable ofInteger(BigInteger value) {
+<span class="nc" id="L110">        Assert.checkNotNullParam(&quot;value&quot;, value);</span>
+<span class="nc" id="L111">        return e -&gt; e.encodeInteger(value);</span>
+    }
+
+    /**
+     * Create an instance that will encode the given object identifier.
+     *
+     * @param oid the object identifier to encode (must not be {@code null})
+     * @return the instance
+     */
+    static ASN1Encodable ofOid(String oid) {
+<span class="nc" id="L121">        Assert.checkNotNullParam(&quot;oid&quot;, oid);</span>
+<span class="nc" id="L122">        return e -&gt; e.encodeObjectIdentifier(oid);</span>
+    }
+
+    /**
+     * Create an instance that will write the given encoded bytes.
+     *
+     * @param bytes the bytes to write (must not be {@code null})
+     * @return the instance
+     */
+    static ASN1Encodable ofEncodedBytes(byte[] bytes) {
+<span class="nc" id="L132">        Assert.checkNotNullParam(&quot;bytes&quot;, bytes);</span>
+<span class="nc" id="L133">        return e -&gt; e.writeEncoded(bytes);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

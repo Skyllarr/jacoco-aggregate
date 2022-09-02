@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ExternalSaslClientFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl-external</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.external</a> &gt; <span class="el_source">ExternalSaslClientFactory.java</span></div><h1>ExternalSaslClientFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.external;
+
+import java.util.Collections;
+import java.util.Map;
+
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.sasl.Sasl;
+import javax.security.sasl.SaslClient;
+import javax.security.sasl.SaslClientFactory;
+import javax.security.sasl.SaslException;
+
+import org.kohsuke.MetaInfServices;
+import org.wildfly.common.array.Arrays2;
+import org.wildfly.security.sasl.WildFlySasl;
+import org.wildfly.security.sasl.util.SaslMechanismInformation;
+
+/**
+ * Implementation of the SASL {@code EXTERNAL} client mechanism.  See &lt;a href=&quot;https://tools.ietf.org/html/rfc4422#appendix-A&quot;&gt;RFC 4422
+ * appendix A&lt;/a&gt; for more information about the {@code EXTERNAL} mechanism.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+@MetaInfServices(value = SaslClientFactory.class)
+<span class="fc" id="L42">public final class ExternalSaslClientFactory implements SaslClientFactory {</span>
+
+    public SaslClient createSaslClient(final String[] mechanisms, final String authorizationId, final String protocol, final String serverName, final Map&lt;String, ?&gt; props, final CallbackHandler cbh) throws SaslException {
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (getMechanismNames(props, false).length != 0) {</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">            for (String mechanism : mechanisms) {</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">                if (SaslMechanismInformation.Names.EXTERNAL.equals(mechanism)) {</span>
+<span class="fc" id="L48">                    return new ExternalSaslClient(authorizationId);</span>
+                }
+            }
+        }
+<span class="fc" id="L52">        return null;</span>
+    }
+
+    private String[] getMechanismNames(Map&lt;String, ?&gt; props, boolean query) {
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (props == null) props = Collections.emptyMap();</span>
+<span class="fc bfc" id="L57" title="All 4 branches covered.">        if (&quot;true&quot;.equals(props.get(WildFlySasl.MECHANISM_QUERY_ALL)) &amp;&amp; query) {</span>
+<span class="fc" id="L58">            return Arrays2.of(SaslMechanismInformation.Names.EXTERNAL);</span>
+        }
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (&quot;true&quot;.equals(props.get(Sasl.POLICY_FORWARD_SECRECY))</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">                || &quot;true&quot;.equals(props.get(Sasl.POLICY_PASS_CREDENTIALS))</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">                || &quot;true&quot;.equals(props.get(Sasl.POLICY_NOANONYMOUS))) {</span>
+<span class="fc" id="L63">            return WildFlySasl.NO_NAMES;</span>
+        }
+<span class="fc" id="L65">        return Arrays2.of(SaslMechanismInformation.Names.EXTERNAL);</span>
+    }
+
+    @Override
+    public String[] getMechanismNames(Map&lt;String, ?&gt; props) {
+<span class="fc" id="L70">        return getMechanismNames(props, true);</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

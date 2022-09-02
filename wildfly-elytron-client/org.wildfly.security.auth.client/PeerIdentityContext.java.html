@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PeerIdentityContext.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-client</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.client</a> &gt; <span class="el_source">PeerIdentityContext.java</span></div><h1>PeerIdentityContext.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.client;
+
+import java.util.function.Function;
+
+import org.wildfly.security.auth.AuthenticationException;
+import org.wildfly.security.auth.ReauthenticationException;
+
+/**
+ * A peer identity context.  The peer identity is relevant only to this context.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+<span class="nc bnc" id="L31" title="All 2 branches missed.">public abstract class PeerIdentityContext {</span>
+    private final ThreadLocal&lt;PeerIdentity&gt; currentIdentity;
+
+    /**
+     * Construct a new instance.
+     */
+<span class="nc" id="L37">    protected PeerIdentityContext() {</span>
+<span class="nc" id="L38">        currentIdentity = new ThreadLocal&lt;&gt;();</span>
+<span class="nc" id="L39">    }</span>
+
+    /**
+     * Get the currently set peer identity for this context.
+     *
+     * @return the currently set peer identity for this context, or {@code null} if no identity is set
+     */
+    public PeerIdentity getCurrentIdentity() {
+<span class="nc" id="L47">        return currentIdentity.get();</span>
+    }
+
+    /**
+     * Authenticate a new peer identity.  The authentication operation may be deferred if the backend cannot perform
+     * authentications on demand.  If so, and the authentication fails, a {@link ReauthenticationException} may be
+     * thrown at a later time.
+     *
+     * @param authenticationConfiguration the authentication configuration to use
+     * @return the peer identity
+     * @throws AuthenticationException if an immediate authentication error occurs
+     */
+    public abstract PeerIdentity authenticate(AuthenticationConfiguration authenticationConfiguration) throws AuthenticationException;
+
+    /**
+     * Construct a new peer identity.  The given function uses the opaque one-time configuration object to construct the
+     * identity, which must be passed as-is to the constructor of the {@link PeerIdentity} class.  This object must not be
+     * retained or made available after the identity is constructed; such misuse may result in an exception or undefined
+     * behavior.
+     *
+     * @param constructFunction a function that, when applied, constructs a new peer identity
+     * @return the constructed peer identity
+     */
+    protected final &lt;I&gt; I constructIdentity(Function&lt;PeerIdentity.Configuration, I&gt; constructFunction) {
+<span class="nc" id="L71">        final PeerIdentity.Configuration conf = new PeerIdentity.Configuration(this);</span>
+        try {
+<span class="nc" id="L73">            return constructFunction.apply(conf);</span>
+        } finally {
+<span class="nc" id="L75">            conf.terminate();</span>
+        }
+    }
+
+    /**
+     * Determine whether this context owns the given identity.
+     *
+     * @param identity the identity
+     * @return {@code true} if this context owns the identity, {@code false} otherwise
+     */
+    public final boolean owns(PeerIdentity identity) {
+<span class="nc bnc" id="L86" title="All 4 branches missed.">        return identity != null &amp;&amp; identity.getPeerIdentityContext() == this;</span>
+    }
+
+    final PeerIdentity getAndSetPeerIdentity(PeerIdentity newIdentity) {
+<span class="nc bnc" id="L90" title="All 6 branches missed.">        assert newIdentity == null || newIdentity.getPeerIdentityContext() == this;</span>
+        try {
+<span class="nc" id="L92">            return currentIdentity.get();</span>
+        } finally {
+<span class="nc bnc" id="L94" title="All 2 branches missed.">            if (newIdentity == null) {</span>
+<span class="nc" id="L95">                currentIdentity.remove();</span>
+            } else {
+<span class="nc" id="L97">                currentIdentity.set(newIdentity);</span>
+            }
+        }
+    }
+
+    void setPeerIdentity(PeerIdentity newIdentity) {
+<span class="nc bnc" id="L103" title="All 6 branches missed.">        assert newIdentity == null || newIdentity.getPeerIdentityContext() == this;</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        if (newIdentity == null) {</span>
+<span class="nc" id="L105">            currentIdentity.remove();</span>
+        } else {
+<span class="nc" id="L107">            currentIdentity.set(newIdentity);</span>
+        }
+<span class="nc" id="L109">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

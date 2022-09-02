@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TransformationSpec.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-util</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.util</a> &gt; <span class="el_source">TransformationSpec.java</span></div><h1>TransformationSpec.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.util;
+
+/**
+ * Data class used by TransformationMapper instances to return desired mapping data.
+ *
+ * @author &lt;a href=&quot;mailto:pskopek@redhat.com&quot;&gt;Peter Skopek&lt;/a&gt;
+ *
+ */
+public class TransformationSpec {
+
+<span class="nc" id="L29">    public static int HIGH_STRENGTH = 300;</span>
+<span class="nc" id="L30">    public static int MEDIUM_STRENGTH = 200;</span>
+<span class="nc" id="L31">    public static int LOW_STRENGTH = 100;</span>
+
+<span class="nc" id="L33">    public static int NO_KEY = 0;</span>
+
+    private String token;
+    private String transformation;
+    private String provider;
+    private int strength;
+    private int keyLength;
+
+    /**
+     * @param token
+     * @param transformation
+     * @param strength
+     * @param provider
+     */
+<span class="nc" id="L47">    public TransformationSpec(String token, String transformation, int keyLength, int strength, String provider) {</span>
+<span class="nc" id="L48">        this.token = token;</span>
+<span class="nc" id="L49">        this.transformation = transformation;</span>
+<span class="nc" id="L50">        this.strength = strength;</span>
+<span class="nc" id="L51">        this.provider = provider;</span>
+<span class="nc" id="L52">        this.keyLength = keyLength;</span>
+<span class="nc" id="L53">    }</span>
+
+
+    /**
+     * @return the keyLength
+     */
+    public int getKeyLength() {
+<span class="nc" id="L60">        return keyLength;</span>
+    }
+
+    /**
+     * @return the token
+     */
+    public String getToken() {
+<span class="nc" id="L67">        return token;</span>
+    }
+
+    /**
+     * @return the transformation
+     */
+    public String getTransformation() {
+<span class="nc" id="L74">        return transformation;</span>
+    }
+
+    /**
+     * @return the provider
+     */
+    public String getProvider() {
+<span class="nc" id="L81">        return provider;</span>
+    }
+
+    /**
+     * @return the strength
+     */
+    public int getStrength() {
+<span class="nc" id="L88">        return strength;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

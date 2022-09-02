@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RawDHPrivateKey.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-credential</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.key</a> &gt; <span class="el_source">RawDHPrivateKey.java</span></div><h1>RawDHPrivateKey.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.key;
+
+import java.math.BigInteger;
+import java.security.Key;
+import java.security.PrivateKey;
+import java.util.Objects;
+
+import javax.crypto.interfaces.DHPrivateKey;
+import javax.crypto.spec.DHParameterSpec;
+
+/**
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+class RawDHPrivateKey extends RawPrivateKey implements DHPrivateKey, PrivateKey {
+    private static final long serialVersionUID = - 4800398215863011448L;
+    private final BigInteger x;
+    private final DHParameterSpec params;
+
+    RawDHPrivateKey(final DHPrivateKey original) {
+<span class="nc" id="L38">        super(original);</span>
+<span class="nc" id="L39">        x = original.getX();</span>
+<span class="nc" id="L40">        params = original.getParams();</span>
+<span class="nc" id="L41">    }</span>
+
+    RawDHPrivateKey(final Key key) {
+<span class="nc" id="L44">        this((DHPrivateKey) key);</span>
+<span class="nc" id="L45">    }</span>
+
+    public BigInteger getX() {
+<span class="nc" id="L48">        return x;</span>
+    }
+
+    public DHParameterSpec getParams() {
+<span class="nc" id="L52">        return params;</span>
+    }
+
+    boolean isEqual(final Key key) {
+<span class="nc bnc" id="L56" title="All 4 branches missed.">        return key instanceof DHPrivateKey &amp;&amp; isEqual((DHPrivateKey) key);</span>
+    }
+
+    boolean isEqual(final DHPrivateKey key) {
+<span class="nc bnc" id="L60" title="All 6 branches missed.">        return super.isEqual(key) &amp;&amp; Objects.equals(x, key.getX()) &amp;&amp; Objects.equals(params, key.getParams());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

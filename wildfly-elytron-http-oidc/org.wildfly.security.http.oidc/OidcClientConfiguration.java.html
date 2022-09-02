@@ -1,0 +1,655 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OidcClientConfiguration.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-oidc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.oidc</a> &gt; <span class="el_source">OidcClientConfiguration.java</span></div><h1>OidcClientConfiguration.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2020 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.http.oidc;
+
+import static org.apache.http.HttpHeaders.ACCEPT;
+import static org.wildfly.security.http.oidc.ElytronMessages.log;
+import static org.wildfly.security.http.oidc.Oidc.ACCOUNT_PATH;
+import static org.wildfly.security.http.oidc.Oidc.CLIENTS_MANAGEMENT_REGISTER_NODE_PATH;
+import static org.wildfly.security.http.oidc.Oidc.CLIENTS_MANAGEMENT_UNREGISTER_NODE_PATH;
+import static org.wildfly.security.http.oidc.Oidc.DEFAULT_TOKEN_SIGNATURE_ALGORITHM;
+import static org.wildfly.security.http.oidc.Oidc.DISCOVERY_PATH;
+import static org.wildfly.security.http.oidc.Oidc.JSON_CONTENT_TYPE;
+import static org.wildfly.security.http.oidc.Oidc.KEYCLOAK_REALMS_PATH;
+import static org.wildfly.security.http.oidc.Oidc.SLASH;
+import static org.wildfly.security.http.oidc.Oidc.SSLRequired;
+import static org.wildfly.security.http.oidc.Oidc.TokenStore;
+
+import java.net.URI;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.Callable;
+
+import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.util.EntityUtils;
+import org.wildfly.security.jose.util.JsonSerialization;
+
+/**
+ * The OpenID Connect (OIDC) configuration for a client application. This class is based on
+ * {@code org.keycloak.adapters.KeycloakDeployment}.
+ *
+ * @author &lt;a href=&quot;mailto:bill@burkecentral.com&quot;&gt;Bill Burke&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:brad.culley@spartasystems.com&quot;&gt;Brad Culley&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:john.ament@spartasystems.com&quot;&gt;John D. Ament&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+public class OidcClientConfiguration {
+
+<span class="nc" id="L57">    public enum RelativeUrlsUsed {</span>
+
+        /**
+         * Always use relative URI and resolve them later based on browser HTTP request
+         */
+<span class="nc" id="L62">        ALWAYS,</span>
+
+        /**
+         * Relative URI not used. Configuration contains absolute URI.
+         */
+<span class="nc" id="L67">        NEVER;</span>
+    }
+
+    protected RelativeUrlsUsed relativeUrls;
+    protected String realm;
+    protected PublicKeyLocator publicKeyLocator;
+    protected String authServerBaseUrl;
+    protected String providerUrl;
+    protected String authUrl;
+    protected String tokenUrl;
+    protected String logoutUrl;
+    protected String accountUrl;
+    protected String registerNodeUrl;
+    protected String unregisterNodeUrl;
+    protected String jwksUrl;
+    protected String issuerUrl;
+<span class="fc" id="L83">    protected String principalAttribute = &quot;sub&quot;;</span>
+
+    protected String resource;
+    protected String clientId;
+    protected boolean bearerOnly;
+    protected boolean autodetectBearerOnly;
+    protected boolean enableBasicAuth;
+    protected boolean publicClient;
+<span class="fc" id="L91">    protected Map&lt;String, Object&gt; resourceCredentials = new HashMap&lt;&gt;();</span>
+    protected ClientCredentialsProvider clientAuthenticator;
+    protected Callable&lt;HttpClient&gt; client;
+
+    protected String scope;
+<span class="fc" id="L96">    protected SSLRequired sslRequired = SSLRequired.ALL;</span>
+<span class="fc" id="L97">    protected int confidentialPort = -1;</span>
+<span class="fc" id="L98">    protected TokenStore tokenStore = TokenStore.SESSION;</span>
+<span class="fc" id="L99">    protected String oidcStateCookiePath = &quot;&quot;;</span>
+<span class="fc" id="L100">    protected String stateCookieName = &quot;OAuth_Token_Request_State&quot;;</span>
+    protected boolean useResourceRoleMappings;
+    protected boolean useRealmRoleMappings;
+    protected boolean cors;
+<span class="fc" id="L104">    protected int corsMaxAge = -1;</span>
+    protected String corsAllowedHeaders;
+    protected String corsAllowedMethods;
+    protected String corsExposedHeaders;
+    protected boolean exposeToken;
+    protected boolean alwaysRefreshToken;
+    protected boolean registerNodeAtStartup;
+    protected int registerNodePeriod;
+    protected boolean turnOffChangeSessionIdOnLogin;
+
+    protected volatile int notBefore;
+    protected int tokenMinimumTimeToLive;
+    protected int minTimeBetweenJwksRequests;
+    protected int publicKeyCacheTtl;
+
+    // https://tools.ietf.org/html/rfc7636
+<span class="fc" id="L120">    protected boolean pkce = false;</span>
+    protected boolean ignoreOAuthQueryParameter;
+
+    protected Map&lt;String, String&gt; redirectRewriteRules;
+
+<span class="fc" id="L125">    protected boolean delegateBearerErrorResponseSending = false;</span>
+<span class="fc" id="L126">    protected boolean verifyTokenAudience = false;</span>
+
+<span class="fc" id="L128">    protected String tokenSignatureAlgorithm = DEFAULT_TOKEN_SIGNATURE_ALGORITHM;</span>
+
+<span class="fc" id="L130">    public OidcClientConfiguration() {</span>
+<span class="fc" id="L131">    }</span>
+
+    public boolean isConfigured() {
+<span class="nc bnc" id="L134" title="All 10 branches missed.">        return getResourceName() != null &amp;&amp; getPublicKeyLocator() != null &amp;&amp; (isBearerOnly() || (getAuthServerBaseUrl() != null || getProviderUrl() != null));</span>
+    }
+
+    public String getResourceName() {
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        return resource != null ? resource : clientId;</span>
+    }
+
+    public String getResource() {
+<span class="nc" id="L142">        return resource;</span>
+    }
+
+    public String getClientId() {
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        return clientId != null ? clientId : resource;</span>
+    }
+
+    public String getRealm() {
+<span class="nc" id="L150">        return realm;</span>
+    }
+
+    public void setRealm(String realm) {
+<span class="nc" id="L154">        this.realm = realm;</span>
+<span class="nc" id="L155">    }</span>
+
+    public PublicKeyLocator getPublicKeyLocator() {
+<span class="nc" id="L158">        return publicKeyLocator;</span>
+    }
+
+    public void setPublicKeyLocator(PublicKeyLocator publicKeyLocator) {
+<span class="nc" id="L162">        this.publicKeyLocator = publicKeyLocator;</span>
+<span class="nc" id="L163">    }</span>
+
+    public String getAuthServerBaseUrl() {
+<span class="nc" id="L166">        return authServerBaseUrl;</span>
+    }
+
+    public void setProviderUrl(String providerUrl) {
+<span class="nc" id="L170">        this.providerUrl = providerUrl;</span>
+<span class="nc" id="L171">        resetUrls();</span>
+<span class="nc" id="L172">    }</span>
+
+
+    public void setAuthServerBaseUrl(OidcJsonConfiguration config) {
+<span class="nc" id="L176">        this.authServerBaseUrl = config.getAuthServerUrl();</span>
+<span class="nc" id="L177">        resetUrls();</span>
+<span class="nc" id="L178">    }</span>
+
+    /**
+     * Resets all calculated urls to null and sets the relativeUrls field
+     * depending the value of the current discovery URL in the configuration.
+     * If it is relative is set to ALWAYS and if absolute is set to NEVER.
+     */
+    protected void resetUrls() {
+<span class="nc" id="L186">        authUrl = null;</span>
+<span class="nc" id="L187">        tokenUrl = null;</span>
+<span class="nc" id="L188">        logoutUrl = null;</span>
+<span class="nc" id="L189">        accountUrl = null;</span>
+<span class="nc" id="L190">        registerNodeUrl = null;</span>
+<span class="nc" id="L191">        unregisterNodeUrl = null;</span>
+<span class="nc" id="L192">        jwksUrl = null;</span>
+<span class="nc" id="L193">        relativeUrls = null;</span>
+<span class="nc bnc" id="L194" title="All 4 branches missed.">        if (providerUrl != null || authServerBaseUrl != null) {</span>
+            try {
+<span class="nc bnc" id="L196" title="All 2 branches missed.">                URI uri = URI.create(providerUrl != null ? providerUrl : authServerBaseUrl);</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">                if (uri.getHost() == null) {</span>
+<span class="nc" id="L198">                    relativeUrls = RelativeUrlsUsed.ALWAYS;</span>
+                } else {
+                    // We have absolute URI in config
+<span class="nc" id="L201">                    relativeUrls = RelativeUrlsUsed.NEVER;</span>
+                }
+<span class="nc" id="L203">            } catch (Exception e) {</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">                log.invalidAuthServerUrlOrProviderUrl(providerUrl != null ? providerUrl : authServerBaseUrl);</span>
+<span class="nc" id="L205">            }</span>
+        }
+<span class="nc" id="L207">    }</span>
+
+    /**
+     * URLs are loaded lazily when used.
+     */
+    protected void resolveUrls() {
+<span class="nc bnc" id="L213" title="All 2 branches missed.">        if (authUrl == null) {</span>
+<span class="nc" id="L214">            synchronized (this) {</span>
+<span class="nc" id="L215">                String discoveryUrl = getDiscoveryUrl();</span>
+                try {
+<span class="nc" id="L217">                    log.debug(&quot;Loading OpenID provider metadata from &quot; + discoveryUrl);</span>
+
+<span class="nc" id="L219">                    OidcProviderMetadata config = getOidcProviderMetadata(discoveryUrl);</span>
+
+<span class="nc" id="L221">                    authUrl = config.getAuthorizationEndpoint();</span>
+<span class="nc" id="L222">                    issuerUrl = config.getIssuer();</span>
+<span class="nc" id="L223">                    tokenUrl = config.getTokenEndpoint();</span>
+<span class="nc" id="L224">                    logoutUrl = config.getLogoutEndpoint();</span>
+<span class="nc" id="L225">                    jwksUrl = config.getJwksUri();</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">                    if (authServerBaseUrl != null) {</span>
+                        // keycloak-specific properties
+<span class="nc" id="L228">                        accountUrl = getUrl(issuerUrl, ACCOUNT_PATH);</span>
+<span class="nc" id="L229">                        registerNodeUrl = getUrl(authServerBaseUrl, KEYCLOAK_REALMS_PATH + getRealm(), CLIENTS_MANAGEMENT_REGISTER_NODE_PATH);</span>
+<span class="nc" id="L230">                        unregisterNodeUrl = getUrl(authServerBaseUrl, KEYCLOAK_REALMS_PATH + getRealm(), CLIENTS_MANAGEMENT_UNREGISTER_NODE_PATH);</span>
+                    }
+<span class="nc" id="L232">                    log.loadedOpenIdProviderMetadata(discoveryUrl);</span>
+<span class="nc" id="L233">                } catch (Exception e) {</span>
+<span class="nc" id="L234">                    log.unableToLoadOpenIdProviderMetadata(discoveryUrl);</span>
+<span class="nc" id="L235">                }</span>
+<span class="nc" id="L236">            }</span>
+        }
+<span class="nc" id="L238">    }</span>
+
+    protected OidcProviderMetadata getOidcProviderMetadata(String discoveryUrl) throws Exception {
+<span class="nc" id="L241">        HttpGet request = new HttpGet(discoveryUrl);</span>
+<span class="nc" id="L242">        request.addHeader(ACCEPT, JSON_CONTENT_TYPE);</span>
+        try {
+<span class="nc" id="L244">            HttpResponse response = getClient().execute(request);</span>
+<span class="nc bnc" id="L245" title="All 2 branches missed.">            if (response.getStatusLine().getStatusCode() != HttpStatus.SC_OK) {</span>
+<span class="nc" id="L246">                EntityUtils.consumeQuietly(response.getEntity());</span>
+<span class="nc" id="L247">                throw new Exception(response.getStatusLine().getReasonPhrase());</span>
+            }
+<span class="nc" id="L249">            return JsonSerialization.readValue(response.getEntity().getContent(), OidcProviderMetadata.class);</span>
+        } finally {
+<span class="nc" id="L251">            request.releaseConnection();</span>
+        }
+    }
+
+    private String getDiscoveryUrl() {
+<span class="nc bnc" id="L256" title="All 2 branches missed.">        if (providerUrl != null) {</span>
+            // generic OpenID provider configuration found
+<span class="nc" id="L258">            return getUrl(providerUrl, DISCOVERY_PATH);</span>
+<span class="nc bnc" id="L259" title="All 2 branches missed.">        } else if (authServerBaseUrl != null) {</span>
+            // keycloak-specific OpenID provider configuration found
+<span class="nc" id="L261">            return getUrl(authServerBaseUrl, KEYCLOAK_REALMS_PATH + getRealm(), DISCOVERY_PATH);</span>
+        } else {
+<span class="nc" id="L263">            throw log.providerUrlOrAuthServerUrlNeedsToBeConfigured();</span>
+        }
+    }
+
+    private static String getUrl(String baseUrl, String... paths) {
+<span class="nc" id="L268">        StringBuilder sb = new StringBuilder(baseUrl);</span>
+<span class="nc bnc" id="L269" title="All 2 branches missed.">        if (! baseUrl.endsWith(SLASH)) {</span>
+<span class="nc" id="L270">            sb.append(SLASH);</span>
+        }
+<span class="nc bnc" id="L272" title="All 2 branches missed.">        for (int i = 0; i &lt; paths.length; i++) {</span>
+<span class="nc" id="L273">            sb.append(paths[i]);</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">            if (i != paths.length - 1) {</span>
+<span class="nc" id="L275">                sb.append(SLASH);</span>
+            }
+        }
+<span class="nc" id="L278">        return sb.toString();</span>
+    }
+
+    public RelativeUrlsUsed getRelativeUrls() {
+<span class="nc" id="L282">        return relativeUrls;</span>
+    }
+
+    public String getProviderUrl() {
+<span class="nc bnc" id="L286" title="All 2 branches missed.">        if (providerUrl == null) {</span>
+<span class="nc" id="L287">            resolveUrls();</span>
+        }
+<span class="nc" id="L289">        return providerUrl;</span>
+    }
+
+    public String getAuthUrl() {
+<span class="nc" id="L293">        resolveUrls();</span>
+<span class="nc" id="L294">        return authUrl;</span>
+    }
+
+    public String getTokenUrl() {
+<span class="nc" id="L298">        resolveUrls();</span>
+<span class="nc" id="L299">        return tokenUrl;</span>
+    }
+
+    public String getLogoutUrl() {
+<span class="nc" id="L303">        resolveUrls();</span>
+<span class="nc" id="L304">        return logoutUrl;</span>
+    }
+
+    public String getAccountUrl() {
+<span class="nc" id="L308">        resolveUrls();</span>
+<span class="nc" id="L309">        return accountUrl;</span>
+    }
+
+    public String getRegisterNodeUrl() {
+<span class="nc" id="L313">        resolveUrls();</span>
+<span class="nc" id="L314">        return registerNodeUrl;</span>
+    }
+
+    public String getUnregisterNodeUrl() {
+<span class="nc" id="L318">        resolveUrls();</span>
+<span class="nc" id="L319">        return unregisterNodeUrl;</span>
+    }
+
+    public String getJwksUrl() {
+<span class="nc" id="L323">        resolveUrls();</span>
+<span class="nc" id="L324">        return jwksUrl;</span>
+    }
+
+    public String getIssuerUrl() {
+<span class="nc" id="L328">        resolveUrls();</span>
+<span class="nc" id="L329">        return issuerUrl;</span>
+    }
+
+    public void setResource(String resource) {
+<span class="nc" id="L333">        this.resource = resource;</span>
+<span class="nc" id="L334">    }</span>
+
+    public void setClientId(String clientId) {
+<span class="fc" id="L337">        this.clientId = clientId;</span>
+<span class="fc" id="L338">    }</span>
+
+    public boolean isBearerOnly() {
+<span class="nc" id="L341">        return bearerOnly;</span>
+    }
+
+    public void setBearerOnly(boolean bearerOnly) {
+<span class="nc" id="L345">        this.bearerOnly = bearerOnly;</span>
+<span class="nc" id="L346">    }</span>
+
+    public boolean isAutodetectBearerOnly() {
+<span class="nc" id="L349">        return autodetectBearerOnly;</span>
+    }
+
+    public void setAutodetectBearerOnly(boolean autodetectBearerOnly) {
+<span class="nc" id="L353">        this.autodetectBearerOnly = autodetectBearerOnly;</span>
+<span class="nc" id="L354">    }</span>
+
+    public boolean isEnableBasicAuth() {
+<span class="nc" id="L357">        return enableBasicAuth;</span>
+    }
+
+    public void setEnableBasicAuth(boolean enableBasicAuth) {
+<span class="nc" id="L361">        this.enableBasicAuth = enableBasicAuth;</span>
+<span class="nc" id="L362">    }</span>
+
+    public boolean isPublicClient() {
+<span class="nc" id="L365">        return publicClient;</span>
+    }
+
+    public void setPublicClient(boolean publicClient) {
+<span class="nc" id="L369">        this.publicClient = publicClient;</span>
+<span class="nc" id="L370">    }</span>
+
+    public Map&lt;String, Object&gt; getResourceCredentials() {
+<span class="nc" id="L373">        return resourceCredentials;</span>
+    }
+
+    public void setResourceCredentials(Map&lt;String, Object&gt; resourceCredentials) {
+<span class="nc" id="L377">        this.resourceCredentials = resourceCredentials;</span>
+<span class="nc" id="L378">    }</span>
+
+    public ClientCredentialsProvider getClientAuthenticator() {
+<span class="nc" id="L381">        return clientAuthenticator;</span>
+    }
+
+    public void setClientAuthenticator(ClientCredentialsProvider clientAuthenticator) {
+<span class="nc" id="L385">        this.clientAuthenticator = clientAuthenticator;</span>
+<span class="nc" id="L386">    }</span>
+
+    public HttpClient getClient() {
+        try {
+<span class="nc" id="L390">            return client.call();</span>
+<span class="nc" id="L391">        } catch (Exception e) {</span>
+<span class="nc" id="L392">            throw new RuntimeException(e);</span>
+        }
+    }
+
+    public void setClient(final HttpClient client) {
+<span class="nc" id="L397">        this.client = new Callable&lt;HttpClient&gt;() {</span>
+            @Override
+            public HttpClient call() {
+<span class="nc" id="L400">                return client;</span>
+            }
+        };
+<span class="nc" id="L403">    }</span>
+
+    public String getScope() {
+<span class="nc" id="L406">        return scope;</span>
+    }
+
+    public void setScope(String scope) {
+<span class="nc" id="L410">        this.scope = scope;</span>
+<span class="nc" id="L411">    }</span>
+
+    public SSLRequired getSSLRequired() {
+<span class="nc" id="L414">        return sslRequired;</span>
+    }
+
+    public void setSSLRequired(SSLRequired sslRequired) {
+<span class="nc" id="L418">        this.sslRequired = sslRequired;</span>
+<span class="nc" id="L419">    }</span>
+
+    public boolean isSSLEnabled() {
+<span class="nc bnc" id="L422" title="All 2 branches missed.">        if (SSLRequired.NONE == sslRequired) {</span>
+<span class="nc" id="L423">            return false;</span>
+        }
+<span class="nc" id="L425">        return true;</span>
+    }
+
+    public int getConfidentialPort() {
+<span class="nc" id="L429">        return confidentialPort;</span>
+    }
+
+    public void setConfidentialPort(int confidentialPort) {
+<span class="nc" id="L433">        this.confidentialPort = confidentialPort;</span>
+<span class="nc" id="L434">    }</span>
+
+    public TokenStore getTokenStore() {
+<span class="nc" id="L437">        return tokenStore;</span>
+    }
+
+    public void setTokenStore(TokenStore tokenStore) {
+<span class="nc" id="L441">        this.tokenStore = tokenStore;</span>
+<span class="nc" id="L442">    }</span>
+
+    public String getOidcStateCookiePath() {
+<span class="nc" id="L445">        return oidcStateCookiePath;</span>
+    }
+
+    public void setOidcStateCookiePath(String oidcStateCookiePath) {
+<span class="nc" id="L449">        this.oidcStateCookiePath = oidcStateCookiePath;</span>
+<span class="nc" id="L450">    }</span>
+
+    public String getStateCookieName() {
+<span class="nc" id="L453">        return stateCookieName;</span>
+    }
+
+    public void setStateCookieName(String stateCookieName) {
+<span class="nc" id="L457">        this.stateCookieName = stateCookieName;</span>
+<span class="nc" id="L458">    }</span>
+
+    public boolean isUseResourceRoleMappings() {
+<span class="fc" id="L461">        return useResourceRoleMappings;</span>
+    }
+
+    public void setUseResourceRoleMappings(boolean useResourceRoleMappings) {
+<span class="fc" id="L465">        this.useResourceRoleMappings = useResourceRoleMappings;</span>
+<span class="fc" id="L466">    }</span>
+
+    public boolean isUseRealmRoleMappings() {
+<span class="fc" id="L469">        return useRealmRoleMappings;</span>
+    }
+
+    public void setUseRealmRoleMappings(boolean useRealmRoleMappings) {
+<span class="fc" id="L473">        this.useRealmRoleMappings = useRealmRoleMappings;</span>
+<span class="fc" id="L474">    }</span>
+
+    public boolean isCors() {
+<span class="nc" id="L477">        return cors;</span>
+    }
+
+    public void setCors(boolean cors) {
+<span class="nc" id="L481">        this.cors = cors;</span>
+<span class="nc" id="L482">    }</span>
+
+    public int getCorsMaxAge() {
+<span class="nc" id="L485">        return corsMaxAge;</span>
+    }
+
+    public void setCorsMaxAge(int corsMaxAge) {
+<span class="nc" id="L489">        this.corsMaxAge = corsMaxAge;</span>
+<span class="nc" id="L490">    }</span>
+
+    public String getCorsAllowedHeaders() {
+<span class="nc" id="L493">        return corsAllowedHeaders;</span>
+    }
+
+    public void setCorsAllowedHeaders(String corsAllowedHeaders) {
+<span class="nc" id="L497">        this.corsAllowedHeaders = corsAllowedHeaders;</span>
+<span class="nc" id="L498">    }</span>
+
+    public String getCorsAllowedMethods() {
+<span class="nc" id="L501">        return corsAllowedMethods;</span>
+    }
+
+    public void setCorsAllowedMethods(String corsAllowedMethods) {
+<span class="nc" id="L505">        this.corsAllowedMethods = corsAllowedMethods;</span>
+<span class="nc" id="L506">    }</span>
+
+    public String getCorsExposedHeaders() {
+<span class="nc" id="L509">        return corsExposedHeaders;</span>
+    }
+
+    public void setCorsExposedHeaders(String corsExposedHeaders) {
+<span class="nc" id="L513">        this.corsExposedHeaders = corsExposedHeaders;</span>
+<span class="nc" id="L514">    }</span>
+
+    public boolean isExposeToken() {
+<span class="nc" id="L517">        return exposeToken;</span>
+    }
+
+    public void setExposeToken(boolean exposeToken) {
+<span class="nc" id="L521">        this.exposeToken = exposeToken;</span>
+<span class="nc" id="L522">    }</span>
+
+    public int getNotBefore() {
+<span class="fc" id="L525">        return notBefore;</span>
+    }
+
+    public void setNotBefore(int notBefore) {
+<span class="nc" id="L529">        this.notBefore = notBefore;</span>
+<span class="nc" id="L530">    }</span>
+
+    public void updateNotBefore(int notBefore) {
+<span class="nc" id="L533">        this.notBefore = notBefore;</span>
+<span class="nc" id="L534">        getPublicKeyLocator().reset(this);</span>
+<span class="nc" id="L535">    }</span>
+
+    public boolean isAlwaysRefreshToken() {
+<span class="nc" id="L538">        return alwaysRefreshToken;</span>
+    }
+
+    public void setAlwaysRefreshToken(boolean alwaysRefreshToken) {
+<span class="nc" id="L542">        this.alwaysRefreshToken = alwaysRefreshToken;</span>
+<span class="nc" id="L543">    }</span>
+
+    public boolean isRegisterNodeAtStartup() {
+<span class="nc" id="L546">        return registerNodeAtStartup;</span>
+    }
+
+    public void setRegisterNodeAtStartup(boolean registerNodeAtStartup) {
+<span class="nc" id="L550">        this.registerNodeAtStartup = registerNodeAtStartup;</span>
+<span class="nc" id="L551">    }</span>
+
+    public int getRegisterNodePeriod() {
+<span class="nc" id="L554">        return registerNodePeriod;</span>
+    }
+
+    public void setRegisterNodePeriod(int registerNodePeriod) {
+<span class="nc" id="L558">        this.registerNodePeriod = registerNodePeriod;</span>
+<span class="nc" id="L559">    }</span>
+
+    public String getPrincipalAttribute() {
+<span class="nc" id="L562">        return principalAttribute;</span>
+    }
+
+    public void setPrincipalAttribute(String principalAttribute) {
+<span class="nc" id="L566">        this.principalAttribute = principalAttribute;</span>
+<span class="nc" id="L567">    }</span>
+
+    public boolean isTurnOffChangeSessionIdOnLogin() {
+<span class="nc" id="L570">        return turnOffChangeSessionIdOnLogin;</span>
+    }
+
+    public void setTurnOffChangeSessionIdOnLogin(boolean turnOffChangeSessionIdOnLogin) {
+<span class="nc" id="L574">        this.turnOffChangeSessionIdOnLogin = turnOffChangeSessionIdOnLogin;</span>
+<span class="nc" id="L575">    }</span>
+
+    public int getTokenMinimumTimeToLive() {
+<span class="fc" id="L578">        return tokenMinimumTimeToLive;</span>
+    }
+
+    public void setTokenMinimumTimeToLive(final int tokenMinimumTimeToLive) {
+<span class="nc" id="L582">        this.tokenMinimumTimeToLive = tokenMinimumTimeToLive;</span>
+<span class="nc" id="L583">    }</span>
+
+    public int getMinTimeBetweenJwksRequests() {
+<span class="nc" id="L586">        return minTimeBetweenJwksRequests;</span>
+    }
+
+    public void setMinTimeBetweenJwksRequests(int minTimeBetweenJwksRequests) {
+<span class="nc" id="L590">        this.minTimeBetweenJwksRequests = minTimeBetweenJwksRequests;</span>
+<span class="nc" id="L591">    }</span>
+
+    public int getPublicKeyCacheTtl() {
+<span class="nc" id="L594">        return publicKeyCacheTtl;</span>
+    }
+
+    public void setPublicKeyCacheTtl(int publicKeyCacheTtl) {
+<span class="nc" id="L598">        this.publicKeyCacheTtl = publicKeyCacheTtl;</span>
+<span class="nc" id="L599">    }</span>
+
+    // https://tools.ietf.org/html/rfc7636
+    public boolean isPkce() {
+<span class="nc" id="L603">        return pkce;</span>
+    }
+
+    public void setPkce(boolean pkce) {
+<span class="nc" id="L607">        this.pkce = pkce;</span>
+<span class="nc" id="L608">    }</span>
+
+    public void setIgnoreOAuthQueryParameter(boolean ignoreOAuthQueryParameter) {
+<span class="nc" id="L611">        this.ignoreOAuthQueryParameter = ignoreOAuthQueryParameter;</span>
+<span class="nc" id="L612">    }</span>
+
+    public boolean isOAuthQueryParameterEnabled() {
+<span class="nc bnc" id="L615" title="All 2 branches missed.">        return !this.ignoreOAuthQueryParameter;</span>
+    }
+
+    public Map&lt;String, String&gt; getRedirectRewriteRules() {
+<span class="nc" id="L619">        return redirectRewriteRules;</span>
+    }
+
+    public void setRewriteRedirectRules(Map&lt;String, String&gt; redirectRewriteRules) {
+<span class="nc" id="L623">        this.redirectRewriteRules = redirectRewriteRules;</span>
+<span class="nc" id="L624">    }</span>
+
+    public boolean isDelegateBearerErrorResponseSending() {
+<span class="nc" id="L627">        return delegateBearerErrorResponseSending;</span>
+    }
+
+    public void setDelegateBearerErrorResponseSending(boolean delegateBearerErrorResponseSending) {
+<span class="nc" id="L631">        this.delegateBearerErrorResponseSending = delegateBearerErrorResponseSending;</span>
+<span class="nc" id="L632">    }</span>
+
+    public boolean isVerifyTokenAudience() {
+<span class="nc" id="L635">        return verifyTokenAudience;</span>
+    }
+
+    public void setVerifyTokenAudience(boolean verifyTokenAudience) {
+<span class="nc" id="L639">        this.verifyTokenAudience = verifyTokenAudience;</span>
+<span class="nc" id="L640">    }</span>
+
+    public void setClient(Callable&lt;HttpClient&gt; callable) {
+<span class="nc" id="L643">        client = callable;</span>
+<span class="nc" id="L644">    }</span>
+
+    public void setTokenSignatureAlgorithm(String tokenSignatureAlgorithm) {
+<span class="nc" id="L647">        this.tokenSignatureAlgorithm = tokenSignatureAlgorithm;</span>
+<span class="nc" id="L648">    }</span>
+
+    public String getTokenSignatureAlgorithm() {
+<span class="nc" id="L651">        return tokenSignatureAlgorithm;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

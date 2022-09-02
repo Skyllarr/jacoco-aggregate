@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MechanismProviderFilteringSaslServerFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.util</a> &gt; <span class="el_source">MechanismProviderFilteringSaslServerFactory.java</span></div><h1>MechanismProviderFilteringSaslServerFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.util;
+
+import java.security.Provider;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.BiPredicate;
+
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.sasl.SaslException;
+import javax.security.sasl.SaslServer;
+import javax.security.sasl.SaslServerFactory;
+
+/**
+ * A SASL server factory which filters mechanisms based on the combination of mechanism name and security provider.
+ * Mechanisms which do not come from a security provider are not filtered.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class MechanismProviderFilteringSaslServerFactory extends AbstractDelegatingSaslServerFactory {
+    private final BiPredicate&lt;String, Provider&gt; predicate;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param delegate the delegate factory
+     * @param predicate the predicate to execute
+     */
+    public MechanismProviderFilteringSaslServerFactory(final SaslServerFactory delegate, final BiPredicate&lt;String, Provider&gt; predicate) {
+<span class="nc" id="L47">        super(delegate);</span>
+<span class="nc" id="L48">        this.predicate = predicate;</span>
+<span class="nc" id="L49">    }</span>
+
+    public SaslServer createSaslServer(final String mechanism, final String protocol, final String serverName, final Map&lt;String, ?&gt; props, final CallbackHandler cbh) throws SaslException {
+<span class="nc" id="L52">        BiPredicate&lt;String, Provider&gt; existing = SaslFactories.getProviderFilterPredicate(props);</span>
+<span class="nc" id="L53">        final HashMap&lt;String, Object&gt; newProps = new HashMap&lt;String, Object&gt;(props);</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        if (existing != null) {</span>
+<span class="nc" id="L55">            newProps.put(SaslFactories.PROVIDER_FILTER_KEY, predicate.and(existing));</span>
+        } else {
+<span class="nc" id="L57">            newProps.put(SaslFactories.PROVIDER_FILTER_KEY, predicate);</span>
+        }
+<span class="nc" id="L59">        return super.createSaslServer(mechanism, protocol, serverName, newProps, cbh);</span>
+    }
+
+    public String[] getMechanismNames(final Map&lt;String, ?&gt; props) {
+<span class="nc" id="L63">        BiPredicate&lt;String, Provider&gt; existing = SaslFactories.getProviderFilterPredicate(props);</span>
+<span class="nc" id="L64">        final HashMap&lt;String, Object&gt; newProps = new HashMap&lt;String, Object&gt;(props);</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        if (existing != null) {</span>
+<span class="nc" id="L66">            newProps.put(SaslFactories.PROVIDER_FILTER_KEY, predicate.and(existing));</span>
+        } else {
+<span class="nc" id="L68">            newProps.put(SaslFactories.PROVIDER_FILTER_KEY, predicate);</span>
+        }
+<span class="nc" id="L70">        return super.getMechanismNames(newProps);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

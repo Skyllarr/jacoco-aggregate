@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AttributeMapping.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-realm-ldap</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.realm.ldap</a> &gt; <span class="el_source">AttributeMapping.java</span></div><h1>AttributeMapping.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.auth.realm.ldap;
+
+import java.util.Locale;
+
+import org.wildfly.common.Assert;
+
+import javax.naming.directory.DirContext;
+
+/**
+ * Definition of a mapping from LDAP to an Elytron attribute.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public class AttributeMapping {
+
+    public static final String DEFAULT_FILTERED_NAME = &quot;filtered&quot;;
+    public static final String DEFAULT_DN_NAME = &quot;dn&quot;;
+    public static final String DEFAULT_ROLE_RECURSION_ATTRIBUTE = &quot;CN&quot;;
+
+    private final String ldapName;
+    private final String searchDn;
+    private final boolean recursiveSearch;
+    private final String filter;
+    private final String reference;
+    private final String name;
+    private final String rdn;
+    private final int roleRecursionDepth;
+    private final String roleRecursionName;
+
+    String getLdapName() {
+<span class="nc" id="L48">        return ldapName;</span>
+    }
+
+    /**
+     * Get name of LDAP attribute to obtain from identity entry
+     * @return LDAP attribute to obtain from identity entry
+     */
+    String getIdentityLdapName() {
+<span class="nc bnc" id="L56" title="All 2 branches missed.">        if (filter != null) return null;</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        return reference != null ? reference : ldapName;</span>
+    }
+
+    String getName() {
+<span class="nc" id="L61">        return name;</span>
+    }
+
+    String getSearchDn() {
+<span class="nc" id="L65">        return searchDn;</span>
+    }
+
+    boolean getRecursiveSearch() {
+<span class="nc" id="L69">        return recursiveSearch;</span>
+    }
+
+    String getFilter() {
+<span class="nc" id="L73">        return filter;</span>
+    }
+
+    String getRdn() {
+<span class="nc" id="L77">        return rdn;</span>
+    }
+
+    String getReference() {
+<span class="nc" id="L81">        return reference;</span>
+    }
+
+    int getRoleRecursionDepth() {
+<span class="nc" id="L85">        return roleRecursionDepth;</span>
+    }
+
+    String getRoleRecursionName() {
+<span class="nc" id="L89">        return roleRecursionName;</span>
+    }
+
+    boolean isFilteredOrReference() {
+<span class="nc bnc" id="L93" title="All 4 branches missed.">        return filter != null || reference != null;</span>
+    }
+
+    /**
+     * Determine which context should be used to search filtered/referenced entry.
+     * Has effect if the identity is behind referral, in different context.
+     * If {@code true}, attribute will be searched in context, where was the identity found.
+     * {@link DirContext} of the LdapRealm will be used otherwise.
+     */
+    boolean searchInIdentityContext() {
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        return reference != null;</span>
+    }
+
+    /**
+     * &lt;p&gt;Create an attribute mapping using LDAP entry of identity itself.
+     *
+     * @return this builder
+     */
+    public static Builder fromIdentity() {
+<span class="nc" id="L112">        Builder builder = new Builder();</span>
+<span class="nc" id="L113">        builder.ldapName = null;</span>
+<span class="nc" id="L114">        return builder;</span>
+    }
+
+    /**
+     * &lt;p&gt;Create an attribute mapping based on the results of the given {@code filter}.
+     *
+     * &lt;p&gt;The {@code filter} &lt;em&gt;may&lt;/em&gt; have one and exactly one &lt;em&gt;{0}&lt;/em&gt; string that will be used to replace with the distinguished
+     * name of the identity. In this case, the filter is specially useful when the values for this attribute should be obtained from a
+     * separated entry. For instance, retrieving roles from entries with a object class of &lt;em&gt;groupOfNames&lt;/em&gt; where the identity's DN is
+     * a value of a &lt;em&gt;member&lt;/em&gt; attribute.
+     *
+     * @param filter the filter that is going to be used to search for entries and obtain values for this attribute
+     * @return this builder
+     */
+    public static Builder fromFilter(String filter) {
+<span class="nc" id="L129">        Assert.checkNotNullParam(&quot;filter&quot;, filter);</span>
+<span class="nc" id="L130">        Builder builder = new Builder();</span>
+<span class="nc" id="L131">        builder.filter = filter;</span>
+<span class="nc" id="L132">        return builder;</span>
+    }
+
+    /**
+     * &lt;p&gt;Create an attribute mapping using LDAP entry referenced by attribute of identity entry.
+     *
+     * @param reference the name of LDAP attribute containing DN of LDAP entry, from which should be value loaded.
+     * @return this builder
+     */
+    public static Builder fromReference(String reference) {
+<span class="nc" id="L142">        Assert.checkNotNullParam(&quot;reference&quot;, reference);</span>
+<span class="nc" id="L143">        Builder builder = new Builder();</span>
+<span class="nc" id="L144">        builder.reference = reference;</span>
+<span class="nc" id="L145">        return builder;</span>
+    }
+
+<span class="nc" id="L148">    public static class Builder {</span>
+
+        private String ldapName;
+        private String searchDn;
+<span class="nc" id="L152">        private boolean recursiveSearch = true;</span>
+        private String filter;
+        private String reference;
+        private String name;
+        private String rdn;
+        private int roleRecursionDepth;
+        private String roleRecursionName;
+
+        /**
+         * Set type of RDN, whose value will be used as identity attribute value.
+         * Use in case the attribute value is in DN form or when DN of entry is used
+         *
+         * @param rdn the name of type of RDN
+         * @return this builder
+         */
+        public Builder extractRdn(String rdn) {
+<span class="nc" id="L168">            Assert.checkNotNullParam(&quot;rdn&quot;, rdn);</span>
+<span class="nc" id="L169">            this.rdn = rdn;</span>
+<span class="nc" id="L170">            return this;</span>
+        }
+
+        /**
+         * Set name of the attribute in LDAP from where the values are obtained.
+         *
+         * @param ldapName the name of the attribute in LDAP from where the values are obtained
+         * @return this builder
+         */
+        public Builder from(String ldapName) {
+<span class="nc" id="L180">            Assert.checkNotNullParam(&quot;ldapName&quot;, ldapName);</span>
+<span class="nc" id="L181">            this.ldapName = ldapName.toUpperCase(Locale.ROOT);</span>
+<span class="nc" id="L182">            return this;</span>
+        }
+
+        /**
+         * Set name of the attribute in LDAP from where are {0} in role recursion obtained.
+         * Wildcard {0} is in filter replaced by user name usually. When role recursion is used,
+         * roles of roles are searched using the same filter, but {0} is replaced by
+         * role name - obtained from role entry attribute specified by this method.
+         *
+         * If not specified, attribute specified in {@link #from(String)} is used.
+         *
+         * @param roleRecursionName the name of the attribute in LDAP which will replace {0} in filter while role recursion
+         * @return this builder
+         */
+        public Builder roleRecursionName(String roleRecursionName) {
+<span class="nc" id="L197">            Assert.checkNotNullParam(&quot;roleRecursionName&quot;, roleRecursionName);</span>
+<span class="nc" id="L198">            this.roleRecursionName = roleRecursionName.toUpperCase(Locale.ROOT);</span>
+<span class="nc" id="L199">            return this;</span>
+        }
+
+        /**
+         * Set name of identity attribute to which will be mapping done.
+         *
+         * @param name the name of identity attribute (not LDAP attribute)
+         * @return this builder
+         */
+        public Builder to(String name) {
+<span class="nc" id="L209">            Assert.checkNotNullParam(&quot;name&quot;, name);</span>
+<span class="nc" id="L210">            this.name = name;</span>
+<span class="nc" id="L211">            return this;</span>
+        }
+
+        /**
+         * Set search DN of LDAP search for attribute entries.
+         * If not specified, search DN from identity mapping will be used.
+         * @param searchDn the name of the context (DN) to be used when executing the filter
+         * @return this builder
+         */
+        public Builder searchDn(String searchDn) {
+<span class="nc" id="L221">            Assert.checkNotNullParam(&quot;searchDn&quot;, searchDn);</span>
+<span class="nc" id="L222">            Assert.checkNotNullParam(&quot;filter&quot;, filter);</span>
+<span class="nc" id="L223">            this.searchDn = searchDn;</span>
+<span class="nc" id="L224">            return this;</span>
+        }
+
+        /**
+         * Set whether LDAP search for attribute entries should be recursive. Enabled by default.
+         * @param recursiveSearch whether the LDAP search should be recursive
+         * @return this builder
+         */
+        public Builder searchRecursively(boolean recursiveSearch) {
+<span class="nc" id="L233">            Assert.checkNotNullParam(&quot;filter&quot;, filter);</span>
+<span class="nc" id="L234">            this.recursiveSearch = recursiveSearch;</span>
+<span class="nc" id="L235">            return this;</span>
+        }
+
+        /**
+         * Set recursive search of filtered attribute (for recursive roles assignment and similar)
+         * @param roleRecursionDepth maximum depth of recursion, 0 by default (no recursion)
+         * @return this builder
+         */
+        public Builder roleRecursion(int roleRecursionDepth) {
+<span class="nc" id="L244">            Assert.checkMinimumParameter(&quot;roleRecursionDepth&quot;, 0, roleRecursionDepth);</span>
+<span class="nc" id="L245">            this.roleRecursionDepth = roleRecursionDepth;</span>
+<span class="nc" id="L246">            return this;</span>
+        }
+
+        public AttributeMapping build() {
+<span class="nc bnc" id="L250" title="All 2 branches missed.">            if (name == null) {</span>
+<span class="nc bnc" id="L251" title="All 4 branches missed.">                name = ldapName != null ? ldapName : (filter != null ? DEFAULT_FILTERED_NAME : DEFAULT_DN_NAME);</span>
+            }
+<span class="nc bnc" id="L253" title="All 2 branches missed.">            if (roleRecursionName == null) {</span>
+<span class="nc bnc" id="L254" title="All 2 branches missed.">                roleRecursionName = ldapName != null ? ldapName : DEFAULT_ROLE_RECURSION_ATTRIBUTE;</span>
+            }
+<span class="nc" id="L256">            return new AttributeMapping(searchDn, recursiveSearch, filter, reference, ldapName, name, rdn, roleRecursionDepth, roleRecursionName);</span>
+        }
+    }
+
+<span class="nc" id="L260">    AttributeMapping(String searchDn, boolean recursiveSearch, String filter,  String reference, String ldapName, String name, String rdn, int roleRecursionDepth, String roleRecursionName) {</span>
+<span class="nc" id="L261">        this.searchDn = searchDn;</span>
+<span class="nc" id="L262">        this.recursiveSearch = recursiveSearch;</span>
+<span class="nc" id="L263">        this.filter = filter;</span>
+<span class="nc" id="L264">        this.reference = reference;</span>
+<span class="nc" id="L265">        this.ldapName = ldapName;</span>
+<span class="nc" id="L266">        this.name = name;</span>
+<span class="nc" id="L267">        this.rdn = rdn;</span>
+<span class="nc" id="L268">        this.roleRecursionDepth = roleRecursionDepth;</span>
+<span class="nc" id="L269">        this.roleRecursionName = roleRecursionName;</span>
+<span class="nc" id="L270">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

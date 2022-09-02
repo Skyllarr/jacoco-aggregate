@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RuleNode.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-client</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.client</a> &gt; <span class="el_source">RuleNode.java</span></div><h1>RuleNode.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.client;
+
+/**
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+class RuleNode&lt;T&gt; {
+    final RuleNode&lt;T&gt; next;
+    final MatchRule rule;
+    final T configuration;
+
+<span class="fc" id="L29">    RuleNode(final RuleNode&lt;T&gt; next, final MatchRule rule, final T configuration) {</span>
+<span class="fc" id="L30">        this.next = next;</span>
+<span class="fc" id="L31">        this.rule = rule;</span>
+<span class="fc" id="L32">        this.configuration = configuration;</span>
+<span class="fc" id="L33">    }</span>
+
+    RuleNode&lt;T&gt; getNext() {
+<span class="fc" id="L36">        return next;</span>
+    }
+
+    MatchRule getRule() {
+<span class="fc" id="L40">        return rule;</span>
+    }
+
+    T getConfiguration() {
+<span class="fc" id="L44">        return configuration;</span>
+    }
+
+    RuleNode&lt;T&gt; without(int idx) {
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (idx &lt; 0) {</span>
+<span class="nc" id="L49">            throw new IndexOutOfBoundsException();</span>
+        }
+<span class="fc" id="L51">        final RuleNode&lt;T&gt; next = this.next;</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (idx == 0) {</span>
+<span class="fc" id="L53">            return next;</span>
+        }
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if (next == null) {</span>
+<span class="nc" id="L56">            throw new IndexOutOfBoundsException();</span>
+        }
+<span class="fc" id="L58">        return new RuleNode&lt;T&gt;(next.without(idx - 1), rule, configuration);</span>
+    }
+
+    RuleNode&lt;T&gt; with(MatchRule rule, T configuration, int idx) {
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        if (idx &lt; 0) {</span>
+<span class="nc" id="L63">            throw new IndexOutOfBoundsException();</span>
+        }
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (idx == 0) {</span>
+<span class="fc" id="L66">            return new RuleNode&lt;T&gt;(this, rule, configuration);</span>
+        }
+<span class="fc" id="L68">        final RuleNode&lt;T&gt; next = this.next;</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (next == null) {</span>
+<span class="nc" id="L70">            throw new IndexOutOfBoundsException();</span>
+        }
+<span class="fc" id="L72">        return new RuleNode&lt;T&gt;(next.with(rule, configuration, idx - 1), this.rule, this.configuration);</span>
+    }
+
+    RuleNode&lt;T&gt; with(final MatchRule rule, final T configuration) {
+<span class="fc" id="L76">        return withAll(new RuleNode&lt;T&gt;(null, rule, configuration));</span>
+    }
+
+    RuleNode&lt;T&gt; withAll(RuleNode&lt;T&gt; other) {
+<span class="fc" id="L80">        final RuleNode&lt;T&gt; next = this.next;</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (next == null) {</span>
+<span class="fc" id="L82">            return new RuleNode&lt;T&gt;(other, rule, configuration);</span>
+        } else {
+<span class="nc" id="L84">            return new RuleNode&lt;T&gt;(next.withAll(other), rule, configuration);</span>
+        }
+    }
+
+    RuleNode&lt;T&gt; withAll(final RuleNode&lt;T&gt; authRules, final int idx) {
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        if (idx &lt; 0) {</span>
+<span class="nc" id="L90">            throw new IndexOutOfBoundsException();</span>
+        }
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        if (idx == 0) {</span>
+<span class="nc" id="L93">            return authRules.withAll(this);</span>
+        }
+<span class="nc" id="L95">        final RuleNode&lt;T&gt; next = this.next;</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        if (next == null) {</span>
+<span class="nc" id="L97">            throw new IndexOutOfBoundsException();</span>
+        }
+<span class="nc" id="L99">        return new RuleNode&lt;T&gt;(next.withAll(authRules, idx - 1), rule, configuration);</span>
+    }
+
+    RuleNode&lt;T&gt; replacing(final MatchRule rule, final T configuration, final int idx) {
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if (idx &lt; 0) {</span>
+<span class="nc" id="L104">            throw new IndexOutOfBoundsException();</span>
+        }
+<span class="fc" id="L106">        final RuleNode&lt;T&gt; next = this.next;</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (idx == 0) {</span>
+<span class="fc" id="L108">            return new RuleNode&lt;T&gt;(next, rule, configuration);</span>
+        }
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        if (next == null) {</span>
+<span class="nc" id="L111">            throw new IndexOutOfBoundsException();</span>
+        }
+<span class="fc" id="L113">        return new RuleNode&lt;T&gt;(next.replacing(rule, configuration, idx - 1), this.rule, this.configuration);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

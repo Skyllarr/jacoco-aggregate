@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CallbackKind.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-client</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.client</a> &gt; <span class="el_source">CallbackKind.java</span></div><h1>CallbackKind.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2017 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.client;
+
+import org.wildfly.security.auth.callback.ChannelBindingCallback;
+import org.wildfly.security.auth.callback.CredentialCallback;
+import org.wildfly.security.auth.callback.EvidenceVerifyCallback;
+import org.wildfly.security.auth.callback.ParameterCallback;
+import org.wildfly.security.auth.callback.PasswordResetCallback;
+import org.wildfly.security.auth.callback.SSLCallback;
+import org.wildfly.security.auth.callback.TrustedAuthoritiesCallback;
+
+import java.util.EnumSet;
+
+import javax.security.auth.callback.ChoiceCallback;
+import javax.security.auth.callback.NameCallback;
+import javax.security.auth.callback.PasswordCallback;
+import javax.security.auth.callback.TextInputCallback;
+import javax.security.auth.callback.TextOutputCallback;
+import javax.security.sasl.RealmCallback;
+import javax.security.sasl.RealmChoiceCallback;
+
+/**
+ * The kinds of callbacks which can be handled by the user's callback.
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+<span class="fc" id="L43">public enum CallbackKind {</span>
+    /**
+     * Callbacks which select a user name or principal: client side {@link NameCallback}
+     */
+<span class="fc" id="L47">    PRINCIPAL,</span>
+    /**
+     * Callbacks which select a credential to use for authentication: {@link PasswordCallback} and {@link CredentialCallback}
+     */
+<span class="fc" id="L51">    CREDENTIAL,</span>
+    /**
+     * Callbacks which handle local credential-reset requests: {@link PasswordResetCallback}
+     */
+<span class="fc" id="L55">    CREDENTIAL_RESET,</span>
+    /**
+     * Callbacks which select the mechanism realm: {@link RealmChoiceCallback} and {@link RealmCallback}
+     */
+<span class="fc" id="L59">    REALM,</span>
+    /**
+     * Callbacks which accept the peer's name or principal: server side {@link NameCallback}
+     */
+<span class="fc" id="L63">    PEER_PRINCIPAL,</span>
+    /**
+     * Callbacks which handle or verify the peer's credentials: {@link EvidenceVerifyCallback}
+     */
+<span class="fc" id="L67">    PEER_CREDENTIAL,</span>
+    /**
+     * Callbacks which extend {@link ChoiceCallback} (not including {@link RealmChoiceCallback}).
+     */
+<span class="fc" id="L71">    CHOICE,</span>
+    /**
+     * Callbacks which select algorithm parameters to use for authentication: {@link ParameterCallback}
+     */
+<span class="fc" id="L75">    PARAMETERS,</span>
+    /**
+     * Callbacks which accept the server's trusted authorities: {@link TrustedAuthoritiesCallback}
+     */
+<span class="fc" id="L79">    SERVER_TRUSTED_AUTHORITIES,</span>
+    /**
+     * Callbacks which provide general output: {@link TextOutputCallback}
+     */
+<span class="fc" id="L83">    GENERAL_OUTPUT,</span>
+    /**
+     * Callbacks which provide general input: {@link TextInputCallback}
+     */
+<span class="fc" id="L87">    GENERAL_INPUT,</span>
+    /**
+     * Callbacks which deal with SSL configuration: {@link SSLCallback}
+     */
+<span class="fc" id="L91">    SSL,</span>
+    /**
+     * Callbacks which configure channel binding options: {@link ChannelBindingCallback}
+     */
+<span class="fc" id="L95">    CHANNEL_BINDING,</span>
+    ;
+
+<span class="fc" id="L98">    private static final int fullSize = values().length;</span>
+
+    /**
+     * Determine whether the given set is fully populated (or &quot;full&quot;), meaning it contains all possible values.
+     *
+     * @param set the set
+     * @return {@code true} if the set is full, {@code false} otherwise
+     */
+    public static boolean isFull(final EnumSet&lt;CallbackKind&gt; set) {
+<span class="nc bnc" id="L107" title="All 4 branches missed.">        return set != null &amp;&amp; set.size() == fullSize;</span>
+    }
+
+    /**
+     * Determine whether this instance is equal to one of the given instances.
+     *
+     * @param v1 the first instance
+     * @return {@code true} if one of the instances matches this one, {@code false} otherwise
+     */
+    public boolean in(final CallbackKind v1) {
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        return this == v1;</span>
+    }
+
+    /**
+     * Determine whether this instance is equal to one of the given instances.
+     *
+     * @param v1 the first instance
+     * @param v2 the second instance
+     * @return {@code true} if one of the instances matches this one, {@code false} otherwise
+     */
+    public boolean in(final CallbackKind v1, final CallbackKind v2) {
+<span class="nc bnc" id="L128" title="All 4 branches missed.">        return this == v1 || this == v2;</span>
+    }
+
+    /**
+     * Determine whether this instance is equal to one of the given instances.
+     *
+     * @param v1 the first instance
+     * @param v2 the second instance
+     * @param v3 the third instance
+     * @return {@code true} if one of the instances matches this one, {@code false} otherwise
+     */
+    public boolean in(final CallbackKind v1, final CallbackKind v2, final CallbackKind v3) {
+<span class="nc bnc" id="L140" title="All 6 branches missed.">        return this == v1 || this == v2 || this == v3;</span>
+    }
+
+    /**
+     * Determine whether this instance is equal to one of the given instances.
+     *
+     * @param values the possible values
+     * @return {@code true} if one of the instances matches this one, {@code false} otherwise
+     */
+    public boolean in(final CallbackKind... values) {
+<span class="nc bnc" id="L150" title="All 4 branches missed.">        if (values != null) for (CallbackKind value : values) {</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">            if (this == value) return true;</span>
+        }
+<span class="nc" id="L153">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

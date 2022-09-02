@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>JDKSpecific.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-ssl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.ssl</a> &gt; <span class="el_source">JDKSpecific.java</span></div><h1>JDKSpecific.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2020 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.ssl;
+
+import static org.wildfly.security.ssl.ElytronMessages.tls;
+
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.List;
+import java.util.function.BiFunction;
+
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
+import javax.net.ssl.SSLSocket;
+
+<span class="nc" id="L32">final class JDKSpecific {</span>
+
+    // SSLEngine Methods
+
+<span class="nc" id="L36">    private static final Method SSLENGINE_GET_APPLICATION_PROTOCOL = getMethodOrNull(SSLEngine.class, &quot;getApplicationProtocol&quot;);</span>
+<span class="nc" id="L37">    private static final Method SSLENGINE_GET_HANDSHAKE_APPLICATION_PROTOCOL = getMethodOrNull(SSLEngine.class, &quot;getHandshakeApplicationProtocol&quot;);</span>
+<span class="nc" id="L38">    private static final Method SSLENGINE_SET_HANDSHAKE_APPLICATION_PROTOCOL_SELECTOR = getMethodOrNull(SSLEngine.class, &quot;setHandshakeApplicationProtocolSelector&quot;, BiFunction.class);</span>
+<span class="nc" id="L39">    private static final Method SSLENGINE_GET_HANDSHAKE_APPLICATION_PROTOCOL_SELECTOR = getMethodOrNull(SSLEngine.class, &quot;getHandshakeApplicationProtocolSelector&quot;);</span>
+
+    // SSLParameters Methods
+
+<span class="nc" id="L43">    private static final Method SSLPARAMETERS_GET_APPLICATION_PROTOCOLS = getMethodOrNull(SSLParameters.class, &quot;getApplicationProtocols&quot;);</span>
+<span class="nc" id="L44">    private static final Method SSLPARAMETERS_SET_APPLICATION_PROTOCOLS = getMethodOrNull(SSLParameters.class, &quot;setApplicationProtocols&quot;, String[].class);</span>
+
+    // SSLSocket Methods
+
+<span class="nc" id="L48">    private static final Method SSLSOCKET_GET_APPLICATION_PROTOCOL = getMethodOrNull(SSLSocket.class, &quot;getApplicationProtocol&quot;);</span>
+<span class="nc" id="L49">    private static final Method SSLSOCKET_GET_HANDSHAKE_APPLICATION_PROTOCOL = getMethodOrNull(SSLSocket.class, &quot;getHandshakeApplicationProtocol&quot;);</span>
+<span class="nc" id="L50">    private static final Method SSLSOCKET_SET_HANDSHAKE_APPLICATION_PROTOCOL_SELECTOR = getMethodOrNull(SSLSocket.class, &quot;setHandshakeApplicationProtocolSelector&quot;, BiFunction.class);</span>
+<span class="nc" id="L51">    private static final Method SSLSOCKET_GET_HANDSHAKE_APPLICATION_PROTOCOL_SELECTOR = getMethodOrNull(SSLSocket.class, &quot;getHandshakeApplicationProtocolSelector&quot;);</span>
+
+    private static Method getMethodOrNull(Class clazz, String methodName, Class... parameterTypes) {
+        try {
+<span class="nc" id="L55">        return clazz.getMethod(methodName, parameterTypes);</span>
+<span class="nc" id="L56">        } catch (Exception e) {</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">            if (tls.isTraceEnabled()) {</span>
+<span class="nc" id="L58">                tls.tracef(e, &quot;Unable to getMethod %s on class %s&quot;, methodName, clazz.getName());</span>
+<span class="nc bnc" id="L59" title="All 2 branches missed.">            } else if (tls.isDebugEnabled()) {</span>
+<span class="nc" id="L60">                tls.debugf(&quot;Unable to getMethod %s on class %s&quot;, methodName, clazz.getName());</span>
+            }
+
+<span class="nc" id="L63">            return null;</span>
+        }
+    }
+
+    /*
+     * SSLEngine
+     */
+
+    static String getApplicationProtocol(SSLEngine sslEngine) {
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        if (SSLENGINE_GET_APPLICATION_PROTOCOL != null) {</span>
+            try {
+<span class="nc" id="L74">                return (String) SSLENGINE_GET_APPLICATION_PROTOCOL.invoke(sslEngine);</span>
+<span class="nc" id="L75">            } catch (IllegalAccessException | InvocationTargetException e) {</span>
+<span class="nc" id="L76">                throw new UnsupportedOperationException(e);</span>
+            }
+        }
+
+<span class="nc" id="L80">        throw new UnsupportedOperationException();</span>
+    }
+
+    static String getHandshakeApplicationProtocol(SSLEngine sslEngine) {
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (SSLENGINE_GET_HANDSHAKE_APPLICATION_PROTOCOL != null) {</span>
+            try {
+<span class="nc" id="L86">                return (String) SSLENGINE_GET_HANDSHAKE_APPLICATION_PROTOCOL.invoke(sslEngine);</span>
+<span class="nc" id="L87">            } catch (IllegalAccessException | InvocationTargetException e) {</span>
+<span class="nc" id="L88">                throw new UnsupportedOperationException(e);</span>
+            }
+        }
+
+<span class="nc" id="L92">        throw new UnsupportedOperationException();</span>
+    }
+
+    static void setHandshakeApplicationProtocolSelector(SSLEngine sslEngine, BiFunction&lt;SSLEngine, List&lt;String&gt;, String&gt; selector) {
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        if (SSLENGINE_SET_HANDSHAKE_APPLICATION_PROTOCOL_SELECTOR != null) {</span>
+            try {
+<span class="nc" id="L98">                SSLENGINE_SET_HANDSHAKE_APPLICATION_PROTOCOL_SELECTOR.invoke(sslEngine, selector);</span>
+<span class="nc" id="L99">            } catch (IllegalAccessException | InvocationTargetException e) {</span>
+<span class="nc" id="L100">                throw new UnsupportedOperationException(e);</span>
+<span class="nc" id="L101">            }</span>
+        }
+
+<span class="nc" id="L104">        throw new UnsupportedOperationException();</span>
+    }
+
+    static BiFunction&lt;SSLEngine, List&lt;String&gt;, String&gt; getHandshakeApplicationProtocolSelector(SSLEngine sslEngine) {
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        if (SSLENGINE_GET_HANDSHAKE_APPLICATION_PROTOCOL_SELECTOR != null) {</span>
+            try {
+<span class="nc" id="L110">                return (BiFunction&lt;SSLEngine, List&lt;String&gt;, String&gt;) SSLENGINE_GET_HANDSHAKE_APPLICATION_PROTOCOL_SELECTOR.invoke(sslEngine);</span>
+<span class="nc" id="L111">            } catch (IllegalAccessException | InvocationTargetException e) {</span>
+<span class="nc" id="L112">                throw new UnsupportedOperationException(e);</span>
+            }
+        }
+
+<span class="nc" id="L116">        throw new UnsupportedOperationException();</span>
+    }
+
+    /*
+     * SSLParameters
+     */
+
+    static String[] getApplicationProtocols(SSLParameters parameters) {
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        if (SSLPARAMETERS_GET_APPLICATION_PROTOCOLS != null) {</span>
+            try {
+<span class="nc" id="L126">                return (String[]) SSLPARAMETERS_GET_APPLICATION_PROTOCOLS.invoke(parameters);</span>
+<span class="nc" id="L127">            } catch (IllegalAccessException | InvocationTargetException e) {</span>
+<span class="nc" id="L128">                throw new UnsupportedOperationException(e);</span>
+            }
+        }
+
+<span class="nc" id="L132">        throw new UnsupportedOperationException();</span>
+    }
+
+    static void setApplicationProtocols(SSLParameters parameters, String[] protocols) {
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        if (SSLPARAMETERS_SET_APPLICATION_PROTOCOLS != null) {</span>
+            try {
+<span class="nc" id="L138">                SSLPARAMETERS_SET_APPLICATION_PROTOCOLS.invoke(parameters, (Object) protocols);</span>
+<span class="nc" id="L139">            } catch (IllegalAccessException | InvocationTargetException e) {</span>
+<span class="nc" id="L140">                throw new UnsupportedOperationException(e);</span>
+<span class="nc" id="L141">            }</span>
+        }
+
+<span class="nc" id="L144">        throw new UnsupportedOperationException();</span>
+    }
+
+    /**
+     * Copies SSLParameters' fields available in java 8.
+     *
+     * @param original SSLParameters that should be applied to new instance
+     * @return instance of SSLParameters with fields copied from original
+     */
+    static SSLParameters setSSLParameters(SSLParameters original) {
+<span class="nc" id="L154">        SSLParameters params = new SSLParameters();</span>
+<span class="nc" id="L155">        params.setProtocols(original.getProtocols());</span>
+<span class="nc" id="L156">        params.setCipherSuites(original.getCipherSuites());</span>
+<span class="nc" id="L157">        params.setUseCipherSuitesOrder(original.getUseCipherSuitesOrder());</span>
+<span class="nc" id="L158">        params.setServerNames(original.getServerNames());</span>
+<span class="nc" id="L159">        params.setSNIMatchers(original.getSNIMatchers());</span>
+<span class="nc" id="L160">        params.setAlgorithmConstraints(original.getAlgorithmConstraints());</span>
+<span class="nc" id="L161">        params.setEndpointIdentificationAlgorithm(original.getEndpointIdentificationAlgorithm());</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">        if (original.getWantClientAuth()) {</span>
+<span class="nc" id="L163">            params.setWantClientAuth(original.getWantClientAuth());</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">        } else if (original.getNeedClientAuth()) {</span>
+<span class="nc" id="L165">            params.setNeedClientAuth(original.getNeedClientAuth());</span>
+        }
+
+        try {
+<span class="nc bnc" id="L169" title="All 4 branches missed.">            if (SSLPARAMETERS_GET_APPLICATION_PROTOCOLS != null &amp;&amp; SSLPARAMETERS_SET_APPLICATION_PROTOCOLS != null) {</span>
+<span class="nc" id="L170">                setApplicationProtocols(params, getApplicationProtocols(original));</span>
+            }
+<span class="nc" id="L172">        } catch (Exception ignored) {}</span>
+
+<span class="nc" id="L174">        return params;</span>
+    }
+
+    /*
+     * SSLSocket
+     */
+
+    static String getApplicationProtocol(SSLSocket socket) {
+<span class="nc bnc" id="L182" title="All 2 branches missed.">        if (SSLSOCKET_GET_APPLICATION_PROTOCOL != null) {</span>
+            try {
+<span class="nc" id="L184">                return (String) SSLSOCKET_GET_APPLICATION_PROTOCOL.invoke(socket);</span>
+<span class="nc" id="L185">            } catch (IllegalAccessException | InvocationTargetException e) {</span>
+<span class="nc" id="L186">                throw new UnsupportedOperationException(e);</span>
+            }
+        }
+
+<span class="nc" id="L190">        throw new UnsupportedOperationException();</span>
+    }
+
+    static String getHandshakeApplicationProtocol(SSLSocket socket) {
+<span class="nc bnc" id="L194" title="All 2 branches missed.">        if (SSLSOCKET_GET_HANDSHAKE_APPLICATION_PROTOCOL != null) {</span>
+            try {
+<span class="nc" id="L196">                return (String) SSLSOCKET_GET_HANDSHAKE_APPLICATION_PROTOCOL.invoke(socket);</span>
+<span class="nc" id="L197">            } catch (IllegalAccessException | InvocationTargetException e) {</span>
+<span class="nc" id="L198">                throw new UnsupportedOperationException(e);</span>
+            }
+        }
+
+<span class="nc" id="L202">        throw new UnsupportedOperationException();</span>
+    }
+
+    static void setHandshakeApplicationProtocolSelector(SSLSocket socket, BiFunction&lt;SSLSocket, List&lt;String&gt;, String&gt; selector) {
+<span class="nc bnc" id="L206" title="All 2 branches missed.">        if (SSLSOCKET_SET_HANDSHAKE_APPLICATION_PROTOCOL_SELECTOR != null) {</span>
+            try {
+<span class="nc" id="L208">                SSLSOCKET_SET_HANDSHAKE_APPLICATION_PROTOCOL_SELECTOR.invoke(socket, selector);</span>
+<span class="nc" id="L209">            } catch (IllegalAccessException | InvocationTargetException e) {</span>
+<span class="nc" id="L210">                throw new UnsupportedOperationException(e);</span>
+<span class="nc" id="L211">            }</span>
+        }
+
+<span class="nc" id="L214">        throw new UnsupportedOperationException();</span>
+    }
+
+    static BiFunction&lt;SSLSocket, List&lt;String&gt;, String&gt; getHandshakeApplicationProtocolSelector(SSLSocket socket) {
+<span class="nc bnc" id="L218" title="All 2 branches missed.">        if (SSLSOCKET_GET_HANDSHAKE_APPLICATION_PROTOCOL_SELECTOR != null) {</span>
+            try {
+<span class="nc" id="L220">                return (BiFunction&lt;SSLSocket, List&lt;String&gt;, String&gt;) SSLSOCKET_GET_HANDSHAKE_APPLICATION_PROTOCOL_SELECTOR.invoke(socket);</span>
+<span class="nc" id="L221">            } catch (IllegalAccessException | InvocationTargetException e) {</span>
+<span class="nc" id="L222">                throw new UnsupportedOperationException(e);</span>
+            }
+        }
+
+<span class="nc" id="L226">        throw new UnsupportedOperationException();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

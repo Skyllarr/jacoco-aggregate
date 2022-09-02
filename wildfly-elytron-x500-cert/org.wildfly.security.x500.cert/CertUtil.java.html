@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CertUtil.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-x500-cert</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.x500.cert</a> &gt; <span class="el_source">CertUtil.java</span></div><h1>CertUtil.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2017 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.x500.cert;
+
+import static org.wildfly.security.x500.cert._private.ElytronMessages.log;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
+import org.wildfly.common.iteration.CodePointIterator;
+import org.wildfly.security.x500.GeneralName;
+import org.wildfly.security.x500.X500;
+
+
+/**
+ * A utility class with common methods used for generating certificate signing requests and self-signed certificates.
+ *
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ * @since 1.2.0
+ */
+<span class="nc" id="L38">class CertUtil {</span>
+
+    private static final String BASIC_CONSTRAINTS = &quot;BasicConstraints&quot;;
+    private static final String KEY_USAGE = &quot;KeyUsage&quot;;
+    private static final String CE_EXT_KEY_USAGE = &quot;ExtendedKeyUsage&quot;;
+    private static final String CE_SUBJECT_ALT_NAME = &quot;SubjectAlternativeName&quot;;
+    private static final String CE_ISSUER_ALT_NAME = &quot;IssuerAlternativeName&quot;;
+    private static final String PE_AUTHORITY_INFO_ACCESS = &quot;AuthorityInfoAccess&quot;;
+    private static final String PE_SUBJECT_INFO_ACCESS = &quot;SubjectInfoAccess&quot;;
+    private static final String CA = &quot;ca&quot;;
+    private static final String PATH_LEN = &quot;pathlen&quot;;
+    private static final String KP_SERVER_AUTH = &quot;serverAuth&quot;;
+    private static final String KP_CLIENT_AUTH = &quot;clientAuth&quot;;
+    private static final String KP_CODE_SIGNING = &quot;codeSigning&quot;;
+    private static final String KP_EMAIL_PROTECTION = &quot;emailProtection&quot;;
+    private static final String KP_TIME_STAMPING = &quot;timeStamping&quot;;
+    private static final String KP_OCSP_SIGNING = &quot;OCSPSigning&quot;;
+    private static final String AD_OCSP = &quot;ocsp&quot;;
+    private static final String AD_CA_ISSUERS = &quot;caIssuers&quot;;
+    private static final String AD_TIME_STAMPING = &quot;timeStamping&quot;;
+    private static final String AD_CA_REPOSITORY = &quot;caRepository&quot;;
+    private static final String EMAIL = &quot;EMAIL&quot;;
+    private static final String URI = &quot;URI&quot;;
+    private static final String DNS = &quot;DNS&quot;;
+    private static final String IP = &quot;IP&quot;;
+    private static final String OID = &quot;OID&quot;;
+<span class="fc" id="L64">    private static final String[] ALT_NAMES_TYPES = new String[] { EMAIL, URI, DNS, IP, OID };</span>
+<span class="fc" id="L65">    private static final int[] DELIMS = new int[] {',', ' '};</span>
+
+    /**
+     * Create an {@code X509CertificateExtension} using the given extension name and string value.
+     *
+     * @param critical whether the extension should be marked as critical
+     * @param extensionName the extension name
+     * @param extensionValue the extension value, as a string
+     * @return the newly created {@code X509CertificateExtension}
+     * @throws IllegalArgumentException if the given extension name or value is invalid or if creating an {@code X509CertificateExtension}
+     * from a string value is not supported for the given extension name
+     */
+    public static X509CertificateExtension getX509CertificateExtension(final boolean critical, final String extensionName, final String extensionValue) throws IllegalArgumentException {
+        final X509CertificateExtension extension;
+        try {
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            if (extensionName.equalsIgnoreCase(BASIC_CONSTRAINTS)) {</span>
+                // ca:{true|false}[,pathlen:&lt;len&gt;]
+<span class="fc" id="L82">                final CodePointIterator cpi = CodePointIterator.ofString(extensionValue);</span>
+<span class="fc" id="L83">                final CodePointIterator di = cpi.delimitedBy(DELIMS);</span>
+<span class="fc" id="L84">                final boolean ca = Boolean.parseBoolean(getKeyValue(CA, di.drainToString()));</span>
+<span class="fc" id="L85">                skipDelims(di, cpi, DELIMS);</span>
+<span class="fc" id="L86">                int pathLen = -1;</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">                if (di.hasNext()) {</span>
+<span class="fc" id="L88">                    pathLen = Integer.parseInt(getKeyValue(PATH_LEN, di.drainToString()));</span>
+                }
+<span class="fc" id="L90">                extension = new BasicConstraintsExtension(critical, ca, pathLen);</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            } else if (extensionName.equalsIgnoreCase(KEY_USAGE)) {</span>
+                // usage(,usage)*
+<span class="fc" id="L93">                final CodePointIterator cpi = CodePointIterator.ofString(extensionValue);</span>
+<span class="fc" id="L94">                final CodePointIterator di = cpi.delimitedBy(DELIMS);</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">                if (! di.hasNext()) {</span>
+<span class="nc" id="L96">                    throw log.invalidCertificateExtensionStringValue(extensionValue);</span>
+                }
+<span class="fc" id="L98">                final List&lt;KeyUsage&gt; keyUsages = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">                while (di.hasNext()) {</span>
+<span class="fc" id="L100">                    final KeyUsage keyUsage = KeyUsage.forName(di.drainToString());</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">                    if (keyUsage == null) {</span>
+<span class="nc" id="L102">                        throw log.invalidCertificateExtensionStringValue(extensionValue);</span>
+                    }
+<span class="fc" id="L104">                    keyUsages.add(keyUsage);</span>
+<span class="fc" id="L105">                    skipDelims(di, cpi, DELIMS);</span>
+<span class="fc" id="L106">                }</span>
+<span class="fc" id="L107">                extension = new KeyUsageExtension(critical, keyUsages.toArray(new KeyUsage[keyUsages.size()]));</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            } else if (extensionName.equalsIgnoreCase(CE_EXT_KEY_USAGE)) {</span>
+                // usage(,usage)*
+<span class="fc" id="L110">                final CodePointIterator cpi = CodePointIterator.ofString(extensionValue);</span>
+<span class="fc" id="L111">                final CodePointIterator di = cpi.delimitedBy(DELIMS);</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">                if (! di.hasNext()) {</span>
+<span class="nc" id="L113">                    throw log.invalidCertificateExtensionStringValue(extensionValue);</span>
+                }
+<span class="fc" id="L115">                final List&lt;String&gt; keyPurposeIds = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">                while (di.hasNext()) {</span>
+<span class="fc" id="L117">                    final String keyPurposeId = oidFromKeyPurpose(di.drainToString());</span>
+<span class="fc" id="L118">                    keyPurposeIds.add(keyPurposeId);</span>
+<span class="fc" id="L119">                    skipDelims(di, cpi, DELIMS);</span>
+<span class="fc" id="L120">                }</span>
+<span class="fc" id="L121">                extension = new ExtendedKeyUsageExtension(critical, keyPurposeIds);</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            } else if (extensionName.equalsIgnoreCase(CE_SUBJECT_ALT_NAME)) {</span>
+<span class="fc" id="L123">                extension = new SubjectAlternativeNamesExtension(critical, getGeneralNames(extensionValue));</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            } else if (extensionName.equalsIgnoreCase(CE_ISSUER_ALT_NAME)) {</span>
+<span class="fc" id="L125">                extension = new IssuerAlternativeNamesExtension(critical, getGeneralNames(extensionValue));</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            } else if (extensionName.equalsIgnoreCase(PE_AUTHORITY_INFO_ACCESS)) {</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">                if (critical) {</span>
+<span class="nc" id="L128">                    throw log.certificateExtensionMustBeNonCritical(extensionName);</span>
+                }
+<span class="fc" id="L130">                extension = new AuthorityInformationAccessExtension(getAccessDescriptions(extensionValue));</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">            } else if (extensionName.equalsIgnoreCase(PE_SUBJECT_INFO_ACCESS)) {</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">                if (critical) {</span>
+<span class="nc" id="L133">                    throw log.certificateExtensionMustBeNonCritical(extensionName);</span>
+                }
+<span class="fc" id="L135">                extension = new SubjectInformationAccessExtension(getAccessDescriptions(extensionValue));</span>
+            } else {
+<span class="nc" id="L137">                throw log.certificateExtensionCreationFromStringNotSupported(extensionName);</span>
+            }
+<span class="nc" id="L139">        } catch (Exception e) {</span>
+<span class="nc" id="L140">            throw log.certificateExtensionCreationFromStringFailed(e);</span>
+<span class="fc" id="L141">        }</span>
+<span class="fc" id="L142">        return extension;</span>
+    }
+
+    private static void skipDelims(CodePointIterator di, CodePointIterator cpi, int...delims) throws IllegalArgumentException {
+<span class="fc bfc" id="L146" title="All 4 branches covered.">        while ((! di.hasNext()) &amp;&amp; cpi.hasNext()) {</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">            if (! isDelim(cpi.next(), delims)) {</span>
+<span class="nc" id="L148">                throw log.invalidCertificateExtensionStringValue();</span>
+            }
+        }
+<span class="fc" id="L151">    }</span>
+
+    private static boolean isDelim(int c, int... delims) {
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        for (int delim : delims) {</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">            if (delim == c) {</span>
+<span class="fc" id="L156">                return true;</span>
+            }
+        }
+<span class="nc" id="L159">        return false;</span>
+    }
+
+    private static String getKeyValue(final String requiredKey, final String keyAndValue) throws IllegalArgumentException {
+        // key:value
+<span class="fc" id="L164">        final CodePointIterator cpi = CodePointIterator.ofString(keyAndValue);</span>
+<span class="fc" id="L165">        final CodePointIterator di = cpi.delimitedBy(':');</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        if (! requiredKey.equalsIgnoreCase(di.drainToString())) {</span>
+<span class="nc" id="L167">           throw log.invalidCertificateExtensionStringValue(keyAndValue);</span>
+        }
+<span class="fc" id="L169">        skipDelims(di, cpi, ':');</span>
+<span class="fc" id="L170">        return di.drainToString();</span>
+    }
+
+    private static String oidFromKeyPurpose(final String keyPurpose) {
+<span class="pc bpc" id="L174" title="5 of 7 branches missed.">        switch (keyPurpose) {</span>
+<span class="nc" id="L175">            case KP_SERVER_AUTH: return X500.OID_KP_SERVER_AUTH;</span>
+<span class="fc" id="L176">            case KP_CLIENT_AUTH: return X500.OID_KP_CLIENT_AUTH;</span>
+<span class="nc" id="L177">            case KP_CODE_SIGNING: return X500.OID_KP_CODE_SIGNING;</span>
+<span class="nc" id="L178">            case KP_EMAIL_PROTECTION: return X500.OID_KP_EMAIL_PROTECTION;</span>
+<span class="fc" id="L179">            case KP_TIME_STAMPING: return X500.OID_KP_TIME_STAMPING;</span>
+<span class="nc" id="L180">            case KP_OCSP_SIGNING: return X500.OID_KP_OCSP_SIGNING;</span>
+<span class="nc" id="L181">            default: return keyPurpose; // must be an oid already</span>
+        }
+    }
+
+    private static List&lt;GeneralName&gt; getGeneralNames(final String extensionValue) throws IllegalArgumentException {
+        // type:val(,type:val)*
+<span class="fc" id="L187">        final CodePointIterator cpi = CodePointIterator.ofString(extensionValue);</span>
+<span class="fc" id="L188">        final CodePointIterator di = cpi.delimitedBy(DELIMS);</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">        if (! di.hasNext()) {</span>
+<span class="nc" id="L190">            throw log.invalidCertificateExtensionStringValue(extensionValue);</span>
+        }
+<span class="fc" id="L192">        List&lt;GeneralName&gt; generalNames = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        while (di.hasNext()) {</span>
+<span class="fc" id="L194">            generalNames.add(getGeneralName(di.drainToString()));</span>
+<span class="fc" id="L195">            skipDelims(di, cpi, DELIMS);</span>
+        }
+<span class="fc" id="L197">        return generalNames;</span>
+    }
+
+    private static GeneralName getGeneralName(final String typeAndValue) throws IllegalArgumentException {
+        // type:val
+<span class="fc" id="L202">        final CodePointIterator cpi = CodePointIterator.ofString(typeAndValue);</span>
+<span class="fc" id="L203">        final CodePointIterator di = cpi.delimitedBy(':');</span>
+<span class="fc" id="L204">        final String type = di.drainToString();</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">        for (String requiredType : ALT_NAMES_TYPES) {</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">            if (requiredType.equalsIgnoreCase(type)) {</span>
+<span class="fc" id="L207">                skipDelims(di, cpi, ':');</span>
+<span class="fc" id="L208">                final String value = cpi.drainToString();</span>
+<span class="pc bpc" id="L209" title="2 of 6 branches missed.">                switch (type.toUpperCase(Locale.ENGLISH)) {</span>
+                    case EMAIL:
+<span class="fc" id="L211">                        return new GeneralName.RFC822Name(value);</span>
+                    case URI:
+<span class="fc" id="L213">                        return new GeneralName.URIName(value);</span>
+                    case DNS:
+<span class="fc" id="L215">                        return new GeneralName.DNSName(value);</span>
+                    case IP:
+<span class="fc" id="L217">                        return new GeneralName.IPAddress(value);</span>
+                    case OID:
+<span class="nc" id="L219">                        return new GeneralName.RegisteredID(value);</span>
+                    default:
+<span class="nc" id="L221">                        throw log.invalidCertificateExtensionStringValue(typeAndValue);</span>
+                }
+            }
+        }
+<span class="nc" id="L225">        throw log.invalidCertificateExtensionStringValue(typeAndValue);</span>
+    }
+
+    private static List&lt;AccessDescription&gt; getAccessDescriptions(final String extensionValue) throws IllegalArgumentException {
+        // method:location-type:location-value(,method:location-type:location-value)*
+<span class="fc" id="L230">        final CodePointIterator cpi = CodePointIterator.ofString(extensionValue);</span>
+<span class="fc" id="L231">        final CodePointIterator di = cpi.delimitedBy(DELIMS);</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        if (! di.hasNext()) {</span>
+<span class="nc" id="L233">            throw log.invalidCertificateExtensionStringValue(extensionValue);</span>
+        }
+<span class="fc" id="L235">        List&lt;AccessDescription&gt; accessDescriptions = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        while (di.hasNext()) {</span>
+<span class="fc" id="L237">            accessDescriptions.add(getAccessDescription(di.drainToString()));</span>
+<span class="fc" id="L238">            skipDelims(di, cpi, DELIMS);</span>
+        }
+<span class="fc" id="L240">        return accessDescriptions;</span>
+    }
+
+    private static AccessDescription getAccessDescription(final String methodAndTypeAndValue) throws IllegalArgumentException {
+        // method:location-type:location-value
+<span class="fc" id="L245">        final CodePointIterator cpi = CodePointIterator.ofString(methodAndTypeAndValue);</span>
+<span class="fc" id="L246">        final CodePointIterator di = cpi.delimitedBy(':');</span>
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">        if (! di.hasNext()) {</span>
+<span class="nc" id="L248">            throw log.invalidCertificateExtensionStringValue(methodAndTypeAndValue);</span>
+        }
+<span class="fc" id="L250">        final String accessMethodId = oidFromMethod(di.drainToString());</span>
+<span class="fc" id="L251">        skipDelims(di, cpi, ':');</span>
+<span class="fc" id="L252">        final String typeAndValue = cpi.drainToString();</span>
+<span class="fc" id="L253">        final GeneralName accessLocation = getGeneralName(typeAndValue);</span>
+<span class="fc" id="L254">        return new AccessDescription(accessMethodId, accessLocation);</span>
+    }
+
+    private static String oidFromMethod(final String method) {
+<span class="pc bpc" id="L258" title="1 of 5 branches missed.">        switch (method) {</span>
+<span class="fc" id="L259">            case AD_OCSP: return X500.OID_AD_OCSP;</span>
+<span class="fc" id="L260">            case AD_CA_ISSUERS: return X500.OID_AD_CA_ISSUERS;</span>
+<span class="fc" id="L261">            case AD_TIME_STAMPING: return X500.OID_AD_TIME_STAMPING;</span>
+<span class="fc" id="L262">            case AD_CA_REPOSITORY: return X500.OID_AD_CA_REPOSITORY;</span>
+<span class="nc" id="L263">            default: return method; // must be an oid already</span>
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

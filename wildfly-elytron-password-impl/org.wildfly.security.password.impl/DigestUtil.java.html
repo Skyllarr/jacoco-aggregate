@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DigestUtil.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-password-impl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.password.impl</a> &gt; <span class="el_source">DigestUtil.java</span></div><h1>DigestUtil.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.password.impl;
+
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetEncoder;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+
+import org.wildfly.common.bytes.ByteStringBuilder;
+
+/**
+ * Common utility functions used by Digest authentication mechanisms.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:pskopek@redhat.com&quot;&gt;Peter Skopek&lt;/a&gt;.
+ */
+<span class="nc" id="L33">class DigestUtil {</span>
+
+    public static byte[] userRealmPasswordDigest(MessageDigest messageDigest, String username, String realm, char[] password) {
+<span class="fc" id="L36">        return userRealmPasswordDigest(messageDigest, username, realm, password, StandardCharsets.UTF_8);</span>
+    }
+
+    public static byte[] userRealmPasswordDigest(MessageDigest messageDigest, String username, String realm, char[] password, Charset chosenCharset) {
+<span class="fc" id="L40">        CharsetEncoder latin1Encoder = StandardCharsets.ISO_8859_1.newEncoder();</span>
+<span class="fc" id="L41">        latin1Encoder.reset();</span>
+<span class="fc" id="L42">        boolean bothLatin1 = latin1Encoder.canEncode(username);</span>
+<span class="fc" id="L43">        latin1Encoder.reset();</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        if (bothLatin1) {</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">            for (char c: password) {</span>
+<span class="fc bfc" id="L46" title="All 4 branches covered.">                bothLatin1 = bothLatin1 &amp;&amp; latin1Encoder.canEncode(c);</span>
+            }
+        }
+
+<span class="fc" id="L50">        ByteStringBuilder urp = new ByteStringBuilder(); // username:realm:password</span>
+<span class="fc" id="L51">        urp.append(username.getBytes(chosenCharset));</span>
+<span class="fc" id="L52">        urp.append(':');</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        if (realm != null) {</span>
+<span class="fc" id="L54">            urp.append(realm.getBytes((chosenCharset)));</span>
+        } else {
+<span class="nc" id="L56">            urp.append(&quot;&quot;);</span>
+        }
+<span class="fc" id="L58">        urp.append(':');</span>
+<span class="fc" id="L59">        urp.append(new String(password).getBytes((chosenCharset)));</span>
+
+<span class="fc" id="L61">        return messageDigest.digest(urp.toArray());</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

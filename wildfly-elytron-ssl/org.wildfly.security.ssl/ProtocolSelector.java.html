@@ -1,0 +1,357 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ProtocolSelector.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-ssl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.ssl</a> &gt; <span class="el_source">ProtocolSelector.java</span></div><h1>ProtocolSelector.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.ssl;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+/**
+ * An immutable filter for SSL/TLS protocols.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public abstract class ProtocolSelector {
+
+    final ProtocolSelector prev;
+
+<span class="fc" id="L39">    ProtocolSelector(final ProtocolSelector prev) {</span>
+<span class="fc" id="L40">        this.prev = prev;</span>
+<span class="fc" id="L41">    }</span>
+
+    /* -- predicates -- */
+
+<span class="fc" id="L45">    private static final ProtocolSelector EMPTY = new ProtocolSelector(null) {</span>
+        void applyFilter(final Set&lt;Protocol&gt; enabled, final EnumMap&lt;Protocol, String&gt; supported) {
+<span class="fc" id="L47">        }</span>
+
+        void toString(final StringBuilder b) {
+<span class="nc" id="L50">            b.append(&quot;(empty)&quot;);</span>
+<span class="nc" id="L51">        }</span>
+    };
+
+    public final String toString() {
+<span class="nc" id="L55">        final StringBuilder b = new StringBuilder();</span>
+<span class="nc" id="L56">        toString(b);</span>
+<span class="nc" id="L57">        return b.toString();</span>
+    }
+
+    abstract void toString(final StringBuilder b);
+
+    /**
+     * Get the basic empty SSL protocol selector.
+     *
+     * @return the empty selector
+     */
+    public static ProtocolSelector empty() {
+<span class="fc" id="L68">        return EMPTY;</span>
+    }
+
+    /**
+     * Get the default SSL protocol selector.
+     *
+     * @return the default selector
+     */
+    public static ProtocolSelector defaultProtocols() {
+<span class="nc" id="L77">        return DEFAULT_SELECTOR;</span>
+    }
+
+
+    /* -- Put this after the EMPTY selector for proper static ordering -- */
+<span class="fc" id="L82">    static final ProtocolSelector DEFAULT_SELECTOR = empty().add(Protocol.TLSv1, Protocol.TLSv1_1, Protocol.TLSv1_2, Protocol.TLSv1_3);</span>
+
+
+    /* -- delete -- */
+
+    /**
+     * Permanently delete the given protocol.  Matching protocols cannot
+     * be re-added by a later rule (such rules will be ignored).
+     *
+     * @param protocolName the name of the protocol to remove
+     * @return a new selector which includes the new rule
+     */
+    public ProtocolSelector deleteFully(final String protocolName) {
+<span class="nc" id="L95">        return deleteFully(Protocol.forName(protocolName));</span>
+    }
+
+    /**
+     * Permanently delete the given protocol.  Matching protocols cannot
+     * be re-added by a later rule (such rules will be ignored).
+     *
+     * @param protocol the protocol to remove
+     * @return a new selector which includes the new rule
+     */
+    public ProtocolSelector deleteFully(final Protocol protocol) {
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        return protocol == null ? this : new FullyDeletingProtocolSelector(this, EnumSet.of(protocol));</span>
+    }
+
+    /**
+     * Permanently delete all of the given protocols.  Matching protocols cannot
+     * be re-added by a later rule (such rules will be ignored).
+     *
+     * @param protocols the protocols to remove
+     * @return a new selector which includes the new rule
+     */
+    public ProtocolSelector deleteFully(final Protocol... protocols) {
+<span class="nc bnc" id="L117" title="All 4 branches missed.">        return protocols == null || protocols.length == 0 ? this : new FullyDeletingProtocolSelector(this, EnumSet.of(protocols[0], protocols));</span>
+    }
+
+    /**
+     * Permanently delete all of the given protocols.  Matching protocols cannot
+     * be re-added by a later rule (such rules will be ignored).
+     *
+     * @param protocols the protocols to remove
+     * @return a new selector which includes the new rule
+     */
+    public ProtocolSelector deleteFully(final EnumSet&lt;Protocol&gt; protocols) {
+<span class="nc bnc" id="L128" title="All 4 branches missed.">        return protocols == null || protocols.isEmpty() ? this : new FullyDeletingProtocolSelector(this, protocols);</span>
+    }
+
+    /* -- remove -- */
+
+    /**
+     * Remove the given protocol.  Matching protocols may be re-added by a later rule.
+     *
+     * @param protocolName the name of the protocol to remove
+     * @return a new selector which includes the new rule
+     */
+    public ProtocolSelector remove(final String protocolName) {
+<span class="nc" id="L140">        return remove(Protocol.forName(protocolName));</span>
+    }
+
+    /**
+     * Remove the given protocol.  Matching protocols may be re-added by a later rule.
+     *
+     * @param protocol the protocol to remove
+     * @return a new selector which includes the new rule
+     */
+    public ProtocolSelector remove(final Protocol protocol) {
+<span class="nc bnc" id="L150" title="All 2 branches missed.">        return protocol == null ? this : new RemovingProtocolSelector(this, EnumSet.of(protocol));</span>
+    }
+
+    /**
+     * Remove the given protocols.  Matching protocols may be re-added by a later rule.
+     *
+     * @param protocols the protocols to remove
+     * @return a new selector which includes the new rule
+     */
+    public ProtocolSelector remove(final Protocol... protocols) {
+<span class="nc bnc" id="L160" title="All 4 branches missed.">        return protocols == null || protocols.length == 0 ? this : new RemovingProtocolSelector(this, EnumSet.of(protocols[0], protocols));</span>
+    }
+
+    /**
+     * Remove the given protocols.  Matching protocols may be re-added by a later rule.
+     *
+     * @param protocols the protocols to remove
+     * @return a new selector which includes the new rule
+     */
+    public ProtocolSelector remove(final EnumSet&lt;Protocol&gt; protocols) {
+<span class="nc bnc" id="L170" title="All 4 branches missed.">        return protocols == null || protocols.isEmpty() ? this : new RemovingProtocolSelector(this, protocols);</span>
+    }
+
+    /* -- add -- */
+
+    /**
+     * Add the given protocol.
+     *
+     * @param protocolName the name of the protocol to add
+     * @return a new selector which includes the new rule
+     */
+    public ProtocolSelector add(final String protocolName) {
+<span class="fc" id="L182">        return add(Protocol.forName(protocolName));</span>
+    }
+
+    /**
+     * Add the given protocol.
+     *
+     * @param protocol the protocol to add
+     * @return a new selector which includes the new rule
+     */
+    public ProtocolSelector add(final Protocol protocol) {
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">        return protocol == null ? this : new AddingProtocolSelector(this, EnumSet.of(protocol));</span>
+    }
+
+    /**
+     * Add the given protocols.
+     *
+     * @param protocols the protocols to add
+     * @return a new selector which includes the new rule
+     */
+    public ProtocolSelector add(final Protocol... protocols) {
+<span class="pc bpc" id="L202" title="2 of 4 branches missed.">        return protocols == null || protocols.length == 0 ? this : new AddingProtocolSelector(this, EnumSet.of(protocols[0], protocols));</span>
+    }
+
+    /**
+     * Add the given protocols.
+     *
+     * @param protocols the protocols to add
+     * @return a new selector which includes the new rule
+     */
+    public ProtocolSelector add(final EnumSet&lt;Protocol&gt; protocols) {
+<span class="nc bnc" id="L212" title="All 4 branches missed.">        return protocols == null || protocols.isEmpty() ? this : new AddingProtocolSelector(this, protocols);</span>
+    }
+
+    /* -- selector implementation -- */
+
+    abstract void applyFilter(Set&lt;Protocol&gt; enabled, EnumMap&lt;Protocol, String&gt; supported);
+
+    private void doEvaluate(Set&lt;Protocol&gt; enabled, EnumMap&lt;Protocol, String&gt; supported) {
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        if (prev != null) {</span>
+<span class="fc" id="L221">            prev.doEvaluate(enabled, supported);</span>
+        }
+<span class="fc" id="L223">        applyFilter(enabled, supported);</span>
+<span class="fc" id="L224">    }</span>
+
+    /**
+     * Evaluate this selector against the given list of JSSE supported protocols.
+     *
+     * @param supportedProtocols the supported protocols
+     * @return the enabled protocols (not {@code null})
+     */
+    public final String[] evaluate(String[] supportedProtocols) {
+<span class="fc" id="L233">        final EnumMap&lt;Protocol, String&gt; supported = new EnumMap&lt;Protocol, String&gt;(Protocol.class);</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">        for (String protocolName : supportedProtocols) {</span>
+<span class="fc" id="L235">            final Protocol protocol = Protocol.forName(protocolName);</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">            if (protocol != null) {</span>
+<span class="fc" id="L237">                supported.put(protocol, protocolName);</span>
+            }
+        }
+<span class="fc" id="L240">        final LinkedHashSet&lt;Protocol&gt; enabledSet = new LinkedHashSet&lt;&gt;(supported.size());</span>
+<span class="fc" id="L241">        doEvaluate(enabledSet, supported);</span>
+<span class="fc" id="L242">        final ArrayList&lt;String&gt; list = new ArrayList&lt;&gt;(enabledSet.size());</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        for (Protocol protocol : enabledSet) {</span>
+<span class="fc" id="L244">            list.add(supported.get(protocol));</span>
+<span class="fc" id="L245">        }</span>
+<span class="fc" id="L246">        return list.toArray(new String[enabledSet.size()]);</span>
+    }
+
+    /* -- selector impls -- */
+
+    static final class AddingProtocolSelector extends ProtocolSelector {
+        private final EnumSet&lt;Protocol&gt; protocols;
+
+        AddingProtocolSelector(final ProtocolSelector prev, final EnumSet&lt;Protocol&gt; protocols) {
+<span class="fc" id="L255">            super(prev);</span>
+<span class="fc" id="L256">            this.protocols = protocols;</span>
+<span class="fc" id="L257">        }</span>
+
+        void toString(final StringBuilder b) {
+<span class="nc bnc" id="L260" title="All 4 branches missed.">            if (prev != null &amp;&amp; prev != EMPTY) {</span>
+<span class="nc" id="L261">                prev.toString(b);</span>
+<span class="nc" id="L262">                b.append(&quot;, then &quot;);</span>
+            }
+<span class="nc" id="L264">            b.append(&quot;add protocols (&quot;);</span>
+<span class="nc" id="L265">            Iterator&lt;Protocol&gt; iterator = protocols.iterator();</span>
+            Protocol protocol;
+<span class="nc bnc" id="L267" title="All 2 branches missed.">            if (iterator.hasNext()) {</span>
+<span class="nc" id="L268">                protocol = iterator.next();</span>
+<span class="nc" id="L269">                b.append(protocol);</span>
+<span class="nc bnc" id="L270" title="All 2 branches missed.">                while (iterator.hasNext()) {</span>
+<span class="nc" id="L271">                    protocol = iterator.next();</span>
+<span class="nc" id="L272">                    b.append(&quot;, &quot;);</span>
+<span class="nc" id="L273">                    b.append(protocol);</span>
+                }
+            }
+<span class="nc" id="L276">            b.append(&quot;)&quot;);</span>
+<span class="nc" id="L277">        }</span>
+
+        void applyFilter(final Set&lt;Protocol&gt; enabled, final EnumMap&lt;Protocol, String&gt; supported) {
+<span class="fc" id="L280">            final List&lt;Protocol&gt; clone = new ArrayList&lt;&gt;(supported.keySet());</span>
+<span class="fc" id="L281">            clone.retainAll(protocols);</span>
+            // it will be in reverse-preference order due to the ordering of the enum
+<span class="fc" id="L283">            Collections.reverse(clone);</span>
+<span class="fc" id="L284">            enabled.addAll(clone);</span>
+<span class="fc" id="L285">        }</span>
+    }
+
+    static final class RemovingProtocolSelector extends ProtocolSelector {
+        private final EnumSet&lt;Protocol&gt; protocols;
+
+        RemovingProtocolSelector(final ProtocolSelector prev, final EnumSet&lt;Protocol&gt; protocols) {
+<span class="nc" id="L292">            super(prev);</span>
+<span class="nc" id="L293">            this.protocols = protocols;</span>
+<span class="nc" id="L294">        }</span>
+
+        void toString(final StringBuilder b) {
+<span class="nc bnc" id="L297" title="All 4 branches missed.">            if (prev != null &amp;&amp; prev != EMPTY) {</span>
+<span class="nc" id="L298">                prev.toString(b);</span>
+<span class="nc" id="L299">                b.append(&quot;, then &quot;);</span>
+            }
+<span class="nc" id="L301">            b.append(&quot;remove protocols (&quot;);</span>
+<span class="nc" id="L302">            Iterator&lt;Protocol&gt; iterator = protocols.iterator();</span>
+            Protocol protocol;
+<span class="nc bnc" id="L304" title="All 2 branches missed.">            if (iterator.hasNext()) {</span>
+<span class="nc" id="L305">                protocol = iterator.next();</span>
+<span class="nc" id="L306">                b.append(protocol);</span>
+<span class="nc bnc" id="L307" title="All 2 branches missed.">                while (iterator.hasNext()) {</span>
+<span class="nc" id="L308">                    protocol = iterator.next();</span>
+<span class="nc" id="L309">                    b.append(&quot;, &quot;);</span>
+<span class="nc" id="L310">                    b.append(protocol);</span>
+                }
+            }
+<span class="nc" id="L313">            b.append(&quot;)&quot;);</span>
+<span class="nc" id="L314">        }</span>
+
+        void applyFilter(final Set&lt;Protocol&gt; enabled, final EnumMap&lt;Protocol, String&gt; supported) {
+<span class="nc" id="L317">            enabled.removeAll(protocols);</span>
+<span class="nc" id="L318">        }</span>
+    }
+
+    static class FullyDeletingProtocolSelector extends ProtocolSelector {
+        private final EnumSet&lt;Protocol&gt; protocols;
+
+        FullyDeletingProtocolSelector(final ProtocolSelector prev, final EnumSet&lt;Protocol&gt; protocols) {
+<span class="nc" id="L325">            super(prev);</span>
+<span class="nc" id="L326">            this.protocols = protocols;</span>
+<span class="nc" id="L327">        }</span>
+
+        void toString(final StringBuilder b) {
+<span class="nc bnc" id="L330" title="All 4 branches missed.">            if (prev != null &amp;&amp; prev != EMPTY) {</span>
+<span class="nc" id="L331">                prev.toString(b);</span>
+<span class="nc" id="L332">                b.append(&quot;, then &quot;);</span>
+            }
+<span class="nc" id="L334">            b.append(&quot;fully remove protocols (&quot;);</span>
+<span class="nc" id="L335">            Iterator&lt;Protocol&gt; iterator = protocols.iterator();</span>
+            Protocol protocol;
+<span class="nc bnc" id="L337" title="All 2 branches missed.">            if (iterator.hasNext()) {</span>
+<span class="nc" id="L338">                protocol = iterator.next();</span>
+<span class="nc" id="L339">                b.append(protocol);</span>
+<span class="nc bnc" id="L340" title="All 2 branches missed.">                while (iterator.hasNext()) {</span>
+<span class="nc" id="L341">                    protocol = iterator.next();</span>
+<span class="nc" id="L342">                    b.append(&quot;, &quot;);</span>
+<span class="nc" id="L343">                    b.append(protocol);</span>
+                }
+            }
+<span class="nc" id="L346">            b.append(&quot;)&quot;);</span>
+<span class="nc" id="L347">        }</span>
+
+        void applyFilter(final Set&lt;Protocol&gt; enabled, final EnumMap&lt;Protocol, String&gt; supported) {
+<span class="nc" id="L350">            enabled.removeAll(protocols);</span>
+<span class="nc bnc" id="L351" title="All 2 branches missed.">            for (Protocol protocol : protocols) {</span>
+<span class="nc" id="L352">                supported.remove(protocol);</span>
+<span class="nc" id="L353">            }</span>
+<span class="nc" id="L354">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

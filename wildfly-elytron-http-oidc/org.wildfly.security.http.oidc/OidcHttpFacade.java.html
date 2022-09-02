@@ -1,0 +1,594 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OidcHttpFacade.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-oidc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.oidc</a> &gt; <span class="el_source">OidcHttpFacade.java</span></div><h1>OidcHttpFacade.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2020 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.http.oidc;
+
+import static org.wildfly.security.http.oidc.ElytronMessages.log;
+import static org.wildfly.security.http.oidc.Oidc.HTML_CONTENT_TYPE;
+
+import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.URLDecoder;
+
+import java.security.Principal;
+import java.security.cert.Certificate;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.sasl.AuthorizeCallback;
+import javax.servlet.ReadListener;
+import javax.servlet.ServletInputStream;
+
+import org.wildfly.security.auth.callback.AuthenticationCompleteCallback;
+import org.wildfly.security.auth.callback.EvidenceVerifyCallback;
+import org.wildfly.security.auth.callback.IdentityCredentialCallback;
+import org.wildfly.security.auth.callback.SecurityIdentityCallback;
+import org.wildfly.security.auth.server.SecurityIdentity;
+import org.wildfly.security.credential.BearerTokenCredential;
+import org.wildfly.security.evidence.Evidence;
+import org.wildfly.security.http.HttpAuthenticationException;
+import org.wildfly.security.http.HttpScope;
+import org.wildfly.security.http.HttpServerCookie;
+import org.wildfly.security.http.HttpServerRequest;
+import org.wildfly.security.http.HttpServerResponse;
+import org.wildfly.security.http.Scope;
+
+/**
+ *
+ * @author &lt;a href=&quot;mailto:psilva@redhat.com&quot;&gt;Pedro Igor&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+public class OidcHttpFacade {
+
+    private final HttpServerRequest request;
+    private final CallbackHandler callbackHandler;
+    private final OidcTokenStore tokenStore;
+    private final OidcClientContext oidcClientContext;
+    private Consumer&lt;HttpServerResponse&gt; responseConsumer;
+    private OidcAccount account;
+    private SecurityIdentity securityIdentity;
+    private boolean restored;
+<span class="nc" id="L80">    private final Map&lt;String, String&gt; headers = new HashMap&lt;&gt;();</span>
+
+<span class="nc" id="L82">    public OidcHttpFacade(HttpServerRequest request, OidcClientContext oidcClientContext, CallbackHandler handler) {</span>
+<span class="nc" id="L83">        this.request = request;</span>
+<span class="nc" id="L84">        this.oidcClientContext = oidcClientContext;</span>
+<span class="nc" id="L85">        this.callbackHandler = handler;</span>
+<span class="nc" id="L86">        this.tokenStore = createTokenStore();</span>
+<span class="nc" id="L87">        this.responseConsumer = response -&gt; {};</span>
+<span class="nc" id="L88">    }</span>
+
+    void authenticationComplete(OidcAccount account, boolean storeToken) {
+<span class="nc" id="L91">        this.securityIdentity = authorize(this.callbackHandler, account.getPrincipal());</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        if (securityIdentity != null) {</span>
+<span class="nc" id="L93">            this.account = account;</span>
+<span class="nc" id="L94">            RefreshableOidcSecurityContext securityContext = account.getOidcSecurityContext();</span>
+<span class="nc" id="L95">            account.setCurrentRequestInfo(securityContext.getOidcClientConfiguration(), this.tokenStore);</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">            if (storeToken) {</span>
+<span class="nc" id="L97">                this.tokenStore.saveAccountInfo(account);</span>
+            }
+        }
+<span class="nc" id="L100">    }</span>
+
+    static final SecurityIdentity authorize(CallbackHandler callbackHandler, Principal principal) {
+        try {
+<span class="nc" id="L104">            EvidenceVerifyCallback evidenceVerifyCallback = new EvidenceVerifyCallback(new Evidence() {</span>
+                @Override
+                public Principal getPrincipal() {
+<span class="nc" id="L107">                    return principal;</span>
+                }
+            });
+
+<span class="nc" id="L111">            callbackHandler.handle(new Callback[]{evidenceVerifyCallback});</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">            if (evidenceVerifyCallback.isVerified()) {</span>
+<span class="nc" id="L113">                AuthorizeCallback authorizeCallback = new AuthorizeCallback(null, null);</span>
+                try {
+<span class="nc" id="L115">                    callbackHandler.handle(new Callback[] {authorizeCallback});</span>
+<span class="nc" id="L116">                    authorizeCallback.isAuthorized();</span>
+<span class="nc" id="L117">                } catch (Exception e) {</span>
+<span class="nc" id="L118">                    throw new HttpAuthenticationException(e);</span>
+<span class="nc" id="L119">                }</span>
+<span class="nc" id="L120">                SecurityIdentityCallback securityIdentityCallback = new SecurityIdentityCallback();</span>
+<span class="nc" id="L121">                IdentityCredentialCallback credentialCallback = new IdentityCredentialCallback(new BearerTokenCredential(OidcPrincipal.class.cast(principal).getOidcSecurityContext().getTokenString()), true);</span>
+<span class="nc" id="L122">                callbackHandler.handle(new Callback[]{credentialCallback, AuthenticationCompleteCallback.SUCCEEDED, securityIdentityCallback});</span>
+<span class="nc" id="L123">                SecurityIdentity securityIdentity = securityIdentityCallback.getSecurityIdentity();</span>
+<span class="nc" id="L124">                return securityIdentity;</span>
+           }
+<span class="nc" id="L126">        } catch (UnsupportedCallbackException | IOException e) {</span>
+<span class="nc" id="L127">            throw new RuntimeException(e);</span>
+<span class="nc" id="L128">        }</span>
+<span class="nc" id="L129">        return null;</span>
+    }
+
+    void authenticationComplete() {
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        if (securityIdentity != null) {</span>
+<span class="nc" id="L134">            HttpScope requestScope = request.getScope(Scope.EXCHANGE);</span>
+<span class="nc" id="L135">            RefreshableOidcSecurityContext securityContext = account.getOidcSecurityContext();</span>
+
+<span class="nc" id="L137">            requestScope.setAttachment(OidcSecurityContext.class.getName(), securityContext);</span>
+
+<span class="nc" id="L139">            this.request.authenticationComplete(response -&gt; {</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">                if (!restored) {</span>
+<span class="nc" id="L141">                    responseConsumer.accept(response);</span>
+                }
+<span class="nc" id="L143">            }, () -&gt; tokenStore.logout(true));</span>
+        }
+<span class="nc" id="L145">    }</span>
+
+    void authenticationFailed() {
+<span class="nc" id="L148">        this.request.authenticationFailed(&quot;Authentication Failed&quot;, response -&gt; responseConsumer.accept(response));</span>
+<span class="nc" id="L149">    }</span>
+
+    void noAuthenticationInProgress() {
+<span class="nc" id="L152">        this.request.noAuthenticationInProgress();</span>
+<span class="nc" id="L153">    }</span>
+
+    void noAuthenticationInProgress(AuthChallenge challenge) {
+<span class="nc bnc" id="L156" title="All 2 branches missed.">        if (challenge != null) {</span>
+<span class="nc" id="L157">            challenge.challenge(this);</span>
+        }
+<span class="nc" id="L159">        this.request.noAuthenticationInProgress(response -&gt; responseConsumer.accept(response));</span>
+<span class="nc" id="L160">    }</span>
+
+    void authenticationInProgress() {
+<span class="nc" id="L163">        this.request.authenticationInProgress(response -&gt; responseConsumer.accept(response));</span>
+<span class="nc" id="L164">    }</span>
+
+    HttpScope getScope(Scope scope) {
+<span class="nc" id="L167">        return request.getScope(scope);</span>
+    }
+
+    HttpScope getScope(Scope scope, String id) {
+<span class="nc" id="L171">        return request.getScope(scope, id);</span>
+    }
+
+    Collection&lt;String&gt; getScopeIds(Scope scope) {
+<span class="nc" id="L175">        return request.getScopeIds(scope);</span>
+    }
+
+    OidcTokenStore getTokenStore() {
+<span class="nc" id="L179">        return this.tokenStore;</span>
+    }
+
+    OidcClientConfiguration getOidcClientConfiguration() {
+<span class="nc" id="L183">        return oidcClientContext.resolveDeployment(this);</span>
+    }
+
+    private OidcTokenStore createTokenStore() {
+<span class="nc" id="L187">        OidcClientConfiguration deployment = getOidcClientConfiguration();</span>
+
+<span class="nc bnc" id="L189" title="All 2 branches missed.">        if (Oidc.TokenStore.SESSION.equals(deployment.getTokenStore())) {</span>
+<span class="nc" id="L190">            return new OidcSessionTokenStore(this);</span>
+        } else {
+<span class="nc" id="L192">            return new OidcCookieTokenStore(this);</span>
+        }
+    }
+
+    public Request getRequest() {
+<span class="nc" id="L197">        return new Request() {</span>
+            private InputStream inputStream;
+
+            @Override
+            public String getMethod() {
+<span class="nc" id="L202">                return request.getRequestMethod();</span>
+            }
+
+            @Override
+            public String getURI() {
+                try {
+<span class="nc" id="L208">                    return URLDecoder.decode(request.getRequestURI().toString(), &quot;UTF-8&quot;);</span>
+<span class="nc" id="L209">                } catch (UnsupportedEncodingException e) {</span>
+<span class="nc" id="L210">                    throw log.failedToDecodeRequestUri(e);</span>
+                }
+            }
+
+            @Override
+            public String getRelativePath() {
+<span class="nc" id="L216">                return request.getRequestPath();</span>
+            }
+
+            @Override
+            public boolean isSecure() {
+<span class="nc" id="L221">                return request.getRequestURI().getScheme().equals(&quot;https&quot;);</span>
+            }
+
+            @Override
+            public String getFirstParam(String param) {
+<span class="nc" id="L226">                return request.getFirstParameterValue(param);</span>
+            }
+
+            @Override
+            public String getQueryParamValue(String param) {
+<span class="nc" id="L231">                URI requestURI = request.getRequestURI();</span>
+<span class="nc" id="L232">                String query = requestURI.getQuery();</span>
+<span class="nc bnc" id="L233" title="All 2 branches missed.">                if (query != null) {</span>
+<span class="nc" id="L234">                    String[] parameters = query.split(&quot;&amp;&quot;);</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">                    for (String parameter : parameters) {</span>
+<span class="nc" id="L236">                        String[] keyValue = parameter.split(&quot;=&quot;, 2);</span>
+<span class="nc bnc" id="L237" title="All 2 branches missed.">                        if (keyValue[0].equals(param)) {</span>
+                            try {
+<span class="nc" id="L239">                                return URLDecoder.decode(keyValue[1], &quot;UTF-8&quot;);</span>
+<span class="nc" id="L240">                            } catch (IOException e) {</span>
+<span class="nc" id="L241">                                throw log.failedToDecodeRequestUri(e);</span>
+                            }
+                        }
+                    }
+                }
+<span class="nc" id="L246">                return null;</span>
+            }
+
+            @Override
+            public Cookie getCookie(final String cookieName) {
+<span class="nc" id="L251">                List&lt;HttpServerCookie&gt; cookies = request.getCookies();</span>
+
+<span class="nc bnc" id="L253" title="All 2 branches missed.">                if (cookies != null) {</span>
+<span class="nc bnc" id="L254" title="All 2 branches missed.">                    for (HttpServerCookie cookie : cookies) {</span>
+<span class="nc bnc" id="L255" title="All 2 branches missed.">                        if (cookie.getName().equals(cookieName)) {</span>
+<span class="nc" id="L256">                            return new Cookie(cookie.getName(), cookie.getValue(), cookie.getVersion(), cookie.getDomain(), cookie.getPath());</span>
+                        }
+<span class="nc" id="L258">                    }</span>
+                }
+
+<span class="nc" id="L261">                return null;</span>
+            }
+
+            @Override
+            public String getHeader(String name) {
+<span class="nc" id="L266">                return request.getFirstRequestHeaderValue(name);</span>
+            }
+
+            @Override
+            public List&lt;String&gt; getHeaders(String name) {
+<span class="nc" id="L271">                return request.getRequestHeaderValues(name);</span>
+            }
+
+            @Override
+            public InputStream getInputStream() {
+<span class="nc" id="L276">                return getInputStream(false);</span>
+            }
+
+            @Override
+            public InputStream getInputStream(boolean buffered) {
+<span class="nc bnc" id="L281" title="All 2 branches missed.">                if (inputStream != null) {</span>
+<span class="nc" id="L282">                    return inputStream;</span>
+                }
+
+<span class="nc bnc" id="L285" title="All 2 branches missed.">                if (buffered) {</span>
+<span class="nc" id="L286">                    inputStream = new BufferedInputStream(request.getInputStream());</span>
+<span class="nc" id="L287">                    Supplier&lt;InputStream&gt; inputStreamSupplier = () -&gt; {</span>
+<span class="nc" id="L288">                        inputStream.mark(0);</span>
+<span class="nc" id="L289">                        return new ServletInputStream() {</span>
+                            @Override
+                            public int read() throws IOException {
+<span class="nc" id="L292">                                return inputStream.read();</span>
+                            }
+
+                            @Override
+                            public boolean isFinished() {
+                                try {
+<span class="nc bnc" id="L298" title="All 2 branches missed.">                                    return inputStream.available() == 0;</span>
+<span class="nc" id="L299">                                } catch (IOException e) {</span>
+<span class="nc" id="L300">                                    return true;</span>
+                                }
+                            }
+
+                            @Override
+                            public boolean isReady() {
+<span class="nc" id="L306">                                return true;</span>
+                            }
+
+                            @Override
+                            public void setReadListener(ReadListener listener) {
+<span class="nc" id="L311">                                throw new UnsupportedOperationException();</span>
+                            }
+                        };
+                    };
+<span class="nc" id="L315">                    request.setRequestInputStreamSupplier(inputStreamSupplier);</span>
+<span class="nc" id="L316">                    return inputStream;</span>
+                }
+<span class="nc" id="L318">                return request.getInputStream();</span>
+            }
+
+            @Override
+            public String getRemoteAddr() {
+<span class="nc" id="L323">                InetSocketAddress sourceAddress = request.getSourceAddress();</span>
+<span class="nc bnc" id="L324" title="All 2 branches missed.">                if (sourceAddress == null) {</span>
+<span class="nc" id="L325">                    return &quot;&quot;;</span>
+                }
+<span class="nc" id="L327">                InetAddress address = sourceAddress.getAddress();</span>
+<span class="nc bnc" id="L328" title="All 2 branches missed.">                if (address == null) {</span>
+                    // this is unresolved, so we just return the host name not exactly spec, but if the name should be
+                    // resolved then a PeerNameResolvingHandler should be used and this is probably better than just
+                    // returning null
+<span class="nc" id="L332">                    return sourceAddress.getHostString();</span>
+                }
+<span class="nc" id="L334">                return address.getHostAddress();</span>
+            }
+
+            @Override
+            public void setError(AuthenticationError error) {
+<span class="nc" id="L339">                request.getScope(Scope.EXCHANGE).setAttachment(AuthenticationError.class.getName(), error);</span>
+<span class="nc" id="L340">            }</span>
+
+            @Override
+            public void setError(LogoutError error) {
+<span class="nc" id="L344">                request.getScope(Scope.EXCHANGE).setAttachment(LogoutError.class.getName(), error);</span>
+<span class="nc" id="L345">            }</span>
+        };
+    }
+
+    public Response getResponse() {
+<span class="nc" id="L350">        return new Response() {</span>
+
+            @Override
+            public void setStatus(final int status) {
+<span class="nc bnc" id="L354" title="All 4 branches missed.">                if (status &lt; 200 || status &gt; 300) {</span>
+<span class="nc" id="L355">                    responseConsumer = responseConsumer.andThen(response -&gt; response.setStatusCode(status));</span>
+                }
+<span class="nc" id="L357">            }</span>
+
+            @Override
+            public void addHeader(final String name, final String value) {
+<span class="nc" id="L361">                headers.put(name, value);</span>
+<span class="nc" id="L362">                responseConsumer = responseConsumer.andThen(new Consumer&lt;HttpServerResponse&gt;() {</span>
+                    @Override
+                    public void accept(HttpServerResponse response) {
+<span class="nc" id="L365">                        String latestValue = headers.get(name);</span>
+
+<span class="nc bnc" id="L367" title="All 2 branches missed.">                        if (latestValue.equals(value)) {</span>
+<span class="nc" id="L368">                            response.addResponseHeader(name, latestValue);</span>
+                        }
+<span class="nc" id="L370">                    }</span>
+                });
+<span class="nc" id="L372">            }</span>
+
+            @Override
+            public void setHeader(String name, String value) {
+<span class="nc" id="L376">                addHeader(name, value);</span>
+<span class="nc" id="L377">            }</span>
+
+            @Override
+            public void resetCookie(final String name, final String path) {
+<span class="nc" id="L381">                responseConsumer = responseConsumer.andThen(response -&gt; setCookie(name, &quot;&quot;, path, null, 0, false, false, response));</span>
+<span class="nc" id="L382">            }</span>
+
+            @Override
+            public void setCookie(final String name, final String value, final String path, final String domain, final int maxAge, final boolean secure, final boolean httpOnly) {
+<span class="nc" id="L386">                responseConsumer = responseConsumer.andThen(response -&gt; setCookie(name, value, path, domain, maxAge, secure, httpOnly, response));</span>
+<span class="nc" id="L387">            }</span>
+
+            private void setCookie(final String name, final String value, final String path, final String domain, final int maxAge, final boolean secure, final boolean httpOnly, HttpServerResponse response) {
+<span class="nc" id="L390">                response.setResponseCookie(new HttpServerCookie() {</span>
+                    @Override
+                    public String getName() {
+<span class="nc" id="L393">                        return name;</span>
+                    }
+
+                    @Override
+                    public String getValue() {
+<span class="nc" id="L398">                        return value;</span>
+                    }
+
+                    @Override
+                    public String getDomain() {
+<span class="nc" id="L403">                        return domain;</span>
+                    }
+
+                    @Override
+                    public int getMaxAge() {
+<span class="nc" id="L408">                        return maxAge;</span>
+                    }
+
+                    @Override
+                    public String getPath() {
+<span class="nc" id="L413">                        return path;</span>
+                    }
+
+                    @Override
+                    public boolean isSecure() {
+<span class="nc" id="L418">                        return secure;</span>
+                    }
+
+                    @Override
+                    public int getVersion() {
+<span class="nc" id="L423">                        return 0;</span>
+                    }
+
+                    @Override
+                    public boolean isHttpOnly() {
+<span class="nc" id="L428">                        return httpOnly;</span>
+                    }
+                });
+<span class="nc" id="L431">            }</span>
+
+            @Override
+            public OutputStream getOutputStream() {
+<span class="nc" id="L435">                ByteArrayOutputStream stream = new ByteArrayOutputStream();</span>
+<span class="nc" id="L436">                responseConsumer = responseConsumer.andThen(new Consumer&lt;HttpServerResponse&gt;() {</span>
+                    @Override
+                    public void accept(HttpServerResponse httpServerResponse) {
+                        try {
+<span class="nc" id="L440">                            httpServerResponse.getOutputStream().write(stream.toByteArray());</span>
+<span class="nc" id="L441">                        } catch (IOException e) {</span>
+<span class="nc" id="L442">                            throw log.failedToWriteToResponseOutputStream(e);</span>
+<span class="nc" id="L443">                        }</span>
+<span class="nc" id="L444">                    }</span>
+                });
+<span class="nc" id="L446">                return stream;</span>
+            }
+
+            @Override
+            public void sendError(int code) {
+<span class="nc" id="L451">                setStatus(code);</span>
+<span class="nc" id="L452">            }</span>
+
+            @Override
+            public void sendError(final int code, final String message) {
+<span class="nc" id="L456">                responseConsumer = responseConsumer.andThen(response -&gt; {</span>
+<span class="nc" id="L457">                    response.setStatusCode(code);</span>
+<span class="nc" id="L458">                    response.addResponseHeader(&quot;Content-Type&quot;, HTML_CONTENT_TYPE);</span>
+                    try {
+<span class="nc" id="L460">                        response.getOutputStream().write(message.getBytes());</span>
+<span class="nc" id="L461">                    } catch (IOException e) {</span>
+<span class="nc" id="L462">                        throw new RuntimeException(e);</span>
+<span class="nc" id="L463">                    }</span>
+<span class="nc" id="L464">                });</span>
+<span class="nc" id="L465">            }</span>
+
+            @Override
+            public void end() {
+
+<span class="nc" id="L470">            }</span>
+        };
+    }
+
+    public Certificate[] getCertificateChain() {
+<span class="nc" id="L475">        return request.getPeerCertificates();</span>
+    }
+
+    public OidcSecurityContext getSecurityContext() {
+<span class="nc bnc" id="L479" title="All 2 branches missed.">        if (account == null) {</span>
+<span class="nc" id="L480">            return null;</span>
+        }
+<span class="nc" id="L482">        return this.account.getOidcSecurityContext();</span>
+    }
+
+    public boolean restoreRequest() {
+<span class="nc" id="L486">        restored = this.request.resumeRequest();</span>
+<span class="nc" id="L487">        return restored;</span>
+    }
+
+    public void suspendRequest() {
+<span class="nc" id="L491">        responseConsumer = responseConsumer.andThen(httpServerResponse -&gt; request.suspendRequest());</span>
+<span class="nc" id="L492">    }</span>
+
+    public boolean isAuthorized() {
+<span class="nc bnc" id="L495" title="All 2 branches missed.">        return this.securityIdentity != null;</span>
+    }
+
+    public interface Request {
+
+        String getMethod();
+        /**
+         * Full request URI with query params
+         *
+         * @return
+         */
+        String getURI();
+
+        /**
+         * Get the request relative path.
+         *
+         * @return the request relative path
+         */
+        String getRelativePath();
+
+        /**
+         * HTTPS?
+         *
+         * @return
+         */
+        boolean isSecure();
+
+        /**
+         * Get first query or form param
+         *
+         * @param param
+         * @return
+         */
+        String getFirstParam(String param);
+        String getQueryParamValue(String param);
+        Cookie getCookie(String cookieName);
+        String getHeader(String name);
+        List&lt;String&gt; getHeaders(String name);
+        InputStream getInputStream();
+        InputStream getInputStream(boolean buffered);
+
+        String getRemoteAddr();
+        void setError(AuthenticationError error);
+        void setError(LogoutError error);
+    }
+
+    public interface Response {
+        void setStatus(int status);
+        void addHeader(String name, String value);
+        void setHeader(String name, String value);
+        void resetCookie(String name, String path);
+        void setCookie(String name, String value, String path, String domain, int maxAge, boolean secure, boolean httpOnly);
+        OutputStream getOutputStream();
+        void sendError(int code);
+        void sendError(int code, String message);
+
+        /**
+         * If the response is finished, end it.
+         *
+         */
+        void end();
+    }
+
+    public class Cookie {
+        protected String name;
+        protected String value;
+        protected int version;
+        protected String domain;
+        protected String path;
+
+<span class="nc" id="L565">        public Cookie(String name, String value, int version, String domain, String path) {</span>
+<span class="nc" id="L566">            this.name = name;</span>
+<span class="nc" id="L567">            this.value = value;</span>
+<span class="nc" id="L568">            this.version = version;</span>
+<span class="nc" id="L569">            this.domain = domain;</span>
+<span class="nc" id="L570">            this.path = path;</span>
+<span class="nc" id="L571">        }</span>
+
+        public String getName() {
+<span class="nc" id="L574">            return name;</span>
+        }
+
+        public String getValue() {
+<span class="nc" id="L578">            return value;</span>
+        }
+
+        public int getVersion() {
+<span class="nc" id="L582">            return version;</span>
+        }
+
+        public String getDomain() {
+<span class="nc" id="L586">            return domain;</span>
+        }
+
+        public String getPath() {
+<span class="nc" id="L590">            return path;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

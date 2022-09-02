@@ -1,0 +1,439 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages_$logger.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-client</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.client._private</a> &gt; <span class="el_source">ElytronMessages_$logger.java</span></div><h1>ElytronMessages_$logger.java</h1><pre class="source lang-java linenums">package org.wildfly.security.auth.client._private;
+
+import java.util.Locale;
+import java.io.Serializable;
+import javax.annotation.Generated;
+import javax.xml.stream.XMLStreamReader;
+import org.wildfly.client.config.XMLLocation;
+import org.jboss.logging.DelegatingBasicLogger;
+import javax.xml.namespace.QName;
+import java.lang.String;
+import java.io.IOException;
+import java.security.NoSuchAlgorithmException;
+import org.jboss.logging.Logger;
+import java.lang.Exception;
+import java.lang.RuntimeException;
+import org.jboss.logging.BasicLogger;
+import java.lang.Throwable;
+import java.lang.Class;
+import java.util.Arrays;
+import org.wildfly.client.config.ConfigurationXMLStreamReader;
+import org.wildfly.client.config.ConfigXMLParseException;
+import java.lang.IllegalArgumentException;
+import javax.xml.stream.Location;
+
+
+import static org.jboss.logging.Logger.Level.WARN;
+
+/**
+ * Warning this class consists of generated code.
+ */
+@Generated(value = &quot;org.jboss.logging.processor.generator.model.MessageLoggerImplementor&quot;, date = &quot;2022-09-02T20:21:53+0200&quot;)
+public class ElytronMessages_$logger extends DelegatingBasicLogger implements ElytronMessages, BasicLogger, Serializable {
+    private static final long serialVersionUID = 1L;
+<span class="fc" id="L34">    private static final String FQCN = ElytronMessages_$logger.class.getName();</span>
+    public ElytronMessages_$logger(final Logger log) {
+<span class="fc" id="L36">        super(log);</span>
+<span class="fc" id="L37">    }</span>
+<span class="fc" id="L38">    private static final Locale LOCALE = Locale.ROOT;</span>
+    protected Locale getLoggingLocale() {
+<span class="fc" id="L40">        return LOCALE;</span>
+    }
+    protected String xmlNoModuleFound$str() {
+<span class="nc" id="L43">        return &quot;ELY01001: No module found for identifier \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException xmlNoModuleFound(final XMLStreamReader reader, final Exception e, final String moduleIdentifier) {
+<span class="nc" id="L47">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), xmlNoModuleFound$str(), moduleIdentifier), reader, e);</span>
+<span class="nc" id="L48">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L49">        return result;</span>
+    }
+    private static void _copyStackTraceMinusOne(final Throwable e) {
+<span class="fc" id="L52">        final StackTraceElement[] st = e.getStackTrace();</span>
+<span class="fc" id="L53">        e.setStackTrace(Arrays.copyOfRange(st, 1, st.length));</span>
+<span class="fc" id="L54">    }</span>
+    protected String xmlInvalidPortNumber$str() {
+<span class="nc" id="L56">        return &quot;ELY01002: Invalid port number \&quot;%s\&quot; specified for attribute \&quot;%s\&quot; of element \&quot;%s\&quot;; expected a numerical value between 1 and 65535 (inclusive)&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException xmlInvalidPortNumber(final XMLStreamReader reader, final String attributeValue, final String attributeName, final QName elementName) {
+<span class="nc" id="L60">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), xmlInvalidPortNumber$str(), attributeValue, attributeName, elementName), reader);</span>
+<span class="nc" id="L61">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L62">        return result;</span>
+    }
+    protected String invalidPortNumber$str() {
+<span class="nc" id="L65">        return &quot;ELY01028: Invalid port number \&quot;%d\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidPortNumber(final int port) {
+<span class="nc" id="L69">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidPortNumber$str(), port));</span>
+<span class="nc" id="L70">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L71">        return result;</span>
+    }
+    protected String invalidHostSpec$str() {
+<span class="fc" id="L74">        return &quot;ELY01029: Invalid host specification \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidHostSpec(final String hostSpec) {
+<span class="fc" id="L78">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidHostSpec$str(), hostSpec));</span>
+<span class="fc" id="L79">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L80">        return result;</span>
+    }
+    protected String unableToCreateKeyManager$str() {
+<span class="nc" id="L83">        return &quot;ELY01035: Unable to create key manager&quot;;</span>
+    }
+    @Override
+    public final IOException unableToCreateKeyManager(final Exception e) {
+<span class="nc" id="L87">        final IOException result = new IOException(String.format(getLoggingLocale(), unableToCreateKeyManager$str()), e);</span>
+<span class="nc" id="L88">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L89">        return result;</span>
+    }
+    protected String unableToCreateTrustManager$str() {
+<span class="nc" id="L92">        return &quot;ELY01036: Unable to create trust manager&quot;;</span>
+    }
+    @Override
+    public final IOException unableToCreateTrustManager(final Exception e) {
+<span class="nc" id="L96">        final IOException result = new IOException(String.format(getLoggingLocale(), unableToCreateTrustManager$str()), e);</span>
+<span class="nc" id="L97">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L98">        return result;</span>
+    }
+    protected String couldNotObtainCredential$str() {
+<span class="nc" id="L101">        return &quot;ELY01041: Could not obtain credential&quot;;</span>
+    }
+    @Override
+    public final RuntimeException couldNotObtainCredential() {
+<span class="nc" id="L105">        final RuntimeException result = new RuntimeException(String.format(getLoggingLocale(), couldNotObtainCredential$str()));</span>
+<span class="nc" id="L106">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L107">        return result;</span>
+    }
+    protected String invalidName$str() {
+<span class="nc" id="L110">        return &quot;ELY01064: Invalid identity name&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidName() {
+<span class="nc" id="L114">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidName$str()));</span>
+<span class="nc" id="L115">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L116">        return result;</span>
+    }
+    @Override
+    public final void postAssociationFailed(final Throwable cause) {
+<span class="nc" id="L120">        super.log.logf(FQCN, WARN, cause, postAssociationFailed$str());</span>
+<span class="nc" id="L121">    }</span>
+    protected String postAssociationFailed$str() {
+<span class="nc" id="L123">        return &quot;ELY01091: Post-association peer context action failed&quot;;</span>
+    }
+    protected String xmlUnknownSslContextSpecified$str() {
+<span class="nc" id="L126">        return &quot;ELY01129: Unknown SSL context \&quot;%s\&quot; specified&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException xmlUnknownSslContextSpecified(final Location location, final String name) {
+<span class="nc" id="L130">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), xmlUnknownSslContextSpecified$str(), name), location);</span>
+<span class="nc" id="L131">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L132">        return result;</span>
+    }
+    protected String xmlDuplicateSslContextName$str() {
+<span class="nc" id="L135">        return &quot;ELY01130: Duplicate SSL context name \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException xmlDuplicateSslContextName(final String name, final ConfigurationXMLStreamReader reader) {
+<span class="nc" id="L139">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), xmlDuplicateSslContextName$str(), name), reader);</span>
+<span class="nc" id="L140">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L141">        return result;</span>
+    }
+    protected String xmlUnknownAuthenticationConfigurationSpecified$str() {
+<span class="nc" id="L144">        return &quot;ELY01132: Unknown authentication configuration \&quot;%s\&quot; specified&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException xmlUnknownAuthenticationConfigurationSpecified(final Location location, final String name) {
+<span class="nc" id="L148">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), xmlUnknownAuthenticationConfigurationSpecified$str(), name), location);</span>
+<span class="nc" id="L149">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L150">        return result;</span>
+    }
+    protected String xmlFailedToCreateCredential$str() {
+<span class="nc" id="L153">        return &quot;ELY01133: Failed to create credential&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException xmlFailedToCreateCredential(final Location location, final Throwable cause) {
+<span class="nc" id="L157">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), xmlFailedToCreateCredential$str()), location, cause);</span>
+<span class="nc" id="L158">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L159">        return result;</span>
+    }
+    protected String xmlDuplicateAuthenticationConfigurationName$str() {
+<span class="nc" id="L162">        return &quot;ELY01134: Duplicate authentication configuration name \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException xmlDuplicateAuthenticationConfigurationName(final String name, final ConfigurationXMLStreamReader reader) {
+<span class="nc" id="L166">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), xmlDuplicateAuthenticationConfigurationName$str(), name), reader);</span>
+<span class="nc" id="L167">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L168">        return result;</span>
+    }
+    protected String xmlFailedToLoadKeyStoreData$str() {
+<span class="nc" id="L171">        return &quot;ELY01135: Failed to load keystore data&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException xmlFailedToLoadKeyStoreData(final Location location, final Throwable cause) {
+<span class="nc" id="L175">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), xmlFailedToLoadKeyStoreData$str()), location, cause);</span>
+<span class="nc" id="L176">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L177">        return result;</span>
+    }
+    protected String xmlFailedToCreateKeyStore$str() {
+<span class="nc" id="L180">        return &quot;ELY01136: Failed to create keystore&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException xmlFailedToCreateKeyStore(final Location location, final Throwable cause) {
+<span class="nc" id="L184">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), xmlFailedToCreateKeyStore$str()), location, cause);</span>
+<span class="nc" id="L185">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L186">        return result;</span>
+    }
+    protected String xmlInvalidKeyStoreEntryType$str() {
+<span class="nc" id="L189">        return &quot;ELY01137: Invalid key store entry type for alias \&quot;%s\&quot; (expected %s, got %s)&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException xmlInvalidKeyStoreEntryType(final Location location, final String alias, final Class&lt;?&gt; expectedClass, final Class&lt;?&gt; actualClass) {
+<span class="nc" id="L193">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), xmlInvalidKeyStoreEntryType$str(), alias, expectedClass, actualClass), location);</span>
+<span class="nc" id="L194">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L195">        return result;</span>
+    }
+    protected String xmlFailedToCreateCredentialStore$str() {
+<span class="nc" id="L198">        return &quot;ELY01139: Failed to create credential store&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException xmlFailedToCreateCredentialStore(final Location location, final Throwable cause) {
+<span class="nc" id="L202">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), xmlFailedToCreateCredentialStore$str()), location, cause);</span>
+<span class="nc" id="L203">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L204">        return result;</span>
+    }
+    protected String xmlWrongPemType$str() {
+<span class="nc" id="L207">        return &quot;ELY01140: Wrong PEM content type; expected %s, actually was %s&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException xmlWrongPemType(final ConfigurationXMLStreamReader reader, final Class&lt;?&gt; expected, final Class&lt;?&gt; actual) {
+<span class="nc" id="L211">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), xmlWrongPemType$str(), expected, actual), reader);</span>
+<span class="nc" id="L212">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L213">        return result;</span>
+    }
+    protected String xmlNoPemContent$str() {
+<span class="nc" id="L216">        return &quot;ELY01141: No PEM content found&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException xmlNoPemContent(final ConfigurationXMLStreamReader reader) {
+<span class="nc" id="L220">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), xmlNoPemContent$str()), reader);</span>
+<span class="nc" id="L221">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L222">        return result;</span>
+    }
+    protected String xmlInvalidUrl$str() {
+<span class="nc" id="L225">        return &quot;ELY01143: Invalid URL [%s]&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException xmlInvalidUrl(final String url) {
+<span class="nc" id="L229">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), xmlInvalidUrl$str(), url));</span>
+<span class="nc" id="L230">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L231">        return result;</span>
+    }
+    protected String keyStoreEntryMissing$str() {
+<span class="nc" id="L234">        return &quot;ELY01159: Key store entry for alias \&quot;%s\&quot; is missing.&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException keyStoreEntryMissing(final Location location, final String alias) {
+<span class="nc" id="L238">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), keyStoreEntryMissing$str(), alias), location);</span>
+<span class="nc" id="L239">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L240">        return result;</span>
+    }
+    protected String xmlInvalidGssMechanismName$str() {
+<span class="nc" id="L243">        return &quot;ELY01162: Invalid GSS mechanism name \&quot;%s\&quot; - unable to convert to mechanism OID&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException xmlInvalidGssMechanismName(final XMLStreamReader reader, final String mechanismName) {
+<span class="nc" id="L247">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), xmlInvalidGssMechanismName$str(), mechanismName), reader);</span>
+<span class="nc" id="L248">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L249">        return result;</span>
+    }
+    protected String xmlGssMechanismOidConversionFailed$str() {
+<span class="nc" id="L252">        return &quot;ELY01163: Mechanism OID conversion from string \&quot;%s\&quot; failed&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException xmlGssMechanismOidConversionFailed(final XMLStreamReader reader, final String mechanismOid, final Throwable cause) {
+<span class="nc" id="L256">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), xmlGssMechanismOidConversionFailed$str(), mechanismOid), reader, cause);</span>
+<span class="nc" id="L257">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L258">        return result;</span>
+    }
+    protected String xmlUnableToIdentifyProvider$str() {
+<span class="nc" id="L261">        return &quot;ELY01164: Unable to identify provider name=%s, for service type=%s, algorithm=%s&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException xmlUnableToIdentifyProvider(final Location location, final String providerName, final String serviceType, final String algorithm) {
+<span class="nc" id="L265">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), xmlUnableToIdentifyProvider$str(), providerName, serviceType, algorithm), location);</span>
+<span class="nc" id="L266">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L267">        return result;</span>
+    }
+    @Override
+    public final void xmlDeprecatedElement(final String name, final XMLLocation location) {
+<span class="nc" id="L271">        super.log.logf(FQCN, WARN, null, xmlDeprecatedElement$str(), name, location);</span>
+<span class="nc" id="L272">    }</span>
+    protected String xmlDeprecatedElement$str() {
+<span class="nc" id="L274">        return &quot;ELY01166: %2$s: Element \&quot;%1$s\&quot; is deprecated&quot;;</span>
+    }
+    protected String missingAlias$str() {
+<span class="nc" id="L277">        return &quot;ELY02034: Alias must be specified if more than one entry exist in keystore&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException missingAlias(final Location location) {
+<span class="nc" id="L281">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), missingAlias$str()), location);</span>
+<span class="nc" id="L282">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L283">        return result;</span>
+    }
+    protected String xmlUnknownKeyStoreSpecified$str() {
+<span class="nc" id="L286">        return &quot;ELY02010: Unknown key store specified&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException xmlUnknownKeyStoreSpecified(final Location location) {
+<span class="nc" id="L290">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), xmlUnknownKeyStoreSpecified$str()), location);</span>
+<span class="nc" id="L291">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L292">        return result;</span>
+    }
+    protected String noDefaultTrustManager$str() {
+<span class="nc" id="L295">        return &quot;ELY04005: No default trust manager available&quot;;</span>
+    }
+    @Override
+    public final NoSuchAlgorithmException noDefaultTrustManager() {
+<span class="nc" id="L299">        final NoSuchAlgorithmException result = new NoSuchAlgorithmException(String.format(getLoggingLocale(), noDefaultTrustManager$str()));</span>
+<span class="nc" id="L300">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L301">        return result;</span>
+    }
+    protected String noDefaultKeyManager$str() {
+<span class="nc" id="L304">        return &quot;ELY04028: No default key manager available&quot;;</span>
+    }
+    @Override
+    public final NoSuchAlgorithmException noDefaultKeyManager() {
+<span class="nc" id="L308">        final NoSuchAlgorithmException result = new NoSuchAlgorithmException(String.format(getLoggingLocale(), noDefaultKeyManager$str()));</span>
+<span class="nc" id="L309">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L310">        return result;</span>
+    }
+    protected String duplicateAttributeFound$str() {
+<span class="nc" id="L313">        return &quot;ELY09501: Duplicate attribute (\&quot;%s\&quot;) found in configuration.&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException duplicateAttributeFound(final XMLStreamReader reader, final String attribute) {
+<span class="nc" id="L317">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), duplicateAttributeFound$str(), attribute), reader);</span>
+<span class="nc" id="L318">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L319">        return result;</span>
+    }
+    protected String duplicateCredentialStoreName$str() {
+<span class="nc" id="L322">        return &quot;ELY09502: Duplicate credential store name found in configuration \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException duplicateCredentialStoreName(final XMLStreamReader reader, final String storeName) {
+<span class="nc" id="L326">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), duplicateCredentialStoreName$str(), storeName), reader);</span>
+<span class="nc" id="L327">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L328">        return result;</span>
+    }
+    protected String xmlCredentialStoreNameNotDefined$str() {
+<span class="nc" id="L331">        return &quot;ELY09503: Credential store name \&quot;%s\&quot; not defined&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException xmlCredentialStoreNameNotDefined(final Location location, final String storeName) {
+<span class="nc" id="L335">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), xmlCredentialStoreNameNotDefined$str(), storeName), location);</span>
+<span class="nc" id="L336">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L337">        return result;</span>
+    }
+    protected String xmlInvalidCredentialStoreRef$str() {
+<span class="nc" id="L340">        return &quot;ELY09527: Invalid credential store reference&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException xmlInvalidCredentialStoreRef(final Location location) {
+<span class="nc" id="L344">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), xmlInvalidCredentialStoreRef$str()), location);</span>
+<span class="nc" id="L345">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L346">        return result;</span>
+    }
+    protected String xmlUnsupportedAlgorithmForType$str() {
+<span class="nc" id="L349">        return &quot;ELY09529: Unsupported algorithm \&quot;%s\&quot; for %s type&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException xmlUnsupportedAlgorithmForType(final Location location, final String algorithm, final String type) {
+<span class="nc" id="L353">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), xmlUnsupportedAlgorithmForType$str(), algorithm, type), location);</span>
+<span class="nc" id="L354">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L355">        return result;</span>
+    }
+    protected String atLeastOneCipherSuiteAttributeMustBeProvided$str() {
+<span class="nc" id="L358">        return &quot;ELY14000: At least one of the '%s' and '%s' cipher-suite attributes must be provided&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException atLeastOneCipherSuiteAttributeMustBeProvided(final String attribute1, final String attribute2) {
+<span class="nc" id="L362">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), atLeastOneCipherSuiteAttributeMustBeProvided$str(), attribute1, attribute2));</span>
+<span class="nc" id="L363">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L364">        return result;</span>
+    }
+    protected String xmlInvalidOpenSSHKey$str() {
+<span class="nc" id="L367">        return &quot;ELY14001: Wrong Key content type; expected OpenSSH private key&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException xmlInvalidOpenSSHKey(final ConfigurationXMLStreamReader reader) {
+<span class="nc" id="L371">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), xmlInvalidOpenSSHKey$str()), reader);</span>
+<span class="nc" id="L372">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L373">        return result;</span>
+    }
+    protected String unableToObtainSslContext$str() {
+<span class="nc" id="L376">        return &quot;ELY14002: Unable to obtain SSLContext&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException unableToObtainSslContext() {
+<span class="nc" id="L380">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), unableToObtainSslContext$str()));</span>
+<span class="nc" id="L381">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L382">        return result;</span>
+    }
+    protected String nameCallbackHandlingWasUnsuccessful$str() {
+<span class="nc" id="L385">        return &quot;ELY14003: Name callback handling was unsuccessful&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException nameCallbackHandlingWasUnsuccessful() {
+<span class="nc" id="L389">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), nameCallbackHandlingWasUnsuccessful$str()));</span>
+<span class="nc" id="L390">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L391">        return result;</span>
+    }
+    protected String passwordCallbackHandlingWasUnsuccessful$str() {
+<span class="nc" id="L394">        return &quot;ELY14004: Password callback handling was unsuccessful&quot;;</span>
+    }
+    @Override
+    public final ConfigXMLParseException passwordCallbackHandlingWasUnsuccessful() {
+<span class="nc" id="L398">        final ConfigXMLParseException result = new ConfigXMLParseException(String.format(getLoggingLocale(), passwordCallbackHandlingWasUnsuccessful$str()));</span>
+<span class="nc" id="L399">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L400">        return result;</span>
+    }
+    protected String sslContextForSecurityProviderCreatesInfiniteLoop$str() {
+<span class="fc" id="L403">        return &quot;ELY14005: Default SSL context in security provider creates infinite loop&quot;;</span>
+    }
+    @Override
+    public final NoSuchAlgorithmException sslContextForSecurityProviderCreatesInfiniteLoop() {
+<span class="fc" id="L407">        final NoSuchAlgorithmException result = new NoSuchAlgorithmException(String.format(getLoggingLocale(), sslContextForSecurityProviderCreatesInfiniteLoop$str()));</span>
+<span class="fc" id="L408">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L409">        return result;</span>
+    }
+    protected String clientConfigurationFileNotFound$str() {
+<span class="fc" id="L412">        return &quot;ELY14006: Configuration file path passed to WildFlyElytronClientDefaultSSLContextProvider not found&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException clientConfigurationFileNotFound() {
+<span class="fc" id="L416">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), clientConfigurationFileNotFound$str()));</span>
+<span class="fc" id="L417">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L418">        return result;</span>
+    }
+    protected String clientConfigurationFileNotValid$str() {
+<span class="fc" id="L421">        return &quot;ELY14007: Invalid path passed to WildFlyElytronClientDefaultSSLContextProvider&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException clientConfigurationFileNotValid() {
+<span class="fc" id="L425">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), clientConfigurationFileNotValid$str()));</span>
+<span class="fc" id="L426">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L427">        return result;</span>
+    }
+    protected String couldNotObtainClientDefaultSSLContext$str() {
+<span class="fc" id="L430">        return &quot;ELY14008: WildFlyElytronClientDefaultSSLContextProvider could not obtain client default SSLContext&quot;;</span>
+    }
+    @Override
+    public final NoSuchAlgorithmException couldNotObtainClientDefaultSSLContext() {
+<span class="fc" id="L434">        final NoSuchAlgorithmException result = new NoSuchAlgorithmException(String.format(getLoggingLocale(), couldNotObtainClientDefaultSSLContext$str()));</span>
+<span class="fc" id="L435">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L436">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>JWK.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-jose-jwk</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.jose.jwk</a> &gt; <span class="el_source">JWK.java</span></div><h1>JWK.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2020 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.jose.jwk;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import com.fasterxml.jackson.annotation.JsonAnyGetter;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+/**
+ * A class that represents a JSON Web Key.
+ *
+ * @author &lt;a href=&quot;mailto:sthorger@redhat.com&quot;&gt;Stian Thorgersen&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ * @since 1.14.0
+ */
+<span class="nc" id="L35">public class JWK {</span>
+
+    public static final String KEY_ID = &quot;kid&quot;;
+
+    public static final String KEY_TYPE = &quot;kty&quot;;
+
+    public static final String ALGORITHM = &quot;alg&quot;;
+
+    public static final String PUBLIC_KEY_USE = &quot;use&quot;;
+
+<span class="nc" id="L45">    public enum Use {</span>
+<span class="nc" id="L46">        SIG(&quot;sig&quot;),</span>
+<span class="nc" id="L47">        ENC(&quot;enc&quot;);</span>
+
+        private String str;
+
+<span class="nc" id="L51">        Use(String str) {</span>
+<span class="nc" id="L52">            this.str = str;</span>
+<span class="nc" id="L53">        }</span>
+
+        public String asString() {
+<span class="nc" id="L56">            return str;</span>
+        }
+    }
+
+    @JsonProperty(KEY_ID)
+    private String keyId;
+
+    @JsonProperty(KEY_TYPE)
+    private String keyType;
+
+    @JsonProperty(ALGORITHM)
+    private String algorithm;
+
+    @JsonProperty(PUBLIC_KEY_USE)
+    private String publicKeyUse;
+
+<span class="nc" id="L72">    protected Map&lt;String, Object&gt; otherClaims = new HashMap&lt;String, Object&gt;();</span>
+
+
+    public String getKeyId() {
+<span class="nc" id="L76">        return keyId;</span>
+    }
+
+    public void setKeyId(String keyId) {
+<span class="nc" id="L80">        this.keyId = keyId;</span>
+<span class="nc" id="L81">    }</span>
+
+    public String getKeyType() {
+<span class="nc" id="L84">        return keyType;</span>
+    }
+
+    public void setKeyType(String keyType) {
+<span class="nc" id="L88">        this.keyType = keyType;</span>
+<span class="nc" id="L89">    }</span>
+
+    public String getAlgorithm() {
+<span class="nc" id="L92">        return algorithm;</span>
+    }
+
+    public void setAlgorithm(String algorithm) {
+<span class="nc" id="L96">        this.algorithm = algorithm;</span>
+<span class="nc" id="L97">    }</span>
+
+    public String getPublicKeyUse() {
+<span class="nc" id="L100">        return publicKeyUse;</span>
+    }
+
+    public void setPublicKeyUse(String publicKeyUse) {
+<span class="nc" id="L104">        this.publicKeyUse = publicKeyUse;</span>
+<span class="nc" id="L105">    }</span>
+
+    @JsonAnyGetter
+    public Map&lt;String, Object&gt; getOtherClaims() {
+<span class="nc" id="L109">        return otherClaims;</span>
+    }
+
+    @JsonAnySetter
+    public void setOtherClaims(String name, Object value) {
+<span class="nc" id="L114">        otherClaims.put(name, value);</span>
+<span class="nc" id="L115">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,2509 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ServerAuthenticationContext.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.server</a> &gt; <span class="el_source">ServerAuthenticationContext.java</span></div><h1>ServerAuthenticationContext.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.server;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+import static org.wildfly.security.auth.server._private.ElytronMessages.log;
+import static org.wildfly.security.authz.RoleDecoder.KEY_SOURCE_ADDRESS;
+
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.security.NoSuchAlgorithmException;
+import java.security.Principal;
+import java.security.cert.X509Certificate;
+import java.security.spec.AlgorithmParameterSpec;
+import java.security.spec.InvalidKeySpecException;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
+import java.util.function.Predicate;
+
+import javax.net.ssl.SSLPeerUnverifiedException;
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.NameCallback;
+import javax.security.auth.callback.PasswordCallback;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.sasl.AuthorizeCallback;
+import javax.security.sasl.RealmCallback;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.auth.SupportLevel;
+import org.wildfly.security.auth.callback.AnonymousAuthorizationCallback;
+import org.wildfly.security.auth.callback.AuthenticationCompleteCallback;
+import org.wildfly.security.auth.callback.AvailableRealmsCallback;
+import org.wildfly.security.auth.callback.CachedIdentityAuthorizeCallback;
+import org.wildfly.security.auth.callback.CallbackUtil;
+import org.wildfly.security.auth.callback.ChannelBindingCallback;
+import org.wildfly.security.auth.callback.CredentialCallback;
+import org.wildfly.security.auth.callback.CredentialUpdateCallback;
+import org.wildfly.security.auth.callback.EvidenceDecodePrincipalCallback;
+import org.wildfly.security.auth.callback.EvidenceVerifyCallback;
+import org.wildfly.security.auth.callback.ExclusiveNameCallback;
+import org.wildfly.security.auth.callback.FastUnsupportedCallbackException;
+import org.wildfly.security.auth.callback.PrincipalAuthorizeCallback;
+import org.wildfly.security.auth.callback.MechanismInformationCallback;
+import org.wildfly.security.auth.callback.IdentityCredentialCallback;
+import org.wildfly.security.auth.callback.PeerPrincipalCallback;
+import org.wildfly.security.auth.callback.SSLCallback;
+import org.wildfly.security.auth.callback.SecurityIdentityCallback;
+import org.wildfly.security.auth.callback.ServerCredentialCallback;
+import org.wildfly.security.auth.callback.SocketAddressCallback;
+import org.wildfly.security.auth.permission.LoginPermission;
+import org.wildfly.security.auth.permission.RunAsPrincipalPermission;
+import org.wildfly.security.auth.principal.AnonymousPrincipal;
+import org.wildfly.security.auth.principal.NamePrincipal;
+import org.wildfly.security.auth.server.event.RealmFailedAuthenticationEvent;
+import org.wildfly.security.auth.server.event.RealmIdentityFailedAuthorizationEvent;
+import org.wildfly.security.auth.server.event.RealmIdentitySuccessfulAuthorizationEvent;
+import org.wildfly.security.auth.server.event.RealmSuccessfulAuthenticationEvent;
+import org.wildfly.security.auth.server.event.SecurityAuthenticationFailedEvent;
+import org.wildfly.security.auth.server.event.SecurityAuthenticationSuccessfulEvent;
+import org.wildfly.security.auth.server.event.SecurityRealmUnavailableEvent;
+import org.wildfly.security.authz.AggregateAttributes;
+import org.wildfly.security.authz.Attributes;
+import org.wildfly.security.authz.AuthorizationIdentity;
+import org.wildfly.security.authz.MapAttributes;
+import org.wildfly.security.credential.Credential;
+import org.wildfly.security.credential.PasswordCredential;
+import org.wildfly.security.credential.source.CredentialSource;
+import org.wildfly.security.evidence.AlgorithmEvidence;
+import org.wildfly.security.evidence.Evidence;
+import org.wildfly.security.evidence.X509PeerCertificateChainEvidence;
+import org.wildfly.security.password.Password;
+import org.wildfly.security.password.PasswordFactory;
+import org.wildfly.security.password.TwoWayPassword;
+import org.wildfly.security.password.interfaces.DigestPassword;
+import org.wildfly.security.password.spec.ClearPasswordSpec;
+import org.wildfly.security.ssl.SSLConnection;
+import org.wildfly.security.x500.X500;
+import org.wildfly.security.auth.server._private.ElytronMessages;
+
+/**
+ * Server-side authentication context.  Instances of this class are used to perform all authentication and re-authorization
+ * operations that involve the usage of an identity in a {@linkplain SecurityDomain security domain}.
+ * &lt;p&gt;
+ * There are various effective states, described as follows:
+ * &lt;ul&gt;
+ *     &lt;li&gt;The &lt;em&gt;inactive&lt;/em&gt; state.&lt;/li&gt;
+ *     &lt;li&gt;
+ *         The &lt;em&gt;unassigned&lt;/em&gt; states:
+ *         &lt;ul&gt;
+ *             &lt;li&gt;&lt;em&gt;Initial&lt;/em&gt;&lt;/li&gt;
+ *             &lt;li&gt;&lt;em&gt;Realm-assigned&lt;/em&gt;&lt;/li&gt;
+ *         &lt;/ul&gt;
+ *     &lt;/li&gt;
+ *     &lt;li&gt;The &lt;em&gt;assigned&lt;/em&gt; state&lt;/li&gt;
+ *     &lt;li&gt;
+ *         The &lt;em&gt;authorized&lt;/em&gt; states:
+ *         &lt;ul&gt;
+ *             &lt;li&gt;&lt;em&gt;Anonymous-authorized&lt;/em&gt;&lt;/li&gt;
+ *             &lt;li&gt;&lt;em&gt;Authorized&lt;/em&gt;&lt;/li&gt;
+ *             &lt;li&gt;&lt;em&gt;Authorized-authenticated&lt;/em&gt;&lt;/li&gt;
+ *         &lt;/ul&gt;
+ *     &lt;/li&gt;
+ *     &lt;li&gt;
+ *         The &lt;em&gt;terminal&lt;/em&gt; states:
+ *         &lt;ul&gt;
+ *             &lt;li&gt;&lt;em&gt;Complete&lt;/em&gt;&lt;/li&gt;
+ *             &lt;li&gt;&lt;em&gt;Failed&lt;/em&gt;&lt;/li&gt;
+ *         &lt;/ul&gt;
+ *     &lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;p&gt;
+ * When an instance of this class is first constructed, it is in the &lt;em&gt;inactive&lt;/em&gt; state. In this state, the context retains
+ * a &lt;em&gt;captured {@linkplain SecurityIdentity identity}&lt;/em&gt; and contains a reference to a
+ * &lt;em&gt;{@linkplain MechanismConfigurationSelector}&lt;/em&gt;. The &lt;em&gt;captured identity&lt;/em&gt; may be used for various
+ * context-sensitive authorization decisions. Additional mechanism information can be supplied to this state so that when
+ * authentication begins an appropriate &lt;em&gt;{@linkplain MechanismConfiguration}&lt;/em&gt; can be selected.
+ * &lt;p&gt;
+ * Once authentication commences the state will automatically transition to the &lt;em&gt;initial&lt;/em&gt; state. In this state, the
+ * context retains an &lt;em&gt;captured {@linkplain SecurityIdentity identity}&lt;/em&gt; and a &lt;em&gt;{@linkplain MechanismConfiguration mechanism configuration}&lt;/em&gt;
+ * which was resolved from the information supplied to the &lt;em&gt;inactive&lt;/em&gt; state. The &lt;em&gt;captured identity&lt;/em&gt; may be
+ * used for various context-sensitive authorization decisions.  The &lt;em&gt;mechanism configuration&lt;/em&gt; is used to associate
+ * an authentication mechanism-specific configuration, including rewriters, {@linkplain MechanismRealmConfiguration mechanism realms},
+ * server credential factories, and more.
+ * &lt;p&gt;
+ * When an authentication mechanism is &quot;realm-aware&quot; (that is, it has a notion of realms that is specific to that particular
+ * authentication mechanism, e.g. &lt;a href=&quot;https://tools.ietf.org/html/rfc2831&quot;&gt;the DIGEST-MD5 SASL mechanism&lt;/a&gt;), it
+ * is necessary for the mechanism to relay the realm selection.  This is done by way of the {@link #setMechanismRealmName(String) setMechanismRealmName()}
+ * method.  Calling this method in the &lt;em&gt;initial&lt;/em&gt; state causes a transition to the &lt;em&gt;realm-assigned&lt;/em&gt; state,
+ * in which the method may be reinvoked idempotently as long as it is called with the same name (calling the method with
+ * a different name will result in an exception).
+ * &lt;p&gt;
+ * The &lt;em&gt;realm-assigned&lt;/em&gt; state is nearly identical to the &lt;em&gt;initial&lt;/em&gt; state, except that from this state, the
+ * mechanism realm-specific configuration is applied to all subsequent operation.
+ * &lt;p&gt;
+ * From these &lt;em&gt;unassigned&lt;/em&gt; states, several possible actions may be taken, depending on the necessary progression
+ * of the authentication:
+ * &lt;ul&gt;
+ *     &lt;li&gt;
+ *         A &lt;em&gt;name&lt;/em&gt; may be assigned by way of the {@link #setAuthenticationName(String)} method.  The name is
+ *         {@linkplain NameRewriter rewritten} and {@linkplain RealmMapper mapped to a realm} according to the
+ *         domain settings, the &lt;em&gt;mechanism configuration&lt;/em&gt;, and/or the &lt;em&gt;mechanism realm configuration&lt;/em&gt;.  The
+ *         &lt;em&gt;{@linkplain SecurityRealm realm}&lt;/em&gt; that is the resultant target of the mapping is queried for a
+ *         &lt;em&gt;{@linkplain RealmIdentity realm identity}&lt;/em&gt;.  The &lt;em&gt;realm identity&lt;/em&gt; may or may not be
+ *         existent; this status will affect the outcome of certain operations in subsequent states (as described below).
+ *         After the &lt;em&gt;realm identity&lt;/em&gt; is selected, any final rewrite operations which are configured are applied,
+ *         and the resultant name is transformed into a {@link NamePrincipal}, and associated as the
+ *         &lt;em&gt;{@linkplain #getAuthenticationPrincipal() authentication principal}&lt;/em&gt; which may subsequently be queried.
+ *     &lt;/li&gt;
+ *     &lt;li&gt;
+ *         A &lt;em&gt;principal&lt;/em&gt; may be assigned using the {@link #setAuthenticationPrincipal(Principal)} method.  The
+ *         principal is {@linkplain PrincipalDecoder decoded} according to the configuration of the security domain (see
+ *         the method documentation for input requirements and failure conditions).  Once a name is decoded from the
+ *         principal, it is assigned as described above.
+ *     &lt;/li&gt;
+ *     &lt;li&gt;
+ *         A unit of &lt;em&gt;{@linkplain Evidence evidence}&lt;/em&gt; may be verified.  This is mostly described below in the
+ *         context of the &lt;em&gt;assigned&lt;/em&gt; state, but with the important distinction the evidence is first examined
+ *         to locate the corresponding evidence, in the following steps:
+ *         &lt;ul&gt;
+ *             &lt;li&gt;
+ *                 Firstly, the evidence is examined to determine whether it {@linkplain Evidence#getPrincipal() contains a principal}.
+ *                 If so, the principal name is first established using the procedure described above, and then the normal
+ *                 evidence verification procedure described below commences.
+ *             &lt;/li&gt;
+ *             &lt;li&gt;
+ *                 Secondly, the evidence is socialized to each &lt;em&gt;realm&lt;/em&gt; in turn, to see if a realm can recognize
+ *                 and {@linkplain SecurityRealm#getRealmIdentity(Principal) locate} an identity based on
+ *                 the evidence.  If so, the &lt;em&gt;realm identity&lt;/em&gt; is {@linkplain RealmIdentity#getRealmIdentityPrincipal() queried}
+ *                 for an authentication principal, which is then decoded and established as described above.  Once this
+ *                 is done successfully, the evidence verification procedure described below commences.
+ *             &lt;/li&gt;
+ *             &lt;li&gt;Finally, if none of these steps succeeds, the verification fails and no state transition occurs.&lt;/li&gt;
+ *         &lt;/ul&gt;
+ *     &lt;/li&gt;
+ *     &lt;li&gt;
+ *         An &lt;em&gt;identity&lt;/em&gt; may be {@linkplain #importIdentity(SecurityIdentity) imported}.  In this process,
+ *         a {@link SecurityIdentity} instance is examined to determine whether it can be used to complete an implicit
+ *         authentication operation which would yield an &lt;em&gt;authorized identity&lt;/em&gt;.  The {@code SecurityIdentity} may
+ *         be from the same &lt;em&gt;domain&lt;/em&gt; or from a different one.
+ *         &lt;p&gt;
+ *         If the &lt;em&gt;identity&lt;/em&gt; being imported is from the same security domain as this context, then the &lt;em&gt;identity&lt;/em&gt;
+ *         is implicitly &lt;em&gt;authorized&lt;/em&gt; for usage, entering the &lt;em&gt;authorized&lt;/em&gt; state described below.
+ *         &lt;p&gt;
+ *         If the &lt;em&gt;identity&lt;/em&gt; being imported is not from the same security domain, then the principal is extracted
+ *         from the identity and used to assign a &lt;em&gt;realm identity&lt;/em&gt; in the same manner as {@link #setAuthenticationPrincipal(Principal)}.
+ *         The &lt;em&gt;domain&lt;/em&gt; is then {@linkplain SecurityDomain.Builder#setTrustedSecurityDomainPredicate(Predicate) queried}
+ *         to determine whether the target identity's source &lt;em&gt;domain&lt;/em&gt; is &lt;em&gt;trusted&lt;/em&gt;.  If so, a normal
+ *         &lt;em&gt;authorization&lt;/em&gt; is carried out as described below for the &lt;em&gt;assigned&lt;/em&gt; state, resulting in an
+ *         &lt;em&gt;authorized-authenticated&lt;/em&gt; state.  If not, then the &lt;em&gt;realm&lt;/em&gt; of the &lt;em&gt;realm identity&lt;/em&gt; is
+ *         compared against the &lt;em&gt;realm&lt;/em&gt; of the &lt;em&gt;identity&lt;/em&gt; being imported.  If they are the same, the
+ *         identity is imported and a normal &lt;em&gt;authorization&lt;/em&gt; is carried out as described below.
+ *     &lt;/li&gt;
+ *     &lt;li&gt;
+ *         An &lt;em&gt;anonymous authorization&lt;/em&gt; may be carried out by way of the {@link #authorizeAnonymous()} method.
+ *         If the &lt;em&gt;{@linkplain SecurityDomain#getAnonymousSecurityIdentity() anonymous identity}&lt;/em&gt; has the
+ *         {@link LoginPermission} granted to it, the context will transition into the &lt;em&gt;anonymous-authorized&lt;/em&gt;
+ *         state; otherwise no state transition occurs.
+ *     &lt;/li&gt;
+ *     &lt;li&gt;
+ *         An &lt;em&gt;external authorization&lt;/em&gt; may be carried out using the {@link #authorize()} method.  The
+ *         &lt;em&gt;captured identity&lt;/em&gt; (which may be &lt;em&gt;anonymous&lt;/em&gt;) is queried for the presence of the
+ *         {@link LoginPermission}; if present, the context will transition into the &lt;em&gt;authorized&lt;/em&gt; or
+ *         &lt;em&gt;anonymous-authorized&lt;/em&gt; state (depending on whether the &lt;em&gt;captured identity&lt;/em&gt; is &lt;em&gt;anonymous&lt;/em&gt;);
+ *         otherwise no state transition occurs.
+ *     &lt;/li&gt;
+ *     &lt;li&gt;
+ *         An &lt;em&gt;external run-as authorization&lt;/em&gt; may be carried out using the {@link #authorize(String)} method.
+ *         First, the given name is &lt;em&gt;rewritten&lt;/em&gt; in the same manner as the {@link #setAuthenticationName(String)}
+ *         method.  Then, the &lt;em&gt;captured identity&lt;/em&gt; (which may be &lt;em&gt;anonymous&lt;/em&gt;) is queried for the presence of a
+ *         {@link RunAsPrincipalPermission} for the target name.  If present, the &lt;em&gt;authentication name&lt;/em&gt; is assigned
+ *         as described above, and the resultant &lt;em&gt;realm identity&lt;/em&gt; is queried for {@link LoginPermission}.  If present,
+ *         the context will transition to the &lt;em&gt;authorized-authenticated&lt;/em&gt; state.  If any step fails, no state transition
+ *         occurs.
+ *     &lt;/li&gt;
+ *     &lt;li&gt;
+ *         The authentication may be &lt;em&gt;failed&lt;/em&gt; by way of the {@link #fail()} method.  This method will dispose
+ *         of all authentication resources and transition to the &lt;em&gt;failed&lt;/em&gt; state.
+ *     &lt;/li&gt;
+ * &lt;/ul&gt;
+ * &lt;p&gt;
+ * In the &lt;em&gt;name-assigned&lt;/em&gt; (or, for brevity, &lt;em&gt;assigned&lt;/em&gt;) state, the following actions may be performed:
+ * &lt;ul&gt;
+ *     &lt;li&gt;
+ *         A name or principal may be assigned as above, however the resultant &lt;em&gt;decoded&lt;/em&gt; and &lt;em&gt;rewritten&lt;/em&gt; name
+ *         and &lt;em&gt;realm identity&lt;/em&gt; must be identical to the previously selected name and identity.
+ *     &lt;/li&gt;
+ *     &lt;li&gt;
+ *         &lt;em&gt;Evidence&lt;/em&gt; may be verified.  The &lt;em&gt;realm identity&lt;/em&gt; is queried directly and no state transitions
+ *         will occur.  Evidence verification will fail if the evidence has an &lt;em&gt;evidence principal&lt;/em&gt; which does
+ *         not result in the same &lt;em&gt;realm identity&lt;/em&gt; as the current one after &lt;em&gt;decoding&lt;/em&gt; and &lt;em&gt;rewriting&lt;/em&gt;.
+ *     &lt;/li&gt;
+ *     &lt;li&gt;
+ *         An &lt;em&gt;authorization&lt;/em&gt; may be performed via the {@link #authorize()} method.  If the selected &lt;em&gt;realm identity&lt;/em&gt;
+ *         possesses the {@link LoginPermission}, then the context transitions to the &lt;em&gt;authorized-authenticated&lt;/em&gt; state,
+ *         otherwise no state transition occurs.
+ *     &lt;/li&gt;
+ *     &lt;li&gt;
+ *         A &lt;em&gt;run-as authorization&lt;/em&gt; may be performed via the {@link #authorize(String)} method.
+ *         First, the given name is &lt;em&gt;rewritten&lt;/em&gt; in the same manner as the {@link #setAuthenticationName(String)} method.
+ *         The current identity is then &lt;em&gt;authorized&lt;/em&gt; as described above, and then the &lt;em&gt;authorized identity&lt;/em&gt;
+ *         is tested for a {@link RunAsPrincipalPermission} for the &lt;em&gt;rewritten&lt;/em&gt; target name.  If authorized,
+ *         the context transitions to the &lt;em&gt;authorized&lt;/em&gt; state for the &lt;em&gt;realm identity&lt;/em&gt; corresponding to the
+ *         &lt;em&gt;rewritten&lt;/em&gt; name; otherwise no state transition occurs.
+ *     &lt;/li&gt;
+ *     &lt;li&gt;
+ *         The authentication may be &lt;em&gt;failed&lt;/em&gt; by way of the {@link #fail()} method.  This method will dispose
+ *         of all authentication resources and transition to the &lt;em&gt;failed&lt;/em&gt; state.
+ *     &lt;/li&gt;
+ * &lt;/ul&gt;
+ * &lt;p&gt;
+ * There are three states related to authorization: the &lt;em&gt;anonymous-authorized&lt;/em&gt; state, the &lt;em&gt;authorized&lt;/em&gt; state,
+ * and the &lt;em&gt;authorized-authenticated&lt;/em&gt; state.  In all three states, the following actions may be taken:
+ * &lt;ul&gt;
+ *     &lt;li&gt;
+ *         As above, a name or principal may be assigned so long as it matches the existing identity.  In particular,
+ *         for the &lt;em&gt;anonymous-authorized&lt;/em&gt; state, all names are rejected, and only the {@linkplain AnonymousPrincipal anonymous principal}
+ *         is accepted.
+ *     &lt;/li&gt;
+ *     &lt;li&gt;
+ *         An &lt;em&gt;authorization&lt;/em&gt; may be performed via the {@link #authorize()} method.  Since the identity is
+ *         always authorized, this is generally a no-op.
+ *     &lt;/li&gt;
+ *     &lt;li&gt;
+ *         A &lt;em&gt;run-as authorization&lt;/em&gt; may be performed via the {@link #authorize(String)} method.  The given
+ *         name is &lt;em&gt;rewritten&lt;/em&gt; as previously described, and then the &lt;em&gt;authorized identity&lt;/em&gt;
+ *         is tested for a {@link RunAsPrincipalPermission} for the &lt;em&gt;rewritten&lt;/em&gt; target name.  If authorized,
+ *         the context transitions to the &lt;em&gt;authorized&lt;/em&gt; state for the &lt;em&gt;realm identity&lt;/em&gt; corresponding to the
+ *         &lt;em&gt;rewritten&lt;/em&gt; name; otherwise no state transition occurs.
+ *     &lt;/li&gt;
+ *     &lt;li&gt;
+ *         The authentication may be &lt;em&gt;completed&lt;/em&gt; by way of the {@link #succeed()} method.  This method will
+ *         dispose of all authentication resources and transition to the &lt;em&gt;complete&lt;/em&gt; state.
+ *     &lt;/li&gt;
+ *     &lt;li&gt;
+ *         The authentication may be &lt;em&gt;failed&lt;/em&gt; by way of the {@link #fail()} method.  This method will dispose
+ *         of all authentication resources and transition to the &lt;em&gt;failed&lt;/em&gt; state.
+ *     &lt;/li&gt;
+ * &lt;/ul&gt;
+ * The &lt;em&gt;authorized-authenticated&lt;/em&gt; state has the additional capability of verifying credentials as described above for
+ * the &lt;em&gt;assigned&lt;/em&gt; state.
+ * &lt;p&gt;
+ * The &lt;em&gt;complete&lt;/em&gt; state has only one capability: the retrieval of the final &lt;em&gt;authorized identity&lt;/em&gt; by way
+ * of the {@link #getAuthorizedIdentity()} method.
+ * &lt;p&gt;
+ * The &lt;em&gt;failed&lt;/em&gt; state has no capabilities and retains no reference to any identities or objects used during
+ * authentication.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public final class ServerAuthenticationContext implements AutoCloseable {
+
+    private final AtomicReference&lt;State&gt; stateRef;
+
+    ServerAuthenticationContext(final SecurityDomain domain, final MechanismConfigurationSelector mechanismConfigurationSelector) {
+<span class="fc" id="L316">        this(domain.getCurrentSecurityIdentity(), mechanismConfigurationSelector);</span>
+<span class="fc" id="L317">    }</span>
+
+<span class="fc" id="L319">    ServerAuthenticationContext(final SecurityIdentity capturedIdentity, final MechanismConfigurationSelector mechanismConfigurationSelector) {</span>
+<span class="fc" id="L320">        stateRef = new AtomicReference&lt;&gt;(new InactiveState(capturedIdentity, mechanismConfigurationSelector, IdentityCredentials.NONE, IdentityCredentials.NONE, Attributes.EMPTY));</span>
+<span class="fc" id="L321">    }</span>
+
+    /**
+     * Set information about the current mechanism and request for this authentication attempt. If the mechanism
+     * information cannot be resolved to a mechanism configuration, an exception is thrown.
+     *
+     * @param mechanismInformation the mechanism information about the current authentication attempt.
+     * @throws IllegalStateException if the mechanism information about the current authentication attempt cannot be
+     * resolved to a mechanism configuration
+     */
+    public void setMechanismInformation(final MechanismInformation mechanismInformation) throws IllegalStateException {
+<span class="nc" id="L332">        stateRef.get().setMechanismInformation(mechanismInformation);</span>
+<span class="nc" id="L333">    }</span>
+
+    /**
+     * Get the authorized identity result of this authentication.
+     *
+     * @return the authorized identity
+     * @throws IllegalStateException if the authentication is incomplete
+     */
+    public SecurityIdentity getAuthorizedIdentity() throws IllegalStateException {
+<span class="fc" id="L342">        return stateRef.get().getAuthorizedIdentity();</span>
+    }
+
+    /**
+     * Set the authentication to anonymous, completing the authentication process.
+     *
+     * @throws IllegalStateException if the authentication is already complete
+     */
+    public boolean authorizeAnonymous() throws IllegalStateException {
+<span class="nc" id="L351">        return authorizeAnonymous(true);</span>
+    }
+
+    /**
+     * Set the authentication to anonymous, completing the authentication process.
+     *
+     * @param requireLoginPermission {@code true} if {@link LoginPermission} is required and {@code false} otherwise
+     * @throws IllegalStateException if the authentication is already complete
+     */
+    public boolean authorizeAnonymous(boolean requireLoginPermission) throws IllegalStateException {
+<span class="nc" id="L361">        return stateRef.get().authorizeAnonymous(requireLoginPermission);</span>
+    }
+
+    /**
+     * Set the authentication name for this authentication.  If the name is already set, then the new name must be
+     * equal to the old name, or else an exception is thrown.
+     *
+     * @param name the authentication name
+     * @throws IllegalArgumentException if the name is syntactically invalid
+     * @throws RealmUnavailableException if the realm is not available
+     * @throws IllegalStateException if the authentication name was already set and there is a mismatch
+     */
+    public void setAuthenticationName(String name) throws IllegalArgumentException, RealmUnavailableException, IllegalStateException {
+<span class="nc" id="L374">        setAuthenticationName(name, false);</span>
+<span class="nc" id="L375">    }</span>
+
+    /**
+     * Set the authentication name for this authentication.  If the name is already set, then the new name must be
+     * equal to the old name, or else an exception is thrown.
+     *
+     * @param name the authentication name
+     * @param exclusive {@code true} if exclusive access to the backing identity is required
+     * @throws IllegalArgumentException if the name is syntactically invalid
+     * @throws RealmUnavailableException if the realm is not available or if exclusive access to the backing identity
+     * is required but could not be granted
+     * @throws IllegalStateException if the authentication name was already set and there is a mismatch
+     */
+    public void setAuthenticationName(String name, boolean exclusive) throws IllegalArgumentException, RealmUnavailableException, IllegalStateException {
+<span class="nc" id="L389">        Assert.checkNotNullParam(&quot;name&quot;, name);</span>
+<span class="nc" id="L390">        setAuthenticationPrincipal(new NamePrincipal(name), exclusive);</span>
+<span class="nc" id="L391">    }</span>
+
+    /**
+     * Set the authentication principal for this authentication.  Calling this method initiates authentication.
+     *
+     * @param principal the authentication principal
+     * @throws IllegalArgumentException if the principal cannot be mapped to a name, or the mapped name is syntactically invalid
+     * @throws RealmUnavailableException if the realm is not available
+     * @throws IllegalStateException if the authentication name was already set
+     */
+    public void setAuthenticationPrincipal(Principal principal) throws IllegalArgumentException, RealmUnavailableException, IllegalStateException {
+<span class="fc" id="L402">        setAuthenticationPrincipal(principal, false);</span>
+<span class="fc" id="L403">    }</span>
+
+    /**
+     * Set the authentication principal for this authentication.  Calling this method initiates authentication.
+     *
+     * @param principal the authentication principal
+     * @param exclusive {@code true} if exclusive access to the backing identity is required
+     * @throws IllegalArgumentException if the principal cannot be mapped to a name, or the mapped name is syntactically invalid
+     * @throws RealmUnavailableException if the realm is not available
+     * @throws IllegalStateException if the authentication name was already set
+     */
+    public void setAuthenticationPrincipal(Principal principal, boolean exclusive) throws IllegalArgumentException, RealmUnavailableException, IllegalStateException {
+<span class="fc" id="L415">        Assert.checkNotNullParam(&quot;principal&quot;, principal);</span>
+<span class="fc" id="L416">        stateRef.get().setPrincipal(principal, exclusive);</span>
+<span class="fc" id="L417">    }</span>
+
+    /**
+     * Determine if the given name refers to the same identity as the currently set authentication name.
+     *
+     * @param name the authentication name
+     * @return {@code true} if the name matches the current identity, {@code false} otherwise
+     * @throws IllegalArgumentException if the name is syntactically invalid
+     * @throws RealmUnavailableException if the realm is not available
+     * @throws IllegalStateException if the authentication name was already set
+     */
+    public boolean isSameName(String name) throws IllegalArgumentException, RealmUnavailableException, IllegalStateException {
+<span class="nc" id="L429">        Assert.checkNotNullParam(&quot;name&quot;, name);</span>
+<span class="nc" id="L430">        return isSamePrincipal(new NamePrincipal(name));</span>
+    }
+
+    /**
+     * Determine if the given principal refers to the same identity as the currently set authentication name.
+     *
+     * @param principal the authentication name
+     * @return {@code true} if the name matches the current identity, {@code false} otherwise
+     * @throws IllegalArgumentException if the name is syntactically invalid
+     * @throws RealmUnavailableException if the realm is not available
+     * @throws IllegalStateException if the authentication name was already set
+     */
+    public boolean isSamePrincipal(Principal principal) throws IllegalArgumentException, RealmUnavailableException, IllegalStateException {
+<span class="nc" id="L443">        Assert.checkNotNullParam(&quot;principal&quot;, principal);</span>
+<span class="nc" id="L444">        return stateRef.get().isSamePrincipal(principal);</span>
+    }
+
+    /**
+     * Determine if the current authentication identity actually exists in the realm.
+     *
+     * @return {@code true} if the identity exists, {@code false} otherwise
+     * @throws RealmUnavailableException if the realm failed to access the identity
+     * @throws IllegalStateException if there is no authentication name set
+     */
+    public boolean exists() throws RealmUnavailableException, IllegalStateException {
+<span class="nc" id="L455">        return stateRef.get().getRealmIdentity().exists();</span>
+    }
+
+    /**
+     * Mark this authentication as &quot;failed&quot;.  The context cannot be used after this method is called.
+     *
+     * @throws IllegalStateException if no authentication has been initiated or authentication is already completed
+     */
+    public void fail() throws IllegalStateException {
+<span class="fc" id="L464">        stateRef.get().fail(true);</span>
+<span class="fc" id="L465">    }</span>
+
+    /**
+     * Attempt to authorize an authentication attempt.  If the authorization is successful, {@code true} is returned and
+     * the context is placed in the &quot;authorized&quot; state with the new authorization identity.  If the authorization fails,
+     * {@code false} is returned and the state of the context is unchanged.
+     *
+     * @return {@code true} if the authorization succeeded, {@code false} otherwise
+     * @throws RealmUnavailableException if the realm is not available
+     * @throws IllegalStateException if the authentication name was not set or authentication was already complete
+     */
+    public boolean authorize() throws RealmUnavailableException, IllegalStateException {
+<span class="fc" id="L477">        return authorize(true);</span>
+    }
+
+    boolean authorize(boolean requireLoginPermission) throws RealmUnavailableException, IllegalStateException {
+<span class="fc" id="L481">        return stateRef.get().authorize(requireLoginPermission);</span>
+    }
+
+    /**
+     * Attempt to authorize a change to a new user (possibly including an authentication attempt).  If the authorization
+     * is successful, {@code true} is returned and the context is placed in the &quot;authorized&quot; state with the new authorization
+     * identity.  If the authorization fails, {@code false} is returned and the state of the context is unchanged.
+     *
+     * @param name the authorization name (must not be {@code null})
+     * @return {@code true} if the authorization succeeded, {@code false} otherwise
+     * @throws IllegalArgumentException if the name is syntactically invalid
+     * @throws RealmUnavailableException if the realm is not available
+     * @throws IllegalStateException if the authentication name was not set or authentication was already complete
+     */
+    public boolean authorize(String name) throws IllegalArgumentException, RealmUnavailableException, IllegalStateException {
+<span class="nc" id="L496">        checkNotNullParam(&quot;name&quot;, name);</span>
+<span class="nc" id="L497">        return authorize(new NamePrincipal(name), true);</span>
+    }
+
+    /**
+     * Attempt to authorize a change to a new user (possibly including an authentication attempt).  If the authorization
+     * is successful, {@code true} is returned and the context is placed in the &quot;authorized&quot; state with the new authorization
+     * identity.  If the authorization fails, {@code false} is returned and the state of the context is unchanged.
+     *
+     * @param principal the authorization principal (must not be {@code null})
+     * @return {@code true} if the authorization succeeded, {@code false} otherwise
+     * @throws IllegalArgumentException if the principal is syntactically invalid
+     * @throws RealmUnavailableException if the realm is not available
+     * @throws IllegalStateException if the authentication principal was not set or authentication was already complete
+     */
+    public boolean authorize(Principal principal) throws IllegalArgumentException, RealmUnavailableException, IllegalStateException {
+<span class="nc" id="L512">        return authorize(principal, true);</span>
+    }
+
+    boolean authorize(Principal principal, boolean authorizeRunAs) throws IllegalArgumentException, RealmUnavailableException, IllegalStateException {
+<span class="fc" id="L516">        checkNotNullParam(&quot;principal&quot;, principal);</span>
+<span class="fc" id="L517">        return stateRef.get().authorize(principal, authorizeRunAs);</span>
+    }
+
+    /**
+     * Mark this authentication as &quot;successful&quot;.  The context cannot be used after this method is called, however
+     * the authorized identity may thereafter be accessed via the {@link #getAuthorizedIdentity()} method.  If no
+     * authentication actually happened, then authentication will complete anonymously.
+     *
+     * @throws IllegalStateException if authentication is already completed
+     * @throws RealmUnavailableException if the realm is not able to handle requests for any reason
+     */
+    public void succeed() throws IllegalStateException, RealmUnavailableException {
+<span class="fc" id="L529">        stateRef.get().succeed();</span>
+<span class="fc" id="L530">    }</span>
+
+    /**
+     * Determine if authentication was already completed on this context.
+     *
+     * @return {@code true} if authentication was completed; {@code false} otherwise
+     */
+    public boolean isDone() {
+<span class="nc" id="L538">        return stateRef.get().isDone();</span>
+    }
+
+    /**
+     * Get the principal associated with the current authentication name.  Only valid during authentication process.
+     *
+     * @return the principal
+     * @throws IllegalStateException if no authentication has been initiated or authentication is already completed
+     */
+    public Principal getAuthenticationPrincipal() {
+<span class="nc" id="L548">        return stateRef.get().getAuthenticationPrincipal();</span>
+    }
+
+    /**
+     * Determine whether a given credential is definitely obtainable, possibly obtainable, or definitely not obtainable.
+     *
+     * If an authentication identity is established this will be for that identity, otherwise this will be the general
+     * level of support advertised by the security domain.
+     *
+     * @param credentialType the credential type class (must not be {@code null})
+     * @param algorithmName the algorithm name, or {@code null} if any algorithm is acceptable or the credential type does
+     *  not support algorithm names
+     * @param parameterSpec the algorithm parameters to match, or {@code null} if any parameters are acceptable or the credential type
+     *  does not support algorithm parameters
+     * @return the level of support for this credential type
+     *
+     * @throws RealmUnavailableException if the realm is not able to handle requests for any reason
+     * @throws IllegalStateException if no authentication has been initiated or authentication is already completed
+     */
+    public SupportLevel getCredentialAcquireSupport(Class&lt;? extends Credential&gt; credentialType, String algorithmName, AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc" id="L568">        Assert.checkNotNullParam(&quot;credentialType&quot;, credentialType);</span>
+<span class="nc" id="L569">        return stateRef.get().getCredentialAcquireSupport(credentialType, algorithmName, parameterSpec);</span>
+    }
+
+    /**
+     * Determine whether a given credential is definitely obtainable, possibly obtainable, or definitely not obtainable.
+     *
+     * If an authentication identity is established this will be for that identity, otherwise this will be the general
+     * level of support advertised by the security domain.
+     *
+     * @param credentialType the credential type class (must not be {@code null})
+     * @param algorithmName the algorithm name, or {@code null} if any algorithm is acceptable or the credential type does
+     *  not support algorithm names
+     * @return the level of support for this credential type
+     *
+     * @throws RealmUnavailableException if the realm is not able to handle requests for any reason
+     * @throws IllegalStateException if no authentication has been initiated or authentication is already completed
+     */
+    public SupportLevel getCredentialAcquireSupport(Class&lt;? extends Credential&gt; credentialType, String algorithmName) throws RealmUnavailableException {
+<span class="nc" id="L587">        return getCredentialAcquireSupport(credentialType, algorithmName, null);</span>
+    }
+
+    /**
+     * Determine whether a given credential is definitely obtainable, possibly obtainable, or definitely not obtainable.
+     *
+     * If an authentication identity is established this will be for that identity, otherwise this will be the general
+     * level of support advertised by the security domain.
+     *
+     * @param credentialType the credential type class (must not be {@code null})
+     * @return the level of support for this credential type
+     *
+     * @throws RealmUnavailableException if the realm is not able to handle requests for any reason
+     * @throws IllegalStateException if no authentication has been initiated or authentication is already completed
+     */
+    public SupportLevel getCredentialAcquireSupport(Class&lt;? extends Credential&gt; credentialType) throws RealmUnavailableException {
+<span class="nc" id="L603">        Assert.checkNotNullParam(&quot;credentialType&quot;, credentialType);</span>
+<span class="nc" id="L604">        return getCredentialAcquireSupport(credentialType, null);</span>
+    }
+
+    /**
+     * Determine whether a given piece of evidence is definitely verifiable, possibly verifiable, or definitely not verifiable.
+     *
+     * If an authentication identity is established this will be for that identity, otherwise this will be the general
+     * level of support advertised by the security domain.
+     *
+     * @param evidenceType the evidence type class (must not be {@code null})
+     * @param algorithmName the algorithm name, or {@code null} if any algorithm is acceptable or the evidence type does
+     *  not support algorithm names
+     * @return the level of support for this credential type
+     *
+     * @throws RealmUnavailableException if the realm is not able to handle requests for any reason
+     * @throws IllegalStateException if no authentication has been initiated or authentication is already completed
+     */
+    public SupportLevel getEvidenceVerifySupport(Class&lt;? extends Evidence&gt; evidenceType, String algorithmName) throws RealmUnavailableException {
+<span class="nc" id="L622">        Assert.checkNotNullParam(&quot;evidenceType&quot;, evidenceType);</span>
+<span class="nc" id="L623">        return stateRef.get().getEvidenceVerifySupport(evidenceType, algorithmName);</span>
+    }
+
+    /**
+     * Determine whether a given piece of evidence is definitely verifiable, possibly verifiable, or definitely not verifiable.
+     *
+     * If an authentication identity is established this will be for that identity, otherwise this will be the general
+     * level of support advertised by the security domain.
+     *
+     * @param evidenceType the evidence type class (must not be {@code null})
+     * @return the level of support for this credential type
+     *
+     * @throws RealmUnavailableException if the realm is not able to handle requests for any reason
+     * @throws IllegalStateException if no authentication has been initiated or authentication is already completed
+     */
+    public SupportLevel getEvidenceVerifySupport(Class&lt;? extends Evidence&gt; evidenceType) throws RealmUnavailableException {
+<span class="nc" id="L639">        Assert.checkNotNullParam(&quot;evidenceType&quot;, evidenceType);</span>
+<span class="nc" id="L640">        return getEvidenceVerifySupport(evidenceType, null);</span>
+    }
+
+    /**
+     * Acquire a credential of the given type.  The credential type is defined by its {@code Class} and an optional {@code algorithmName}.  If the
+     * algorithm name is not given, then the query is performed for any algorithm of the given type.
+     *
+     * @param credentialType the credential type class (must not be {@code null})
+     * @param algorithmName the algorithm name, or {@code null} if any algorithm is acceptable or the credential type does
+     *  not support algorithm names
+     * @param parameterSpec the algorithm parameters to match, or {@code null} if any parameters are acceptable or the credential type
+     *  does not support algorithm parameters
+     * @param &lt;C&gt; the credential type
+     *
+     * @return the credential, or {@code null} if the principal has no credential of that type
+     *
+     * @throws RealmUnavailableException if the realm is not able to handle requests for any reason
+     * @throws IllegalStateException if no authentication has been initiated or authentication is already completed
+     */
+    public &lt;C extends Credential&gt; C getCredential(Class&lt;C&gt; credentialType, String algorithmName, AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc" id="L660">        Assert.checkNotNullParam(&quot;credentialType&quot;, credentialType);</span>
+<span class="nc" id="L661">        return stateRef.get().getCredential(credentialType, algorithmName, parameterSpec);</span>
+    }
+
+    /**
+     * Acquire a credential of the given type.  The credential type is defined by its {@code Class} and an optional {@code algorithmName}.  If the
+     * algorithm name is not given, then the query is performed for any algorithm of the given type.
+     *
+     * @param credentialType the credential type class (must not be {@code null})
+     * @param algorithmName the algorithm name, or {@code null} if any algorithm is acceptable or the credential type does
+     *  not support algorithm names
+     * @param &lt;C&gt; the credential type
+     *
+     * @return the credential, or {@code null} if the principal has no credential of that type
+     *
+     * @throws RealmUnavailableException if the realm is not able to handle requests for any reason
+     * @throws IllegalStateException if no authentication has been initiated or authentication is already completed
+     */
+    public &lt;C extends Credential&gt; C getCredential(Class&lt;C&gt; credentialType, String algorithmName) throws RealmUnavailableException {
+<span class="nc" id="L679">        Assert.checkNotNullParam(&quot;credentialType&quot;, credentialType);</span>
+<span class="nc" id="L680">        return stateRef.get().getCredential(credentialType, algorithmName, null);</span>
+    }
+
+    /**
+     * Acquire a credential of the given type.  The credential type is defined by its {@code Class} and an optional {@code algorithmName}.  If the
+     * algorithm name is not given, then the query is performed for any algorithm of the given type.
+     *
+     * @param credentialType the credential type class (must not be {@code null})
+     * @param &lt;C&gt; the credential type
+     *
+     * @return the credential, or {@code null} if the principal has no credential of that type
+     *
+     * @throws RealmUnavailableException if the realm is not able to handle requests for any reason
+     * @throws IllegalStateException if no authentication has been initiated or authentication is already completed
+     */
+    public &lt;C extends Credential&gt; C getCredential(Class&lt;C&gt; credentialType) throws RealmUnavailableException {
+<span class="nc" id="L696">        Assert.checkNotNullParam(&quot;credentialType&quot;, credentialType);</span>
+<span class="nc" id="L697">        return stateRef.get().getCredential(credentialType, null, null);</span>
+    }
+
+    /**
+     * Apply the given function to the acquired credential, if it is set and of the given type.
+     *
+     * @param credentialType the credential type class (must not be {@code null})
+     * @param function the function to apply (must not be {@code null})
+     * @param &lt;C&gt; the credential type
+     * @param &lt;R&gt; the return type
+     * @return the result of the function, or {@code null} if the criteria are not met
+     *
+     * @throws RealmUnavailableException if the realm is not able to handle requests for any reason
+     * @throws IllegalStateException if no authentication has been initiated or authentication is already completed
+     */
+    public &lt;C extends Credential, R&gt; R applyToCredential(Class&lt;C&gt; credentialType, Function&lt;C, R&gt; function) throws RealmUnavailableException {
+<span class="nc" id="L713">        final Credential credential = getCredential(credentialType);</span>
+<span class="nc bnc" id="L714" title="All 2 branches missed.">        return credential == null ? null : credential.castAndApply(credentialType, function);</span>
+    }
+
+    /**
+     * Apply the given function to the acquired credential, if it is set and of the given type and algorithm.
+     *
+     * @param credentialType the credential type class (must not be {@code null})
+     * @param algorithmName the algorithm name
+     * @param function the function to apply (must not be {@code null})
+     * @param &lt;C&gt; the credential type
+     * @param &lt;R&gt; the return type
+     * @return the result of the function, or {@code null} if the criteria are not met
+     *
+     * @throws RealmUnavailableException if the realm is not able to handle requests for any reason
+     * @throws IllegalStateException if no authentication has been initiated or authentication is already completed
+     */
+    public &lt;C extends Credential, R&gt; R applyToCredential(Class&lt;C&gt; credentialType, String algorithmName, Function&lt;C, R&gt; function) throws RealmUnavailableException {
+<span class="nc" id="L731">        final Credential credential = getCredential(credentialType, algorithmName);</span>
+<span class="nc bnc" id="L732" title="All 2 branches missed.">        return credential == null ? null : credential.castAndApply(credentialType, algorithmName, function);</span>
+    }
+
+    /**
+     * Apply the given function to the acquired credential, if it is set and of the given type and algorithm.
+     *
+     * @param credentialType the credential type class (must not be {@code null})
+     * @param algorithmName the algorithm name
+     * @param parameterSpec the algorithm parameters to match, or {@code null} if any parameters are acceptable or the credential type
+     *  does not support algorithm parameters
+     * @param function the function to apply (must not be {@code null})
+     * @param &lt;C&gt; the credential type
+     * @param &lt;R&gt; the return type
+     * @return the result of the function, or {@code null} if the criteria are not met
+     *
+     * @throws RealmUnavailableException if the realm is not able to handle requests for any reason
+     * @throws IllegalStateException if no authentication has been initiated or authentication is already completed
+     */
+    public &lt;C extends Credential, R&gt; R applyToCredential(Class&lt;C&gt; credentialType, String algorithmName, AlgorithmParameterSpec parameterSpec, Function&lt;C, R&gt; function) throws RealmUnavailableException {
+<span class="nc" id="L751">        final Credential credential = getCredential(credentialType, algorithmName, parameterSpec);</span>
+<span class="nc bnc" id="L752" title="All 2 branches missed.">        return credential == null ? null : credential.castAndApply(credentialType, algorithmName, parameterSpec, function);</span>
+    }
+
+    /**
+     * Verify the given evidence.
+     *
+     * @param evidence the evidence to verify
+     *
+     * @return {@code true} if verification was successful, {@code false} otherwise
+     *
+     * @throws RealmUnavailableException if the realm is not able to handle requests for any reason
+     * @throws IllegalStateException if no authentication has been initiated or authentication is already completed
+     */
+    public boolean verifyEvidence(Evidence evidence) throws RealmUnavailableException {
+<span class="fc" id="L766">        Assert.checkNotNullParam(&quot;evidence&quot;, evidence);</span>
+<span class="fc" id="L767">        return stateRef.get().verifyEvidence(evidence);</span>
+    }
+
+    /**
+     * Set the decoded evidence principal.
+     *
+     * @param evidence the evidence to decode and associate with a principal
+     * @since 1.10.0
+     */
+    public void setDecodedEvidencePrincipal(Evidence evidence) throws RealmUnavailableException {
+<span class="nc" id="L777">        Assert.checkNotNullParam(&quot;evidence&quot;, evidence);</span>
+<span class="nc" id="L778">        evidence.setDecodedPrincipal(stateRef.get().getSecurityDomain().getEvidenceDecoder().apply(evidence));</span>
+<span class="nc" id="L779">    }</span>
+
+    /**
+     * Add a public credential to the identity being authenticated.
+     *
+     * @param credential the credential to add (must not be {@code null})
+     */
+    public void addPublicCredential(Credential credential) {
+<span class="nc" id="L787">        Assert.checkNotNullParam(&quot;credential&quot;, credential);</span>
+<span class="nc" id="L788">        stateRef.get().addPublicCredential(credential);</span>
+<span class="nc" id="L789">    }</span>
+
+    /**
+     * Add a private credential to the identity being authenticated.  This credential may be forwarded to outbound
+     * authentication mechanisms.
+     *
+     * @param credential the credential to add (must not be {@code null})
+     */
+    public void addPrivateCredential(Credential credential) {
+<span class="fc" id="L798">        Assert.checkNotNullParam(&quot;credential&quot;, credential);</span>
+<span class="fc" id="L799">        stateRef.get().addPrivateCredential(credential);</span>
+<span class="fc" id="L800">    }</span>
+
+    /**
+     * Add runtime attributes to the identity being authenticated.
+     *
+     * @param runtimeAttributes the runtime attributes to add (must not be {@code null})
+     */
+    public void addRuntimeAttributes(Attributes runtimeAttributes) {
+<span class="nc" id="L808">        Assert.checkNotNullParam(&quot;runtimeAttributes&quot;, runtimeAttributes);</span>
+<span class="nc" id="L809">        stateRef.get().addRuntimeAttributes(runtimeAttributes);</span>
+<span class="nc" id="L810">    }</span>
+
+    /**
+     * Attempt to import the given security identity as a trusted identity.  If this method returns {@code true},
+     * the context will be in an authorized state, and the new identity can be retrieved.
+     *
+     * @param identity the identity to import (must not be {@code null})
+     * @return {@code true} if the identity is authorized, {@code false} otherwise
+     * @throws RealmUnavailableException if the realm is not able to handle requests for any reason
+     */
+    public boolean importIdentity(SecurityIdentity identity) throws RealmUnavailableException {
+<span class="fc" id="L821">        Assert.checkNotNullParam(&quot;identity&quot;, identity);</span>
+<span class="fc" id="L822">        return stateRef.get().importIdentity(identity);</span>
+    }
+
+    /**
+     * Set the mechanism realm name to be equal to the given name.  If no mechanism realms are configured, the realm
+     * name is ignored.
+     *
+     * @param realmName the selected realm name
+     * @throws IllegalStateException if a realm name was already selected or it is too late to choose a realm
+     * @throws IllegalArgumentException if the selected realm name was not offered
+     */
+    public void setMechanismRealmName(String realmName) throws IllegalStateException, IllegalArgumentException {
+<span class="nc" id="L834">        Assert.checkNotNullParam(&quot;realmName&quot;, realmName);</span>
+<span class="nc" id="L835">        stateRef.get().setMechanismRealmName(realmName);</span>
+<span class="nc" id="L836">    }</span>
+
+    /**
+     * Update the credential for the current authentication identity.
+     *
+     * @param credential the new credential (must not be {@code null})
+     * @throws RealmUnavailableException if the realm is not able to handle requests for any reason
+     */
+    public void updateCredential(Credential credential) throws RealmUnavailableException {
+<span class="nc" id="L845">        Assert.checkNotNullParam(&quot;credential&quot;, credential);</span>
+<span class="nc" id="L846">        stateRef.get().updateCredential(credential);</span>
+<span class="nc" id="L847">    }</span>
+
+    /**
+     * Close the server authentication context, failing any in-progress authentication and releasing any
+     * associated resources.
+     */
+    public void close() {
+<span class="fc" id="L854">        stateRef.get().fail(false);</span>
+<span class="fc" id="L855">    }</span>
+
+    AtomicReference&lt;State&gt; getStateRef() {
+<span class="fc" id="L858">        return stateRef;</span>
+    }
+
+    CallbackHandler createCallbackHandler() {
+<span class="nc" id="L862">        return new CallbackHandler() {</span>
+            private SSLConnection sslConnection;
+            private X509Certificate[] peerCerts;
+
+            @Override
+            public void handle(final Callback[] callbacks) throws IOException, UnsupportedCallbackException {
+<span class="nc" id="L868">                handleOne(callbacks, 0);</span>
+<span class="nc" id="L869">            }</span>
+
+            private void handleOne(final Callback[] callbacks, final int idx) throws IOException, UnsupportedCallbackException {
+<span class="nc bnc" id="L872" title="All 2 branches missed.">                if (idx == callbacks.length) {</span>
+<span class="nc" id="L873">                    return;</span>
+                }
+<span class="nc" id="L875">                final AtomicReference&lt;State&gt; stateRef = getStateRef();</span>
+<span class="nc" id="L876">                final Callback callback = callbacks[idx];</span>
+<span class="nc bnc" id="L877" title="All 2 branches missed.">                if (callback instanceof AnonymousAuthorizationCallback) {</span>
+<span class="nc" id="L878">                    boolean authorized = authorizeAnonymous();</span>
+<span class="nc" id="L879">                    log.tracef(&quot;Handling AnonymousAuthorizationCallback: authorized = %b&quot;, authorized);</span>
+<span class="nc" id="L880">                    ((AnonymousAuthorizationCallback) callback).setAuthorized(authorized);</span>
+<span class="nc" id="L881">                    handleOne(callbacks, idx + 1);</span>
+<span class="nc bnc" id="L882" title="All 2 branches missed.">                } else if (callback instanceof AuthorizeCallback) {</span>
+<span class="nc" id="L883">                    final AuthorizeCallback authorizeCallback = (AuthorizeCallback) callback;</span>
+<span class="nc" id="L884">                    String authenticationID = authorizeCallback.getAuthenticationID();</span>
+<span class="nc bnc" id="L885" title="All 2 branches missed.">                    if (authenticationID != null) {</span>
+                        // always re-set the authentication name to ensure it hasn't changed.
+<span class="nc" id="L887">                        setAuthenticationName(authenticationID);</span>
+                    } else {
+                        // This is a special case to support scenarios where the identity was already established by some
+                        // external method (e.g.: EXTERNAL SASL and TLS) where only authorization is necessary. We delay authentication
+                        // until we receive an authorization request.
+                        // In the future, we may want to support external methods other than TLS peer authentication
+<span class="nc bnc" id="L893" title="All 2 branches missed.">                        if (stateRef.get().canVerifyEvidence()) {</span>
+<span class="nc bnc" id="L894" title="All 2 branches missed.">                            if (peerCerts != null) {</span>
+<span class="nc" id="L895">                                log.tracef(&quot;Authentication ID is null but SSL peer certificates are available. Trying to authenticate peer&quot;);</span>
+<span class="nc" id="L896">                                verifyEvidence(new X509PeerCertificateChainEvidence(peerCerts));</span>
+                            }
+                        }
+                    }
+<span class="nc" id="L900">                    String authorizationID = authorizeCallback.getAuthorizationID();</span>
+<span class="nc bnc" id="L901" title="All 2 branches missed.">                    boolean authorized = authorizationID != null ? authorize(authorizationID) : authorize();</span>
+<span class="nc" id="L902">                    log.tracef(&quot;Handling AuthorizeCallback: authenticationID = %s  authorizationID = %s  authorized = %b&quot;, authenticationID, authorizationID, authorized);</span>
+<span class="nc" id="L903">                    authorizeCallback.setAuthorized(authorized);</span>
+<span class="nc" id="L904">                    handleOne(callbacks, idx + 1);</span>
+<span class="nc bnc" id="L905" title="All 2 branches missed.">                } else if (callback instanceof  ExclusiveNameCallback) {</span>
+<span class="nc" id="L906">                    final ExclusiveNameCallback exclusiveNameCallback = ((ExclusiveNameCallback) callback);</span>
+                    // login name
+<span class="nc" id="L908">                    final String name = exclusiveNameCallback.getDefaultName();</span>
+                    try {
+<span class="nc" id="L910">                        boolean exclusive = exclusiveNameCallback.needsExclusiveAccess();</span>
+<span class="nc" id="L911">                        log.tracef(&quot;Handling ExclusiveNameCallback: authenticationName = %s  needsExclusiveAccess = %b&quot;, name, exclusive);</span>
+<span class="nc bnc" id="L912" title="All 2 branches missed.">                        if (exclusive) {</span>
+<span class="nc" id="L913">                            setAuthenticationName(name, true);</span>
+<span class="nc" id="L914">                            exclusiveNameCallback.setExclusiveAccess(true);</span>
+                        } else {
+<span class="nc" id="L916">                            setAuthenticationName(name);</span>
+                        }
+<span class="nc" id="L918">                    } catch (Exception e) {</span>
+<span class="nc" id="L919">                        throw new IOException(e);</span>
+<span class="nc" id="L920">                    }</span>
+<span class="nc" id="L921">                    handleOne(callbacks, idx + 1);</span>
+<span class="nc bnc" id="L922" title="All 2 branches missed.">                } else if (callback instanceof NameCallback) {</span>
+                    // login name
+<span class="nc" id="L924">                    final String name = ((NameCallback) callback).getDefaultName();</span>
+                    try {
+<span class="nc" id="L926">                        log.tracef(&quot;Handling NameCallback: authenticationName = %s&quot;, name);</span>
+<span class="nc" id="L927">                        setAuthenticationName(name);</span>
+<span class="nc" id="L928">                    } catch (Exception e) {</span>
+<span class="nc" id="L929">                        throw new IOException(e);</span>
+<span class="nc" id="L930">                    }</span>
+<span class="nc" id="L931">                    handleOne(callbacks, idx + 1);</span>
+<span class="nc bnc" id="L932" title="All 2 branches missed.">                } else if (callback instanceof PeerPrincipalCallback) {</span>
+                    // login name
+<span class="nc" id="L934">                    final Principal principal = ((PeerPrincipalCallback) callback).getPrincipal();</span>
+                    try {
+<span class="nc" id="L936">                        log.tracef(&quot;Handling PeerPrincipalCallback: principal = %s&quot;, principal);</span>
+<span class="nc" id="L937">                        setAuthenticationPrincipal(principal);</span>
+<span class="nc" id="L938">                    } catch (Exception e) {</span>
+<span class="nc" id="L939">                        throw new IOException(e);</span>
+<span class="nc" id="L940">                    }</span>
+<span class="nc" id="L941">                    handleOne(callbacks, idx + 1);</span>
+<span class="nc bnc" id="L942" title="All 2 branches missed.">                } else if (callback instanceof PasswordCallback) {</span>
+<span class="nc" id="L943">                    final PasswordCallback passwordCallback = (PasswordCallback) callback;</span>
+
+<span class="nc bnc" id="L945" title="All 2 branches missed.">                    if (getCredentialAcquireSupport(PasswordCredential.class).mayBeSupported()) {</span>
+<span class="nc" id="L946">                        final TwoWayPassword password = applyToCredential(PasswordCredential.class, c -&gt; c.getPassword(TwoWayPassword.class));</span>
+<span class="nc bnc" id="L947" title="All 2 branches missed.">                        if (password != null) {</span>
+                            final ClearPasswordSpec clearPasswordSpec;
+                            try {
+<span class="nc" id="L950">                                final PasswordFactory passwordFactory = PasswordFactory.getInstance(password.getAlgorithm());</span>
+<span class="nc" id="L951">                                clearPasswordSpec = passwordFactory.getKeySpec(password, ClearPasswordSpec.class);</span>
+<span class="nc" id="L952">                            } catch (InvalidKeySpecException | NoSuchAlgorithmException e) {</span>
+<span class="nc" id="L953">                                log.trace(&quot;Unable to get key spec&quot;, e);</span>
+<span class="nc" id="L954">                                throw new FastUnsupportedCallbackException(callback);</span>
+<span class="nc" id="L955">                            }</span>
+<span class="nc" id="L956">                            log.tracef(&quot;Handling PasswordCallback: obtained successfully&quot;);</span>
+<span class="nc" id="L957">                            passwordCallback.setPassword(clearPasswordSpec.getEncodedPassword());</span>
+<span class="nc" id="L958">                            handleOne(callbacks, idx + 1);</span>
+<span class="nc" id="L959">                            return;</span>
+                        }
+<span class="nc" id="L961">                        log.tracef(&quot;Handling PasswordCallback: failed to obtain PasswordCredential&quot;);</span>
+<span class="nc" id="L962">                        throw new FastUnsupportedCallbackException(callback);</span>
+                    }
+
+                    // otherwise just fail out; some mechanisms will try again with different credentials
+<span class="nc" id="L966">                    log.tracef(&quot;Handling PasswordCallback: PasswordCredential may not be supported&quot;);</span>
+<span class="nc" id="L967">                    throw new FastUnsupportedCallbackException(callback);</span>
+
+<span class="nc bnc" id="L969" title="All 2 branches missed.">                } else if (callback instanceof CredentialCallback) {</span>
+<span class="nc" id="L970">                    final CredentialCallback credentialCallback = (CredentialCallback) callback;</span>
+<span class="nc" id="L971">                    String requestedRealm = stateRef.get().getMechanismRealmConfiguration().getRealmName();</span>
+
+<span class="nc" id="L973">                    final Credential credential = getCredential(credentialCallback.getCredentialType(), credentialCallback.getAlgorithm(), credentialCallback.getParameterSpec());</span>
+<span class="nc bnc" id="L974" title="All 2 branches missed.">                    if (credential != null) {</span>
+<span class="nc bnc" id="L975" title="All 2 branches missed.">                        if (credential instanceof PasswordCredential) {</span>
+<span class="nc" id="L976">                            Password password = ((PasswordCredential) credential).getPassword();</span>
+<span class="nc bnc" id="L977" title="All 4 branches missed.">                            if (password != null &amp;&amp; password instanceof DigestPassword) {</span>
+<span class="nc" id="L978">                                String providedRealm = ((DigestPassword) password).getRealm();</span>
+<span class="nc bnc" id="L979" title="All 2 branches missed.">                                if ( ! providedRealm.equals(requestedRealm)) {</span>
+<span class="nc" id="L980">                                    log.tracef(&quot;Handling CredentialCallback: credential for realm \&quot;%s\&quot; is not available (\&quot;%s\&quot; provided)&quot;, requestedRealm, providedRealm);</span>
+<span class="nc" id="L981">                                    throw new FastUnsupportedCallbackException(callback);</span>
+                                } else {
+<span class="nc" id="L983">                                    log.tracef(&quot;Handling CredentialCallback: obtained credential for correct realm \&quot;%s\&quot;&quot;, providedRealm);</span>
+                                }
+                            }
+                        }
+<span class="nc" id="L987">                        log.tracef(&quot;Handling CredentialCallback: obtained credential: %s&quot;, credential);</span>
+<span class="nc" id="L988">                        credentialCallback.setCredential(credential);</span>
+<span class="nc" id="L989">                        handleOne(callbacks, idx + 1);</span>
+<span class="nc" id="L990">                        return;</span>
+                    }
+
+                    // otherwise just fail out; some mechanisms will try again with different credentials
+<span class="nc" id="L994">                    log.tracef(&quot;Handling CredentialCallback: failed to obtain credential&quot;);</span>
+<span class="nc" id="L995">                    throw new FastUnsupportedCallbackException(callback);</span>
+<span class="nc bnc" id="L996" title="All 2 branches missed.">                } else if (callback instanceof ServerCredentialCallback) {</span>
+<span class="nc" id="L997">                    final ServerCredentialCallback serverCredentialCallback = (ServerCredentialCallback) callback;</span>
+
+<span class="nc" id="L999">                    CredentialSource serverCredentialSource = stateRef.get().getMechanismConfiguration().getServerCredentialSource();</span>
+
+<span class="nc" id="L1001">                    final Class&lt;? extends Credential&gt; credentialType = serverCredentialCallback.getCredentialType();</span>
+<span class="nc" id="L1002">                    final String algorithm = serverCredentialCallback.getAlgorithm();</span>
+<span class="nc" id="L1003">                    final AlgorithmParameterSpec parameterSpec = serverCredentialCallback.getParameterSpec();</span>
+
+                    // optimize for some cases
+<span class="nc bnc" id="L1006" title="All 2 branches missed.">                    if (serverCredentialSource.getCredentialAcquireSupport(credentialType, algorithm, parameterSpec).mayBeSupported()) {</span>
+<span class="nc" id="L1007">                        final Credential credential = serverCredentialSource.getCredential(credentialType, algorithm, parameterSpec);</span>
+<span class="nc bnc" id="L1008" title="All 2 branches missed.">                        if (credential != null) {</span>
+<span class="nc" id="L1009">                            log.tracef(&quot;Handling ServerCredentialCallback: successfully obtained credential type type=%s, algorithm=%s, params=%s&quot;, credentialType, algorithm, parameterSpec);</span>
+<span class="nc" id="L1010">                            serverCredentialCallback.setCredential(credential);</span>
+<span class="nc" id="L1011">                            handleOne(callbacks, idx + 1);</span>
+                            // return here so we don't double-log, or double-handle callbacks
+<span class="nc" id="L1013">                            return;</span>
+                        }
+                    }
+<span class="nc" id="L1016">                    log.tracef(&quot;Handling ServerCredentialCallback: skipping credential type type=%s, algorithm=%s, params=%s&quot;, credentialType, algorithm, parameterSpec);</span>
+<span class="nc" id="L1017">                    handleOne(callbacks, idx + 1);</span>
+<span class="nc bnc" id="L1018" title="All 2 branches missed.">                } else if (callback instanceof EvidenceVerifyCallback) {</span>
+<span class="nc" id="L1019">                    EvidenceVerifyCallback evidenceVerifyCallback = (EvidenceVerifyCallback) callback;</span>
+
+<span class="nc" id="L1021">                    evidenceVerifyCallback.setVerified(verifyEvidence(evidenceVerifyCallback.getEvidence()));</span>
+
+<span class="nc" id="L1023">                    handleOne(callbacks, idx + 1);</span>
+<span class="nc bnc" id="L1024" title="All 2 branches missed.">                } else if (callback instanceof EvidenceDecodePrincipalCallback) {</span>
+<span class="nc" id="L1025">                    EvidenceDecodePrincipalCallback evidenceDecodePrincipalCallback = (EvidenceDecodePrincipalCallback) callback;</span>
+<span class="nc" id="L1026">                    setDecodedEvidencePrincipal(evidenceDecodePrincipalCallback.getEvidence());</span>
+<span class="nc bnc" id="L1027" title="All 2 branches missed.">                } else if (callback instanceof SSLCallback) {</span>
+<span class="nc" id="L1028">                    SSLCallback sslCallback = (SSLCallback) callback;</span>
+<span class="nc" id="L1029">                    this.sslConnection = sslCallback.getSslConnection();</span>
+
+                    try {
+<span class="nc" id="L1032">                        peerCerts = X500.asX509CertificateArray(sslCallback.getSslConnection().getSession().getPeerCertificates());</span>
+<span class="nc" id="L1033">                    } catch (SSLPeerUnverifiedException e) {</span>
+<span class="nc" id="L1034">                        log.trace(&quot;Peer unverified&quot;, e);</span>
+<span class="nc" id="L1035">                        peerCerts = null;</span>
+<span class="nc" id="L1036">                    }</span>
+<span class="nc" id="L1037">                    handleOne(callbacks, idx + 1);</span>
+<span class="nc bnc" id="L1038" title="All 2 branches missed.">                } else if (callback instanceof ChannelBindingCallback) {</span>
+<span class="nc" id="L1039">                    final SSLConnection sslConnection = this.sslConnection;</span>
+<span class="nc bnc" id="L1040" title="All 2 branches missed.">                    if (sslConnection != null) {</span>
+<span class="nc" id="L1041">                        sslConnection.handleChannelBindingCallback((ChannelBindingCallback) callback);</span>
+                    }
+<span class="nc" id="L1043">                    handleOne(callbacks, idx + 1);</span>
+<span class="nc bnc" id="L1044" title="All 2 branches missed.">                } else if (callback instanceof AuthenticationCompleteCallback) {</span>
+<span class="nc bnc" id="L1045" title="All 2 branches missed.">                    if (! isDone()) {</span>
+<span class="nc bnc" id="L1046" title="All 2 branches missed.">                        if (((AuthenticationCompleteCallback) callback).succeeded()) {</span>
+<span class="nc" id="L1047">                            log.tracef(&quot;Handling AuthenticationCompleteCallback: succeed&quot;);</span>
+<span class="nc" id="L1048">                            succeed();</span>
+                        } else {
+<span class="nc" id="L1050">                            log.tracef(&quot;Handling AuthenticationCompleteCallback: fail&quot;);</span>
+<span class="nc" id="L1051">                            fail();</span>
+                        }
+                    }
+<span class="nc" id="L1054">                    handleOne(callbacks, idx + 1);</span>
+<span class="nc bnc" id="L1055" title="All 2 branches missed.">                } else if (callback instanceof SocketAddressCallback) {</span>
+<span class="nc" id="L1056">                    final SocketAddressCallback socketAddressCallback = (SocketAddressCallback) callback;</span>
+<span class="nc" id="L1057">                    log.tracef(&quot;Handling SocketAddressCallback&quot;);</span>
+<span class="nc bnc" id="L1058" title="All 2 branches missed.">                    if (socketAddressCallback.getKind() == SocketAddressCallback.Kind.PEER) {</span>
+<span class="nc" id="L1059">                        Attributes runtimeAttributes = new MapAttributes();</span>
+<span class="nc bnc" id="L1060" title="All 4 branches missed.">                        if ((socketAddressCallback.getAddress() != null) &amp;&amp; ((InetSocketAddress) socketAddressCallback.getAddress()).getAddress() != null) {</span>
+<span class="nc" id="L1061">                            runtimeAttributes.addFirst(KEY_SOURCE_ADDRESS, ((InetSocketAddress) socketAddressCallback.getAddress()).getAddress().getHostAddress());</span>
+<span class="nc" id="L1062">                            addRuntimeAttributes(runtimeAttributes);</span>
+                        } else {
+<span class="nc" id="L1064">                            log.tracef(&quot;Client's IP address is unknown.&quot;);</span>
+                        }
+                    }
+<span class="nc" id="L1067">                    handleOne(callbacks, idx + 1);</span>
+<span class="nc bnc" id="L1068" title="All 2 branches missed.">                } else if (callback instanceof SecurityIdentityCallback) {</span>
+<span class="nc" id="L1069">                    SecurityIdentity identity = getAuthorizedIdentity();</span>
+<span class="nc" id="L1070">                    log.tracef(&quot;Handling SecurityIdentityCallback: identity = %s&quot;, identity);</span>
+<span class="nc" id="L1071">                    ((SecurityIdentityCallback) callback).setSecurityIdentity(identity);</span>
+<span class="nc" id="L1072">                    handleOne(callbacks, idx + 1);</span>
+<span class="nc bnc" id="L1073" title="All 2 branches missed.">                } else if (callback instanceof AvailableRealmsCallback) {</span>
+<span class="nc" id="L1074">                    Collection&lt;String&gt; names = stateRef.get().getMechanismConfiguration().getMechanismRealmNames();</span>
+<span class="nc bnc" id="L1075" title="All 2 branches missed.">                    if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L1076">                        log.tracef(&quot;Handling AvailableRealmsCallback: realms = [%s]&quot;, String.join(&quot;, &quot;, names));</span>
+                    }
+<span class="nc bnc" id="L1078" title="All 2 branches missed.">                    if (! names.isEmpty()) {</span>
+<span class="nc" id="L1079">                        ((AvailableRealmsCallback) callback).setRealmNames(names.toArray(new String[names.size()]));</span>
+                    }
+<span class="nc" id="L1081">                    handleOne(callbacks, idx + 1);</span>
+<span class="nc bnc" id="L1082" title="All 2 branches missed.">                } else if (callback instanceof RealmCallback) {</span>
+<span class="nc" id="L1083">                    RealmCallback rcb = (RealmCallback) callback;</span>
+<span class="nc" id="L1084">                    String mechanismRealm = rcb.getText();</span>
+<span class="nc bnc" id="L1085" title="All 2 branches missed.">                    if (mechanismRealm == null) {</span>
+<span class="nc" id="L1086">                        mechanismRealm = rcb.getDefaultText();</span>
+                    }
+<span class="nc" id="L1088">                    log.tracef(&quot;Handling RealmCallback: selected = [%s]&quot;, mechanismRealm);</span>
+<span class="nc" id="L1089">                    setMechanismRealmName(mechanismRealm);</span>
+<span class="nc" id="L1090">                    handleOne(callbacks, idx + 1);</span>
+<span class="nc bnc" id="L1091" title="All 2 branches missed.">                } else if (callback instanceof MechanismInformationCallback) {</span>
+<span class="nc" id="L1092">                    MechanismInformationCallback mic = (MechanismInformationCallback) callback;</span>
+                    try {
+<span class="nc" id="L1094">                        MechanismInformation mi = mic.getMechanismInformation();</span>
+<span class="nc bnc" id="L1095" title="All 2 branches missed.">                        if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L1096">                            log.tracef(&quot;Handling MechanismInformationCallback type='%s' name='%s' host-name='%s' protocol='%s'&quot;,</span>
+<span class="nc" id="L1097">                                    mi.getMechanismType(), mi.getMechanismName(), mi.getHostName(), mi.getProtocol());</span>
+                        }
+<span class="nc" id="L1099">                        setMechanismInformation(mi);</span>
+<span class="nc" id="L1100">                        handleOne(callbacks, idx + 1);</span>
+<span class="nc" id="L1101">                    } catch (Exception e) {</span>
+<span class="nc" id="L1102">                        throw new IOException(e);</span>
+<span class="nc" id="L1103">                    }</span>
+<span class="nc bnc" id="L1104" title="All 2 branches missed.">                } else if (callback instanceof CredentialUpdateCallback) {</span>
+<span class="nc" id="L1105">                    final CredentialUpdateCallback credentialUpdateCallback = (CredentialUpdateCallback) callback;</span>
+<span class="nc" id="L1106">                    log.tracef(&quot;Handling CredentialUpdateCallback&quot;);</span>
+<span class="nc" id="L1107">                    updateCredential(credentialUpdateCallback.getCredential());</span>
+<span class="nc" id="L1108">                    handleOne(callbacks, idx + 1);</span>
+<span class="nc bnc" id="L1109" title="All 2 branches missed.">                } else if (callback instanceof CachedIdentityAuthorizeCallback) {</span>
+<span class="nc" id="L1110">                    CachedIdentityAuthorizeCallback authorizeCallback = (CachedIdentityAuthorizeCallback) callback;</span>
+<span class="nc" id="L1111">                    authorizeCallback.setSecurityDomain(stateRef.get().getSecurityDomain());</span>
+<span class="nc" id="L1112">                    SecurityIdentity authorizedIdentity = null;</span>
+<span class="nc" id="L1113">                    Principal principal = null;</span>
+<span class="nc" id="L1114">                    SecurityIdentity identity = authorizeCallback.getIdentity();</span>
+<span class="nc bnc" id="L1115" title="All 4 branches missed.">                    if (identity != null &amp;&amp; importIdentity(identity)) {</span>
+<span class="nc" id="L1116">                        authorizedIdentity = getAuthorizedIdentity();</span>
+                    } else {
+<span class="nc" id="L1118">                        principal = authorizeCallback.getPrincipal();</span>
+<span class="nc bnc" id="L1119" title="All 2 branches missed.">                        if (principal == null) {</span>
+<span class="nc" id="L1120">                            principal = authorizeCallback.getAuthorizationPrincipal();</span>
+                        }
+<span class="nc bnc" id="L1122" title="All 2 branches missed.">                        if (principal != null) {</span>
+<span class="nc" id="L1123">                            setAuthenticationPrincipal(principal);</span>
+<span class="nc bnc" id="L1124" title="All 2 branches missed.">                            if (authorize()) {</span>
+<span class="nc" id="L1125">                                authorizedIdentity = getAuthorizedIdentity();</span>
+                            }
+                        }
+                    }
+<span class="nc" id="L1129">                    log.tracef(&quot;Handling CachedIdentityAuthorizeCallback: principal = %s  authorizedIdentity = %s&quot;, principal, authorizedIdentity);</span>
+<span class="nc" id="L1130">                    authorizeCallback.setAuthorized(authorizedIdentity);</span>
+<span class="nc" id="L1131">                    handleOne(callbacks, idx + 1);</span>
+<span class="nc bnc" id="L1132" title="All 2 branches missed.">                } else if (callback instanceof IdentityCredentialCallback) {</span>
+<span class="nc" id="L1133">                    IdentityCredentialCallback icc = (IdentityCredentialCallback) callback;</span>
+<span class="nc" id="L1134">                    Credential credential = icc.getCredential();</span>
+<span class="nc bnc" id="L1135" title="All 2 branches missed.">                    if (icc.isPrivate()) {</span>
+<span class="nc" id="L1136">                        addPrivateCredential(credential);</span>
+                    } else {
+<span class="nc" id="L1138">                        addPublicCredential(credential);</span>
+                    }
+<span class="nc" id="L1140">                    handleOne(callbacks, idx + 1);</span>
+<span class="nc bnc" id="L1141" title="All 2 branches missed.">                } else if (callback instanceof PrincipalAuthorizeCallback) {</span>
+<span class="nc" id="L1142">                    PrincipalAuthorizeCallback authorizeCallback = (PrincipalAuthorizeCallback) callback;</span>
+<span class="nc" id="L1143">                    Principal principal = authorizeCallback.getPrincipal();</span>
+                    // always re-set the principal to ensure it hasn't changed.
+<span class="nc" id="L1145">                    setAuthenticationPrincipal(principal);</span>
+<span class="nc" id="L1146">                    boolean authorized = authorize();</span>
+<span class="nc" id="L1147">                    log.tracef(&quot;Handling PrincipalAuthorizeCallback: principal = %s  authorized = %b&quot;, principal, authorized);</span>
+<span class="nc" id="L1148">                    authorizeCallback.setAuthorized(authorized);</span>
+<span class="nc" id="L1149">                    handleOne(callbacks, idx + 1);</span>
+<span class="nc" id="L1150">                } else {</span>
+<span class="nc" id="L1151">                    CallbackUtil.unsupported(callback);</span>
+<span class="nc" id="L1152">                    handleOne(callbacks, idx + 1);</span>
+                }
+<span class="nc" id="L1154">            }</span>
+
+        };
+    }
+
+    private static Principal rewriteAll(Principal principal, Function&lt;Principal, Principal&gt; r1, Function&lt;Principal, Principal&gt; r2, Function&lt;Principal, Principal&gt; r3) {
+<span class="fc" id="L1160">        principal = r1.apply(principal);</span>
+<span class="pc bpc" id="L1161" title="1 of 2 branches missed.">        if (principal == null) return null;</span>
+<span class="fc" id="L1162">        principal = r2.apply(principal);</span>
+<span class="pc bpc" id="L1163" title="1 of 2 branches missed.">        if (principal == null) return null;</span>
+<span class="fc" id="L1164">        principal = r3.apply(principal);</span>
+<span class="fc" id="L1165">        return principal;</span>
+    }
+
+    static String mapAll(Principal principal, RealmMapper r1, RealmMapper r2, RealmMapper r3, String defaultRealmName, Evidence evidence) {
+<span class="pc bpc" id="L1169" title="1 of 2 branches missed.">        if (r1 != null) {</span>
+<span class="nc" id="L1170">            return mapRealmName(principal, r1, defaultRealmName, evidence);</span>
+        }
+<span class="pc bpc" id="L1172" title="1 of 2 branches missed.">        if (r2 != null) {</span>
+<span class="nc" id="L1173">            return mapRealmName(principal, r2, defaultRealmName, evidence);</span>
+        }
+<span class="pc bpc" id="L1175" title="1 of 2 branches missed.">        if (r3 != null) {</span>
+<span class="fc" id="L1176">            return mapRealmName(principal, r3, defaultRealmName, evidence);</span>
+        }
+<span class="nc" id="L1178">        return defaultRealmName;</span>
+    }
+
+    private static String mapRealmName(Principal principal, RealmMapper realmMapper, String defaultRealmName, Evidence evidence) {
+<span class="fc" id="L1182">        String realmName = realmMapper.getRealmMapping(principal, evidence);</span>
+<span class="pc bpc" id="L1183" title="1 of 2 branches missed.">        return realmName != null ? realmName : defaultRealmName;</span>
+    }
+
+    State assignName(final SecurityIdentity capturedIdentity, final MechanismConfiguration mechanismConfiguration, final MechanismRealmConfiguration mechanismRealmConfiguration, Principal originalPrincipal, final Evidence evidence, final IdentityCredentials privateCredentials, final IdentityCredentials publicCredentials, final Attributes runtimeAttributes) throws RealmUnavailableException {
+<span class="fc" id="L1187">        return assignName(capturedIdentity, mechanismConfiguration, mechanismRealmConfiguration, originalPrincipal, evidence, privateCredentials, publicCredentials, false, runtimeAttributes);</span>
+    }
+
+    State assignName(final SecurityIdentity capturedIdentity, final MechanismConfiguration mechanismConfiguration, final MechanismRealmConfiguration mechanismRealmConfiguration, Principal originalPrincipal, final Evidence evidence, final IdentityCredentials privateCredentials, final IdentityCredentials publicCredentials, final boolean exclusive, final Attributes runtimeAttributes) throws RealmUnavailableException {
+<span class="fc" id="L1191">        final SecurityDomain domain = capturedIdentity.getSecurityDomain();</span>
+<span class="fc" id="L1192">        final Principal preRealmPrincipal = rewriteAll(originalPrincipal, mechanismRealmConfiguration.getPreRealmRewriter(), mechanismConfiguration.getPreRealmRewriter(), domain.getPreRealmRewriter());</span>
+<span class="pc bpc" id="L1193" title="1 of 2 branches missed.">        if (preRealmPrincipal == null) {</span>
+<span class="nc" id="L1194">            log.tracef(&quot;Unable to rewrite principal [%s] by pre-realm rewritters&quot;, originalPrincipal);</span>
+<span class="nc" id="L1195">            return new InvalidNameState(capturedIdentity, mechanismConfiguration, mechanismRealmConfiguration, privateCredentials, publicCredentials, runtimeAttributes);</span>
+        }
+<span class="fc" id="L1197">        String realmName = mapAll(preRealmPrincipal, mechanismRealmConfiguration.getRealmMapper(), mechanismConfiguration.getRealmMapper(), domain.getRealmMapper(), domain.getDefaultRealmName(), evidence);</span>
+<span class="fc" id="L1198">        final RealmInfo realmInfo = domain.getRealmInfo(realmName);</span>
+<span class="fc" id="L1199">        final Principal postRealmPrincipal = rewriteAll(preRealmPrincipal, mechanismRealmConfiguration.getPostRealmRewriter(), mechanismConfiguration.getPostRealmRewriter(), domain.getPostRealmRewriter());</span>
+<span class="pc bpc" id="L1200" title="1 of 2 branches missed.">        if (postRealmPrincipal == null) {</span>
+<span class="nc" id="L1201">            log.tracef(&quot;Unable to rewrite principal [%s] by post-realm rewritters&quot;, preRealmPrincipal);</span>
+<span class="nc" id="L1202">            return new InvalidNameState(capturedIdentity, mechanismConfiguration, mechanismRealmConfiguration, privateCredentials, publicCredentials, runtimeAttributes);</span>
+        }
+<span class="fc" id="L1204">        final Principal finalPrincipal = rewriteAll(postRealmPrincipal, mechanismRealmConfiguration.getFinalRewriter(), mechanismConfiguration.getFinalRewriter(), realmInfo.getPrincipalRewriter());</span>
+<span class="pc bpc" id="L1205" title="1 of 2 branches missed.">        if (finalPrincipal == null) {</span>
+<span class="nc" id="L1206">            log.tracef(&quot;Unable to rewrite principal [%s] by final rewritters&quot;, postRealmPrincipal);</span>
+<span class="nc" id="L1207">            return new InvalidNameState(capturedIdentity, mechanismConfiguration, mechanismRealmConfiguration, privateCredentials, publicCredentials, runtimeAttributes);</span>
+        }
+
+<span class="fc" id="L1210">        log.tracef(&quot;Principal assigning: [%s], pre-realm rewritten: [%s], realm name: [%s], post-realm rewritten: [%s], realm rewritten: [%s]&quot;,</span>
+                originalPrincipal, preRealmPrincipal, realmName, postRealmPrincipal, finalPrincipal);
+
+<span class="fc" id="L1213">        final SecurityRealm securityRealm = realmInfo.getSecurityRealm();</span>
+        final RealmIdentity realmIdentity;
+        try {
+<span class="pc bpc" id="L1216" title="1 of 2 branches missed.">            if (exclusive) {</span>
+<span class="nc bnc" id="L1217" title="All 2 branches missed.">                if (securityRealm instanceof ModifiableSecurityRealm) {</span>
+<span class="nc" id="L1218">                    realmIdentity = ((ModifiableSecurityRealm) securityRealm).getRealmIdentityForUpdate(finalPrincipal);</span>
+                } else {
+<span class="nc" id="L1220">                    throw log.unableToObtainExclusiveAccess();</span>
+                }
+            } else {
+<span class="fc" id="L1223">                realmIdentity = securityRealm.getRealmIdentity(finalPrincipal);</span>
+            }
+<span class="nc" id="L1225">        } catch (RealmUnavailableException e) {</span>
+<span class="nc" id="L1226">            SecurityDomain.safeHandleSecurityEvent(domain, new SecurityRealmUnavailableEvent(capturedIdentity, realmName));</span>
+<span class="nc" id="L1227">            throw e;</span>
+<span class="fc" id="L1228">        }</span>
+
+
+<span class="fc" id="L1231">        return new NameAssignedState(capturedIdentity, realmInfo, realmIdentity, preRealmPrincipal, mechanismConfiguration, mechanismRealmConfiguration, privateCredentials, publicCredentials, runtimeAttributes);</span>
+    }
+
+<span class="fc" id="L1234">    abstract static class State {</span>
+        MechanismConfiguration getMechanismConfiguration() {
+<span class="nc" id="L1236">            throw log.noAuthenticationInProgress();</span>
+        }
+
+        MechanismRealmConfiguration getMechanismRealmConfiguration() {
+<span class="nc" id="L1240">            throw log.noAuthenticationInProgress();</span>
+        }
+
+        SecurityIdentity getAuthorizedIdentity() {
+<span class="nc" id="L1244">            throw log.noAuthenticationInProgress();</span>
+        }
+
+        Principal getAuthenticationPrincipal() {
+<span class="nc" id="L1248">            throw log.noAuthenticationInProgress();</span>
+        }
+
+        boolean isSamePrincipal(Principal principal) {
+<span class="nc" id="L1252">            return false;</span>
+        }
+
+        SupportLevel getCredentialAcquireSupport(Class&lt;? extends Credential&gt; credentialType, String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc" id="L1256">            throw log.noAuthenticationInProgress();</span>
+        }
+
+        SupportLevel getEvidenceVerifySupport(Class&lt;? extends Evidence&gt; evidenceType, String algorithmName) throws RealmUnavailableException {
+<span class="nc" id="L1260">            throw log.noAuthenticationInProgress();</span>
+        }
+
+        &lt;C extends Credential&gt; C getCredential(Class&lt;C&gt; credentialType, String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc" id="L1264">            throw log.noAuthenticationInProgress();</span>
+        }
+
+        boolean verifyEvidence(final Evidence evidence) throws RealmUnavailableException {
+<span class="nc" id="L1268">            throw log.noAuthenticationInProgress();</span>
+        }
+
+        boolean importIdentity(final SecurityIdentity identity) throws RealmUnavailableException {
+<span class="nc" id="L1272">            throw log.noAuthenticationInProgress();</span>
+        }
+
+        RealmIdentity getRealmIdentity() {
+<span class="nc" id="L1276">            throw log.noAuthenticationInProgress();</span>
+        }
+
+        SecurityDomain getSecurityDomain() {
+<span class="nc" id="L1280">            throw log.noAuthenticationInProgress();</span>
+        }
+
+        boolean authorizeAnonymous(final boolean requireLoginPermission) {
+<span class="nc" id="L1284">            throw log.noAuthenticationInProgress();</span>
+        }
+
+        void setMechanismInformation(final MechanismInformation mechanismInformation) {
+<span class="nc" id="L1288">            throw log.noAuthenticationInProgress();</span>
+        }
+
+        void setPrincipal(Principal principal, boolean exclusive) throws RealmUnavailableException {
+<span class="nc" id="L1292">            throw log.noAuthenticationInProgress();</span>
+        }
+
+        boolean authorize(final boolean requireLoginPermission) throws RealmUnavailableException {
+<span class="nc" id="L1296">            throw log.noAuthenticationInProgress();</span>
+        }
+
+        boolean authorize(Principal authorizationId, final boolean authorizeRunAs) throws RealmUnavailableException {
+<span class="nc" id="L1300">            throw log.noAuthenticationInProgress();</span>
+        }
+
+        void setMechanismRealmName(String name) {
+<span class="nc" id="L1304">            throw log.noAuthenticationInProgress();</span>
+        }
+
+        void updateCredential(Credential credential) throws RealmUnavailableException {
+<span class="nc" id="L1308">            throw log.noAuthenticationInProgress();</span>
+        }
+
+        void succeed() {
+<span class="nc" id="L1312">            throw log.noAuthenticationInProgress();</span>
+        }
+
+        void fail(final boolean requireInProgress) {
+<span class="pc bpc" id="L1316" title="1 of 2 branches missed.">            if (requireInProgress) throw log.noAuthenticationInProgress();</span>
+<span class="fc" id="L1317">        }</span>
+
+        boolean isDone() {
+<span class="nc" id="L1320">            return false;</span>
+        }
+
+        void addPublicCredential(final Credential credential) {
+<span class="nc" id="L1324">            throw log.noAuthenticationInProgress();</span>
+        }
+
+        void addPrivateCredential(final Credential credential) {
+<span class="nc" id="L1328">            throw log.noAuthenticationInProgress();</span>
+        }
+
+        void addRuntimeAttributes(final Attributes runtimeAttributes) {
+<span class="nc" id="L1332">            throw log.noAuthenticationInProgress();</span>
+        }
+
+        /**
+         * Indicate whether or not current state is {@link NameAssignedState}.
+         *
+         * @return {@code true} if state is {@link NameAssignedState}. Otherwise, {@code false}.
+         */
+        public boolean isNameAssigned() {
+<span class="fc" id="L1341">            return this instanceof NameAssignedState;</span>
+        }
+
+        /**
+         * Indicate whether or not current state is {@link AuthorizedState}.
+         *
+         * @return {@code true} if state is {@link AuthorizedState}. Otherwise, {@code false}.
+         */
+        public boolean isAuthorized() {
+<span class="nc" id="L1350">            return this instanceof AuthorizedState;</span>
+        }
+
+        /**
+         * Indicate whether or not evidence verification is allowed.
+         *
+         * @return {@code true} if evidence verification can be performed. Otherwise, {@code false}.
+         */
+        public boolean canVerifyEvidence() {
+<span class="nc bnc" id="L1359" title="All 4 branches missed.">            return !(this instanceof NameAssignedState || this instanceof AuthorizedState);</span>
+        }
+    }
+
+    final class InactiveState extends State {
+
+        private final SecurityIdentity capturedIdentity;
+        private final MechanismConfigurationSelector mechanismConfigurationSelector;
+        private final MechanismInformation mechanismInformation;
+        private final IdentityCredentials privateCredentials;
+        private final IdentityCredentials publicCredentials;
+        private final Attributes runtimeAttributes;
+
+        public InactiveState(SecurityIdentity capturedIdentity, MechanismConfigurationSelector mechanismConfigurationSelector, IdentityCredentials privateCredentials, IdentityCredentials publicCredentials, Attributes runtimeAttributes) {
+<span class="fc" id="L1373">            this(capturedIdentity, mechanismConfigurationSelector, MechanismInformation.DEFAULT, privateCredentials, publicCredentials, runtimeAttributes);</span>
+<span class="fc" id="L1374">        }</span>
+
+        public InactiveState(SecurityIdentity capturedIdentity, MechanismConfigurationSelector mechanismConfigurationSelector,
+<span class="fc" id="L1377">                MechanismInformation mechanismInformation, IdentityCredentials privateCredentials, IdentityCredentials publicCredentials, Attributes runtimeAttributes) {</span>
+<span class="fc" id="L1378">            this.capturedIdentity = capturedIdentity;</span>
+<span class="fc" id="L1379">            this.mechanismConfigurationSelector = mechanismConfigurationSelector;</span>
+<span class="fc" id="L1380">            this.mechanismInformation = checkNotNullParam(&quot;mechanismInformation&quot;, mechanismInformation);</span>
+<span class="fc" id="L1381">            this.privateCredentials = privateCredentials;</span>
+<span class="fc" id="L1382">            this.publicCredentials = publicCredentials;</span>
+<span class="fc" id="L1383">            this.runtimeAttributes = runtimeAttributes;</span>
+<span class="fc" id="L1384">        }</span>
+
+        @Override
+        void setMechanismInformation(MechanismInformation mechanismInformation) {
+<span class="nc" id="L1388">            InactiveState inactiveState = new InactiveState(capturedIdentity, mechanismConfigurationSelector, mechanismInformation, privateCredentials, publicCredentials, runtimeAttributes);</span>
+<span class="nc" id="L1389">            InitialState nextState = inactiveState.selectMechanismConfiguration();</span>
+<span class="nc bnc" id="L1390" title="All 2 branches missed.">            if (! stateRef.compareAndSet(this, nextState)) {</span>
+<span class="nc" id="L1391">                stateRef.get().setMechanismInformation(mechanismInformation);</span>
+            }
+<span class="nc" id="L1393">        }</span>
+
+        @Override
+        SecurityDomain getSecurityDomain() {
+<span class="nc" id="L1397">            return capturedIdentity.getSecurityDomain();</span>
+        }
+
+        boolean authorize(Principal authorizationId, boolean authorizeRunAs) throws RealmUnavailableException {
+<span class="nc" id="L1401">            transition();</span>
+<span class="nc" id="L1402">            return stateRef.get().authorize(authorizationId, authorizeRunAs);</span>
+        }
+
+        @Override
+        void setMechanismRealmName(String name) {
+<span class="nc" id="L1407">            transition();</span>
+<span class="nc" id="L1408">            stateRef.get().setMechanismRealmName(name);</span>
+<span class="nc" id="L1409">        }</span>
+
+
+        @Override
+        MechanismRealmConfiguration getMechanismRealmConfiguration() {
+<span class="nc" id="L1414">            transition();</span>
+<span class="nc" id="L1415">            return stateRef.get().getMechanismRealmConfiguration();</span>
+        }
+
+        @Override
+        void fail(final boolean requireInProgress) {
+<span class="nc" id="L1420">            transition();</span>
+<span class="nc" id="L1421">            stateRef.get().fail(requireInProgress);</span>
+<span class="nc" id="L1422">        }</span>
+
+        @Override
+        boolean authorizeAnonymous(boolean requireLoginPermission) {
+<span class="nc" id="L1426">            transition();</span>
+<span class="nc" id="L1427">            return stateRef.get().authorizeAnonymous(requireLoginPermission);</span>
+        }
+
+        @Override
+        boolean authorize(boolean requireLoginPermission) throws RealmUnavailableException {
+<span class="nc" id="L1432">            transition();</span>
+<span class="nc" id="L1433">            return stateRef.get().authorize(requireLoginPermission);</span>
+        }
+
+        @Override
+        boolean importIdentity(SecurityIdentity identity) throws RealmUnavailableException {
+<span class="fc" id="L1438">            transition();</span>
+<span class="fc" id="L1439">            return stateRef.get().importIdentity(identity);</span>
+        }
+
+        @Override
+        SupportLevel getEvidenceVerifySupport(final Class&lt;? extends Evidence&gt; evidenceType, final String algorithmName) throws RealmUnavailableException {
+<span class="nc" id="L1444">            return getSecurityDomain().getEvidenceVerifySupport(evidenceType, algorithmName);</span>
+        }
+
+        @Override
+        boolean verifyEvidence(Evidence evidence) throws RealmUnavailableException {
+<span class="nc" id="L1449">            transition();</span>
+<span class="nc" id="L1450">            return stateRef.get().verifyEvidence(evidence);</span>
+        }
+
+        @Override
+        void setPrincipal(Principal principal, boolean exclusive) throws RealmUnavailableException {
+<span class="fc" id="L1455">            transition();</span>
+<span class="fc" id="L1456">            stateRef.get().setPrincipal(principal, exclusive);</span>
+<span class="fc" id="L1457">        }</span>
+
+        @Override
+        MechanismConfiguration getMechanismConfiguration() {
+<span class="nc" id="L1461">            transition();</span>
+<span class="nc" id="L1462">            return stateRef.get().getMechanismConfiguration();</span>
+        }
+
+        @Override
+        void addPublicCredential(final Credential credential) {
+<span class="nc" id="L1467">            final InactiveState newState = new InactiveState(capturedIdentity, mechanismConfigurationSelector, mechanismInformation, privateCredentials, publicCredentials.withCredential(credential), runtimeAttributes);</span>
+<span class="nc bnc" id="L1468" title="All 2 branches missed.">            if (! stateRef.compareAndSet(this, newState)) {</span>
+<span class="nc" id="L1469">                stateRef.get().addPublicCredential(credential);</span>
+            }
+<span class="nc" id="L1471">        }</span>
+
+        @Override
+        void addPrivateCredential(final Credential credential) {
+<span class="nc" id="L1475">            final InactiveState newState = new InactiveState(capturedIdentity, mechanismConfigurationSelector, mechanismInformation, privateCredentials.withCredential(credential), publicCredentials, runtimeAttributes);</span>
+<span class="nc bnc" id="L1476" title="All 2 branches missed.">            if (! stateRef.compareAndSet(this, newState)) {</span>
+<span class="nc" id="L1477">                stateRef.get().addPrivateCredential(credential);</span>
+            }
+<span class="nc" id="L1479">        }</span>
+
+        @Override
+        void addRuntimeAttributes(final Attributes runtimeAttributes) {
+<span class="nc" id="L1483">            final InactiveState newState = new InactiveState(capturedIdentity, mechanismConfigurationSelector, mechanismInformation, privateCredentials, publicCredentials, AggregateAttributes.aggregateOf(this.runtimeAttributes, runtimeAttributes));</span>
+<span class="nc bnc" id="L1484" title="All 2 branches missed.">            if (! stateRef.compareAndSet(this, newState)) {</span>
+<span class="nc" id="L1485">                stateRef.get().addRuntimeAttributes(runtimeAttributes);</span>
+            }
+<span class="nc" id="L1487">        }</span>
+
+        private void transition() {
+<span class="fc" id="L1490">            InitialState initialState = selectMechanismConfiguration();</span>
+<span class="fc" id="L1491">            stateRef.compareAndSet(this, initialState);</span>
+<span class="fc" id="L1492">        }</span>
+
+        private InitialState selectMechanismConfiguration() {
+<span class="fc" id="L1495">            MechanismConfiguration mechanismConfiguration = mechanismConfigurationSelector.selectConfiguration(mechanismInformation);</span>
+<span class="pc bpc" id="L1496" title="1 of 2 branches missed.">            if (mechanismConfiguration == null) {</span>
+<span class="nc" id="L1497">                throw log.unableToSelectMechanismConfiguration(mechanismInformation.getMechanismType(),</span>
+<span class="nc" id="L1498">                        mechanismInformation.getMechanismName(), mechanismInformation.getHostName(),</span>
+<span class="nc" id="L1499">                        mechanismInformation.getProtocol());</span>
+            }
+<span class="fc" id="L1501">            return new InitialState(capturedIdentity, mechanismConfiguration, mechanismConfigurationSelector, privateCredentials, publicCredentials, runtimeAttributes);</span>
+        }
+
+    }
+
+    abstract class ActiveState extends State {
+
+<span class="fc" id="L1508">        ActiveState() {</span>
+<span class="fc" id="L1509">        }</span>
+
+        boolean authorize(Principal authorizationId, boolean authorizeRunAs) throws RealmUnavailableException {
+<span class="fc" id="L1512">            final AtomicReference&lt;State&gt; stateRef = getStateRef();</span>
+
+            // get the identity we are authorizing from
+<span class="fc" id="L1515">            final SecurityIdentity sourceIdentity = getSourceIdentity();</span>
+
+<span class="fc" id="L1517">            final State state = assignName(sourceIdentity, getMechanismConfiguration(), getMechanismRealmConfiguration(), authorizationId, null, IdentityCredentials.NONE, IdentityCredentials.NONE, Attributes.EMPTY);</span>
+<span class="pc bpc" id="L1518" title="1 of 2 branches missed.">            if (!state.isNameAssigned()) {</span>
+<span class="nc" id="L1519">                ElytronMessages.log.tracef(&quot;Authorization failed - unable to assign identity name&quot;);</span>
+<span class="nc" id="L1520">                return false;</span>
+            }
+
+<span class="fc" id="L1523">            final NameAssignedState nameAssignedState = (NameAssignedState) state;</span>
+<span class="fc" id="L1524">            final RealmIdentity realmIdentity = nameAssignedState.getRealmIdentity();</span>
+<span class="fc" id="L1525">            boolean ok = false;</span>
+            try {
+<span class="pc bpc" id="L1527" title="1 of 2 branches missed.">                if (! realmIdentity.exists()) {</span>
+<span class="nc" id="L1528">                    ElytronMessages.log.tracef(&quot;Authorization failed - identity does not exists&quot;);</span>
+<span class="nc" id="L1529">                    return false;</span>
+                }
+                // check the run-as permission on the old identity
+<span class="pc bpc" id="L1532" title="2 of 4 branches missed.">                if (authorizeRunAs &amp;&amp; ! sourceIdentity.implies(new RunAsPrincipalPermission(nameAssignedState.getAuthenticationPrincipal().getName()))) {</span>
+<span class="nc" id="L1533">                    ElytronMessages.log.tracef(&quot;Authorization failed - source identity does not have RunAsPrincipalPermission&quot;);</span>
+<span class="nc" id="L1534">                    return false;</span>
+                }
+<span class="fc" id="L1536">                final AuthorizedAuthenticationState newState = nameAssignedState.doAuthorization(false);</span>
+<span class="pc bpc" id="L1537" title="1 of 2 branches missed.">                if (newState == null) {</span>
+<span class="nc" id="L1538">                    return false;</span>
+                }
+<span class="pc bpc" id="L1540" title="1 of 2 branches missed.">                if (! stateRef.compareAndSet(this, newState)) {</span>
+                    // try again
+<span class="nc" id="L1542">                    return stateRef.get().authorize(authorizationId, authorizeRunAs);</span>
+                }
+<span class="fc" id="L1544">                ok = true;</span>
+<span class="fc" id="L1545">                return true;</span>
+            } finally {
+<span class="pc bpc" id="L1547" title="1 of 2 branches missed.">                if (! ok) realmIdentity.dispose();</span>
+            }
+        }
+
+        @Override
+        void setMechanismRealmName(final String realmName) {
+<span class="nc" id="L1553">            final MechanismRealmConfiguration currentConfiguration = getMechanismRealmConfiguration();</span>
+<span class="nc" id="L1554">            final MechanismConfiguration mechanismConfiguration = getMechanismConfiguration();</span>
+<span class="nc bnc" id="L1555" title="All 2 branches missed.">            if (mechanismConfiguration.getMechanismRealmNames().isEmpty()) {</span>
+                // no realms are configured
+<span class="nc" id="L1557">                throw log.invalidMechRealmSelection(realmName);</span>
+            }
+<span class="nc" id="L1559">            final MechanismRealmConfiguration configuration = mechanismConfiguration.getMechanismRealmConfiguration(realmName);</span>
+<span class="nc bnc" id="L1560" title="All 2 branches missed.">            if (configuration == null) {</span>
+<span class="nc" id="L1561">                throw log.invalidMechRealmSelection(realmName);</span>
+            }
+<span class="nc bnc" id="L1563" title="All 2 branches missed.">            if (currentConfiguration != configuration) {</span>
+<span class="nc" id="L1564">                throw log.mechRealmAlreadySelected();</span>
+            }
+<span class="nc" id="L1566">        }</span>
+
+        @Override
+        void setMechanismInformation(MechanismInformation mechanismInformation) {
+<span class="nc" id="L1570">            throw log.tooLateToSetMechanismInformation();</span>
+        }
+
+        abstract SecurityIdentity getSourceIdentity();
+    }
+
+    /**
+     * State shared among both the initial state and the realm-assigned state, where no authentication name is yet set.
+     */
+    abstract class UnassignedState extends ActiveState {
+        final SecurityIdentity capturedIdentity;
+        final MechanismConfiguration mechanismConfiguration;
+        final IdentityCredentials privateCredentials;
+        final IdentityCredentials publicCredentials;
+        final Attributes runtimeAttributes;
+
+<span class="fc" id="L1586">        UnassignedState(final SecurityIdentity capturedIdentity, final MechanismConfiguration mechanismConfiguration, final IdentityCredentials privateCredentials, final IdentityCredentials publicCredentials, final Attributes runtimeAttributes) {</span>
+<span class="fc" id="L1587">            this.capturedIdentity = capturedIdentity;</span>
+<span class="fc" id="L1588">            this.mechanismConfiguration = mechanismConfiguration;</span>
+<span class="fc" id="L1589">            this.privateCredentials = privateCredentials;</span>
+<span class="fc" id="L1590">            this.publicCredentials = publicCredentials;</span>
+<span class="fc" id="L1591">            this.runtimeAttributes = runtimeAttributes;</span>
+<span class="fc" id="L1592">        }</span>
+
+        SecurityIdentity getSourceIdentity() {
+<span class="fc" id="L1595">            return capturedIdentity;</span>
+        }
+
+        @Override
+        SecurityDomain getSecurityDomain() {
+<span class="nc" id="L1600">            return capturedIdentity.getSecurityDomain();</span>
+        }
+
+        @Override
+        void fail(final boolean requireInProgress) {
+<span class="nc" id="L1605">            final AtomicReference&lt;State&gt; stateRef = getStateRef();</span>
+<span class="nc bnc" id="L1606" title="All 2 branches missed.">            if (! stateRef.compareAndSet(this, FAILED)) {</span>
+                // recurse &amp; retry
+<span class="nc" id="L1608">                stateRef.get().fail(requireInProgress);</span>
+            }
+<span class="nc" id="L1610">        }</span>
+
+        @Override
+        boolean authorizeAnonymous(final boolean requireLoginPermission) {
+<span class="nc" id="L1614">            final AtomicReference&lt;State&gt; stateRef = getStateRef();</span>
+<span class="nc" id="L1615">            final SecurityIdentity anonymousIdentity = getSecurityDomain().getAnonymousSecurityIdentity();</span>
+<span class="nc bnc" id="L1616" title="All 8 branches missed.">            return (! requireLoginPermission || anonymousIdentity.implies(LoginPermission.getInstance())) &amp;&amp; (stateRef.compareAndSet(this, new AnonymousAuthorizedState(anonymousIdentity)) || stateRef.get().authorizeAnonymous(requireLoginPermission));</span>
+        }
+
+        @Override
+        boolean authorize(final boolean requireLoginPermission) throws RealmUnavailableException {
+<span class="nc" id="L1621">            final SecurityIdentity capturedIdentity = this.capturedIdentity;</span>
+<span class="nc bnc" id="L1622" title="All 2 branches missed.">            if (capturedIdentity.isAnonymous()) {</span>
+<span class="nc" id="L1623">                return authorizeAnonymous(requireLoginPermission);</span>
+            }
+<span class="nc" id="L1625">            final AtomicReference&lt;State&gt; stateRef = getStateRef();</span>
+<span class="nc bnc" id="L1626" title="All 8 branches missed.">            return (! requireLoginPermission || capturedIdentity.implies(LoginPermission.getInstance())) &amp;&amp; (stateRef.compareAndSet(this, new AuthorizedState(capturedIdentity, capturedIdentity.getPrincipal(), capturedIdentity.getRealmInfo(), mechanismConfiguration, getMechanismRealmConfiguration())) || stateRef.get().authorize(requireLoginPermission));</span>
+        }
+
+        @Override
+        boolean importIdentity(final SecurityIdentity importedIdentity) throws RealmUnavailableException {
+            // As long as a name is not yet assigned, we can authorize an imported identity
+<span class="fc" id="L1632">            final RealmInfo evidenceRealmInfo = importedIdentity.getRealmInfo();</span>
+<span class="fc" id="L1633">            final SecurityRealm evidenceSecurityRealm = evidenceRealmInfo.getSecurityRealm();</span>
+<span class="fc" id="L1634">            final SecurityDomain evidenceSecurityDomain = importedIdentity.getSecurityDomain();</span>
+<span class="fc" id="L1635">            final AtomicReference&lt;State&gt; stateRef = getStateRef();</span>
+<span class="fc" id="L1636">            final SecurityIdentity sourceIdentity = getSourceIdentity();</span>
+<span class="fc" id="L1637">            final SecurityDomain domain = sourceIdentity.getSecurityDomain();</span>
+            // Check that the given security identity evidence either corresponds to the same realm that created the
+            // current authentication identity or it corresponds to a domain that is trusted by the current domain
+<span class="fc bfc" id="L1640" title="All 2 branches covered.">            if (importedIdentity.isAnonymous()) {</span>
+<span class="fc" id="L1641">                AnonymousAuthorizedState newState = new AnonymousAuthorizedState(domain.getAnonymousSecurityIdentity());</span>
+<span class="pc bpc" id="L1642" title="3 of 4 branches missed.">                return stateRef.compareAndSet(this, newState) || stateRef.get().importIdentity(importedIdentity);</span>
+            }
+<span class="fc" id="L1644">            final Principal importedPrincipal = importedIdentity.getPrincipal();</span>
+<span class="pc bpc" id="L1645" title="1 of 2 branches missed.">            if (domain == importedIdentity.getSecurityDomain()) {</span>
+                // it's authorized already because it's the same domain
+<span class="fc" id="L1647">                AuthorizedState newState = new AuthorizedState(importedIdentity, importedPrincipal, importedIdentity.getRealmInfo(), mechanismConfiguration, getMechanismRealmConfiguration());</span>
+<span class="pc bpc" id="L1648" title="3 of 4 branches missed.">                return stateRef.compareAndSet(this, newState) || stateRef.get().importIdentity(importedIdentity);</span>
+            }
+
+<span class="nc" id="L1651">            boolean trusted = false;</span>
+            // it didn't come from our domain.  Check to see if it came from a trusted domain.
+<span class="nc bnc" id="L1653" title="All 2 branches missed.">            if (domain.trustsDomain(evidenceSecurityDomain)) {</span>
+<span class="nc" id="L1654">                trusted = true;</span>
+            }
+
+            // Finally, run the identity through the normal name selection process.
+<span class="nc" id="L1658">            final State state = assignName(sourceIdentity, mechanismConfiguration, getMechanismRealmConfiguration(), importedPrincipal, null, privateCredentials, publicCredentials, runtimeAttributes);</span>
+<span class="nc bnc" id="L1659" title="All 2 branches missed.">            if (!state.isNameAssigned()) {</span>
+<span class="nc" id="L1660">                return false;</span>
+            }
+<span class="nc" id="L1662">            final NameAssignedState nameState = (NameAssignedState) state;</span>
+<span class="nc" id="L1663">            final RealmIdentity realmIdentity = nameState.getRealmIdentity();</span>
+<span class="nc" id="L1664">            boolean ok = false;</span>
+            try {
+<span class="nc bnc" id="L1666" title="All 2 branches missed.">                if (! trusted) {</span>
+<span class="nc bnc" id="L1667" title="All 2 branches missed.">                    if (nameState.getRealmInfo().getSecurityRealm() != evidenceSecurityRealm) {</span>
+                        // mapped realm does not correspond with the imported realm name
+<span class="nc" id="L1669">                        return false;</span>
+                    }
+                }
+
+                // with the name we have now, try and authorize
+<span class="nc" id="L1674">                final AuthorizedAuthenticationState authzState = nameState.doAuthorization(false);</span>
+<span class="nc bnc" id="L1675" title="All 2 branches missed.">                if (authzState == null) {</span>
+<span class="nc" id="L1676">                    return false;</span>
+                }
+
+<span class="nc bnc" id="L1679" title="All 2 branches missed.">                if (! stateRef.compareAndSet(this, authzState)) {</span>
+<span class="nc" id="L1680">                    return stateRef.get().importIdentity(importedIdentity);</span>
+                }
+
+<span class="nc" id="L1683">                ok = true;</span>
+<span class="nc" id="L1684">                return true;</span>
+            } finally {
+<span class="nc bnc" id="L1686" title="All 2 branches missed.">                if (! ok) realmIdentity.dispose();</span>
+            }
+        }
+
+        @Override
+        SupportLevel getEvidenceVerifySupport(final Class&lt;? extends Evidence&gt; evidenceType, final String algorithmName) throws RealmUnavailableException {
+<span class="nc" id="L1692">            return getSecurityDomain().getEvidenceVerifySupport(evidenceType, algorithmName);</span>
+        }
+
+        @Override
+        boolean verifyEvidence(final Evidence evidence) throws RealmUnavailableException {
+            // TODO: this method probably should never cause a state change... consider setEvidence or something instead?
+<span class="nc" id="L1698">            final AtomicReference&lt;State&gt; stateRef = getStateRef();</span>
+<span class="nc" id="L1699">            setDecodedEvidencePrincipal(evidence);</span>
+<span class="nc" id="L1700">            Principal evidencePrincipal = evidence.getDecodedPrincipal();</span>
+<span class="nc" id="L1701">            log.tracef(&quot;Evidence verification: evidence = %s  evidencePrincipal = %s&quot;, evidence, evidencePrincipal);</span>
+<span class="nc" id="L1702">            final MechanismRealmConfiguration mechanismRealmConfiguration = getMechanismRealmConfiguration();</span>
+<span class="nc bnc" id="L1703" title="All 2 branches missed.">            if (evidencePrincipal != null) {</span>
+<span class="nc" id="L1704">                final State newState = assignName(getSourceIdentity(), mechanismConfiguration, mechanismRealmConfiguration, evidencePrincipal, evidence, privateCredentials, publicCredentials, runtimeAttributes);</span>
+<span class="nc bnc" id="L1705" title="All 2 branches missed.">                if (! newState.verifyEvidence(evidence)) {</span>
+<span class="nc bnc" id="L1706" title="All 2 branches missed.">                    if (newState.isNameAssigned()) {</span>
+<span class="nc" id="L1707">                        ((NameAssignedState)newState).realmIdentity.dispose();</span>
+                    }
+<span class="nc" id="L1709">                    return false;</span>
+                }
+<span class="nc bnc" id="L1711" title="All 2 branches missed.">                if (! stateRef.compareAndSet(this, newState)) {</span>
+<span class="nc bnc" id="L1712" title="All 2 branches missed.">                    if (newState.isNameAssigned()) {</span>
+<span class="nc" id="L1713">                        ((NameAssignedState)newState).realmIdentity.dispose();</span>
+                    }
+<span class="nc" id="L1715">                    return stateRef.get().verifyEvidence(evidence);</span>
+                }
+<span class="nc" id="L1717">                return true;</span>
+            }
+<span class="nc" id="L1719">            Class&lt;? extends Evidence&gt; evidenceType = evidence.getClass();</span>
+<span class="nc bnc" id="L1720" title="All 2 branches missed.">            String algorithm = evidence instanceof AlgorithmEvidence ? ((AlgorithmEvidence) evidence).getAlgorithm() : null;</span>
+
+            // verify evidence with no name set: use the realms to find a match (SSO scenario, etc.)
+<span class="nc" id="L1723">            final SecurityDomain domain = getSecurityDomain();</span>
+<span class="nc" id="L1724">            final Collection&lt;RealmInfo&gt; realmInfos = domain.getRealmInfos();</span>
+<span class="nc" id="L1725">            RealmIdentity realmIdentity = null;</span>
+<span class="nc" id="L1726">            RealmInfo realmInfo = null;</span>
+<span class="nc bnc" id="L1727" title="All 2 branches missed.">            for (RealmInfo info : realmInfos) {</span>
+                try {
+<span class="nc" id="L1729">                    realmIdentity = info.getSecurityRealm().getRealmIdentity(evidence);</span>
+<span class="nc bnc" id="L1730" title="All 2 branches missed.">                    if (realmIdentity.getEvidenceVerifySupport(evidenceType, algorithm).mayBeSupported()) {</span>
+<span class="nc" id="L1731">                        realmInfo = info;</span>
+<span class="nc" id="L1732">                        break;</span>
+                    } else {
+<span class="nc" id="L1734">                        realmIdentity.dispose();</span>
+                    }
+<span class="nc" id="L1736">                } catch (RealmUnavailableException e) {</span>
+<span class="nc" id="L1737">                    SecurityDomain.safeHandleSecurityEvent(domain, new SecurityRealmUnavailableEvent(domain.getCurrentSecurityIdentity(), info.getName()));</span>
+<span class="nc" id="L1738">                    throw e;</span>
+<span class="nc" id="L1739">                }</span>
+<span class="nc" id="L1740">            }</span>
+<span class="nc bnc" id="L1741" title="All 2 branches missed.">            if (realmInfo == null) {</span>
+                // no verification possible, no identity found
+<span class="nc" id="L1743">                return false;</span>
+            }
+<span class="nc bnc" id="L1745" title="All 2 branches missed.">            if (! realmIdentity.verifyEvidence(evidence)) {</span>
+<span class="nc" id="L1746">                realmIdentity.dispose();</span>
+<span class="nc" id="L1747">                return false;</span>
+            }
+<span class="nc" id="L1749">            final Principal resolvedPrincipal = realmIdentity.getRealmIdentityPrincipal();</span>
+<span class="nc bnc" id="L1750" title="All 2 branches missed.">            if (resolvedPrincipal == null) {</span>
+                // we have to have a principal
+<span class="nc" id="L1752">                realmIdentity.dispose();</span>
+<span class="nc" id="L1753">                return false;</span>
+            }
+<span class="nc" id="L1755">            final NameAssignedState newState = new NameAssignedState(getSourceIdentity(), realmInfo, realmIdentity, resolvedPrincipal, mechanismConfiguration, mechanismRealmConfiguration, privateCredentials, publicCredentials, runtimeAttributes);</span>
+<span class="nc bnc" id="L1756" title="All 2 branches missed.">            if (! stateRef.compareAndSet(this, newState)) {</span>
+<span class="nc" id="L1757">                realmIdentity.dispose();</span>
+<span class="nc" id="L1758">                return stateRef.get().verifyEvidence(evidence);</span>
+            }
+<span class="nc" id="L1760">            return true;</span>
+        }
+
+        @Override
+        void setPrincipal(final Principal principal, final boolean exclusive) throws RealmUnavailableException {
+<span class="fc" id="L1765">            Assert.checkNotNullParam(&quot;principal&quot;, principal);</span>
+<span class="fc" id="L1766">            final AtomicReference&lt;State&gt; stateRef = getStateRef();</span>
+<span class="fc" id="L1767">            final State newState = assignName(capturedIdentity, mechanismConfiguration, getMechanismRealmConfiguration(), principal, null, privateCredentials, publicCredentials, exclusive, runtimeAttributes);</span>
+<span class="pc bpc" id="L1768" title="1 of 2 branches missed.">            if (! stateRef.compareAndSet(this, newState)) {</span>
+<span class="nc bnc" id="L1769" title="All 2 branches missed.">                if (newState.isNameAssigned()) {</span>
+<span class="nc" id="L1770">                    ((NameAssignedState)newState).realmIdentity.dispose();</span>
+                }
+<span class="nc" id="L1772">                stateRef.get().setPrincipal(principal, exclusive);</span>
+            }
+<span class="fc" id="L1774">        }</span>
+
+        @Override
+        MechanismConfiguration getMechanismConfiguration() {
+<span class="nc" id="L1778">            return mechanismConfiguration;</span>
+        }
+
+        IdentityCredentials getPrivateCredentials() {
+<span class="nc" id="L1782">            return privateCredentials;</span>
+        }
+
+        IdentityCredentials getPublicCredentials() {
+<span class="nc" id="L1786">            return publicCredentials;</span>
+        }
+
+        Attributes getRuntimeAttributes() {
+<span class="nc" id="L1790">            return runtimeAttributes;</span>
+        }
+    }
+
+    final class InitialState extends UnassignedState {
+
+        private final MechanismConfigurationSelector mechanismConfigurationSelector;
+
+<span class="fc" id="L1798">        InitialState(final SecurityIdentity capturedIdentity, final MechanismConfiguration mechanismConfiguration, final MechanismConfigurationSelector mechanismConfigurationSelector, final IdentityCredentials privateCredentials, final IdentityCredentials publicCredentials, final Attributes runtimeAttributes) {</span>
+<span class="fc" id="L1799">            super(capturedIdentity, mechanismConfiguration, privateCredentials, publicCredentials, runtimeAttributes);</span>
+<span class="fc" id="L1800">            this.mechanismConfigurationSelector = mechanismConfigurationSelector;</span>
+<span class="fc" id="L1801">        }</span>
+
+        @Override
+        void setMechanismRealmName(final String realmName) {
+<span class="nc" id="L1805">            final MechanismConfiguration mechanismConfiguration = getMechanismConfiguration();</span>
+<span class="nc bnc" id="L1806" title="All 2 branches missed.">            if (mechanismConfiguration.getMechanismRealmNames().isEmpty()) {</span>
+                // no realms are configured
+<span class="nc" id="L1808">                throw log.invalidMechRealmSelection(realmName);</span>
+            }
+<span class="nc" id="L1810">            final MechanismRealmConfiguration configuration = mechanismConfiguration.getMechanismRealmConfiguration(realmName);</span>
+<span class="nc bnc" id="L1811" title="All 2 branches missed.">            if (configuration == null) {</span>
+<span class="nc" id="L1812">                throw log.invalidMechRealmSelection(realmName);</span>
+            }
+<span class="nc" id="L1814">            final AtomicReference&lt;State&gt; stateRef = getStateRef();</span>
+<span class="nc bnc" id="L1815" title="All 2 branches missed.">            if (! stateRef.compareAndSet(this, new RealmAssignedState(capturedIdentity, mechanismConfiguration, configuration, privateCredentials, publicCredentials, runtimeAttributes))) {</span>
+<span class="nc" id="L1816">                stateRef.get().setMechanismRealmName(realmName);</span>
+            }
+<span class="nc" id="L1818">        }</span>
+
+        @Override
+        MechanismRealmConfiguration getMechanismRealmConfiguration() {
+<span class="fc" id="L1822">            final Collection&lt;String&gt; mechanismRealmNames = mechanismConfiguration.getMechanismRealmNames();</span>
+<span class="fc" id="L1823">            final Iterator&lt;String&gt; iterator = mechanismRealmNames.iterator();</span>
+<span class="pc bpc" id="L1824" title="1 of 2 branches missed.">            if (iterator.hasNext()) {</span>
+                // use the default realm
+<span class="nc" id="L1826">                return mechanismConfiguration.getMechanismRealmConfiguration(iterator.next());</span>
+            } else {
+<span class="fc" id="L1828">                return MechanismRealmConfiguration.NO_REALM;</span>
+            }
+        }
+
+        @Override
+        void setMechanismInformation(MechanismInformation mechanismInformation) {
+<span class="nc" id="L1834">            InactiveState inactiveState = new InactiveState(capturedIdentity, mechanismConfigurationSelector, mechanismInformation, privateCredentials, publicCredentials, runtimeAttributes);</span>
+<span class="nc" id="L1835">            InitialState newState = inactiveState.selectMechanismConfiguration();</span>
+<span class="nc bnc" id="L1836" title="All 2 branches missed.">            if (! stateRef.compareAndSet(this, newState)) {</span>
+<span class="nc" id="L1837">                stateRef.get().setMechanismInformation(mechanismInformation);</span>
+            }
+<span class="nc" id="L1839">        }</span>
+
+        void addPublicCredential(final Credential credential) {
+<span class="nc" id="L1842">            final InitialState newState = new InitialState(getSourceIdentity(), getMechanismConfiguration(), mechanismConfigurationSelector, getPrivateCredentials(), getPublicCredentials().withCredential(credential), runtimeAttributes);</span>
+<span class="nc bnc" id="L1843" title="All 2 branches missed.">            if (! stateRef.compareAndSet(this, newState)) {</span>
+<span class="nc" id="L1844">                stateRef.get().addPublicCredential(credential);</span>
+            }
+<span class="nc" id="L1846">        }</span>
+
+        @Override
+        void addPrivateCredential(final Credential credential) {
+<span class="nc" id="L1850">            final InitialState newState = new InitialState(getSourceIdentity(), getMechanismConfiguration(), mechanismConfigurationSelector, getPrivateCredentials().withCredential(credential), getPublicCredentials(), runtimeAttributes);</span>
+<span class="nc bnc" id="L1851" title="All 2 branches missed.">            if (! stateRef.compareAndSet(this, newState)) {</span>
+<span class="nc" id="L1852">                stateRef.get().addPublicCredential(credential);</span>
+            }
+<span class="nc" id="L1854">        }</span>
+
+        void addRuntimeAttributes(final Attributes runtimeAttributes) {
+<span class="nc" id="L1857">            final InitialState newState = new InitialState(getSourceIdentity(), getMechanismConfiguration(), mechanismConfigurationSelector, getPrivateCredentials(), getPublicCredentials(), AggregateAttributes.aggregateOf(getRuntimeAttributes(), runtimeAttributes));</span>
+<span class="nc bnc" id="L1858" title="All 2 branches missed.">            if (! stateRef.compareAndSet(this, newState)) {</span>
+<span class="nc" id="L1859">                stateRef.get().addRuntimeAttributes(runtimeAttributes);</span>
+            }
+<span class="nc" id="L1861">        }</span>
+    }
+
+    final class RealmAssignedState extends UnassignedState {
+        final MechanismRealmConfiguration mechanismRealmConfiguration;
+
+<span class="nc" id="L1867">        RealmAssignedState(final SecurityIdentity capturedIdentity, final MechanismConfiguration mechanismConfiguration, final MechanismRealmConfiguration mechanismRealmConfiguration, final IdentityCredentials privateCredentials, final IdentityCredentials publicCredentials, final Attributes runtimeAttributes) {</span>
+<span class="nc" id="L1868">            super(capturedIdentity, mechanismConfiguration, privateCredentials, publicCredentials, runtimeAttributes);</span>
+<span class="nc" id="L1869">            this.mechanismRealmConfiguration = mechanismRealmConfiguration;</span>
+<span class="nc" id="L1870">        }</span>
+
+        @Override
+        MechanismRealmConfiguration getMechanismRealmConfiguration() {
+<span class="nc" id="L1874">            return mechanismRealmConfiguration;</span>
+        }
+
+        @Override
+        void addPublicCredential(final Credential credential) {
+<span class="nc" id="L1879">            final RealmAssignedState newState = new RealmAssignedState(getSourceIdentity(), getMechanismConfiguration(), getMechanismRealmConfiguration(), getPrivateCredentials(), getPublicCredentials().withCredential(credential), runtimeAttributes);</span>
+<span class="nc bnc" id="L1880" title="All 2 branches missed.">            if (! stateRef.compareAndSet(this, newState)) {</span>
+<span class="nc" id="L1881">                stateRef.get().addPublicCredential(credential);</span>
+            }
+<span class="nc" id="L1883">        }</span>
+
+        @Override
+        void addPrivateCredential(final Credential credential) {
+<span class="nc" id="L1887">            final RealmAssignedState newState = new RealmAssignedState(getSourceIdentity(), getMechanismConfiguration(), getMechanismRealmConfiguration(), getPrivateCredentials().withCredential(credential), getPublicCredentials(), runtimeAttributes);</span>
+<span class="nc bnc" id="L1888" title="All 2 branches missed.">            if (! stateRef.compareAndSet(this, newState)) {</span>
+<span class="nc" id="L1889">                stateRef.get().addPublicCredential(credential);</span>
+            }
+<span class="nc" id="L1891">        }</span>
+
+        @Override
+        void addRuntimeAttributes(final Attributes runtimeAttributes) {
+<span class="nc" id="L1895">            final RealmAssignedState newState = new RealmAssignedState(getSourceIdentity(), getMechanismConfiguration(), getMechanismRealmConfiguration(), getPrivateCredentials(), getPublicCredentials(), AggregateAttributes.aggregateOf(getRuntimeAttributes(), runtimeAttributes));</span>
+<span class="nc bnc" id="L1896" title="All 2 branches missed.">            if (! stateRef.compareAndSet(this, newState)) {</span>
+<span class="nc" id="L1897">                stateRef.get().addRuntimeAttributes(runtimeAttributes);</span>
+            }
+<span class="nc" id="L1899">        }</span>
+    }
+
+    final class InvalidNameState extends UnassignedState {
+
+        final MechanismRealmConfiguration mechanismRealmConfiguration;
+
+<span class="nc" id="L1906">        InvalidNameState(final SecurityIdentity capturedIdentity, final MechanismConfiguration mechanismConfiguration, final MechanismRealmConfiguration mechanismRealmConfiguration, final IdentityCredentials privateCredentials, final IdentityCredentials publicCredentials, final Attributes runtimeAttributes) {</span>
+<span class="nc" id="L1907">            super(capturedIdentity, mechanismConfiguration, privateCredentials, publicCredentials, runtimeAttributes);</span>
+<span class="nc" id="L1908">            this.mechanismRealmConfiguration = mechanismRealmConfiguration;</span>
+<span class="nc" id="L1909">        }</span>
+
+        @Override
+        MechanismRealmConfiguration getMechanismRealmConfiguration() {
+<span class="nc" id="L1913">            return mechanismRealmConfiguration;</span>
+        }
+
+        @Override
+        RealmIdentity getRealmIdentity() {
+<span class="nc" id="L1918">            return RealmIdentity.NON_EXISTENT;</span>
+        }
+
+        @Override
+        void fail(final boolean requireInProgress) {
+<span class="nc" id="L1923">            final AtomicReference&lt;State&gt; stateRef = getStateRef();</span>
+<span class="nc bnc" id="L1924" title="All 2 branches missed.">            if (! stateRef.compareAndSet(this, FAILED)) {</span>
+                // recurse &amp; retry
+<span class="nc" id="L1926">                stateRef.get().fail(requireInProgress);</span>
+            }
+<span class="nc" id="L1928">        }</span>
+
+        @Override
+        boolean isDone() {
+<span class="nc" id="L1932">            return true;</span>
+        }
+    }
+
+    final class NameAssignedState extends ActiveState {
+        private final SecurityIdentity capturedIdentity;
+        private final RealmInfo realmInfo;
+        private final RealmIdentity realmIdentity;
+        private final Principal authenticationPrincipal;
+        private final MechanismConfiguration mechanismConfiguration;
+        private final MechanismRealmConfiguration mechanismRealmConfiguration;
+        private final IdentityCredentials privateCredentials;
+        private final IdentityCredentials publicCredentials;
+        private final Attributes runtimeAttributes;
+
+<span class="fc" id="L1947">        NameAssignedState(final SecurityIdentity capturedIdentity, final RealmInfo realmInfo, final RealmIdentity realmIdentity, final Principal authenticationPrincipal, final MechanismConfiguration mechanismConfiguration, final MechanismRealmConfiguration mechanismRealmConfiguration, final IdentityCredentials privateCredentials, final IdentityCredentials publicCredentials, final Attributes runtimeAttributes) {</span>
+<span class="fc" id="L1948">            this.capturedIdentity = capturedIdentity;</span>
+<span class="fc" id="L1949">            this.realmInfo = realmInfo;</span>
+<span class="fc" id="L1950">            this.realmIdentity = realmIdentity;</span>
+<span class="fc" id="L1951">            this.authenticationPrincipal = authenticationPrincipal;</span>
+<span class="fc" id="L1952">            this.mechanismConfiguration = mechanismConfiguration;</span>
+<span class="fc" id="L1953">            this.mechanismRealmConfiguration = mechanismRealmConfiguration;</span>
+<span class="fc" id="L1954">            this.privateCredentials = privateCredentials;</span>
+<span class="fc" id="L1955">            this.publicCredentials = publicCredentials;</span>
+<span class="fc" id="L1956">            this.runtimeAttributes = runtimeAttributes;</span>
+<span class="fc" id="L1957">        }</span>
+
+        @Override
+        MechanismConfiguration getMechanismConfiguration() {
+<span class="nc" id="L1961">            return mechanismConfiguration;</span>
+        }
+
+        @Override
+        MechanismRealmConfiguration getMechanismRealmConfiguration() {
+<span class="nc" id="L1966">            return mechanismRealmConfiguration;</span>
+        }
+
+        @Override
+        Principal getAuthenticationPrincipal() {
+<span class="fc" id="L1971">            return authenticationPrincipal;</span>
+        }
+
+        @Override
+        RealmIdentity getRealmIdentity() {
+<span class="fc" id="L1976">            return realmIdentity;</span>
+        }
+
+        @Override
+        SecurityDomain getSecurityDomain() {
+<span class="nc" id="L1981">            return capturedIdentity.getSecurityDomain();</span>
+        }
+
+        @Override
+        SupportLevel getCredentialAcquireSupport(final Class&lt;? extends Credential&gt; credentialType, final String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc" id="L1986">            return realmIdentity.getCredentialAcquireSupport(credentialType, algorithmName, parameterSpec);</span>
+        }
+
+        @Override
+        SupportLevel getEvidenceVerifySupport(final Class&lt;? extends Evidence&gt; evidenceType, final String algorithmName) throws RealmUnavailableException {
+<span class="nc" id="L1991">            return realmIdentity.getEvidenceVerifySupport(evidenceType, algorithmName);</span>
+        }
+
+        @Override
+        &lt;C extends Credential&gt; C getCredential(final Class&lt;C&gt; credentialType, final String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc" id="L1996">            return realmIdentity.getCredential(credentialType, algorithmName, parameterSpec);</span>
+        }
+
+        @Override
+        boolean authorize(final boolean requireLoginPermission) throws RealmUnavailableException {
+<span class="fc" id="L2001">            AuthorizedAuthenticationState newState = doAuthorization(requireLoginPermission);</span>
+<span class="pc bpc" id="L2002" title="1 of 2 branches missed.">            if (newState == null) {</span>
+<span class="nc" id="L2003">                return false;</span>
+            }
+<span class="fc" id="L2005">            final AtomicReference&lt;State&gt; stateRef = getStateRef();</span>
+            // retry if necessary
+<span class="pc bpc" id="L2007" title="3 of 4 branches missed.">            return stateRef.compareAndSet(this, newState) || stateRef.get().authorize(requireLoginPermission);</span>
+        }
+
+        AuthorizedAuthenticationState doAuthorization(final boolean requireLoginPermission) throws RealmUnavailableException {
+<span class="fc" id="L2011">            final RealmIdentity realmIdentity = this.realmIdentity;</span>
+
+<span class="pc bpc" id="L2013" title="1 of 2 branches missed.">            if (! realmIdentity.exists()) {</span>
+<span class="nc" id="L2014">                ElytronMessages.log.trace(&quot;Authorization failed - realm identity does not exists&quot;);</span>
+<span class="nc" id="L2015">                return null;</span>
+            }
+
+<span class="fc" id="L2018">            final RealmInfo realmInfo = this.realmInfo;</span>
+<span class="fc" id="L2019">            final Principal authenticationPrincipal = this.authenticationPrincipal;</span>
+<span class="pc bpc" id="L2020" title="1 of 2 branches missed.">            final AuthorizationIdentity authorizationIdentity = runtimeAttributes == Attributes.EMPTY ? realmIdentity.getAuthorizationIdentity()</span>
+<span class="pc" id="L2021">                    : AuthorizationIdentity.basicIdentity(realmIdentity.getAuthorizationIdentity(), runtimeAttributes);</span>
+<span class="fc" id="L2022">            final SecurityDomain domain = capturedIdentity.getSecurityDomain();</span>
+
+<span class="fc" id="L2024">            SecurityIdentity authorizedIdentity = Assert.assertNotNull(domain.transform(new SecurityIdentity(domain, authenticationPrincipal, realmInfo, authorizationIdentity, domain.getCategoryRoleMappers(), IdentityCredentials.NONE, IdentityCredentials.NONE)));</span>
+<span class="fc" id="L2025">            authorizedIdentity = authorizedIdentity.withPublicCredentials(publicCredentials).withPrivateCredentials(privateCredentials);</span>
+
+<span class="pc bpc" id="L2027" title="1 of 2 branches missed.">            if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L2028">                log.tracef(&quot;Authorizing principal %s.&quot;, authenticationPrincipal.getName());</span>
+<span class="nc bnc" id="L2029" title="All 2 branches missed.">                if (authorizationIdentity != null) {</span>
+<span class="nc" id="L2030">                    log.tracef(&quot;Authorizing against the following attributes: %s =&gt; %s&quot;,</span>
+<span class="nc" id="L2031">                            authorizationIdentity.getAttributes().keySet(), authorizationIdentity.getAttributes().values());</span>
+<span class="nc" id="L2032">                    log.tracef(&quot;Authorizing against the following runtime attributes: %s =&gt; %s&quot;,</span>
+<span class="nc" id="L2033">                            authorizationIdentity.getRuntimeAttributes().keySet(), authorizationIdentity.getRuntimeAttributes().values());</span>
+                } else {
+<span class="nc" id="L2035">                    log.tracef(&quot;Authorizing against the following attributes: Cannot obtain the attributes. Authorization Identity is null.&quot;);</span>
+                }
+            }
+<span class="fc bfc" id="L2038" title="All 2 branches covered.">            if (requireLoginPermission) {</span>
+<span class="pc bpc" id="L2039" title="1 of 2 branches missed.">                if (! authorizedIdentity.implies(LoginPermission.getInstance())) {</span>
+<span class="nc" id="L2040">                    SecurityRealm.safeHandleRealmEvent(realmInfo.getSecurityRealm(), new RealmIdentityFailedAuthorizationEvent(authorizedIdentity.getAuthorizationIdentity(), authorizedIdentity.getPrincipal(), authenticationPrincipal));</span>
+<span class="nc" id="L2041">                    ElytronMessages.log.trace(&quot;Authorization failed - identity does not have required LoginPermission&quot;);</span>
+<span class="nc" id="L2042">                    return null;</span>
+                } else {
+<span class="fc" id="L2044">                    SecurityRealm.safeHandleRealmEvent(realmInfo.getSecurityRealm(), new RealmIdentitySuccessfulAuthorizationEvent(authorizedIdentity.getAuthorizationIdentity(), authorizedIdentity.getPrincipal(), authenticationPrincipal));</span>
+                }
+            }
+<span class="fc" id="L2047">            ElytronMessages.log.trace(&quot;Authorization succeed&quot;);</span>
+<span class="fc" id="L2048">            return new AuthorizedAuthenticationState(authorizedIdentity, authenticationPrincipal, realmInfo, realmIdentity, mechanismRealmConfiguration, mechanismConfiguration);</span>
+        }
+
+        @Override
+        boolean authorize(final Principal authorizationId, final boolean authorizeRunAs) throws RealmUnavailableException {
+<span class="nc" id="L2053">            final AuthorizedAuthenticationState authzState = doAuthorization(true);</span>
+<span class="nc bnc" id="L2054" title="All 2 branches missed.">            if (authzState == null) {</span>
+<span class="nc" id="L2055">                return false;</span>
+            }
+<span class="nc" id="L2057">            final AuthorizedState newState = authzState.authorizeRunAs(authorizationId, authorizeRunAs);</span>
+<span class="nc bnc" id="L2058" title="All 2 branches missed.">            if (newState == null) {</span>
+<span class="nc" id="L2059">                return false;</span>
+            }
+<span class="nc" id="L2061">            final AtomicReference&lt;State&gt; stateRef = getStateRef();</span>
+<span class="nc bnc" id="L2062" title="All 2 branches missed.">            if (! stateRef.compareAndSet(this, newState)) {</span>
+<span class="nc" id="L2063">                return stateRef.get().authorize(authorizationId, authorizeRunAs);</span>
+            }
+<span class="nc bnc" id="L2065" title="All 2 branches missed.">            if (newState != authzState) getRealmIdentity().dispose();</span>
+<span class="nc" id="L2066">            return true;</span>
+        }
+
+        @Override
+        SecurityIdentity getSourceIdentity() {
+<span class="fc" id="L2071">            return capturedIdentity;</span>
+        }
+
+        @Override
+        boolean verifyEvidence(final Evidence evidence) throws RealmUnavailableException {
+            // At this stage, we just verify that the evidence principal matches, and verify it with the realm.
+<span class="fc" id="L2077">            final Principal evidencePrincipal = evidence.getDecodedPrincipal();</span>
+<span class="pc bpc" id="L2078" title="3 of 6 branches missed.">            return (evidencePrincipal == null || isSamePrincipal(evidencePrincipal)) &amp;&amp; getRealmIdentity().verifyEvidence(evidence);</span>
+        }
+
+        @Override
+        void updateCredential(Credential credential) throws RealmUnavailableException {
+<span class="nc" id="L2083">            realmIdentity.updateCredential(credential);</span>
+<span class="nc" id="L2084">        }</span>
+
+        @Override
+        void succeed() {
+<span class="nc" id="L2088">            throw log.cannotSucceedNotAuthorized();</span>
+        }
+
+        @Override
+        void fail(final boolean requireInProgress) {
+<span class="fc" id="L2093">            final SecurityIdentity capturedIdentity = getSourceIdentity();</span>
+<span class="fc" id="L2094">            final AtomicReference&lt;State&gt; stateRef = getStateRef();</span>
+<span class="pc bpc" id="L2095" title="1 of 2 branches missed.">            if (! stateRef.compareAndSet(this, FAILED)) {</span>
+<span class="nc" id="L2096">                stateRef.get().fail(requireInProgress);</span>
+<span class="nc" id="L2097">                return;</span>
+            }
+<span class="fc" id="L2099">            SecurityRealm.safeHandleRealmEvent(getRealmInfo().getSecurityRealm(), new RealmFailedAuthenticationEvent(realmIdentity, null, null));</span>
+<span class="fc" id="L2100">            SecurityDomain.safeHandleSecurityEvent(capturedIdentity.getSecurityDomain(), new SecurityAuthenticationFailedEvent(capturedIdentity, realmIdentity.getRealmIdentityPrincipal()));</span>
+<span class="fc" id="L2101">            realmIdentity.dispose();</span>
+<span class="fc" id="L2102">        }</span>
+
+        @Override
+        void setPrincipal(final Principal principal, final boolean exclusive) {
+<span class="nc bnc" id="L2106" title="All 2 branches missed.">            if (isSamePrincipal(principal)) {</span>
+<span class="nc" id="L2107">                return;</span>
+            }
+<span class="nc" id="L2109">            throw log.nameAlreadySet();</span>
+        }
+
+        @Override
+        boolean isSamePrincipal(Principal principal) {
+<span class="nc" id="L2114">            final SecurityDomain domain = capturedIdentity.getSecurityDomain();</span>
+<span class="nc" id="L2115">            principal = rewriteAll(principal, mechanismRealmConfiguration.getPreRealmRewriter(), mechanismConfiguration.getPreRealmRewriter(), domain.getPreRealmRewriter());</span>
+<span class="nc" id="L2116">            return authenticationPrincipal.equals(principal);</span>
+        }
+
+        @Override
+        void addPublicCredential(final Credential credential) {
+<span class="nc" id="L2121">            final NameAssignedState newState = new NameAssignedState(getSourceIdentity(), getRealmInfo(), getRealmIdentity(), getAuthenticationPrincipal(), getMechanismConfiguration(), getMechanismRealmConfiguration(), privateCredentials, publicCredentials.withCredential(credential), runtimeAttributes);</span>
+<span class="nc bnc" id="L2122" title="All 2 branches missed.">            if (! stateRef.compareAndSet(this, newState)) {</span>
+<span class="nc" id="L2123">                stateRef.get().addPublicCredential(credential);</span>
+            }
+<span class="nc" id="L2125">        }</span>
+
+        @Override
+        void addPrivateCredential(final Credential credential) {
+<span class="nc" id="L2129">            final NameAssignedState newState = new NameAssignedState(getSourceIdentity(), getRealmInfo(), getRealmIdentity(), getAuthenticationPrincipal(), getMechanismConfiguration(), getMechanismRealmConfiguration(), privateCredentials.withCredential(credential), publicCredentials, runtimeAttributes);</span>
+<span class="nc bnc" id="L2130" title="All 2 branches missed.">            if (! stateRef.compareAndSet(this, newState)) {</span>
+<span class="nc" id="L2131">                stateRef.get().addPublicCredential(credential);</span>
+            }
+<span class="nc" id="L2133">        }</span>
+
+        @Override
+        void addRuntimeAttributes(final Attributes runtimeAttributes) {
+<span class="nc" id="L2137">            final NameAssignedState newState = new NameAssignedState(getSourceIdentity(), getRealmInfo(), getRealmIdentity(), getAuthenticationPrincipal(), getMechanismConfiguration(), getMechanismRealmConfiguration(), privateCredentials, publicCredentials, AggregateAttributes.aggregateOf(this.runtimeAttributes, runtimeAttributes));</span>
+<span class="nc bnc" id="L2138" title="All 2 branches missed.">            if (! stateRef.compareAndSet(this, newState)) {</span>
+<span class="nc" id="L2139">                stateRef.get().addRuntimeAttributes(runtimeAttributes);</span>
+            }
+<span class="nc" id="L2141">        }</span>
+
+        RealmInfo getRealmInfo() {
+<span class="fc" id="L2144">            return realmInfo;</span>
+        }
+    }
+
+    final class AnonymousAuthorizedState extends ActiveState {
+        private final SecurityIdentity anonymousIdentity;
+
+<span class="fc" id="L2151">        AnonymousAuthorizedState(final SecurityIdentity anonymousIdentity) {</span>
+<span class="fc" id="L2152">            this.anonymousIdentity = anonymousIdentity;</span>
+<span class="fc" id="L2153">        }</span>
+
+        @Override
+        MechanismConfiguration getMechanismConfiguration() {
+<span class="fc" id="L2157">            return MechanismConfiguration.EMPTY;</span>
+        }
+
+        @Override
+        MechanismRealmConfiguration getMechanismRealmConfiguration() {
+<span class="fc" id="L2162">            return MechanismRealmConfiguration.NO_REALM;</span>
+        }
+
+        @Override
+        SecurityIdentity getAuthorizedIdentity() {
+<span class="nc" id="L2167">            return anonymousIdentity;</span>
+        }
+
+        @Override
+        Principal getAuthenticationPrincipal() {
+<span class="nc" id="L2172">            return AnonymousPrincipal.getInstance();</span>
+        }
+
+        @Override
+        boolean isSamePrincipal(final Principal principal) {
+<span class="nc" id="L2177">            return principal instanceof AnonymousPrincipal;</span>
+        }
+
+        @Override
+        SupportLevel getCredentialAcquireSupport(final Class&lt;? extends Credential&gt; credentialType, final String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc" id="L2182">            return SupportLevel.UNSUPPORTED;</span>
+        }
+
+        @Override
+        SupportLevel getEvidenceVerifySupport(final Class&lt;? extends Evidence&gt; evidenceType, final String algorithmName) throws RealmUnavailableException {
+<span class="nc" id="L2187">            return SupportLevel.UNSUPPORTED;</span>
+        }
+
+        @Override
+        &lt;C extends Credential&gt; C getCredential(final Class&lt;C&gt; credentialType, final String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc" id="L2192">            return null;</span>
+        }
+
+        @Override
+        boolean verifyEvidence(final Evidence evidence) throws RealmUnavailableException {
+<span class="nc" id="L2197">            return false;</span>
+        }
+
+        @Override
+        RealmIdentity getRealmIdentity() {
+<span class="nc" id="L2202">            return RealmIdentity.ANONYMOUS;</span>
+        }
+
+        @Override
+        SecurityDomain getSecurityDomain() {
+<span class="nc" id="L2207">            return anonymousIdentity.getSecurityDomain();</span>
+        }
+
+        @Override
+        boolean authorizeAnonymous(final boolean requireLoginPermission) {
+<span class="nc" id="L2212">            return true;</span>
+        }
+
+        @Override
+        void setPrincipal(final Principal principal, final boolean exclusive) throws RealmUnavailableException {
+<span class="nc bnc" id="L2217" title="All 2 branches missed.">            if (! (principal instanceof AnonymousPrincipal)) {</span>
+<span class="nc" id="L2218">                super.setPrincipal(principal, exclusive);</span>
+            }
+<span class="nc" id="L2220">        }</span>
+
+        @Override
+        boolean authorize(final boolean requireLoginPermission) throws RealmUnavailableException {
+<span class="nc bnc" id="L2224" title="All 4 branches missed.">            return ! requireLoginPermission || anonymousIdentity.implies(LoginPermission.getInstance());</span>
+        }
+
+        @Override
+        void updateCredential(Credential credential) throws RealmUnavailableException {
+            // no-op
+<span class="nc" id="L2230">        }</span>
+
+        @Override
+        void succeed() {
+<span class="nc" id="L2234">            final AtomicReference&lt;State&gt; stateRef = getStateRef();</span>
+<span class="nc bnc" id="L2235" title="All 2 branches missed.">            if (! stateRef.compareAndSet(this, new CompleteState(anonymousIdentity))) {</span>
+<span class="nc" id="L2236">                stateRef.get().succeed();</span>
+            }
+<span class="nc" id="L2238">        }</span>
+
+        @Override
+        void fail(final boolean requireInProgress) {
+<span class="nc" id="L2242">            final AtomicReference&lt;State&gt; stateRef = getStateRef();</span>
+<span class="nc bnc" id="L2243" title="All 2 branches missed.">            if (! stateRef.compareAndSet(this, FAILED)) {</span>
+<span class="nc" id="L2244">                stateRef.get().fail(requireInProgress);</span>
+            }
+<span class="nc" id="L2246">        }</span>
+
+        @Override
+        SecurityIdentity getSourceIdentity() {
+<span class="fc" id="L2250">            return anonymousIdentity;</span>
+        }
+    }
+
+    class AuthorizedState extends ActiveState {
+        private final SecurityIdentity authorizedIdentity;
+        private final Principal authenticationPrincipal;
+        private final RealmInfo realmInfo;
+        private final MechanismConfiguration mechanismConfiguration;
+        private final MechanismRealmConfiguration mechanismRealmConfiguration;
+
+<span class="fc" id="L2261">        AuthorizedState(final SecurityIdentity authorizedIdentity, final Principal authenticationPrincipal, final RealmInfo realmInfo, final MechanismConfiguration mechanismConfiguration, final MechanismRealmConfiguration mechanismRealmConfiguration) {</span>
+<span class="fc" id="L2262">            this.authorizedIdentity = authorizedIdentity;</span>
+<span class="fc" id="L2263">            this.authenticationPrincipal = authenticationPrincipal;</span>
+<span class="fc" id="L2264">            this.realmInfo = realmInfo;</span>
+<span class="fc" id="L2265">            this.mechanismConfiguration = mechanismConfiguration;</span>
+<span class="fc" id="L2266">            this.mechanismRealmConfiguration = mechanismRealmConfiguration;</span>
+<span class="fc" id="L2267">        }</span>
+
+        @Override
+        MechanismRealmConfiguration getMechanismRealmConfiguration() {
+<span class="fc" id="L2271">            return mechanismRealmConfiguration;</span>
+        }
+
+        @Override
+        MechanismConfiguration getMechanismConfiguration() {
+<span class="fc" id="L2276">            return mechanismConfiguration;</span>
+        }
+
+        @Override
+        SecurityIdentity getAuthorizedIdentity() {
+<span class="fc" id="L2281">            return authorizedIdentity;</span>
+        }
+
+        @Override
+        Principal getAuthenticationPrincipal() {
+<span class="fc" id="L2286">            return authenticationPrincipal;</span>
+        }
+
+        @Override
+        SecurityDomain getSecurityDomain() {
+<span class="nc" id="L2291">            return authorizedIdentity.getSecurityDomain();</span>
+        }
+
+        @Override
+        SecurityIdentity getSourceIdentity() {
+<span class="fc" id="L2296">            return authorizedIdentity;</span>
+        }
+
+        @Override
+        boolean isSamePrincipal(Principal principal) {
+<span class="nc" id="L2301">            final SecurityDomain domain = authorizedIdentity.getSecurityDomain();</span>
+<span class="nc" id="L2302">            principal = rewriteAll(principal, mechanismRealmConfiguration.getPreRealmRewriter(), mechanismConfiguration.getPreRealmRewriter(), domain.getPreRealmRewriter());</span>
+<span class="nc" id="L2303">            return authenticationPrincipal.equals(principal);</span>
+        }
+
+        RealmInfo getRealmInfo() {
+<span class="fc" id="L2307">            return realmInfo;</span>
+        }
+
+        @Override
+        boolean authorize(final boolean requireLoginPermission) throws RealmUnavailableException {
+<span class="pc bpc" id="L2312" title="2 of 4 branches missed.">            return ! requireLoginPermission || authorizedIdentity.implies(LoginPermission.getInstance());</span>
+        }
+
+        AuthorizedState authorizeRunAs(final Principal authorizationId, final boolean authorizeRunAs) throws RealmUnavailableException {
+<span class="nc bnc" id="L2316" title="All 2 branches missed.">            if (isSamePrincipal(authorizationId)) {</span>
+<span class="nc" id="L2317">                ElytronMessages.log.trace(&quot;RunAs authorization succeed - the same identity&quot;);</span>
+<span class="nc" id="L2318">                return this;</span>
+            }
+<span class="nc" id="L2320">            final State state = assignName(authorizedIdentity, getMechanismConfiguration(), getMechanismRealmConfiguration(), authorizationId, null, IdentityCredentials.NONE, IdentityCredentials.NONE, Attributes.EMPTY);</span>
+<span class="nc bnc" id="L2321" title="All 2 branches missed.">            if (!state.isNameAssigned()) {</span>
+<span class="nc" id="L2322">                ElytronMessages.log.tracef(&quot;RunAs authorization failed - unable to assign identity name&quot;);</span>
+<span class="nc" id="L2323">                return null;</span>
+            }
+
+<span class="nc" id="L2326">            final NameAssignedState nameAssignedState = (NameAssignedState) state;</span>
+<span class="nc" id="L2327">            final RealmIdentity realmIdentity = nameAssignedState.getRealmIdentity();</span>
+<span class="nc" id="L2328">            boolean ok = false;</span>
+            try {
+<span class="nc" id="L2330">                String targetName = nameAssignedState.getAuthenticationPrincipal().getName();</span>
+<span class="nc bnc" id="L2331" title="All 4 branches missed.">                if (authorizeRunAs &amp;&amp; ! authorizedIdentity.implies(new RunAsPrincipalPermission(targetName))) {</span>
+<span class="nc" id="L2332">                    ElytronMessages.log.tracef(&quot;RunAs authorization failed - identity does not have required RunAsPrincipalPermission(%s)&quot;, targetName);</span>
+<span class="nc" id="L2333">                    return null;</span>
+                }
+<span class="nc" id="L2335">                final AuthorizedAuthenticationState newState = nameAssignedState.doAuthorization(false);</span>
+<span class="nc bnc" id="L2336" title="All 2 branches missed.">                if (newState == null) {</span>
+<span class="nc" id="L2337">                    ElytronMessages.log.trace(&quot;RunAs authorization failed&quot;);</span>
+<span class="nc" id="L2338">                    return null;</span>
+                }
+<span class="nc" id="L2340">                ok = true;</span>
+<span class="nc" id="L2341">                ElytronMessages.log.trace(&quot;RunAs authorization succeed&quot;);</span>
+<span class="nc" id="L2342">                return newState;</span>
+            } finally {
+<span class="nc bnc" id="L2344" title="All 2 branches missed.">                if (! ok) realmIdentity.dispose();</span>
+            }
+        }
+
+        @Override
+        void succeed() {
+<span class="nc bnc" id="L2350" title="All 2 branches missed.">            if (authorizedIdentity != null) {</span>
+<span class="nc" id="L2351">                return;</span>
+            }
+<span class="nc" id="L2353">            super.succeed();</span>
+<span class="nc" id="L2354">        }</span>
+
+        void addPublicCredential(final Credential credential) {
+<span class="nc" id="L2357">            final SecurityIdentity sourceIdentity = getSourceIdentity();</span>
+<span class="nc" id="L2358">            final AuthorizedState newState = new AuthorizedState(sourceIdentity.withPublicCredential(credential), getAuthenticationPrincipal(), getRealmInfo(), getMechanismConfiguration(), getMechanismRealmConfiguration());</span>
+<span class="nc bnc" id="L2359" title="All 2 branches missed.">            if (! stateRef.compareAndSet(this, newState)) {</span>
+<span class="nc" id="L2360">                stateRef.get().addPublicCredential(credential);</span>
+            }
+<span class="nc" id="L2362">        }</span>
+
+        @Override
+        void addPrivateCredential(final Credential credential) {
+<span class="nc" id="L2366">            final SecurityIdentity sourceIdentity = getSourceIdentity();</span>
+<span class="nc" id="L2367">            final AuthorizedState newState = new AuthorizedState(sourceIdentity.withPrivateCredential(credential), getAuthenticationPrincipal(), getRealmInfo(), getMechanismConfiguration(), getMechanismRealmConfiguration());</span>
+<span class="nc bnc" id="L2368" title="All 2 branches missed.">            if (! stateRef.compareAndSet(this, newState)) {</span>
+<span class="nc" id="L2369">                stateRef.get().addPrivateCredential(credential);</span>
+            }
+<span class="nc" id="L2371">        }</span>
+
+        @Override
+        void addRuntimeAttributes(final Attributes runtimeAttributes) {
+<span class="nc" id="L2375">            final SecurityIdentity sourceIdentity = getSourceIdentity();</span>
+<span class="nc" id="L2376">            final AuthorizedState newState = new AuthorizedState(sourceIdentity.withRuntimeAttributes(runtimeAttributes), getAuthenticationPrincipal(), getRealmInfo(), getMechanismConfiguration(), getMechanismRealmConfiguration());</span>
+<span class="nc bnc" id="L2377" title="All 2 branches missed.">            if (! stateRef.compareAndSet(this, newState)) {</span>
+<span class="nc" id="L2378">                stateRef.get().addRuntimeAttributes(runtimeAttributes);</span>
+            }
+<span class="nc" id="L2380">        }</span>
+    }
+
+    final class AuthorizedAuthenticationState extends AuthorizedState {
+        private final RealmIdentity realmIdentity;
+
+<span class="fc" id="L2386">        AuthorizedAuthenticationState(final SecurityIdentity authorizedIdentity, final Principal authenticationPrincipal, final RealmInfo realmInfo, final RealmIdentity realmIdentity, final MechanismRealmConfiguration mechanismRealmConfiguration, final MechanismConfiguration mechanismConfiguration) {</span>
+<span class="fc" id="L2387">            super(authorizedIdentity, authenticationPrincipal, realmInfo, mechanismConfiguration, mechanismRealmConfiguration);</span>
+<span class="fc" id="L2388">            this.realmIdentity = realmIdentity;</span>
+<span class="fc" id="L2389">        }</span>
+
+        @Override
+        SupportLevel getCredentialAcquireSupport(final Class&lt;? extends Credential&gt; credentialType, final String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc" id="L2393">            return realmIdentity.getCredentialAcquireSupport(credentialType, algorithmName, parameterSpec);</span>
+        }
+
+        @Override
+        SupportLevel getEvidenceVerifySupport(final Class&lt;? extends Evidence&gt; evidenceType, final String algorithmName) throws RealmUnavailableException {
+<span class="nc" id="L2398">            return realmIdentity.getEvidenceVerifySupport(evidenceType, algorithmName);</span>
+        }
+
+        @Override
+        &lt;C extends Credential&gt; C getCredential(final Class&lt;C&gt; credentialType, String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc" id="L2403">            return realmIdentity.getCredential(credentialType, algorithmName, parameterSpec);</span>
+        }
+
+        @Override
+        boolean verifyEvidence(final Evidence evidence) throws RealmUnavailableException {
+<span class="nc" id="L2408">            return realmIdentity.verifyEvidence(evidence);</span>
+        }
+
+        @Override
+        RealmIdentity getRealmIdentity() {
+<span class="fc" id="L2413">            return realmIdentity;</span>
+        }
+
+        @Override
+        void updateCredential(Credential credential) throws RealmUnavailableException {
+<span class="nc" id="L2418">            realmIdentity.updateCredential(credential);</span>
+<span class="nc" id="L2419">        }</span>
+
+        @Override
+        void succeed() {
+<span class="fc" id="L2423">            final SecurityIdentity authorizedIdentity = getSourceIdentity();</span>
+<span class="fc" id="L2424">            final AtomicReference&lt;State&gt; stateRef = getStateRef();</span>
+<span class="pc bpc" id="L2425" title="1 of 2 branches missed.">            if (! stateRef.compareAndSet(this, new CompleteState(authorizedIdentity))) {</span>
+<span class="nc" id="L2426">                stateRef.get().succeed();</span>
+<span class="nc" id="L2427">                return;</span>
+            }
+<span class="fc" id="L2429">            SecurityRealm.safeHandleRealmEvent(getRealmInfo().getSecurityRealm(), new RealmSuccessfulAuthenticationEvent(realmIdentity, authorizedIdentity.getAuthorizationIdentity(), null, null));</span>
+<span class="fc" id="L2430">            SecurityDomain.safeHandleSecurityEvent(authorizedIdentity.getSecurityDomain(), new SecurityAuthenticationSuccessfulEvent(authorizedIdentity));</span>
+<span class="fc" id="L2431">            realmIdentity.dispose();</span>
+<span class="fc" id="L2432">        }</span>
+
+        @Override
+        void fail(final boolean requireInProgress) {
+<span class="fc" id="L2436">            final SecurityIdentity authorizedIdentity = getSourceIdentity();</span>
+<span class="fc" id="L2437">            final AtomicReference&lt;State&gt; stateRef = getStateRef();</span>
+<span class="pc bpc" id="L2438" title="1 of 2 branches missed.">            if (! stateRef.compareAndSet(this, FAILED)) {</span>
+<span class="nc" id="L2439">                stateRef.get().fail(requireInProgress);</span>
+<span class="nc" id="L2440">                return;</span>
+            }
+<span class="fc" id="L2442">            SecurityRealm.safeHandleRealmEvent(getRealmInfo().getSecurityRealm(), new RealmFailedAuthenticationEvent(realmIdentity, null, null));</span>
+<span class="fc" id="L2443">            SecurityDomain.safeHandleSecurityEvent(authorizedIdentity.getSecurityDomain(), new SecurityAuthenticationFailedEvent(authorizedIdentity, realmIdentity.getRealmIdentityPrincipal()));</span>
+<span class="fc" id="L2444">            realmIdentity.dispose();</span>
+<span class="fc" id="L2445">        }</span>
+
+        @Override
+        void addPublicCredential(final Credential credential) {
+<span class="nc" id="L2449">            final SecurityIdentity sourceIdentity = getSourceIdentity();</span>
+<span class="nc" id="L2450">            final AuthorizedAuthenticationState newState = new AuthorizedAuthenticationState(sourceIdentity.withPublicCredential(credential), getAuthenticationPrincipal(), getRealmInfo(), getRealmIdentity(), getMechanismRealmConfiguration(), getMechanismConfiguration());</span>
+<span class="nc bnc" id="L2451" title="All 2 branches missed.">            if (! stateRef.compareAndSet(this, newState)) {</span>
+<span class="nc" id="L2452">                stateRef.get().addPublicCredential(credential);</span>
+            }
+<span class="nc" id="L2454">        }</span>
+
+        @Override
+        void addPrivateCredential(final Credential credential) {
+<span class="fc" id="L2458">            final SecurityIdentity sourceIdentity = getSourceIdentity();</span>
+<span class="fc" id="L2459">            final AuthorizedAuthenticationState newState = new AuthorizedAuthenticationState(sourceIdentity.withPrivateCredential(credential), getAuthenticationPrincipal(), getRealmInfo(), getRealmIdentity(), getMechanismRealmConfiguration(), getMechanismConfiguration());</span>
+<span class="pc bpc" id="L2460" title="1 of 2 branches missed.">            if (! stateRef.compareAndSet(this, newState)) {</span>
+<span class="nc" id="L2461">                stateRef.get().addPrivateCredential(credential);</span>
+            }
+<span class="fc" id="L2463">        }</span>
+
+        @Override
+        void addRuntimeAttributes(final Attributes runtimeAttributes) {
+<span class="nc" id="L2467">            final SecurityIdentity sourceIdentity = getSourceIdentity();</span>
+<span class="nc" id="L2468">            final AuthorizedAuthenticationState newState = new AuthorizedAuthenticationState(sourceIdentity.withRuntimeAttributes(runtimeAttributes), getAuthenticationPrincipal(), getRealmInfo(), getRealmIdentity(), getMechanismRealmConfiguration(), getMechanismConfiguration());</span>
+<span class="nc bnc" id="L2469" title="All 2 branches missed.">            if (! stateRef.compareAndSet(this, newState)) {</span>
+<span class="nc" id="L2470">                stateRef.get().addRuntimeAttributes(runtimeAttributes);</span>
+            }
+<span class="nc" id="L2472">        }</span>
+
+    }
+
+    static final class CompleteState extends State {
+        private final SecurityIdentity identity;
+
+<span class="fc" id="L2479">        public CompleteState(final SecurityIdentity identity) {</span>
+<span class="fc" id="L2480">            this.identity = identity;</span>
+<span class="fc" id="L2481">        }</span>
+
+        @Override
+        SecurityIdentity getAuthorizedIdentity() {
+<span class="fc" id="L2485">            return identity;</span>
+        }
+
+        @Override
+        boolean isDone() {
+<span class="nc" id="L2490">            return true;</span>
+        }
+
+        void succeed() {
+            // always works
+<span class="nc" id="L2495">        }</span>
+    }
+
+<span class="fc" id="L2498">    private static final State FAILED = new State() {</span>
+        @Override
+        void fail(final boolean requireInProgress) {
+<span class="fc" id="L2501">        }</span>
+
+        @Override
+        boolean isDone() {
+<span class="nc" id="L2505">            return true;</span>
+        }
+    };
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

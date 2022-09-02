@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>IdentitySharedExclusiveLock.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-realm</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.realm</a> &gt; <span class="el_source">IdentitySharedExclusiveLock.java</span></div><h1>IdentitySharedExclusiveLock.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.realm;
+
+/**
+ * A simple shared/exclusive lock for a realm identity.
+ *
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+<span class="fc" id="L26">public class IdentitySharedExclusiveLock {</span>
+
+    private int sharedHoldCount;
+    private boolean isExclusiveLocked;
+    private int exclusiveRequests;
+
+    /**
+     * Acquire the exclusive lock. An invocation of this method will block until the lock can be acquired.
+     *
+     * @return a lock object representing the newly acquired lock
+     */
+    public synchronized IdentityLock lockExclusive() {
+<span class="fc" id="L38">        boolean interrupted = false;</span>
+        try {
+<span class="fc" id="L40">            exclusiveRequests++;</span>
+<span class="pc bpc" id="L41" title="2 of 4 branches missed.">            while ((sharedHoldCount &gt; 0) || isExclusiveLocked) {</span>
+                try {
+<span class="nc" id="L43">                    wait();</span>
+<span class="nc" id="L44">                } catch (InterruptedException e) {</span>
+<span class="nc" id="L45">                    interrupted = true;</span>
+<span class="nc" id="L46">                }</span>
+            }
+<span class="fc" id="L48">            isExclusiveLocked = true;</span>
+<span class="fc" id="L49">            exclusiveRequests--;</span>
+<span class="fc" id="L50">            return new IdentityLock(true);</span>
+        } finally {
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">            if (interrupted) {</span>
+<span class="nc" id="L53">                Thread.currentThread().interrupt();</span>
+            }
+        }
+
+    }
+
+    /**
+     * Acquire a shared lock. An invocation of this method will block until the lock can be acquired.
+     *
+     * @return a lock object representing the newly acquired lock
+     */
+    public synchronized IdentityLock lockShared() {
+<span class="fc" id="L65">        boolean interrupted = false;</span>
+        try {
+<span class="pc bpc" id="L67" title="2 of 4 branches missed.">            while (isExclusiveLocked || (exclusiveRequests &gt; 0)) {</span>
+                try {
+<span class="nc" id="L69">                    wait();</span>
+<span class="nc" id="L70">                } catch (InterruptedException e) {</span>
+<span class="nc" id="L71">                    interrupted = true;</span>
+<span class="nc" id="L72">                }</span>
+            }
+<span class="fc" id="L74">            sharedHoldCount++;</span>
+<span class="fc" id="L75">            return new IdentityLock(false);</span>
+        } finally {
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">            if (interrupted) {</span>
+<span class="nc" id="L78">                Thread.currentThread().interrupt();</span>
+            }
+        }
+    }
+
+    private synchronized void release(IdentityLock identityLock) {
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (identityLock.isExclusive()) {</span>
+<span class="fc" id="L85">            isExclusiveLocked = false;</span>
+<span class="fc" id="L86">            notifyAll();</span>
+        } else {
+<span class="nc bnc" id="L88" title="All 2 branches missed.">            if (--sharedHoldCount == 0) {</span>
+<span class="nc" id="L89">                notifyAll();</span>
+            }
+        }
+
+<span class="fc" id="L93">    }</span>
+
+    /**
+     * Class that represents a lock on a realm identity. A lock object is created each time a lock is
+     * acquired on a realm identity via {@link IdentitySharedExclusiveLock#lockExclusive()} or
+     * {@link IdentitySharedExclusiveLock#lockShared()}.
+     */
+    public class IdentityLock implements AutoCloseable {
+
+        private final boolean exclusive;
+<span class="fc" id="L103">        private volatile boolean valid = true;</span>
+
+        /**
+         * Construct a new instance.
+         *
+         * @param exclusive {@code true} if this lock is exclusive, {@code false} if this lock is shared
+         */
+<span class="fc" id="L110">        public IdentityLock(final boolean exclusive) {</span>
+<span class="fc" id="L111">            this.exclusive = exclusive;</span>
+<span class="fc" id="L112">        }</span>
+
+        /**
+         * Release this lock. Invoking this method has no effect if this lock is invalid.
+         */
+        public synchronized void release() {
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">            if (valid) {</span>
+<span class="fc" id="L119">                IdentitySharedExclusiveLock.this.release(this);</span>
+<span class="fc" id="L120">                valid = false;</span>
+            }
+<span class="fc" id="L122">        }</span>
+
+        @Override
+        public void close() {
+<span class="nc" id="L126">            release();</span>
+<span class="nc" id="L127">        }</span>
+
+        /**
+         * Determine whether this lock is exclusive or shared.
+         *
+         * @return {@code true} if this lock is exclusive, {@code false} if this lock is shared
+         */
+        public boolean isExclusive() {
+<span class="fc" id="L135">            return exclusive;</span>
+        }
+
+        /**
+         * Determine whether this lock is valid. A lock starts out valid and becomes invalid when it
+         * is released via {@link #release()} or {@link #close()}.
+         *
+         * @return {@code true} if this lock is valid, {@code false} otherwise
+         */
+        public boolean isValid() {
+<span class="nc" id="L145">            return valid;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

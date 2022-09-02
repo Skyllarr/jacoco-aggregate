@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ProgrammaticSingleSignOnCache.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-sso</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.util.sso</a> &gt; <span class="el_source">ProgrammaticSingleSignOnCache.java</span></div><h1>ProgrammaticSingleSignOnCache.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2021 Red Hat, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.http.util.sso;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+
+import org.wildfly.security.auth.server.SecurityIdentity;
+import org.wildfly.security.cache.CachedIdentity;
+import org.wildfly.security.cache.IdentityCache;
+import org.wildfly.security.http.HttpAuthenticationException;
+import org.wildfly.security.http.HttpExchangeSpi;
+import org.wildfly.security.http.HttpServerCookie;
+import org.wildfly.security.http.HttpServerMechanismsResponder;
+import org.wildfly.security.http.HttpServerRequest;
+import org.wildfly.security.http.impl.BaseHttpServerRequest;
+import org.wildfly.security.http.util.SimpleHttpServerCookie;
+
+/**
+ * An implementation of {@link IdentityCache} to provide SSO for programmatic authentication.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public class ProgrammaticSingleSignOnCache implements IdentityCache {
+
+    private final HttpExchangeSpi httpExchangeSpi;
+    private final String mechanismName;
+    private final SingleSignOnSessionFactory singleSignOnSessionFactory;
+    private final SingleSignOnConfiguration configuration;
+
+    /*
+     * Due to the nature of programmatic authentication is it very likely the three
+     * methods will be called from different threads.
+     */
+
+    private volatile HttpServerRequest httpServerRequest;
+    private volatile String ssoSessionId;
+
+    ProgrammaticSingleSignOnCache(HttpExchangeSpi httpExchangeSpi, String mechanismName,
+<span class="nc" id="L53">            SingleSignOnSessionFactory singleSignOnSessionFactory, SingleSignOnConfiguration configuration) {</span>
+<span class="nc" id="L54">        this.httpExchangeSpi = checkNotNullParam(&quot;httpExchangeSpi&quot;, httpExchangeSpi);</span>
+<span class="nc" id="L55">        this.mechanismName = checkNotNullParam(&quot;mechanismName&quot;, mechanismName);</span>
+<span class="nc" id="L56">        this.singleSignOnSessionFactory = checkNotNullParam(&quot;singleSignOnSessionFactory&quot;, singleSignOnSessionFactory);</span>
+<span class="nc" id="L57">        this.configuration = checkNotNullParam(&quot;configuration&quot;, configuration);</span>
+<span class="nc" id="L58">    }</span>
+
+    @Override
+    public CachedIdentity get() {
+        // This is called early for an incoming request.
+        // Get the SingleSignOnSession but don't create at this point as we don't know if we will use it.
+<span class="nc" id="L64">        try (SingleSignOnSession singleSignOnSession = getSingleSignOnSession(false)) {</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">            if (singleSignOnSession == null) {</span>
+<span class="nc bnc" id="L66" title="All 4 branches missed.">                if (ssoSessionId != null &amp;&amp; ssoSessionId.length() &gt; 0) {</span>
+<span class="nc" id="L67">                    clearCookie();</span>
+                }
+<span class="nc" id="L69">                return null; // No session so nothing to return from the session.</span>
+            }
+            // Check if this is a logout request, if so close the session and return null.
+<span class="nc bnc" id="L72" title="All 2 branches missed.">            if (singleSignOnSession.logout()) {</span>
+<span class="nc" id="L73">                singleSignOnSession.close();</span>
+<span class="nc" id="L74">                return null; // This was a logout call, nothing else to do.</span>
+            }
+
+<span class="nc" id="L77">            CachedIdentity cachedIdentity = singleSignOnSession.get();</span>
+<span class="nc bnc" id="L78" title="All 4 branches missed.">            if (cachedIdentity != null &amp;&amp; cachedIdentity.isProgrammatic()</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">                    &amp;&amp; mechanismName.equals(cachedIdentity.getMechanismName())) {</span>
+<span class="nc" id="L80">                return cachedIdentity; // The identity is ours so use it.</span>
+            }
+
+<span class="nc" id="L83">            return null;</span>
+<span class="nc bnc" id="L84" title="All 6 branches missed.">        }</span>
+    }
+
+    @Override
+    public void put(SecurityIdentity identity) {
+<span class="nc" id="L89">        try (SingleSignOnSession singleSignOnSession = getSingleSignOnSession(true)) {</span>
+<span class="nc" id="L90">            singleSignOnSession.put(identity);</span>
+<span class="nc" id="L91">            ssoSessionId = singleSignOnSession.getId();</span>
+<span class="nc" id="L92">            setCookie();</span>
+        }
+<span class="nc" id="L94">    }</span>
+
+    @Override
+    public CachedIdentity remove() {
+<span class="nc" id="L98">        try (SingleSignOnSession singleSignOnSession = getSingleSignOnSession(false)) {</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            if (getCookie() != null) {</span>
+<span class="nc" id="L100">                clearCookie();</span>
+            }
+
+<span class="nc bnc" id="L103" title="All 2 branches missed.">            if (singleSignOnSession != null) {</span>
+<span class="nc" id="L104">                return singleSignOnSession.remove();</span>
+            }
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        }</span>
+
+<span class="nc" id="L108">        return null;</span>
+    }
+
+    private HttpServerRequest getOrCreateHttpServerRequest() {
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        if (httpServerRequest == null) {</span>
+<span class="nc" id="L113">            httpServerRequest = new SSOHttpServerRequest(httpExchangeSpi);</span>
+        }
+
+<span class="nc" id="L116">        return httpServerRequest;</span>
+    }
+
+    private String getSSOSessionId() {
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        if (ssoSessionId == null) {</span>
+<span class="nc" id="L121">            HttpServerCookie cookie = getCookie();</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">            ssoSessionId = (cookie != null) ? cookie.getValue() : &quot;&quot;; // Use empty string so we know we queried the cookies once.</span>
+        }
+
+<span class="nc" id="L125">        return ssoSessionId;</span>
+    }
+
+    private SingleSignOnSession getSingleSignOnSession(boolean create) {
+<span class="nc" id="L129">        String ssoSessionId = getSSOSessionId();</span>
+
+<span class="nc bnc" id="L131" title="All 4 branches missed.">        SingleSignOnSession singleSignOnSession = (ssoSessionId != null &amp;&amp; ssoSessionId.length() &gt; 0)</span>
+<span class="nc" id="L132">                ? singleSignOnSessionFactory.find(ssoSessionId, getOrCreateHttpServerRequest())</span>
+<span class="nc" id="L133">                : null;</span>
+
+<span class="nc bnc" id="L135" title="All 4 branches missed.">        if (singleSignOnSession == null &amp;&amp; create) {</span>
+<span class="nc" id="L136">            singleSignOnSession = singleSignOnSessionFactory.create(getOrCreateHttpServerRequest(), mechanismName, true);</span>
+        }
+
+<span class="nc" id="L139">        return singleSignOnSession;</span>
+    }
+
+    private HttpServerCookie getCookie() {
+<span class="nc" id="L143">        final String expectedCookieName = configuration.getCookieName();</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        for (HttpServerCookie currentCookie : httpExchangeSpi.getCookies()) {</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">            if (expectedCookieName.equals(currentCookie.getName())) {</span>
+<span class="nc" id="L146">                return currentCookie;</span>
+            }
+<span class="nc" id="L148">        }</span>
+
+<span class="nc" id="L150">        return null;</span>
+    }
+
+    private void setCookie() {
+<span class="nc" id="L154">        httpExchangeSpi.setResponseCookie(</span>
+<span class="nc" id="L155">                SimpleHttpServerCookie.newInstance(configuration.getCookieName(), ssoSessionId, configuration.getDomain(), -1,</span>
+<span class="nc" id="L156">                        configuration.getPath(), configuration.isSecure(), 0, configuration.isHttpOnly()));</span>
+<span class="nc" id="L157">    }</span>
+
+    private void clearCookie() {
+<span class="nc" id="L160">        ssoSessionId = null;</span>
+<span class="nc" id="L161">        httpExchangeSpi.setResponseCookie(</span>
+<span class="nc" id="L162">                SimpleHttpServerCookie.newInstance(configuration.getCookieName(), null, configuration.getDomain(), 0,</span>
+<span class="nc" id="L163">                        configuration.getPath(), configuration.isSecure(), 0, configuration.isHttpOnly()));</span>
+<span class="nc" id="L164">    }</span>
+
+    public static IdentityCache newInstance(HttpExchangeSpi httpExchangeSpi, String mechanismName,
+            SingleSignOnSessionFactory singleSignOnSessionFactory, SingleSignOnConfiguration configuration) {
+<span class="nc" id="L168">        return new ProgrammaticSingleSignOnCache(httpExchangeSpi, mechanismName, singleSignOnSessionFactory, configuration);</span>
+    }
+
+    /**
+     * An implementation of {@link HttpServerRequest} which can be used with the {link SingleSignOnSessionFactory}.
+     *
+     * As this is only expected to be used for programmatic authentication the callback methods are not supported.
+     */
+    private static class SSOHttpServerRequest extends BaseHttpServerRequest {
+
+        SSOHttpServerRequest(final HttpExchangeSpi httpExchangeSpi) {
+<span class="nc" id="L179">            super(httpExchangeSpi);</span>
+<span class="nc" id="L180">        }</span>
+
+        @Override
+        public void noAuthenticationInProgress(HttpServerMechanismsResponder responder) {
+<span class="nc" id="L184">            throw new IllegalStateException();</span>
+        }
+
+        @Override
+        public void authenticationInProgress(HttpServerMechanismsResponder responder) {
+<span class="nc" id="L189">            throw new IllegalStateException();</span>
+        }
+
+        @Override
+        public void authenticationComplete(HttpServerMechanismsResponder responder) {
+<span class="nc" id="L194">            throw new IllegalStateException();</span>
+        }
+
+        @Override
+        public void authenticationComplete(HttpServerMechanismsResponder responder, Runnable logoutHandler) {
+<span class="nc" id="L199">            throw new IllegalStateException();</span>
+        }
+
+        @Override
+        public void authenticationFailed(String message, HttpServerMechanismsResponder responder) {
+<span class="nc" id="L204">            throw new IllegalStateException();</span>
+        }
+
+        @Override
+        public void badRequest(HttpAuthenticationException failure, HttpServerMechanismsResponder responder) {
+<span class="nc" id="L209">            throw new IllegalStateException();</span>
+        }
+
+        @Override
+        public boolean suspendRequest() {
+<span class="nc" id="L214">            throw new IllegalStateException();</span>
+        }
+
+        @Override
+        public boolean resumeRequest() {
+<span class="nc" id="L219">            throw new IllegalStateException();</span>
+        }
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

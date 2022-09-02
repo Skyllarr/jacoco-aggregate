@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-credential</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.credential._private</a> &gt; <span class="el_source">ElytronMessages.java</span></div><h1>ElytronMessages.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.credential._private;
+
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.InvalidParameterSpecException;
+
+import javax.security.sasl.SaslException;
+
+import org.jboss.logging.BasicLogger;
+import org.jboss.logging.Logger;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageLogger;
+import org.jboss.logging.annotations.ValidIdRange;
+import org.jboss.logging.annotations.ValidIdRanges;
+
+/**
+ * Log messages and exceptions for Elytron.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+@MessageLogger(projectCode = &quot;ELY&quot;, length = 5)
+@ValidIdRanges({
+    @ValidIdRange(min = 2, max = 4),
+    @ValidIdRange(min = 1037, max = 1037),
+    @ValidIdRange(min = 1053, max = 1063),
+    @ValidIdRange(min = 2032, max = 2033),
+    @ValidIdRange(min = 5151, max = 5151),
+    @ValidIdRange(min = 8001, max = 8029),
+    @ValidIdRange(min = 9000, max = 9000)
+})
+public interface ElytronMessages extends BasicLogger {
+
+<span class="nc" id="L54">    ElytronMessages log = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security&quot;);</span>
+<span class="nc" id="L55">    ElytronMessages tls = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.tls&quot;);</span>
+
+    @Message(id = 2, value = &quot;Parameter %s is empty&quot;)
+    IllegalArgumentException emptyParameter(String parameter);
+
+    @Message(id = 4, value = &quot;Unrecognized algorithm \&quot;%s\&quot;&quot;)
+    IllegalArgumentException unrecognizedAlgorithm(String algorithm);
+
+    @Message(id = 1037, value = &quot;Certificate chain is empty&quot;)
+    IllegalArgumentException certificateChainIsEmpty();
+
+    @Message(id = 1053, value = &quot;Insufficient data to form a digest and a salt&quot;)
+    InvalidKeySpecException insufficientDataToFormDigestAndSalt();
+
+    @Message(id = 1054, value = &quot;Invalid salt \&quot;%s%s\&quot;&quot;)
+    IllegalArgumentException invalidSalt(char lo, char hi);
+
+    @Message(id = 1055, value = &quot;Invalid rounds \&quot;%s%s%s%s\&quot;&quot;)
+    IllegalArgumentException invalidRounds(char b0, char b1, char b2, char b3);
+
+    @Message(id = 1056, value = &quot;Invalid salt \&quot;%s%s%s%s\&quot;&quot;)
+    IllegalArgumentException invalidSalt(char b0, char b1, char b2, char b3);
+
+    @Message(id = 1059, value = &quot;Public and private key algorithm names are mismatched&quot;)
+    IllegalArgumentException mismatchedPublicPrivateKeyAlgorithms();
+
+    @Message(id = 1061, value = &quot;Public key is null&quot;)
+    IllegalArgumentException publicKeyIsNull();
+
+    @Message(id = 1063, value = &quot;Private key is null&quot;)
+    IllegalArgumentException privateKeyIsNull();
+
+    @Message(id = 2032, value = &quot;keySpec must be SecretKeySpect, given: [%s]&quot;)
+    InvalidKeySpecException keySpecMustBeSecretKeySpec(String type);
+
+    @Message(id = 2033, value = &quot;key must implement SecretKeySpec and keySpec must be SecretKeySpec, given key, keySpec: [%s]&quot;)
+    InvalidKeySpecException keyMustImplementSecretKeySpecAndKeySpecMustBeSecretKeySpec(String keyAndKeySpec);
+
+    // Also used in SASL / OTP
+    @Message(id = 5151, value = &quot;Invalid OTP algorithm \&quot;%s\&quot;&quot;)
+    SaslException mechInvalidOTPAlgorithm(String algorithm);
+
+    @Message(id = 8001, value = &quot;Unrecognized key spec algorithm&quot;)
+    InvalidKeySpecException invalidKeySpecUnrecognizedKeySpecAlgorithm();
+
+    @Message(id = 8002, value = &quot;Password spec cannot be rendered as a string&quot;)
+    InvalidKeySpecException invalidKeySpecPasswordSpecCannotBeRenderedAsString();
+
+    @Message(id = 8003, value = &quot;Unknown crypt string algorithm&quot;)
+    InvalidKeySpecException invalidKeySpecUnknownCryptStringAlgorithm();
+
+    @Message(id = 8004, value = &quot;Invalid character encountered&quot;)
+    InvalidKeySpecException invalidKeySpecInvalidCharacterEncountered();
+
+    @Message(id = 8005, value = &quot;No iteration count terminator given&quot;)
+    InvalidKeySpecException invalidKeySpecNoIterationCountTerminatorGiven();
+
+    @Message(id = 8006, value = &quot;Unexpected end of input string&quot;)
+    InvalidKeySpecException invalidKeySpecUnexpectedEndOfInputString();
+
+    @Message(id = 8007, value = &quot;No salt terminator given&quot;)
+    InvalidKeySpecException invalidKeySpecNoSaltTerminatorGiven();
+
+    @Message(id = 8008, value = &quot;Invalid hash length&quot;)
+    IllegalArgumentException invalidHashLength();
+
+    @Message(id = 8009, value = &quot;Unexpected end of password string&quot;)
+    InvalidKeySpecException invalidKeySpecUnexpectedEndOfPasswordString();
+
+    @Message(id = 8010, value = &quot;Unexpected end of password string&quot;)
+    InvalidKeySpecException invalidKeySpecUnexpectedEndOfPasswordStringWithCause(@Cause Throwable cause);
+
+    @Message(id = 8011, value = &quot;Invalid minor version&quot;)
+    InvalidKeySpecException invalidKeySpecInvalidMinorVersion();
+
+    @Message(id = 8012, value = &quot;Invalid cost: must be a two digit integer&quot;)
+    InvalidKeySpecException invalidKeySpecCostMustBeTwoDigitInteger();
+
+    @Message(id = 8013, value = &quot;No such MessageDigest algorithm for \&quot;%s\&quot;&quot;)
+    InvalidKeySpecException invalidKeySpecNoSuchMessageDigestAlgorithm(String algorithm);
+
+    @Message(id = 8014, value = &quot;No such MessageDigest algorithm for \&quot;%s\&quot;&quot;)
+    InvalidKeyException invalidKeyNoSuchMessageDigestAlgorithm(String algorithm);
+
+    @Message(id = 8015, value = &quot;Cannot verify password&quot;)
+    InvalidKeyException invalidKeyCannotVerifyPassword(@Cause Throwable cause);
+
+    @Message(id = 8017, value = &quot;DES crypt password hash must be %d bytes&quot;)
+    InvalidKeyException invalidKeyDesCryptPasswordHashMustBeBytes(int bytes);
+
+    @Message(id = 8018, value = &quot;Salt must be %d bytes (%d bits)&quot;)
+    InvalidParameterSpecException invalidParameterSpecSaltMustBeBytesBits(int bytes, int bits);
+
+    @Message(id = 8020, value = &quot;Invalid number of rounds. Must be an integer between %d and %d, inclusive&quot;)
+    IllegalArgumentException invalidNumberOfRoundsMustBeIntBetween(int min, int max);
+
+    @Message(id = 8021, value = &quot;Invalid salt: must be %d bytes long&quot;)
+    IllegalArgumentException invalidSaltMustBeBytesLong(int length);
+
+    @Message(id = 8022, value = &quot;BSD DES crypt password hash must be %d bytes&quot;)
+    InvalidKeySpecException invalidKeySpecBsdDesCryptPasswordHashMustBeBytes(int bytes);
+
+    @Message(id = 8023, value = &quot;Salt must be %d bytes&quot;)
+    InvalidParameterSpecException invalidParameterSpecSaltMustBeBytes(int bytes);
+
+    @Message(id = 8024, value = &quot;BSD DES crypt password hash must be %d bytes&quot;)
+    InvalidKeyException invalidKeyBsdDesCryptPasswordHashMustBeBytes(int bytes);
+
+    @Message(id = 8025, value = &quot;Expected to get a \&quot;%s\&quot; as spec, got \&quot;%s\&quot;&quot;)
+    InvalidKeySpecException invalidKeySpecExpectedSpecGotSpec(String expected, String got);
+
+    @Message(id = 8026, value = &quot;Unknown algorithm or incompatible PasswordSpec&quot;)
+    InvalidKeySpecException invalidKeySpecUnknownAlgorithmOrIncompatiblePasswordSpec();
+
+    @Message(id = 8027, value = &quot;Unknown password type or algorithm&quot;)
+    InvalidKeyException invalidKeyUnknownUnknownPasswordTypeOrAlgorithm();
+
+    @Message(id = 8028, value = &quot;Invalid algorithm \&quot;%s\&quot;&quot;)
+    NoSuchAlgorithmException noSuchAlgorithmInvalidAlgorithm(String algorithm);
+
+    @Message(id = 8029, value = &quot;Could not obtain key spec encoding identifier.&quot;)
+    IllegalArgumentException couldNotObtainKeySpecEncodingIdentifier();
+
+    @Message(id = 9000, value = &quot;Public and private key parameters are mismatched&quot;)
+    IllegalArgumentException mismatchedPublicPrivateKeyParameters();
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

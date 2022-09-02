@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>IntersectionPermissionCollection.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-permission</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.permission</a> &gt; <span class="el_source">IntersectionPermissionCollection.java</span></div><h1>IntersectionPermissionCollection.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.permission;
+
+import java.security.Permission;
+import java.security.PermissionCollection;
+import java.util.Enumeration;
+
+import org.wildfly.common.Assert;
+
+
+final class IntersectionPermissionCollection extends PermissionCollection implements PermissionVerifier {
+    private static final long serialVersionUID = 8045087406778847303L;
+
+    private final PermissionCollection pc1;
+    private final PermissionCollection pc2;
+
+<span class="nc" id="L34">    IntersectionPermissionCollection(final PermissionCollection pc1, final PermissionCollection pc2) {</span>
+<span class="nc" id="L35">        this.pc1 = pc1;</span>
+<span class="nc" id="L36">        this.pc2 = pc2;</span>
+<span class="nc" id="L37">        setReadOnly();</span>
+<span class="nc" id="L38">    }</span>
+
+    public void add(final Permission permission) {
+<span class="nc" id="L41">        throw ElytronMessages.log.readOnlyPermissionCollection();</span>
+    }
+
+    public boolean implies(final Permission permission) {
+<span class="nc bnc" id="L45" title="All 4 branches missed.">        return pc1.implies(permission) &amp;&amp; pc2.implies(permission);</span>
+    }
+
+    public Enumeration&lt;Permission&gt; elements() {
+        // TODO: this is theoretically possible to implement using an IntersectionCollectionPermission;
+        // however the primary use case is going to be in protection domains and verification scenarios so we may
+        // not ever actually need this
+<span class="nc" id="L52">        throw Assert.unsupported();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

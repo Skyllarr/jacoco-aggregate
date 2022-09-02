@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DigestMechanismFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-digest</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.digest</a> &gt; <span class="el_source">DigestMechanismFactory.java</span></div><h1>DigestMechanismFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.http.digest;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+import static org.wildfly.security.http.HttpConstants.CONFIG_CONTEXT_PATH;
+import static org.wildfly.security.http.HttpConstants.CONFIG_REALM;
+import static org.wildfly.security.http.HttpConstants.DIGEST_NAME;
+import static org.wildfly.security.http.HttpConstants.DIGEST_SHA256_NAME;
+import static org.wildfly.security.http.HttpConstants.DIGEST_SHA512_256_NAME;
+import static org.wildfly.security.http.HttpConstants.MD5;
+import static org.wildfly.security.http.HttpConstants.SHA256;
+import static org.wildfly.security.http.HttpConstants.SHA512_256;
+import static org.wildfly.security.provider.util.ProviderUtil.INSTALLED_PROVIDERS;
+
+import java.security.Provider;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.function.Supplier;
+
+import javax.security.auth.callback.CallbackHandler;
+
+import org.kohsuke.MetaInfServices;
+import org.wildfly.security.http.HttpAuthenticationException;
+import org.wildfly.security.http.HttpConstants;
+import org.wildfly.security.http.HttpServerAuthenticationMechanism;
+import org.wildfly.security.http.HttpServerAuthenticationMechanismFactory;
+import org.wildfly.security.mechanism._private.ElytronMessages;
+
+/**
+ * The {@link HttpServerAuthenticationMechanismFactory} implementation for the HTTP Digest authentication mechanism.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+@MetaInfServices(value = HttpServerAuthenticationMechanismFactory.class)
+public class DigestMechanismFactory implements HttpServerAuthenticationMechanismFactory {
+
+    private final Supplier&lt;Provider[]&gt; providers;
+
+<span class="nc" id="L56">    public DigestMechanismFactory() {</span>
+<span class="nc" id="L57">        providers = INSTALLED_PROVIDERS;</span>
+<span class="nc" id="L58">    }</span>
+
+    public DigestMechanismFactory(final Provider provider) {
+<span class="nc" id="L61">        this(new Provider[] { provider });</span>
+<span class="nc" id="L62">    }</span>
+
+<span class="nc" id="L64">    public DigestMechanismFactory(final Provider... providers) {</span>
+<span class="nc" id="L65">        this.providers = () -&gt; providers;</span>
+<span class="nc" id="L66">    }</span>
+
+    /*
+     * 5  Minutes Initial Nonce Validity
+     * 15 Minutes Validity Since Last Use With Nonce Count
+     * Single Use
+     * 20 Byte Private Key (Gives us at least enough material for SHA-256 to digest))
+     * SHA256 Digest Algorithm
+     */
+
+<span class="nc" id="L76">    private static NonceManager nonceManager = new NonceManager(300000, 900000, true, 20, SHA256, ElytronMessages.httpDigest);</span>
+
+    /**
+     * @see org.wildfly.security.http.HttpServerAuthenticationMechanismFactory#getMechanismNames(java.util.Map)
+     */
+    @Override
+    public String[] getMechanismNames(Map&lt;String, ?&gt; properties) {
+        // TODO We may cache this later but for now leave the option open for properties to influence selection.
+<span class="nc" id="L84">        ArrayList&lt;String&gt; mechanismNames = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L85">        mechanismNames.add(DIGEST_NAME);</span>
+<span class="nc" id="L86">        mechanismNames.add(DIGEST_SHA256_NAME);</span>
+<span class="nc" id="L87">        mechanismNames.add(DIGEST_SHA512_256_NAME);</span>
+
+<span class="nc" id="L89">        return mechanismNames.toArray(new String[mechanismNames.size()]);</span>
+    }
+
+    /**
+     * @see org.wildfly.security.http.HttpServerAuthenticationMechanismFactory#createAuthenticationMechanism(java.lang.String, java.util.Map, javax.security.auth.callback.CallbackHandler)
+     */
+    @Override
+    public HttpServerAuthenticationMechanism createAuthenticationMechanism(String mechanismName, Map&lt;String, ?&gt; properties, CallbackHandler callbackHandler) throws HttpAuthenticationException {
+<span class="nc" id="L97">        checkNotNullParam(&quot;mechanismName&quot;, mechanismName);</span>
+<span class="nc" id="L98">        checkNotNullParam(&quot;properties&quot;, properties);</span>
+<span class="nc" id="L99">        checkNotNullParam(&quot;callbackHandler&quot;, callbackHandler);</span>
+
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        if (properties.containsKey(&quot;nonceManager&quot;)) {</span>
+<span class="nc" id="L102">            nonceManager = (NonceManager) properties.get(&quot;nonceManager&quot;);</span>
+        }
+
+<span class="nc bnc" id="L105" title="All 4 branches missed.">        switch (mechanismName) {</span>
+            case DIGEST_NAME:
+<span class="nc" id="L107">                return new DigestAuthenticationMechanism(callbackHandler, nonceManager, (String) properties.get(CONFIG_REALM), (String) properties.get(CONFIG_CONTEXT_PATH), DIGEST_NAME, MD5, providers, (String) properties.get(HttpConstants.CONFIG_VALIDATE_DIGEST_URI));</span>
+            case DIGEST_SHA256_NAME:
+<span class="nc" id="L109">                return new DigestAuthenticationMechanism(callbackHandler, nonceManager, (String) properties.get(CONFIG_REALM), (String) properties.get(CONFIG_CONTEXT_PATH), DIGEST_SHA256_NAME, SHA256, providers, (String) properties.get(HttpConstants.CONFIG_VALIDATE_DIGEST_URI));</span>
+            case DIGEST_SHA512_256_NAME:
+<span class="nc" id="L111">                return new DigestAuthenticationMechanism(callbackHandler, nonceManager, (String) properties.get(CONFIG_REALM), (String) properties.get(CONFIG_CONTEXT_PATH), DIGEST_SHA512_256_NAME, SHA512_256, providers, (String) properties.get(HttpConstants.CONFIG_VALIDATE_DIGEST_URI));</span>
+        }
+<span class="nc" id="L113">        return null;</span>
+    }
+
+    /*
+     * Shut down the NonceManager created by the DigestMechanismFactory
+     */
+    @Override
+    public void shutdown() {
+<span class="nc" id="L121">        nonceManager.shutdown();</span>
+<span class="nc" id="L122">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,314 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages_$logger.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-x500-cert-acme</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.x500.cert.acme</a> &gt; <span class="el_source">ElytronMessages_$logger.java</span></div><h1>ElytronMessages_$logger.java</h1><pre class="source lang-java linenums">package org.wildfly.security.x500.cert.acme;
+
+import java.util.Locale;
+import java.io.Serializable;
+import javax.annotation.Generated;
+import org.jboss.logging.DelegatingBasicLogger;
+import org.wildfly.security.x500.cert.acme.AcmeException;
+import org.jboss.logging.BasicLogger;
+import java.time.Instant;
+import java.lang.String;
+import org.jboss.logging.Logger;
+import java.util.Arrays;
+import java.lang.IllegalArgumentException;
+import java.lang.Exception;
+
+/**
+ * Warning this class consists of generated code.
+ */
+@Generated(value = &quot;org.jboss.logging.processor.generator.model.MessageLoggerImplementor&quot;, date = &quot;2022-09-02T20:22:48+0200&quot;)
+public class ElytronMessages_$logger extends DelegatingBasicLogger implements ElytronMessages, BasicLogger, Serializable {
+    private static final long serialVersionUID = 1L;
+<span class="fc" id="L22">    private static final String FQCN = ElytronMessages_$logger.class.getName();</span>
+    public ElytronMessages_$logger(final Logger log) {
+<span class="fc" id="L24">        super(log);</span>
+<span class="fc" id="L25">    }</span>
+<span class="fc" id="L26">    private static final Locale LOCALE = Locale.ROOT;</span>
+    protected Locale getLoggingLocale() {
+<span class="fc" id="L28">        return LOCALE;</span>
+    }
+    protected String unableToDetermineKeySize$str() {
+<span class="nc" id="L31">        return &quot;ELY10016: Unable to determine key size&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException unableToDetermineKeySize() {
+<span class="nc" id="L35">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), unableToDetermineKeySize$str()));</span>
+<span class="nc" id="L36">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L37">        return result;</span>
+    }
+    private static void _copyStackTraceMinusOne(final Throwable e) {
+<span class="fc" id="L40">        final StackTraceElement[] st = e.getStackTrace();</span>
+<span class="fc" id="L41">        e.setStackTrace(Arrays.copyOfRange(st, 1, st.length));</span>
+<span class="fc" id="L42">    }</span>
+    protected String unableToDetermineDefaultCompatibleSignatureAlgorithmName$str() {
+<span class="nc" id="L44">        return &quot;ELY10019: Unable to determine default compatible signature algorithm name for key algorithm name \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException unableToDetermineDefaultCompatibleSignatureAlgorithmName(final String keyAlgorithmName) {
+<span class="nc" id="L48">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), unableToDetermineDefaultCompatibleSignatureAlgorithmName$str(), keyAlgorithmName));</span>
+<span class="nc" id="L49">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L50">        return result;</span>
+    }
+    protected String acmeAccountKeyPairGenerationFailed$str() {
+<span class="nc" id="L53">        return &quot;ELY10029: Failed to generate ACME account key pair&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException acmeAccountKeyPairGenerationFailed(final Exception cause) {
+<span class="nc" id="L57">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), acmeAccountKeyPairGenerationFailed$str()), cause);</span>
+<span class="nc" id="L58">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L59">        return result;</span>
+    }
+    protected String noAcmeServerUrlGiven$str() {
+<span class="nc" id="L62">        return &quot;ELY10030: No ACME server URL given&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException noAcmeServerUrlGiven() {
+<span class="nc" id="L66">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), noAcmeServerUrlGiven$str()));</span>
+<span class="nc" id="L67">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L68">        return result;</span>
+    }
+    protected String unsupportedAcmeAccountSignatureAlgorithm$str() {
+<span class="nc" id="L71">        return &quot;ELY10031: Unsupported ACME account signature algorithm \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException unsupportedAcmeAccountSignatureAlgorithm(final String signatureAlgorithm) {
+<span class="nc" id="L75">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), unsupportedAcmeAccountSignatureAlgorithm$str(), signatureAlgorithm));</span>
+<span class="nc" id="L76">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L77">        return result;</span>
+    }
+    protected String unableToCreateAcmeSignature$str() {
+<span class="nc" id="L80">        return &quot;ELY10032: Unable to create ACME signature&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException unableToCreateAcmeSignature(final Exception cause) {
+<span class="nc" id="L84">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), unableToCreateAcmeSignature$str()), cause);</span>
+<span class="nc" id="L85">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L86">        return result;</span>
+    }
+    protected String unableToRetrieveAcmeServerDirectoryUrls$str() {
+<span class="nc" id="L89">        return &quot;ELY10033: Unable to retrieve ACME server directory URLs&quot;;</span>
+    }
+    @Override
+    public final org.wildfly.security.x500.cert.acme.AcmeException unableToRetrieveAcmeServerDirectoryUrls(final Exception cause) {
+<span class="nc" id="L93">        final org.wildfly.security.x500.cert.acme.AcmeException result = new org.wildfly.security.x500.cert.acme.AcmeException(String.format(getLoggingLocale(), unableToRetrieveAcmeServerDirectoryUrls$str()), cause);</span>
+<span class="nc" id="L94">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L95">        return result;</span>
+    }
+    protected String noNonceProvidedByAcmeServer$str() {
+<span class="nc" id="L98">        return &quot;ELY10034: No nonce provided by ACME server&quot;;</span>
+    }
+    @Override
+    public final org.wildfly.security.x500.cert.acme.AcmeException noNonceProvidedByAcmeServer() {
+<span class="nc" id="L102">        final org.wildfly.security.x500.cert.acme.AcmeException result = new org.wildfly.security.x500.cert.acme.AcmeException(String.format(getLoggingLocale(), noNonceProvidedByAcmeServer$str()));</span>
+<span class="nc" id="L103">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L104">        return result;</span>
+    }
+    protected String noLocationUrlProvidedByAcmeServer$str() {
+<span class="fc" id="L107">        return &quot;ELY10035: No %s location URL provided by ACME server&quot;;</span>
+    }
+    @Override
+    public final org.wildfly.security.x500.cert.acme.AcmeException noLocationUrlProvidedByAcmeServer(final String urlType) {
+<span class="fc" id="L111">        final org.wildfly.security.x500.cert.acme.AcmeException result = new org.wildfly.security.x500.cert.acme.AcmeException(String.format(getLoggingLocale(), noLocationUrlProvidedByAcmeServer$str(), urlType));</span>
+<span class="fc" id="L112">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L113">        return result;</span>
+    }
+    protected String unableToObtainNewNonceFromAcmeServer$str() {
+<span class="nc" id="L116">        return &quot;ELY10036: Unable to obtain new nonce from ACME server&quot;;</span>
+    }
+    @Override
+    public final org.wildfly.security.x500.cert.acme.AcmeException unableToObtainNewNonceFromAcmeServer() {
+<span class="nc" id="L120">        final org.wildfly.security.x500.cert.acme.AcmeException result = new org.wildfly.security.x500.cert.acme.AcmeException(String.format(getLoggingLocale(), unableToObtainNewNonceFromAcmeServer$str()));</span>
+<span class="nc" id="L121">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L122">        return result;</span>
+    }
+    protected String unableToObtainJsonResponseFromAcmeServer$str() {
+<span class="nc" id="L125">        return &quot;ELY10037: Unable to obtain JSON response from ACME server&quot;;</span>
+    }
+    @Override
+    public final org.wildfly.security.x500.cert.acme.AcmeException unableToObtainJsonResponseFromAcmeServer(final Exception cause) {
+<span class="nc" id="L129">        final org.wildfly.security.x500.cert.acme.AcmeException result = new org.wildfly.security.x500.cert.acme.AcmeException(String.format(getLoggingLocale(), unableToObtainJsonResponseFromAcmeServer$str()), cause);</span>
+<span class="nc" id="L130">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L131">        return result;</span>
+    }
+    protected String unexpectedResponseCodeFromAcmeServer$str() {
+<span class="fc" id="L134">        return &quot;ELY10038: Unexpected HTTP status code in response from ACME server \&quot;%d\&quot;: \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final org.wildfly.security.x500.cert.acme.AcmeException unexpectedResponseCodeFromAcmeServer(final int responseCode, final String responseMessage) {
+<span class="fc" id="L138">        final org.wildfly.security.x500.cert.acme.AcmeException result = new org.wildfly.security.x500.cert.acme.AcmeException(String.format(getLoggingLocale(), unexpectedResponseCodeFromAcmeServer$str(), responseCode, responseMessage));</span>
+<span class="fc" id="L139">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L140">        return result;</span>
+    }
+    protected String badAcmeNonce$str() {
+<span class="nc" id="L143">        return &quot;ELY10039: Bad ACME replay nonce, maximum retries attempted&quot;;</span>
+    }
+    @Override
+    public final org.wildfly.security.x500.cert.acme.AcmeException badAcmeNonce() {
+<span class="nc" id="L147">        final org.wildfly.security.x500.cert.acme.AcmeException result = new org.wildfly.security.x500.cert.acme.AcmeException(String.format(getLoggingLocale(), badAcmeNonce$str()));</span>
+<span class="nc" id="L148">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L149">        return result;</span>
+    }
+    protected String unexpectedContentTypeFromAcmeServer$str() {
+<span class="nc" id="L152">        return &quot;ELY10040: Unexpected content type in response from ACME server \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final org.wildfly.security.x500.cert.acme.AcmeException unexpectedContentTypeFromAcmeServer(final String contentType) {
+<span class="nc" id="L156">        final org.wildfly.security.x500.cert.acme.AcmeException result = new org.wildfly.security.x500.cert.acme.AcmeException(String.format(getLoggingLocale(), unexpectedContentTypeFromAcmeServer$str(), contentType));</span>
+<span class="nc" id="L157">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L158">        return result;</span>
+    }
+    protected String invalidContentTypeFromAcmeServer$str() {
+<span class="nc" id="L161">        return &quot;ELY10041: Invalid content type in response from ACME server&quot;;</span>
+    }
+    @Override
+    public final org.wildfly.security.x500.cert.acme.AcmeException invalidContentTypeFromAcmeServer() {
+<span class="nc" id="L165">        final org.wildfly.security.x500.cert.acme.AcmeException result = new org.wildfly.security.x500.cert.acme.AcmeException(String.format(getLoggingLocale(), invalidContentTypeFromAcmeServer$str()));</span>
+<span class="nc" id="L166">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L167">        return result;</span>
+    }
+    protected String domainNameIsNull$str() {
+<span class="nc" id="L170">        return &quot;ELY10042: Domain name is null&quot;;</span>
+    }
+    @Override
+    public final org.wildfly.security.x500.cert.acme.AcmeException domainNameIsNull() {
+<span class="nc" id="L174">        final org.wildfly.security.x500.cert.acme.AcmeException result = new org.wildfly.security.x500.cert.acme.AcmeException(String.format(getLoggingLocale(), domainNameIsNull$str()));</span>
+<span class="nc" id="L175">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L176">        return result;</span>
+    }
+    protected String domainNamesIsEmpty$str() {
+<span class="nc" id="L179">        return &quot;ELY10043: Domain names is empty&quot;;</span>
+    }
+    @Override
+    public final org.wildfly.security.x500.cert.acme.AcmeException domainNamesIsEmpty() {
+<span class="nc" id="L183">        final org.wildfly.security.x500.cert.acme.AcmeException result = new org.wildfly.security.x500.cert.acme.AcmeException(String.format(getLoggingLocale(), domainNamesIsEmpty$str()));</span>
+<span class="nc" id="L184">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L185">        return result;</span>
+    }
+    protected String noCertificateUrlProvidedByAcmeServer$str() {
+<span class="nc" id="L188">        return &quot;ELY10044: No certificate URL provided by ACME server&quot;;</span>
+    }
+    @Override
+    public final org.wildfly.security.x500.cert.acme.AcmeException noCertificateUrlProvidedByAcmeServer() {
+<span class="nc" id="L192">        final org.wildfly.security.x500.cert.acme.AcmeException result = new org.wildfly.security.x500.cert.acme.AcmeException(String.format(getLoggingLocale(), noCertificateUrlProvidedByAcmeServer$str()));</span>
+<span class="nc" id="L193">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L194">        return result;</span>
+    }
+    protected String noCertificateWillBeIssuedByAcmeServer$str() {
+<span class="nc" id="L197">        return &quot;ELY10045: No certificate will be issued by the ACME server&quot;;</span>
+    }
+    @Override
+    public final org.wildfly.security.x500.cert.acme.AcmeException noCertificateWillBeIssuedByAcmeServer() {
+<span class="nc" id="L201">        final org.wildfly.security.x500.cert.acme.AcmeException result = new org.wildfly.security.x500.cert.acme.AcmeException(String.format(getLoggingLocale(), noCertificateWillBeIssuedByAcmeServer$str()));</span>
+<span class="nc" id="L202">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L203">        return result;</span>
+    }
+    protected String unableToGetEncodedFormOfCertificateToBeRevoked$str() {
+<span class="nc" id="L206">        return &quot;ELY10046: Unable to get encoded form of certificate to be revoked&quot;;</span>
+    }
+    @Override
+    public final org.wildfly.security.x500.cert.acme.AcmeException unableToGetEncodedFormOfCertificateToBeRevoked(final Exception cause) {
+<span class="nc" id="L210">        final org.wildfly.security.x500.cert.acme.AcmeException result = new org.wildfly.security.x500.cert.acme.AcmeException(String.format(getLoggingLocale(), unableToGetEncodedFormOfCertificateToBeRevoked$str()), cause);</span>
+<span class="nc" id="L211">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L212">        return result;</span>
+    }
+    protected String unableToDetermineKeyAuthorizationString$str() {
+<span class="nc" id="L215">        return &quot;ELY10047: Unable to determine key authorization string&quot;;</span>
+    }
+    @Override
+    public final org.wildfly.security.x500.cert.acme.AcmeException unableToDetermineKeyAuthorizationString(final Exception cause) {
+<span class="nc" id="L219">        final org.wildfly.security.x500.cert.acme.AcmeException result = new org.wildfly.security.x500.cert.acme.AcmeException(String.format(getLoggingLocale(), unableToDetermineKeyAuthorizationString$str()), cause);</span>
+<span class="nc" id="L220">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L221">        return result;</span>
+    }
+    protected String challengeResponseFailedValidationByAcmeServer$str() {
+<span class="nc" id="L224">        return &quot;ELY10048: Challenge response failed validation by the ACME server&quot;;</span>
+    }
+    @Override
+    public final org.wildfly.security.x500.cert.acme.AcmeException challengeResponseFailedValidationByAcmeServer() {
+<span class="nc" id="L228">        final org.wildfly.security.x500.cert.acme.AcmeException result = new org.wildfly.security.x500.cert.acme.AcmeException(String.format(getLoggingLocale(), challengeResponseFailedValidationByAcmeServer$str()));</span>
+<span class="nc" id="L229">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L230">        return result;</span>
+    }
+    protected String unableToDownloadCertificateChainFromAcmeServer$str() {
+<span class="nc" id="L233">        return &quot;ELY10049: Unable to download certificate chain from ACME server&quot;;</span>
+    }
+    @Override
+    public final org.wildfly.security.x500.cert.acme.AcmeException unableToDownloadCertificateChainFromAcmeServer(final Exception cause) {
+<span class="nc" id="L237">        final org.wildfly.security.x500.cert.acme.AcmeException result = new org.wildfly.security.x500.cert.acme.AcmeException(String.format(getLoggingLocale(), unableToDownloadCertificateChainFromAcmeServer$str()), cause);</span>
+<span class="nc" id="L238">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L239">        return result;</span>
+    }
+    protected String acmeAccountDoesNotExist$str() {
+<span class="nc" id="L242">        return &quot;ELY10050: ACME account does not exist&quot;;</span>
+    }
+    @Override
+    public final org.wildfly.security.x500.cert.acme.AcmeException acmeAccountDoesNotExist() {
+<span class="nc" id="L246">        final org.wildfly.security.x500.cert.acme.AcmeException result = new org.wildfly.security.x500.cert.acme.AcmeException(String.format(getLoggingLocale(), acmeAccountDoesNotExist$str()));</span>
+<span class="nc" id="L247">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L248">        return result;</span>
+    }
+    protected String userActionRequired$str() {
+<span class="nc" id="L251">        return &quot;ELY10051: User action required since the ACME server's terms of service have changed, visit \&quot;%s\&quot; for details&quot;;</span>
+    }
+    @Override
+    public final org.wildfly.security.x500.cert.acme.AcmeException userActionRequired(final String url) {
+<span class="nc" id="L255">        final org.wildfly.security.x500.cert.acme.AcmeException result = new org.wildfly.security.x500.cert.acme.AcmeException(String.format(getLoggingLocale(), userActionRequired$str(), url));</span>
+<span class="nc" id="L256">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L257">        return result;</span>
+    }
+    protected String rateLimitExceededTryAgainLater$str() {
+<span class="nc" id="L260">        return &quot;ELY10052: Rate limit has been exceeded, try again after \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final org.wildfly.security.x500.cert.acme.AcmeException rateLimitExceededTryAgainLater(final Instant instant) {
+<span class="nc" id="L264">        final org.wildfly.security.x500.cert.acme.AcmeException result = new org.wildfly.security.x500.cert.acme.AcmeException(String.format(getLoggingLocale(), rateLimitExceededTryAgainLater$str(), instant));</span>
+<span class="nc" id="L265">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L266">        return result;</span>
+    }
+    protected String rateLimitExceeded$str() {
+<span class="nc" id="L269">        return &quot;ELY10053: Rate limit has been exceeded&quot;;</span>
+    }
+    @Override
+    public final org.wildfly.security.x500.cert.acme.AcmeException rateLimitExceeded() {
+<span class="nc" id="L273">        final org.wildfly.security.x500.cert.acme.AcmeException result = new org.wildfly.security.x500.cert.acme.AcmeException(String.format(getLoggingLocale(), rateLimitExceeded$str()));</span>
+<span class="nc" id="L274">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L275">        return result;</span>
+    }
+    protected String resourceNotSupportedByAcmeServer$str() {
+<span class="nc" id="L278">        return &quot;ELY10054: Resource not supported by the ACME server \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final org.wildfly.security.x500.cert.acme.AcmeException resourceNotSupportedByAcmeServer(final String resource) {
+<span class="nc" id="L282">        final org.wildfly.security.x500.cert.acme.AcmeException result = new org.wildfly.security.x500.cert.acme.AcmeException(String.format(getLoggingLocale(), resourceNotSupportedByAcmeServer$str(), resource));</span>
+<span class="nc" id="L283">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L284">        return result;</span>
+    }
+    protected String unsupportedAcmeAccountPublicKeyType$str() {
+<span class="nc" id="L287">        return &quot;ELY10055: Unsupported ACME account public key type \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException unsupportedAcmeAccountPublicKeyType(final String keyAlgorithmName) {
+<span class="nc" id="L291">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), unsupportedAcmeAccountPublicKeyType$str(), keyAlgorithmName));</span>
+<span class="nc" id="L292">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L293">        return result;</span>
+    }
+    protected String unableToDetermineCurveParameterFromAlgHeader$str() {
+<span class="nc" id="L296">        return &quot;ELY10056: Unable to determine curve parameter from alg header \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException unableToDetermineCurveParameterFromAlgHeader(final String algHeader) {
+<span class="nc" id="L300">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), unableToDetermineCurveParameterFromAlgHeader$str(), algHeader));</span>
+<span class="nc" id="L301">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L302">        return result;</span>
+    }
+    protected String noAcmeServerStagingUrlGiven$str() {
+<span class="nc" id="L305">        return &quot;ELY10057: No ACME server staging URL given&quot;;</span>
+    }
+    @Override
+    public final org.wildfly.security.x500.cert.acme.AcmeException noAcmeServerStagingUrlGiven() {
+<span class="nc" id="L309">        final org.wildfly.security.x500.cert.acme.AcmeException result = new org.wildfly.security.x500.cert.acme.AcmeException(String.format(getLoggingLocale(), noAcmeServerStagingUrlGiven$str()));</span>
+<span class="nc" id="L310">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L311">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

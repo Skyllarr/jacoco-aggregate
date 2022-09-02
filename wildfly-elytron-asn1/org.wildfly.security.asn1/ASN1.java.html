@@ -1,0 +1,473 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ASN1.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-asn1</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.asn1</a> &gt; <span class="el_source">ASN1.java</span></div><h1>ASN1.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.asn1;
+
+import static org.wildfly.security.asn1.ElytronMessages.log;
+
+import org.wildfly.common.array.Arrays2;
+
+/**
+ * A class that contains ASN.1 constants and utilities.
+ *
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+<span class="nc" id="L30">public class ASN1 {</span>
+
+    /**
+     * The universal boolean type tag.
+     */
+    public static final int BOOLEAN_TYPE = 1;
+
+    /**
+     * The universal integer type tag.
+     */
+    public static final int INTEGER_TYPE = 2;
+
+    /**
+     * The universal bit string type tag.
+     */
+    public static final int BIT_STRING_TYPE = 3;
+
+    /**
+     * The universal octet string type tag.
+     */
+    public static final int OCTET_STRING_TYPE = 4;
+
+    /**
+     * The universal null type tag.
+     */
+    public static final int NULL_TYPE = 5;
+
+    /**
+     * The universal object identifier type tag.
+     */
+    public static final int OBJECT_IDENTIFIER_TYPE = 6;
+
+    /**
+     * The universal UTF-8 string type tag.
+     */
+    public static final int UTF8_STRING_TYPE = 12;
+
+    /**
+     * The universal printable string type tag.
+     */
+    public static final int PRINTABLE_STRING_TYPE = 19;
+
+    /**
+     * The universal IA5 string type tag.
+     */
+    public static final int IA5_STRING_TYPE = 22;
+
+    /**
+     * A type for representing timestamps.
+     */
+    public static final int GENERALIZED_TIME_TYPE = 24;
+
+    /**
+     * The universal (UTF-32 big-endian) string type tag.
+     */
+    public static final int UNIVERSAL_STRING_TYPE = 28;
+
+    /**
+     * The universal BMP (UTF-16 big-endian) string type tag.
+     */
+    public static final int BMP_STRING_TYPE = 30;
+
+    /**
+     * The universal sequence type tag.
+     */
+    public static final int SEQUENCE_TYPE = 48;
+
+    /**
+     * The universal set type tag.
+     */
+    public static final int SET_TYPE = 49;
+
+    /**
+     * Mask used to determine if a type tag is constructed.
+     */
+    public static final int CONSTRUCTED_MASK = 0x20;
+
+    /**
+     * Mask used to determine if a type tag is application-specific.
+     */
+    public static final int APPLICATION_SPECIFIC_MASK = 0x40;
+
+    /**
+     * Mask used to determine if a type tag is context-specific.
+     */
+    public static final int CONTEXT_SPECIFIC_MASK = 0x80;
+
+    /**
+     * Mask used to obtain the class bits from a type tag.
+     */
+    public static final int CLASS_MASK = 0xc0;
+
+    /**
+     * Mask used to obtain the tag number bits from a type tag.
+     */
+    public static final int TAG_NUMBER_MASK = 0x1f;
+
+    // 1.2.840.10040
+
+    /**
+     * Object identifier for the SHA1 with DSA signature algorithm.
+     */
+    public static final String OID_SHA1_WITH_DSA = &quot;1.2.840.10040.4.3&quot;;
+
+    /**
+     * Object identifier for the SHA256 with DSA signature algorithm.
+     *
+     * @since 1.2.0
+     */
+    public static final String OID_SHA256_WITH_DSA = &quot;2.16.840.1.101.3.4.3.2&quot;;
+
+    // 1.2.840.10045
+
+    /**
+     * Object identifier for the SHA1 with ECDSA signature algorithm.
+     */
+    public static final String OID_SHA1_WITH_ECDSA = &quot;1.2.840.10045.4.1&quot;;
+
+    /**
+     * Object identifier for the SHA-225 with ECDSA signature algorithm.
+     */
+    public static final String OID_SHA224_WITH_ECDSA = &quot;1.2.840.10045.4.3.1&quot;;
+
+    /**
+     * Object identifier for the SHA-256 with ECDSA signature algorithm.
+     */
+    public static final String OID_SHA256_WITH_ECDSA = &quot;1.2.840.10045.4.3.2&quot;;
+
+    /**
+     * Object identifier for the SHA-384 with ECDSA signature algorithm.
+     */
+    public static final String OID_SHA384_WITH_ECDSA = &quot;1.2.840.10045.4.3.3&quot;;
+
+    /**
+     * Object identifier for the SHA-512 with ECDSA signature algorithm.
+     */
+    public static final String OID_SHA512_WITH_ECDSA = &quot;1.2.840.10045.4.3.4&quot;;
+
+    // 1.2.840.113549.1
+
+    /**
+     * Object identifier for the MD2 with RSA signature algorithm.
+     */
+    public static final String OID_MD2_WITH_RSA = &quot;1.2.840.113549.1.1.2&quot;;
+
+    /**
+     * Object identifier for the MD4 with RSA signature algorithm.
+     */
+    public static final String OID_MD4_WITH_RSA = &quot;1.2.840.113549.1.1.3&quot;;
+
+    /**
+     * Object identifier for the MD5 with RSA signature algorithm.
+     */
+    public static final String OID_MD5_WITH_RSA = &quot;1.2.840.113549.1.1.4&quot;;
+
+    /**
+     * Object identifier for the SHA1 with RSA signature algorithm.
+     */
+    public static final String OID_SHA1_WITH_RSA = &quot;1.2.840.113549.1.1.5&quot;;
+
+    /**
+     * Object identifier for the SHA-256 with RSA signature algorithm.
+     */
+    public static final String OID_SHA256_WITH_RSA = &quot;1.2.840.113549.1.1.11&quot;;
+
+    /**
+     * Object identifier for the SHA-384 with RSA signature algorithm.
+     */
+    public static final String OID_SHA384_WITH_RSA = &quot;1.2.840.113549.1.1.12&quot;;
+
+    /**
+     * Object identifier for the SHA-512 with RSA signature algorithm.
+     */
+    public static final String OID_SHA512_WITH_RSA = &quot;1.2.840.113549.1.1.13&quot;;
+
+    /**
+     * Object identifier for the PKCS #9 {@code extensionRequest} attribute.
+     *
+     * @since 1.2.0
+     */
+    public static final String OID_EXTENSION_REQUEST = &quot;1.2.840.113549.1.9.14&quot;;
+
+    // 1.2.840.113549.2
+
+    /**
+     * Object identifier for the MD2 hash algorithm.
+     */
+    public static final String OID_MD2 = &quot;1.2.840.113549.2.2&quot;;
+
+    /**
+     * Object identifier for the MD5 hash algorithm.
+     */
+    public static final String OID_MD5 = &quot;1.2.840.113549.2.5&quot;;
+
+    // 1.3.14
+
+    /**
+     * Object identifier for the SHA1 hash algorithm.
+     */
+    public static final String OID_SHA1 = &quot;1.3.14.3.2.26&quot;;
+
+    /**
+     * Algorithm ID for RSA keys used for any purpose.
+     */
+    public static final String OID_RSA = &quot;1.2.840.113549.1.1.1&quot;;
+
+    /**
+     * Algorithm ID for DSA keys used for any purpose.
+     */
+    public static final String OID_DSA = &quot;1.2.840.10040.4.1&quot;;
+
+    /**
+     * Algorithm ID for EC keys used for any purpose.
+     */
+    public static final String OID_EC = &quot;1.2.840.10045.2.1&quot;;
+
+    /**
+     * Format an AS.1 string from the given decoder as a string.
+     *
+     * @param decoder the ASN.1 decoder
+     * @return the formatted string
+     */
+    public static String formatAsn1(ASN1Decoder decoder) {
+<span class="fc" id="L253">        final StringBuilder builder = new StringBuilder();</span>
+<span class="fc" id="L254">        formatAsn1(decoder, builder);</span>
+<span class="fc" id="L255">        return builder.toString();</span>
+    }
+
+    /**
+     * Format an ASN.1 string from the given decoder as a string.
+     *
+     * @param decoder the ASN.1 decoder
+     * @param builder the target string builder
+     */
+    public static void formatAsn1(ASN1Decoder decoder, StringBuilder builder) {
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        while (decoder.hasNextElement()) {</span>
+<span class="fc" id="L266">            final int type = decoder.peekType();</span>
+<span class="pc bpc" id="L267" title="5 of 13 branches missed.">            switch (type) {</span>
+                case INTEGER_TYPE: {
+<span class="nc" id="L269">                    builder.append(&quot;[int:&quot;).append(decoder.decodeInteger()).append(&quot;]&quot;);</span>
+<span class="nc" id="L270">                    break;</span>
+                }
+                case BIT_STRING_TYPE: {
+<span class="nc" id="L273">                    builder.append(&quot;[bits:&quot;).append(decoder.decodeBitStringAsString()).append(']');</span>
+<span class="nc" id="L274">                    break;</span>
+                }
+                case OCTET_STRING_TYPE: {
+<span class="nc" id="L277">                    builder.append(&quot;[octets:&quot;).append(Arrays2.toString(decoder.decodeOctetString())).append(']');</span>
+<span class="nc" id="L278">                    break;</span>
+                }
+                case NULL_TYPE: {
+<span class="nc" id="L281">                    builder.append(&quot;[null]&quot;);</span>
+<span class="nc" id="L282">                    decoder.decodeNull();</span>
+<span class="nc" id="L283">                    break;</span>
+                }
+                case OBJECT_IDENTIFIER_TYPE: {
+<span class="fc" id="L286">                    builder.append(&quot;[oid:&quot;).append(decoder.decodeObjectIdentifier()).append(']');</span>
+<span class="fc" id="L287">                    break;</span>
+                }
+                case IA5_STRING_TYPE: {
+<span class="fc" id="L290">                    builder.append(&quot;[ia5:&quot;).append(decoder.decodeIA5String()).append(']');</span>
+<span class="fc" id="L291">                    break;</span>
+                }
+                case SEQUENCE_TYPE: {
+<span class="fc" id="L294">                    builder.append(&quot;[sequence:&quot;);</span>
+<span class="fc" id="L295">                    decoder.startSequence();</span>
+<span class="fc" id="L296">                    formatAsn1(decoder, builder);</span>
+<span class="fc" id="L297">                    decoder.endSequence();</span>
+<span class="fc" id="L298">                    builder.append(']');</span>
+<span class="fc" id="L299">                    break;</span>
+                }
+                case SET_TYPE: {
+<span class="fc" id="L302">                    builder.append(&quot;[set:&quot;);</span>
+<span class="fc" id="L303">                    decoder.startSet();</span>
+<span class="fc" id="L304">                    formatAsn1(decoder, builder);</span>
+<span class="fc" id="L305">                    decoder.endSet();</span>
+<span class="fc" id="L306">                    builder.append(']');</span>
+<span class="fc" id="L307">                    break;</span>
+                }
+                case PRINTABLE_STRING_TYPE: {
+<span class="fc" id="L310">                    builder.append(&quot;[printable:&quot;).append(decoder.decodePrintableString()).append(']');</span>
+<span class="fc" id="L311">                    break;</span>
+                }
+                case UNIVERSAL_STRING_TYPE: {
+<span class="fc" id="L314">                    builder.append(&quot;[universal:&quot;).append(decoder.decodeUniversalString()).append(']');</span>
+<span class="fc" id="L315">                    break;</span>
+                }
+                case UTF8_STRING_TYPE: {
+<span class="fc" id="L318">                    builder.append(&quot;[utf8:&quot;).append(decoder.decodeUtf8String()).append(']');</span>
+<span class="fc" id="L319">                    break;</span>
+                }
+                case BMP_STRING_TYPE: {
+<span class="fc" id="L322">                    builder.append(&quot;[bmp:&quot;).append(decoder.decodeBMPString()).append(']');</span>
+<span class="fc" id="L323">                    break;</span>
+                }
+                default: {
+<span class="nc" id="L326">                    throw log.asnUnknownTagType(type);</span>
+                }
+            }
+<span class="fc" id="L329">        }</span>
+<span class="fc" id="L330">    }</span>
+
+    /**
+     * Resolves a key algorithm based on a given &lt;code&gt;oid&lt;/code&gt;.
+     *
+     * @param oid an ASN.1 object identifier or OID (not {@code null})
+     * @return the string representing the key algorithm or null if no algorithm could be resolved for the given OID
+     */
+    public static String keyAlgorithmFromOid(String oid) {
+<span class="nc bnc" id="L339" title="All 4 branches missed.">        switch (oid) {</span>
+            case OID_RSA:
+<span class="nc" id="L341">                return &quot;RSA&quot;;</span>
+            case OID_DSA:
+<span class="nc" id="L343">                return &quot;DSA&quot;;</span>
+            case OID_EC:
+<span class="nc" id="L345">                return &quot;EC&quot;;</span>
+            default:
+<span class="nc" id="L347">                return null;</span>
+        }
+    }
+
+    @SuppressWarnings(&quot;SpellCheckingInspection&quot;)
+    public static String oidFromSignatureAlgorithm(String algorithmName) {
+<span class="pc bpc" id="L353" title="9 of 16 branches missed.">        switch (algorithmName) {</span>
+            case &quot;NONEwithRSA&quot;: {
+<span class="nc" id="L355">                return null;</span>
+            }
+            case &quot;MD2withRSA&quot;: {
+<span class="nc" id="L358">                return OID_MD2_WITH_RSA;</span>
+            }
+            case &quot;MD5withRSA&quot;: {
+<span class="nc" id="L361">                return OID_MD5_WITH_RSA;</span>
+            }
+            case &quot;SHA1withRSA&quot;: {
+<span class="fc" id="L364">                return OID_SHA1_WITH_RSA;</span>
+            }
+            case &quot;SHA256withRSA&quot;: {
+<span class="fc" id="L367">                return OID_SHA256_WITH_RSA;</span>
+            }
+            case &quot;SHA384withRSA&quot;: {
+<span class="fc" id="L370">                return OID_SHA384_WITH_RSA;</span>
+            }
+            case &quot;SHA512withRSA&quot;: {
+<span class="fc" id="L373">                return OID_SHA512_WITH_RSA;</span>
+            }
+            case &quot;NONEwithDSA&quot;: {
+<span class="nc" id="L376">                return null;</span>
+            }
+            case &quot;SHA1withDSA&quot;: {
+<span class="fc" id="L379">                return OID_SHA1_WITH_DSA;</span>
+            }
+            case &quot;SHA256withDSA&quot;: {
+<span class="fc" id="L382">                return OID_SHA256_WITH_DSA;</span>
+            }
+            case &quot;NONEwithECDSA&quot;: {
+<span class="nc" id="L385">                return null;</span>
+            }
+            case &quot;ECDSA&quot;: // obsolete alias for SHA1withECDSA
+            case &quot;SHA1withECDSA&quot;: {
+<span class="nc" id="L389">                return OID_SHA1_WITH_ECDSA;</span>
+            }
+            case &quot;SHA256withECDSA&quot;: {
+<span class="fc" id="L392">                return OID_SHA256_WITH_ECDSA;</span>
+            }
+            case &quot;SHA384withECDSA&quot;: {
+<span class="nc" id="L395">                return OID_SHA384_WITH_ECDSA;</span>
+            }
+            case &quot;SHA512withECDSA&quot;: {
+<span class="nc" id="L398">                return OID_SHA512_WITH_ECDSA;</span>
+            }
+            default: {
+<span class="nc" id="L401">                return null;</span>
+            }
+        }
+    }
+
+    @SuppressWarnings(&quot;SpellCheckingInspection&quot;)
+    public static String signatureAlgorithmFromOid(String oid) {
+<span class="nc bnc" id="L408" title="All 12 branches missed.">        switch (oid) {</span>
+            case OID_MD2_WITH_RSA: {
+<span class="nc" id="L410">                return &quot;MD2withRSA&quot;;</span>
+            }
+            case OID_MD5_WITH_RSA: {
+<span class="nc" id="L413">                return &quot;MD5withRSA&quot;;</span>
+            }
+            case OID_SHA1_WITH_RSA: {
+<span class="nc" id="L416">                return &quot;SHA1withRSA&quot;;</span>
+            }
+            case OID_SHA256_WITH_RSA: {
+<span class="nc" id="L419">                return &quot;SHA256withRSA&quot;;</span>
+            }
+            case OID_SHA384_WITH_RSA: {
+<span class="nc" id="L422">                return &quot;SHA384withRSA&quot;;</span>
+            }
+            case OID_SHA512_WITH_RSA: {
+<span class="nc" id="L425">                return &quot;SHA512withRSA&quot;;</span>
+            }
+            case OID_SHA1_WITH_DSA: {
+<span class="nc" id="L428">                return &quot;SHA1withDSA&quot;;</span>
+            }
+            case OID_SHA1_WITH_ECDSA: {
+<span class="nc" id="L431">                return &quot;SHA1withECDSA&quot;;</span>
+            }
+            case OID_SHA256_WITH_ECDSA: {
+<span class="nc" id="L434">                return &quot;SHA256withECDSA&quot;;</span>
+            }
+            case OID_SHA384_WITH_ECDSA: {
+<span class="nc" id="L437">                return &quot;SHA384withECDSA&quot;;</span>
+            }
+            case OID_SHA512_WITH_ECDSA: {
+<span class="nc" id="L440">                return &quot;SHA512withECDSA&quot;;</span>
+            }
+            default: {
+<span class="nc" id="L443">                return null;</span>
+            }
+        }
+    }
+
+    public static void validatePrintableByte(final int b) throws ASN1Exception {
+<span class="fc bfc" id="L449" title="All 2 branches covered.">        switch (b) {</span>
+            case ' ':
+            case '\'':
+            case '(':
+            case ')':
+            case '+':
+            case ',':
+            case '-':
+            case '.':
+            case '/':
+            case ':':
+            case '=':
+            case '?': {
+<span class="fc" id="L462">                return;</span>
+            }
+            default: {
+<span class="pc bpc" id="L465" title="7 of 12 branches missed.">                if ('A' &lt;= b &amp;&amp; b &lt;= 'Z' || 'a' &lt;= b &amp;&amp; b &lt;= 'z' || '0' &lt;= b &amp;&amp; b &lt;= '9') {</span>
+<span class="fc" id="L466">                    return;</span>
+                }
+<span class="nc" id="L468">                throw log.asnUnexpectedCharacterByteForPrintableString();</span>
+            }
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

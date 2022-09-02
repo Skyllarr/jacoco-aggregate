@@ -1,0 +1,566 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>EntityUtil.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl-entity</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.entity</a> &gt; <span class="el_source">EntityUtil.java</span></div><h1>EntityUtil.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.entity;
+
+import static org.wildfly.security.asn1.ASN1.*;
+import static org.wildfly.security.mechanism._private.ElytronMessages.saslEntity;
+import static org.wildfly.security.sasl.entity.Entity.*;
+import static org.wildfly.security.x500.GeneralName.*;
+import static org.wildfly.security.x500.TrustedAuthority.*;
+
+import java.io.ByteArrayInputStream;
+import java.security.SecureRandom;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateEncodingException;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.CertificateParsingException;
+import java.security.cert.CertPath;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
+
+import javax.security.auth.x500.X500Principal;
+
+import org.wildfly.security.asn1.ASN1Exception;
+import org.wildfly.security.asn1.DERDecoder;
+import org.wildfly.security.asn1.DEREncoder;
+import org.wildfly.security.x500.GeneralName;
+import org.wildfly.security.x500.TrustedAuthority;
+import org.wildfly.security.x500.X500;
+import org.wildfly.security.x500.util.X500PrincipalUtil;
+
+/**
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+<span class="nc bnc" id="L55" title="All 2 branches missed.">class EntityUtil {</span>
+
+    private static final byte[] randomCharDictionary;
+
+    static {
+<span class="nc" id="L60">        byte[] dict = new byte[93];</span>
+<span class="nc" id="L61">        int i = 0;</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        for (byte c = '!'; c &lt; ','; c ++) {</span>
+<span class="nc" id="L63">            dict[i ++] = c;</span>
+        }
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        for (byte c = ',' + 1; c &lt; 127; c ++) {</span>
+<span class="nc" id="L66">            dict[i ++] = c;</span>
+        }
+<span class="nc bnc" id="L68" title="All 4 branches missed.">        assert i == dict.length;</span>
+<span class="nc" id="L69">        randomCharDictionary = dict;</span>
+<span class="nc" id="L70">    }</span>
+
+    /* -- Methods used to encode ASN.1 data structures required for entity authentication -- */
+
+    /**
+     * Encode an ASN.1 set of certificates using the given DER encoder and the
+     * given {@code X509Certificate} chain.
+     *
+     * @param encoder the DER encoder
+     * @param certChain the X.509 certificate chain to encode
+     * @throws ASN1Exception if an error occurs while encoding the given certificate chain
+     */
+    public static void encodeX509CertificateChain(final DEREncoder encoder, X509Certificate[] certChain) throws ASN1Exception {
+        try {
+<span class="nc" id="L84">            int chainSize = certChain.length;</span>
+<span class="nc" id="L85">            encoder.startSetOf();</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">            for (int i = 0; i &lt; chainSize; i++) {</span>
+<span class="nc" id="L87">                encoder.writeEncoded(certChain[i].getEncoded());</span>
+            }
+<span class="nc" id="L89">            encoder.endSetOf();</span>
+<span class="nc" id="L90">        } catch (CertificateEncodingException e) {</span>
+<span class="nc" id="L91">            throw new ASN1Exception(e);</span>
+<span class="nc" id="L92">        }</span>
+<span class="nc" id="L93">    }</span>
+
+    /**
+     * &lt;p&gt;
+     * Encode an {@code AlgorithmIdentifier} without any parameters using the given
+     * DER encoder and object identifier, where {@code AlgorithmIdentifier} is defined as:
+     *
+     * &lt;pre&gt;
+     *      AlgorithmIdentifier  ::=  SEQUENCE  {
+     *          algorithm      OBJECT IDENTIFIER,
+     *          parameters     ANY DEFINED BY algorithm OPTIONAL
+     *      }
+     * &lt;/pre&gt;
+     * &lt;/p&gt;
+     *
+     * @param encoder the DER encoder
+     * @param objectIdentifier the object identifier for the algorithm
+     * @param omitParametersField {@code true} if the parameters field should be ommitted in
+     * the encoding and {@code false} otherwise
+     * @throws ASN1Exception if the given object identifier is invalid
+     */
+    public static void encodeAlgorithmIdentifier(final DEREncoder encoder, String objectIdentifier,
+            boolean omitParametersField) throws ASN1Exception {
+<span class="nc" id="L116">        encoder.startSequence();</span>
+<span class="nc" id="L117">        encoder.encodeObjectIdentifier(objectIdentifier);</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        if (!omitParametersField) {</span>
+<span class="nc" id="L119">            encoder.encodeNull();</span>
+        }
+<span class="nc" id="L121">        encoder.endSequence();</span>
+<span class="nc" id="L122">    }</span>
+
+    /**
+     * &lt;p&gt;
+     * Encode an {@code AlgorithmIdentifier} using the given DER encoder, where
+     * {@code AlgorithmIdentifier} is defined as:
+     *
+     * &lt;pre&gt;
+     *      AlgorithmIdentifier  ::=  SEQUENCE  {
+     *          algorithm      OBJECT IDENTIFIER,
+     *          parameters     ANY DEFINED BY algorithm OPTIONAL
+     *      }
+     * &lt;/pre&gt;
+     * &lt;/p&gt;
+     *
+     * @param encoder the DER encoder
+     * @param algorithm the algorithm name
+     * @throws ASN1Exception if the given algorithm name is unrecognised
+     */
+    public static void encodeAlgorithmIdentifier(final DEREncoder encoder, String algorithm) throws ASN1Exception {
+        // Determine whether or not the parameters field should be omitted in the encoding,
+        // as specified in RFC 3279 (http://www.ietf.org/rfc/rfc3279)
+        boolean omitParametersField;
+<span class="nc bnc" id="L145" title="All 3 branches missed.">        switch (algorithm) {</span>
+            case SHA1_WITH_RSA: {
+<span class="nc" id="L147">                omitParametersField = false;</span>
+<span class="nc" id="L148">                break;</span>
+            }
+            case SHA1_WITH_DSA:
+            case SHA1_WITH_ECDSA: {
+<span class="nc" id="L152">                omitParametersField = true;</span>
+<span class="nc" id="L153">                break;</span>
+            }
+<span class="nc" id="L155">            default: throw saslEntity.asnUnrecognisedAlgorithm(algorithm);</span>
+        }
+<span class="nc" id="L157">        encodeAlgorithmIdentifier(encoder, algorithmOid(algorithm), omitParametersField);</span>
+<span class="nc" id="L158">    }</span>
+
+    /**
+     * &lt;p&gt;
+     * Encode a {@code GeneralNames} element using the given DER encoder, where
+     * {@code GeneralNames} is defined as:
+     *
+     * &lt;pre&gt;
+     *      GeneralNames ::= SEQUENCE SIZE (1..MAX) OF GeneralName
+     * &lt;/pre&gt;
+     * &lt;/p&gt;
+     *
+     * @param encoder the DER encoder
+     * @param generalNames the general names, as a {@code List} where each entry is a {@link GeneralName}
+     * @throws ASN1Exception if any of the general names are invalid
+     */
+    public static void encodeGeneralNames(final DEREncoder encoder, List&lt;GeneralName&gt; generalNames) throws ASN1Exception {
+<span class="nc" id="L175">        encoder.startSequence();</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        for (GeneralName generalName : generalNames) {</span>
+<span class="nc" id="L177">            generalName.encodeTo(encoder);</span>
+<span class="nc" id="L178">        }</span>
+<span class="nc" id="L179">        encoder.endSequence();</span>
+<span class="nc" id="L180">    }</span>
+
+    /**
+     * Encode a {@code GeneralNames} element consisting of one general name using
+     * the given DER encoder.
+     *
+     * @param encoder the DER encoder
+     * @param generalName the general name
+     * @throws ASN1Exception if the general name is invalid
+     */
+    public static void encodeGeneralNames(final DEREncoder encoder, GeneralName generalName) throws ASN1Exception {
+<span class="nc" id="L191">        List&lt;GeneralName&gt; generalNames = new ArrayList&lt;GeneralName&gt;(1);</span>
+<span class="nc" id="L192">        generalNames.add(generalName);</span>
+<span class="nc" id="L193">        encodeGeneralNames(encoder, generalNames);</span>
+<span class="nc" id="L194">    }</span>
+
+    public static void encodeGeneralNames(final DEREncoder encoder, String subjectName,
+            Collection&lt;List&lt;?&gt;&gt; subjectAltNames) throws ASN1Exception {
+<span class="nc" id="L198">        encoder.startSequence();</span>
+<span class="nc bnc" id="L199" title="All 2 branches missed.">        if (! subjectName.isEmpty()) {</span>
+<span class="nc" id="L200">            new DirectoryName(subjectName).encodeTo(encoder);</span>
+        }
+<span class="nc bnc" id="L202" title="All 2 branches missed.">        if (subjectAltNames != null) {</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">            for (List&lt;?&gt; altName : subjectAltNames) {</span>
+<span class="nc" id="L204">                convertToGeneralName(altName).encodeTo(encoder);</span>
+<span class="nc" id="L205">            }</span>
+        }
+<span class="nc" id="L207">        encoder.endSequence();</span>
+<span class="nc" id="L208">    }</span>
+
+    /**
+     * &lt;p&gt;
+     * Encode a {@code RandomNumber} element using the given DER encoder, where
+     * {@code RandomNumber} is defined as:
+     *
+     * &lt;pre&gt;
+     *      RandomNumber ::= OCTET STRING (SIZE(8..MAX))
+     * &lt;/pre&gt;
+     * &lt;/p&gt;
+     *
+     * @param encoder the DER encoder
+     * @param secureRandom the secure random to use (may be null)
+     */
+    public static byte[] encodeRandomNumber(final DEREncoder encoder, SecureRandom secureRandom) {
+<span class="nc bnc" id="L224" title="All 2 branches missed.">        Random random = secureRandom != null ? secureRandom : ThreadLocalRandom.current();</span>
+<span class="nc" id="L225">        byte[] randomA = generateRandomString(48, random);</span>
+<span class="nc" id="L226">        encoder.encodeOctetString(randomA);</span>
+<span class="nc" id="L227">        return randomA;</span>
+    }
+
+    public static byte[] generateRandomString(int length, Random random) {
+<span class="nc" id="L231">        final byte[] chars = new byte[length];</span>
+<span class="nc bnc" id="L232" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i ++) {</span>
+<span class="nc" id="L233">            chars[i] = randomCharDictionary[random.nextInt(93)];</span>
+        }
+<span class="nc" id="L235">        return chars;</span>
+    }
+
+    /**
+     * Encode an ASN.1 sequence of trusted authorities using the given DER encoder.
+     *
+     * @param encoder the DER encoder
+     * @param trustedAuthorities the trusted authorities as a {@code List} where each entry must
+     * be a {@link NameTrustedAuthority}, a {@link CertificateTrustedAuthority}, or a {@link HashTrustedAuthority}
+     * @throws ASN1Exception if any of the trusted authorities are invalid
+     */
+    public static void encodeTrustedAuthorities(final DEREncoder encoder,
+            List&lt;TrustedAuthority&gt; trustedAuthorities) throws ASN1Exception {
+<span class="nc" id="L248">        encoder.startSequence();</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">        for (TrustedAuthority trustedAuthority : trustedAuthorities) {</span>
+<span class="nc" id="L250">            trustedAuthority.encodeTo(encoder);</span>
+<span class="nc" id="L251">        }</span>
+<span class="nc" id="L252">        encoder.endSequence();</span>
+<span class="nc" id="L253">    }</span>
+
+    /* -- Methods used to decode ASN.1 data structures required for entity authentication -- */
+
+    /**
+     * Decode the next element from the given DER decoder as a {@code GeneralNames} element.
+     *
+     * @param decoder the DER decoder
+     * @return the general names
+     * @throws ASN1Exception if the next element from the given decoder is not a general names element
+     */
+    public static List&lt;GeneralName&gt; decodeGeneralNames(final DERDecoder decoder) throws ASN1Exception {
+<span class="nc" id="L265">        List&lt;GeneralName&gt; generalNames = new ArrayList&lt;GeneralName&gt;();</span>
+<span class="nc" id="L266">        GeneralName generalName = null;</span>
+<span class="nc" id="L267">        decoder.startSequence();</span>
+<span class="nc bnc" id="L268" title="All 2 branches missed.">        while (decoder.hasNextElement()) {</span>
+            out: {
+<span class="nc bnc" id="L270" title="All 2 branches missed.">                for (int generalNameType = 0; generalNameType &lt;= 8; generalNameType++) {</span>
+<span class="nc bnc" id="L271" title="All 10 branches missed.">                    switch (generalNameType) {</span>
+                        case OTHER_NAME:
+<span class="nc bnc" id="L273" title="All 2 branches missed.">                            if (decoder.isNextType(CONTEXT_SPECIFIC_MASK, generalNameType, true)) {</span>
+<span class="nc" id="L274">                                decoder.decodeImplicit(generalNameType);</span>
+<span class="nc" id="L275">                                decoder.startSequence();</span>
+<span class="nc" id="L276">                                String typeId = decoder.decodeObjectIdentifier();</span>
+<span class="nc" id="L277">                                byte[] encodedValue = decoder.drainElement();</span>
+<span class="nc" id="L278">                                decoder.endSequence();</span>
+<span class="nc" id="L279">                                generalName = new OtherName(typeId, encodedValue);</span>
+<span class="nc" id="L280">                                break out;</span>
+                            }
+                            break;
+                        case RFC_822_NAME:
+<span class="nc bnc" id="L284" title="All 2 branches missed.">                            if (decoder.isNextType(CONTEXT_SPECIFIC_MASK, generalNameType, false)) {</span>
+<span class="nc" id="L285">                                decoder.decodeImplicit(generalNameType);</span>
+<span class="nc" id="L286">                                generalName = new RFC822Name(decoder.decodeIA5String());</span>
+<span class="nc" id="L287">                                break out;</span>
+                            }
+                            break;
+                        case DNS_NAME:
+<span class="nc bnc" id="L291" title="All 2 branches missed.">                            if (decoder.isNextType(CONTEXT_SPECIFIC_MASK, generalNameType, false)) {</span>
+<span class="nc" id="L292">                                decoder.decodeImplicit(generalNameType);</span>
+<span class="nc" id="L293">                                generalName = new DNSName(decoder.decodeIA5String());</span>
+<span class="nc" id="L294">                                break out;</span>
+                            }
+                            break;
+                        case X400_ADDRESS:
+<span class="nc bnc" id="L298" title="All 2 branches missed.">                            if (decoder.isNextType(CONTEXT_SPECIFIC_MASK, generalNameType, true)) {</span>
+<span class="nc" id="L299">                                decoder.decodeImplicit(generalNameType);</span>
+<span class="nc" id="L300">                                generalName = new X400Address(decoder.drainElementValue(), true);</span>
+<span class="nc" id="L301">                                break out;</span>
+                            }
+                            break;
+                        case DIRECTORY_NAME:
+<span class="nc bnc" id="L305" title="All 2 branches missed.">                            if (decoder.isNextType(CONTEXT_SPECIFIC_MASK, generalNameType, true)) {</span>
+<span class="nc" id="L306">                                byte[] encodedName = decoder.drainElementValue();</span>
+<span class="nc" id="L307">                                generalName = new DirectoryName((new X500Principal(encodedName)).getName(X500Principal.CANONICAL));</span>
+<span class="nc" id="L308">                                break out;</span>
+                            }
+                            break;
+                        case EDI_PARTY_NAME:
+<span class="nc bnc" id="L312" title="All 2 branches missed.">                            if (decoder.isNextType(CONTEXT_SPECIFIC_MASK, generalNameType, true)) {</span>
+<span class="nc" id="L313">                                decoder.decodeImplicit(generalNameType);</span>
+<span class="nc" id="L314">                                generalName = new EDIPartyName(decoder.drainElementValue(), true);</span>
+<span class="nc" id="L315">                                break out;</span>
+                            }
+                            break;
+                        case URI_NAME:
+<span class="nc bnc" id="L319" title="All 2 branches missed.">                            if (decoder.isNextType(CONTEXT_SPECIFIC_MASK, generalNameType, false)) {</span>
+<span class="nc" id="L320">                                decoder.decodeImplicit(generalNameType);</span>
+<span class="nc" id="L321">                                generalName = new URIName(decoder.decodeIA5String());</span>
+<span class="nc" id="L322">                                break out;</span>
+                            }
+                            break;
+                        case IP_ADDRESS:
+<span class="nc bnc" id="L326" title="All 2 branches missed.">                            if (decoder.isNextType(CONTEXT_SPECIFIC_MASK, generalNameType, false)) {</span>
+<span class="nc" id="L327">                                decoder.decodeImplicit(generalNameType);</span>
+<span class="nc" id="L328">                                generalName = new IPAddress(decoder.decodeOctetString());</span>
+<span class="nc" id="L329">                                break out;</span>
+                            }
+                            break;
+                        case REGISTERED_ID:
+<span class="nc bnc" id="L333" title="All 2 branches missed.">                            if (decoder.isNextType(CONTEXT_SPECIFIC_MASK, generalNameType, false)) {</span>
+<span class="nc" id="L334">                                decoder.decodeImplicit(generalNameType);</span>
+<span class="nc" id="L335">                                generalName = new RegisteredID(decoder.decodeObjectIdentifier());</span>
+<span class="nc" id="L336">                                break out;</span>
+                            }
+                            break;
+<span class="nc" id="L339">                        default: throw saslEntity.asnInvalidGeneralNameType();</span>
+                    }
+                }
+            }
+<span class="nc" id="L343">            generalNames.add(generalName);</span>
+        }
+<span class="nc" id="L345">        decoder.endSequence();</span>
+<span class="nc" id="L346">        return generalNames;</span>
+    }
+
+    /**
+     * Decode the next element from the given DER decoder as an X.509 certificate chain.
+     *
+     * @param decoder the DER decoder
+     * @return the X.509 certificate chain
+     * @throws ASN1Exception if the next element from the given decoder is not an X.509
+     * certificate chain or if an error occurs while decoding the X.509 certificate chain
+     */
+    public static X509Certificate[] decodeX509CertificateChain(final DERDecoder decoder) throws ASN1Exception {
+<span class="nc bnc" id="L358" title="All 2 branches missed.">        if (decoder.peekType() != SET_TYPE) {</span>
+<span class="nc" id="L359">            throw saslEntity.asnUnexpectedTag();</span>
+        }
+<span class="nc" id="L361">        byte[] certChain = decoder.drainElement();</span>
+        try {
+<span class="nc" id="L363">            CertificateFactory certFactory = CertificateFactory.getInstance(&quot;X.509&quot;);</span>
+<span class="nc" id="L364">            certChain[0] = SEQUENCE_TYPE; // CertificateFactory#generateCertPath requires a DER SEQUE</span>
+<span class="nc" id="L365">            CertPath certPath = certFactory.generateCertPath(new ByteArrayInputStream(certChain));</span>
+<span class="nc" id="L366">            List&lt;? extends Certificate&gt; certs = certPath.getCertificates();</span>
+<span class="nc" id="L367">            return certs.toArray(new X509Certificate[certs.size()]);</span>
+<span class="nc" id="L368">        } catch (CertificateException e) {</span>
+<span class="nc" id="L369">            throw new ASN1Exception(e);</span>
+        }
+    }
+
+    /**
+     * &lt;p&gt;
+     * Decode the next element from the given DER decoder as a {@code CertData} element,
+     * which is defined as follows:
+     *
+     * &lt;pre&gt;
+     *      CertData ::= CHOICE {
+     *          certificateSet     SET SIZE (1..MAX) OF Certificate,
+     *          certURL            IA5String (Note: No support for certificate URL)
+     *      }
+     * &lt;/pre&gt;
+     * &lt;/p&gt;
+     *
+     * @param decoder the DER decoder
+     * @return the X.509 certificate or certificate chain
+     * @throws ASN1Exception if the next element from the given decoder is not a {@code CertData}
+     * element or if an error occurs while decoding the certificate data
+     */
+    public static X509Certificate[] decodeCertificateData(final DERDecoder decoder) throws ASN1Exception {
+        X509Certificate[] peerCertChain;
+<span class="nc bnc" id="L393" title="All 2 branches missed.">        if (decoder.peekType() == SET_TYPE) {</span>
+<span class="nc" id="L394">            peerCertChain = decodeX509CertificateChain(decoder);</span>
+        } else {
+<span class="nc" id="L396">            throw saslEntity.asnUnexpectedTag();</span>
+        }
+<span class="nc" id="L398">        return peerCertChain;</span>
+    }
+
+    /**
+     * Decode the next element from the given DER decoder as a trusted authorities element.
+     *
+     * @param decoder the DER decoder
+     * @return the trusted authorities
+     * @throws ASN1Exception if the next element from the given decoder is not a trusted authorities
+     * element or if an error occurs while decoding the trusted authorities element
+     */
+    public static List&lt;TrustedAuthority&gt; decodeTrustedAuthorities(final DERDecoder decoder) throws ASN1Exception {
+<span class="nc" id="L410">        List&lt;TrustedAuthority&gt; trustedAuthorities = new ArrayList&lt;TrustedAuthority&gt;();</span>
+<span class="nc" id="L411">        TrustedAuthority trustedAuthority = null;</span>
+<span class="nc" id="L412">        decoder.startSequence();</span>
+<span class="nc bnc" id="L413" title="All 2 branches missed.">        while (decoder.hasNextElement()) {</span>
+            out: {
+<span class="nc bnc" id="L415" title="All 2 branches missed.">                for (int trustedAuthorityType = 0; trustedAuthorityType &lt;= 4; trustedAuthorityType++) {</span>
+<span class="nc bnc" id="L416" title="All 6 branches missed.">                    switch (trustedAuthorityType) {</span>
+                        case AUTHORITY_NAME:
+<span class="nc bnc" id="L418" title="All 2 branches missed.">                            if (decoder.isNextType(CONTEXT_SPECIFIC_MASK, trustedAuthorityType, true)) {</span>
+<span class="nc" id="L419">                                byte[] encodedName = decoder.drainElementValue();</span>
+<span class="nc" id="L420">                                trustedAuthority = new NameTrustedAuthority((new X500Principal(encodedName)).getName(X500Principal.CANONICAL));</span>
+<span class="nc" id="L421">                                break out;</span>
+                            }
+                            break;
+                        case AUTHORITY_CERTIFICATE:
+<span class="nc bnc" id="L425" title="All 2 branches missed.">                            if (decoder.isNextType(CONTEXT_SPECIFIC_MASK, trustedAuthorityType, true)) {</span>
+<span class="nc" id="L426">                                decoder.decodeImplicit(trustedAuthorityType);</span>
+<span class="nc" id="L427">                                byte[] cert = decoder.drainElement();</span>
+<span class="nc" id="L428">                                cert[0] = SEQUENCE_TYPE; // Replace the trusted authority type tag with a DER SEQUENCE tag, as required by CertificateFactory#generateCertificate</span>
+                                try {
+<span class="nc" id="L430">                                    CertificateFactory certFactory = CertificateFactory.getInstance(&quot;X.509&quot;);</span>
+<span class="nc" id="L431">                                    trustedAuthority = new CertificateTrustedAuthority((X509Certificate) certFactory.generateCertificate(new ByteArrayInputStream(cert)));</span>
+<span class="nc" id="L432">                                } catch (CertificateException e) {</span>
+<span class="nc" id="L433">                                    throw new ASN1Exception(e);</span>
+<span class="nc" id="L434">                                }</span>
+                                break out;
+                            }
+                            break;
+                        case ISSUER_NAME_HASH:
+<span class="nc bnc" id="L439" title="All 2 branches missed.">                            if (decoder.isNextType(CONTEXT_SPECIFIC_MASK, trustedAuthorityType, false)) {</span>
+<span class="nc" id="L440">                                decoder.decodeImplicit(trustedAuthorityType);</span>
+<span class="nc" id="L441">                                trustedAuthority = new IssuerNameHashTrustedAuthority(decoder.decodeOctetString());</span>
+<span class="nc" id="L442">                                break out;</span>
+                            }
+                            break;
+                        case ISSUER_KEY_HASH:
+<span class="nc bnc" id="L446" title="All 2 branches missed.">                            if (decoder.isNextType(CONTEXT_SPECIFIC_MASK, trustedAuthorityType, false)) {</span>
+<span class="nc" id="L447">                                decoder.decodeImplicit(trustedAuthorityType);</span>
+<span class="nc" id="L448">                                trustedAuthority = new IssuerKeyHashTrustedAuthority(decoder.decodeOctetString());</span>
+<span class="nc" id="L449">                                break out;</span>
+                            }
+                            break;
+                        case PKCS_15_KEY_HASH:
+<span class="nc bnc" id="L453" title="All 2 branches missed.">                            if (decoder.isNextType(CONTEXT_SPECIFIC_MASK, trustedAuthorityType, false)) {</span>
+<span class="nc" id="L454">                                decoder.decodeImplicit(trustedAuthorityType);</span>
+<span class="nc" id="L455">                                trustedAuthority = new PKCS15KeyHashTrustedAuthority(decoder.decodeOctetString());</span>
+<span class="nc" id="L456">                                break out;</span>
+                            }
+                            break;
+<span class="nc" id="L459">                        default: throw saslEntity.asnInvalidGeneralNameType();</span>
+                    }
+                }
+            }
+<span class="nc" id="L463">            trustedAuthorities.add(trustedAuthority);</span>
+        }
+<span class="nc" id="L465">        decoder.endSequence();</span>
+<span class="nc" id="L466">        return trustedAuthorities;</span>
+    }
+
+    public static boolean matchGeneralNames(List&lt;GeneralName&gt; generalNames,
+            List&lt;GeneralName&gt; actualGeneralNames) {
+<span class="nc bnc" id="L471" title="All 4 branches missed.">        if ((generalNames == null) || (actualGeneralNames == null)) {</span>
+<span class="nc" id="L472">            return false;</span>
+        }
+<span class="nc bnc" id="L474" title="All 2 branches missed.">        for (GeneralName generalName : generalNames) {</span>
+<span class="nc bnc" id="L475" title="All 2 branches missed.">            for (GeneralName actualGeneralName : actualGeneralNames) {</span>
+<span class="nc bnc" id="L476" title="All 2 branches missed.">                if (matchGeneralName(generalName, actualGeneralName)) {</span>
+<span class="nc" id="L477">                    return true;</span>
+                }
+<span class="nc" id="L479">            }</span>
+<span class="nc" id="L480">        }</span>
+<span class="nc" id="L481">        return false;</span>
+    }
+
+    public static boolean matchGeneralName(GeneralName generalName, GeneralName actualGeneralName) {
+<span class="nc bnc" id="L485" title="All 4 branches missed.">        if ((generalName instanceof DNSName) &amp;&amp; (actualGeneralName instanceof DirectoryName)) {</span>
+            // Check if the DNSName matches the DirectoryName's (most specific) Common Name field.
+            // Although specifying a DNS name using the Common Name field has been deprecated, it is
+            // still used in practice (e.g., see http://tools.ietf.org/html/rfc2818).
+<span class="nc" id="L489">            String[] cnValues = X500PrincipalUtil.getAttributeValues(new X500Principal(((DirectoryName) actualGeneralName).getName()), X500.OID_AT_COMMON_NAME);</span>
+<span class="nc" id="L490">            String dnsName = ((DNSName) generalName).getName();</span>
+<span class="nc" id="L491">            return dnsName.equalsIgnoreCase(cnValues[0]);</span>
+        } else {
+<span class="nc" id="L493">            return generalName.equals(actualGeneralName);</span>
+        }
+    }
+
+    public static boolean matchGeneralNames(List&lt;GeneralName&gt; generalNames, X509Certificate cert) {
+<span class="nc" id="L498">        X500Principal certSubjectName = cert.getSubjectX500Principal();</span>
+        try {
+<span class="nc bnc" id="L500" title="All 2 branches missed.">            if (matchGeneralNames(generalNames, convertToGeneralNames(cert.getSubjectAlternativeNames()))) {</span>
+<span class="nc" id="L501">                return true;</span>
+            }
+<span class="nc" id="L503">        } catch (CertificateParsingException e) {</span>
+            // Ignore unless the subject name is empty
+<span class="nc bnc" id="L505" title="All 2 branches missed.">            if (certSubjectName == null) {</span>
+<span class="nc" id="L506">                throw saslEntity.unableToDetermineSubjectName(e);</span>
+            }
+<span class="nc" id="L508">        }</span>
+        List&lt;GeneralName&gt; certNames;
+<span class="nc bnc" id="L510" title="All 2 branches missed.">        if (certSubjectName != null) {</span>
+<span class="nc" id="L511">            certNames = new ArrayList&lt;GeneralName&gt;(1);</span>
+<span class="nc" id="L512">            certNames.add(new DirectoryName(certSubjectName.getName(X500Principal.CANONICAL)));</span>
+<span class="nc bnc" id="L513" title="All 2 branches missed.">            if (matchGeneralNames(generalNames, certNames)) {</span>
+<span class="nc" id="L514">                return true;</span>
+            }
+        }
+<span class="nc" id="L517">        return false;</span>
+    }
+
+    public static String getDistinguishedNameFromGeneralNames(List&lt;GeneralName&gt; generalNames) {
+<span class="nc bnc" id="L521" title="All 2 branches missed.">        for (GeneralName generalName : generalNames) {</span>
+<span class="nc bnc" id="L522" title="All 2 branches missed.">            if (generalName instanceof DirectoryName) {</span>
+<span class="nc" id="L523">                return ((DirectoryName) generalName).getName();</span>
+            }
+<span class="nc" id="L525">        }</span>
+<span class="nc" id="L526">        return null;</span>
+    }
+
+    private static GeneralName convertToGeneralName(List&lt;?&gt; generalName) throws ASN1Exception {
+<span class="nc" id="L530">        int type = ((Integer) generalName.get(0)).intValue();</span>
+<span class="nc" id="L531">        Object name = generalName.get(1);</span>
+<span class="nc bnc" id="L532" title="All 10 branches missed.">        switch (type) {</span>
+            case OTHER_NAME:
+<span class="nc" id="L534">                return new OtherName((byte[]) name);</span>
+            case RFC_822_NAME:
+<span class="nc" id="L536">                return new RFC822Name((String) name);</span>
+            case DNS_NAME:
+<span class="nc" id="L538">                return new DNSName((String) name);</span>
+            case X400_ADDRESS:
+<span class="nc" id="L540">                return new X400Address((byte[]) name);</span>
+            case DIRECTORY_NAME:
+<span class="nc" id="L542">                return new DirectoryName((String) name);</span>
+            case EDI_PARTY_NAME:
+<span class="nc" id="L544">                return new EDIPartyName((byte[]) name);</span>
+            case URI_NAME:
+<span class="nc" id="L546">                return new URIName((String) name);</span>
+            case IP_ADDRESS:
+<span class="nc" id="L548">                return new IPAddress((String) name);</span>
+            case REGISTERED_ID:
+<span class="nc" id="L550">                return new RegisteredID((String) name);</span>
+<span class="nc" id="L551">            default: throw saslEntity.asnInvalidGeneralNameType();</span>
+        }
+    }
+
+    private static List&lt;GeneralName&gt; convertToGeneralNames(Collection&lt;List&lt;?&gt;&gt; generalNames) throws ASN1Exception {
+<span class="nc bnc" id="L556" title="All 2 branches missed.">        if (generalNames == null) {</span>
+<span class="nc" id="L557">            return null;</span>
+        }
+<span class="nc" id="L559">        List&lt;GeneralName&gt; convertedGeneralNames = new ArrayList&lt;GeneralName&gt;();</span>
+<span class="nc bnc" id="L560" title="All 2 branches missed.">        for (List&lt;?&gt; generalName : generalNames) {</span>
+<span class="nc" id="L561">            convertedGeneralNames.add(convertToGeneralName(generalName));</span>
+<span class="nc" id="L562">        }</span>
+<span class="nc" id="L563">        return convertedGeneralNames;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

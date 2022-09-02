@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>EntitySaslClient.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl-entity</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.entity</a> &gt; <span class="el_source">EntitySaslClient.java</span></div><h1>EntitySaslClient.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.entity;
+
+import static org.wildfly.security.asn1.ASN1.CONTEXT_SPECIFIC_MASK;
+import static org.wildfly.security.mechanism._private.ElytronMessages.saslEntity;
+import static org.wildfly.security.sasl.entity.Entity.keyType;
+
+import java.security.InvalidKeyException;
+import java.security.PrivateKey;
+import java.security.SecureRandom;
+import java.security.Signature;
+import java.security.SignatureException;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.sasl.SaslException;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.asn1.ASN1Exception;
+import org.wildfly.security.asn1.DERDecoder;
+import org.wildfly.security.asn1.DEREncoder;
+import org.wildfly.security.auth.callback.CredentialCallback;
+import org.wildfly.security.auth.callback.EvidenceVerifyCallback;
+import org.wildfly.security.auth.callback.TrustedAuthoritiesCallback;
+import org.wildfly.security.credential.X509CertificateChainPrivateCredential;
+import org.wildfly.security.evidence.X509PeerCertificateChainEvidence;
+import org.wildfly.security.x500.GeneralName;
+import org.wildfly.security.x500.GeneralName.DNSName;
+import org.wildfly.security.x500.GeneralName.DirectoryName;
+import org.wildfly.security.sasl.util.AbstractSaslClient;
+import org.wildfly.security.x500.TrustedAuthority;
+
+/**
+ * SaslClient for the ISO/IEC 9798-3 authentication mechanism as defined by
+ * &lt;a href=&quot;https://tools.ietf.org/html/rfc3163&quot;&gt;RFC 3163&lt;/a&gt;.
+ *
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+final class EntitySaslClient extends AbstractSaslClient {
+
+    private static final int ST_CHALLENGE_RESPONSE = 1;
+    private static final int ST_RESPONSE_SENT = 2;
+
+    private final SecureRandom secureRandom;
+    private final Signature signature;
+    private final boolean mutual;
+    private final String serverName;
+    private byte[] randomA;
+    private byte[] randomB;
+    private X509Certificate[] clientCertChain;
+
+    EntitySaslClient(final String mechanismName, final boolean mutual, final Signature signature, final SecureRandom secureRandom, final String protocol,
+            final String serverName, final CallbackHandler callbackHandler, final String authorizationId) {
+<span class="nc" id="L74">        super(mechanismName, protocol, serverName, callbackHandler, authorizationId, false, saslEntity);</span>
+<span class="nc" id="L75">        this.signature = signature;</span>
+<span class="nc" id="L76">        this.secureRandom = secureRandom;</span>
+<span class="nc" id="L77">        this.mutual = mutual;</span>
+<span class="nc" id="L78">        this.serverName = serverName;</span>
+<span class="nc" id="L79">    }</span>
+
+    @Override
+    public void init() {
+<span class="nc" id="L83">        setNegotiationState(ST_CHALLENGE_RESPONSE);</span>
+<span class="nc" id="L84">    }</span>
+
+    @Override
+    protected byte[] evaluateMessage(final int state, final byte[] challenge) throws SaslException {
+<span class="nc bnc" id="L88" title="All 3 branches missed.">        switch (state) {</span>
+            case ST_CHALLENGE_RESPONSE: {
+<span class="nc" id="L90">                final DERDecoder decoder = new DERDecoder(challenge);</span>
+<span class="nc" id="L91">                List&lt;TrustedAuthority&gt; trustedAuthorities = null;</span>
+<span class="nc" id="L92">                List&lt;GeneralName&gt; entityB = null;</span>
+                try {
+                    // == Parse message ==
+<span class="nc" id="L95">                    decoder.startSequence();</span>
+
+                    // randomB
+<span class="nc" id="L98">                    randomB = decoder.decodeOctetString();</span>
+
+                    // entityB
+<span class="nc bnc" id="L101" title="All 4 branches missed.">                    if ((serverName != null) &amp;&amp; (! serverName.isEmpty())) {</span>
+<span class="nc" id="L102">                        entityB = new ArrayList&lt;GeneralName&gt;(1);</span>
+<span class="nc" id="L103">                        entityB.add(new DNSName(serverName));</span>
+                    }
+<span class="nc bnc" id="L105" title="All 2 branches missed.">                    if (decoder.isNextType(CONTEXT_SPECIFIC_MASK, 0, true)) {</span>
+<span class="nc" id="L106">                        decoder.decodeImplicit(0);</span>
+<span class="nc" id="L107">                        List&lt;GeneralName&gt; decodedEntityB = EntityUtil.decodeGeneralNames(decoder);</span>
+<span class="nc bnc" id="L108" title="All 4 branches missed.">                        if ((entityB != null) &amp;&amp; (! EntityUtil.matchGeneralNames(decodedEntityB, entityB))) {</span>
+<span class="nc" id="L109">                            throw saslEntity.mechServerIdentifierMismatch().toSaslException();</span>
+                        }
+                    }
+
+                    // certPref
+<span class="nc bnc" id="L114" title="All 2 branches missed.">                    if (decoder.isNextType(CONTEXT_SPECIFIC_MASK, 1, true)) {</span>
+<span class="nc" id="L115">                        decoder.decodeImplicit(1);</span>
+<span class="nc" id="L116">                        trustedAuthorities = EntityUtil.decodeTrustedAuthorities(decoder);</span>
+                    }
+<span class="nc" id="L118">                    decoder.endSequence();</span>
+<span class="nc" id="L119">                } catch (ASN1Exception e) {</span>
+<span class="nc" id="L120">                    throw saslEntity.mechInvalidServerMessageWithCause(e).toSaslException();</span>
+<span class="nc" id="L121">                }</span>
+
+                // == Send response ==
+
+                // Construct TokenAB, where:
+                // TokenAB ::= SEQUENCE {
+                //      randomA         RandomNumber,
+                //      entityB         [0] GeneralNames OPTIONAL,
+                //      certA           [1] CertData,
+                //      authId          [2] GeneralNames OPTIONAL,
+                //      signature       SIGNATURE { TBSDataAB }
+                // }
+                // TBSDataAB ::= SEQUENCE {
+                //      randomA         RandomNumber,
+                //      randomB         RandomNumber,
+                //      entityB         [0] GeneralNames OPTIONAL,
+                //      authId          [1] GeneralNames OPTIONAL
+                // }
+                // CertData ::= CHOICE {
+                //      certificateSet  SET SIZE (1..MAX) OF Certificate
+                //      certURL         IA5String (Note: No support for certificate URL)
+                // }
+                // SIGNATURE { ToBeSigned } ::= SEQUENCE {
+                //      algorithm       AlgorithmIdentifier,
+                //      signature       BIT STRING
+                // }
+<span class="nc" id="L147">                final DEREncoder encoder = new DEREncoder();</span>
+                try {
+<span class="nc" id="L149">                    encoder.startSequence();</span>
+
+                    // randomA
+<span class="nc" id="L152">                    randomA = EntityUtil.encodeRandomNumber(encoder, secureRandom);</span>
+
+                    // entityB
+<span class="nc bnc" id="L155" title="All 2 branches missed.">                    if (entityB != null) {</span>
+<span class="nc" id="L156">                        encoder.encodeImplicit(0);</span>
+<span class="nc" id="L157">                        EntityUtil.encodeGeneralNames(encoder, entityB);</span>
+                    }
+
+                    // certA (try obtaining a certificate chain)
+<span class="nc" id="L161">                    encoder.startExplicit(1);</span>
+<span class="nc" id="L162">                    TrustedAuthoritiesCallback trustedAuthoritiesCallback = new TrustedAuthoritiesCallback();</span>
+<span class="nc" id="L163">                    trustedAuthoritiesCallback.setTrustedAuthorities(trustedAuthorities); // Server's preferred certificates</span>
+<span class="nc" id="L164">                    CredentialCallback credentialCallback = new CredentialCallback(X509CertificateChainPrivateCredential.class, keyType(signature.getAlgorithm()));</span>
+
+                    PrivateKey privateKey;
+                    try {
+<span class="nc" id="L168">                        tryHandleCallbacks(trustedAuthoritiesCallback, credentialCallback);</span>
+<span class="nc" id="L169">                        final X509CertificateChainPrivateCredential clientCertChainPrivateCredential = credentialCallback.getCredential(X509CertificateChainPrivateCredential.class);</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">                        if (clientCertChainPrivateCredential != null) {</span>
+<span class="nc" id="L171">                            clientCertChain = clientCertChainPrivateCredential.getCertificateChain();</span>
+<span class="nc bnc" id="L172" title="All 4 branches missed.">                            if ((clientCertChain != null) &amp;&amp; (clientCertChain.length &gt; 0)) {</span>
+<span class="nc" id="L173">                                EntityUtil.encodeX509CertificateChain(encoder, clientCertChain);</span>
+                            } else {
+<span class="nc" id="L175">                                throw saslEntity.mechCallbackHandlerNotProvidedClientCertificate().toSaslException();</span>
+                            }
+<span class="nc" id="L177">                            privateKey = clientCertChainPrivateCredential.getPrivateKey();</span>
+                        } else {
+<span class="nc" id="L179">                            throw saslEntity.mechCallbackHandlerNotProvidedClientCertificate().toSaslException();</span>
+                        }
+<span class="nc" id="L181">                    } catch (UnsupportedCallbackException e) {</span>
+<span class="nc" id="L182">                        throw saslEntity.mechCallbackHandlerNotProvidedClientCertificate().toSaslException();</span>
+<span class="nc" id="L183">                    }</span>
+<span class="nc" id="L184">                    encoder.endExplicit();</span>
+
+                    // authId
+<span class="nc" id="L187">                    final String authorizationId = getAuthorizationId();</span>
+<span class="nc" id="L188">                    List&lt;GeneralName&gt; authId = null;</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">                    if (authorizationId != null) {</span>
+<span class="nc" id="L190">                        encoder.encodeImplicit(2);</span>
+                        // TODO: Will authorizationId be a distinguished name or is a callback needed to
+                        // determine the appropriate GeneralName type to use?
+<span class="nc" id="L193">                        authId = new ArrayList&lt;GeneralName&gt;(1);</span>
+<span class="nc" id="L194">                        authId.add(new DirectoryName(authorizationId));</span>
+<span class="nc" id="L195">                        EntityUtil.encodeGeneralNames(encoder, authId);</span>
+                    }
+
+                    // Private key
+<span class="nc bnc" id="L199" title="All 2 branches missed.">                    if (privateKey == null) {</span>
+<span class="nc" id="L200">                        throw saslEntity.mechCallbackHandlerNotProvidedPrivateKey().toSaslException();</span>
+                    }
+
+                    // TBSDataAB
+<span class="nc" id="L204">                    final DEREncoder tbsEncoder = new DEREncoder();</span>
+<span class="nc" id="L205">                    tbsEncoder.startSequence();</span>
+<span class="nc" id="L206">                    tbsEncoder.encodeOctetString(randomA);</span>
+<span class="nc" id="L207">                    tbsEncoder.encodeOctetString(randomB);</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">                    if (entityB != null) {</span>
+<span class="nc" id="L209">                        tbsEncoder.encodeImplicit(0);</span>
+<span class="nc" id="L210">                        EntityUtil.encodeGeneralNames(tbsEncoder, entityB);</span>
+                    }
+<span class="nc bnc" id="L212" title="All 2 branches missed.">                    if (authId != null) {</span>
+<span class="nc" id="L213">                        tbsEncoder.encodeImplicit(1);</span>
+<span class="nc" id="L214">                        EntityUtil.encodeGeneralNames(tbsEncoder, authId);</span>
+                    }
+<span class="nc" id="L216">                    tbsEncoder.endSequence();</span>
+
+                    // Signature
+                    byte[] signatureBytes;
+                    try {
+<span class="nc" id="L221">                        signature.initSign(privateKey);</span>
+<span class="nc" id="L222">                        signature.update(tbsEncoder.getEncoded());</span>
+<span class="nc" id="L223">                        signatureBytes = signature.sign();</span>
+<span class="nc" id="L224">                    } catch (SignatureException | InvalidKeyException e) {</span>
+<span class="nc" id="L225">                        throw saslEntity.mechUnableToCreateSignature(e).toSaslException();</span>
+<span class="nc" id="L226">                    }</span>
+
+<span class="nc" id="L228">                    encoder.startSequence();</span>
+<span class="nc" id="L229">                    EntityUtil.encodeAlgorithmIdentifier(encoder, signature.getAlgorithm());</span>
+<span class="nc" id="L230">                    encoder.encodeBitString(signatureBytes);</span>
+<span class="nc" id="L231">                    encoder.endSequence();</span>
+
+<span class="nc" id="L233">                    encoder.endSequence();</span>
+<span class="nc" id="L234">                } catch (ASN1Exception e) {</span>
+<span class="nc" id="L235">                    throw saslEntity.mechUnableToCreateResponseToken(e).toSaslException();</span>
+<span class="nc" id="L236">                }</span>
+<span class="nc" id="L237">                setNegotiationState(ST_RESPONSE_SENT);</span>
+<span class="nc" id="L238">                return encoder.getEncoded();</span>
+            }
+            case ST_RESPONSE_SENT: {
+<span class="nc bnc" id="L241" title="All 2 branches missed.">                if (mutual) {</span>
+<span class="nc" id="L242">                    final DERDecoder decoder = new DERDecoder(challenge);</span>
+<span class="nc" id="L243">                    List&lt;GeneralName&gt; entityA = null;</span>
+                    try {
+<span class="nc" id="L245">                        decoder.startSequence();</span>
+<span class="nc" id="L246">                        byte[] randomC = decoder.decodeOctetString();</span>
+
+<span class="nc bnc" id="L248" title="All 2 branches missed.">                        if (decoder.isNextType(CONTEXT_SPECIFIC_MASK, 0, true)) {</span>
+<span class="nc" id="L249">                            decoder.decodeImplicit(0);</span>
+<span class="nc" id="L250">                            entityA = EntityUtil.decodeGeneralNames(decoder);</span>
+                            // Verify that entityA matches the client's distinguishing identifier
+<span class="nc bnc" id="L252" title="All 2 branches missed.">                            if (! EntityUtil.matchGeneralNames(entityA, getClientCertificate())) {</span>
+<span class="nc" id="L253">                                throw saslEntity.mechClientIdentifierMismatch().toSaslException();</span>
+                            }
+                        }
+
+                        // Get the server's certificate data and verify it
+<span class="nc" id="L258">                        decoder.startExplicit(1);</span>
+<span class="nc" id="L259">                        final X509PeerCertificateChainEvidence evidence = new X509PeerCertificateChainEvidence(EntityUtil.decodeCertificateData(decoder));</span>
+<span class="nc" id="L260">                        decoder.endExplicit();</span>
+<span class="nc" id="L261">                        X509Certificate serverCert = evidence.getFirstCertificate();</span>
+
+<span class="nc" id="L263">                        EvidenceVerifyCallback evidenceVerifyCallback = new EvidenceVerifyCallback(evidence);</span>
+<span class="nc" id="L264">                        handleCallbacks(evidenceVerifyCallback);</span>
+<span class="nc bnc" id="L265" title="All 2 branches missed.">                        if (! evidenceVerifyCallback.isVerified()) {</span>
+<span class="nc" id="L266">                            throw saslEntity.mechServerAuthenticityCannotBeVerified().toSaslException();</span>
+                        }
+
+                        // Get the server's signature and verify it
+<span class="nc" id="L270">                        decoder.startSequence();</span>
+<span class="nc" id="L271">                        decoder.skipElement();</span>
+<span class="nc" id="L272">                        byte[] serverSignature = decoder.decodeBitString();</span>
+<span class="nc" id="L273">                        decoder.endSequence();</span>
+
+<span class="nc" id="L275">                        final DEREncoder tbsEncoder = new DEREncoder();</span>
+<span class="nc" id="L276">                        tbsEncoder.startSequence();</span>
+<span class="nc" id="L277">                        tbsEncoder.encodeOctetString(randomB);</span>
+<span class="nc" id="L278">                        tbsEncoder.encodeOctetString(randomA);</span>
+<span class="nc" id="L279">                        tbsEncoder.encodeOctetString(randomC);</span>
+<span class="nc bnc" id="L280" title="All 2 branches missed.">                        if (entityA != null) {</span>
+<span class="nc" id="L281">                            EntityUtil.encodeGeneralNames(tbsEncoder, entityA);</span>
+                        }
+<span class="nc" id="L283">                        tbsEncoder.endSequence();</span>
+
+                        try {
+<span class="nc" id="L286">                            signature.initVerify(serverCert);</span>
+<span class="nc" id="L287">                            signature.update(tbsEncoder.getEncoded());</span>
+<span class="nc bnc" id="L288" title="All 2 branches missed.">                            if (! signature.verify(serverSignature)) {</span>
+<span class="nc" id="L289">                                setNegotiationState(FAILED_STATE);</span>
+<span class="nc" id="L290">                                throw saslEntity.mechServerAuthenticityCannotBeVerified().toSaslException();</span>
+                            }
+<span class="nc" id="L292">                        } catch (SignatureException | InvalidKeyException e) {</span>
+<span class="nc" id="L293">                            throw saslEntity.mechUnableToVerifyServerSignature(e).toSaslException();</span>
+<span class="nc" id="L294">                        }</span>
+<span class="nc" id="L295">                        decoder.endSequence();</span>
+<span class="nc" id="L296">                    } catch (ASN1Exception e) {</span>
+<span class="nc" id="L297">                        throw saslEntity.mechInvalidServerMessageWithCause(e).toSaslException();</span>
+<span class="nc" id="L298">                    }</span>
+<span class="nc" id="L299">                } else {</span>
+<span class="nc bnc" id="L300" title="All 4 branches missed.">                    if (challenge != null &amp;&amp; challenge.length != 0) {</span>
+<span class="nc" id="L301">                        throw saslEntity.mechServerSentExtraMessage().toSaslException();</span>
+                    }
+                }
+<span class="nc" id="L304">                negotiationComplete();</span>
+<span class="nc" id="L305">                return null;</span>
+            }
+        }
+<span class="nc" id="L308">        throw Assert.impossibleSwitchCase(state);</span>
+    }
+
+    @Override
+    public void dispose() throws SaslException {
+<span class="nc" id="L313">        clientCertChain = null;</span>
+<span class="nc" id="L314">    }</span>
+
+    private X509Certificate getClientCertificate() throws SaslException {
+<span class="nc bnc" id="L317" title="All 4 branches missed.">        if (clientCertChain == null || clientCertChain.length == 0) throw saslEntity.mechCallbackHandlerNotProvidedServerCertificate().toSaslException();</span>
+<span class="nc" id="L318">        return clientCertChain[0];</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractDigestFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl-digest</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.digest</a> &gt; <span class="el_source">AbstractDigestFactory.java</span></div><h1>AbstractDigestFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.digest;
+
+import java.util.Map;
+
+import javax.security.sasl.Sasl;
+
+import org.wildfly.security.sasl.WildFlySasl;
+import org.wildfly.security.sasl.util.SaslMechanismInformation;
+
+/**
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+<span class="nc" id="L31">abstract class AbstractDigestFactory {</span>
+
+<span class="nc" id="L33">    private static final String[] MECHS = {</span>
+        SaslMechanismInformation.Names.DIGEST_SHA_512,
+        SaslMechanismInformation.Names.DIGEST_SHA_512_256,
+        SaslMechanismInformation.Names.DIGEST_SHA_256,
+        SaslMechanismInformation.Names.DIGEST_SHA_384,
+        SaslMechanismInformation.Names.DIGEST_SHA,
+        SaslMechanismInformation.Names.DIGEST_MD5,
+    };
+<span class="nc" id="L41">    private static final String[] NO_MECHS = new String[0];</span>
+
+    @SuppressWarnings(&quot;RedundantIfStatement&quot;)
+    boolean matches(final Map&lt;String, ?&gt; props, boolean query) {
+<span class="nc bnc" id="L45" title="All 2 branches missed.">        if (props == null) return true;</span>
+<span class="nc bnc" id="L46" title="All 4 branches missed.">        if (&quot;true&quot;.equals(props.get(WildFlySasl.MECHANISM_QUERY_ALL)) &amp;&amp; query) {</span>
+<span class="nc" id="L47">            return true;</span>
+        }
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        if (&quot;true&quot;.equals(props.get(Sasl.POLICY_FORWARD_SECRECY))</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">            || &quot;true&quot;.equals(props.get(Sasl.POLICY_PASS_CREDENTIALS))</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">            || &quot;true&quot;.equals(props.get(Sasl.POLICY_NODICTIONARY))</span>
+<span class="nc bnc" id="L52" title="All 2 branches missed.">            || &quot;true&quot;.equals(props.get(Sasl.POLICY_NOACTIVE))) {</span>
+<span class="nc" id="L53">            return false;</span>
+        }
+<span class="nc" id="L55">        return true;</span>
+    }
+
+    boolean matchesMech(String mechanismName) {
+<span class="nc bnc" id="L59" title="All 2 branches missed.">        switch (mechanismName) {</span>
+            case SaslMechanismInformation.Names.DIGEST_MD5:
+            case SaslMechanismInformation.Names.DIGEST_SHA:
+            case SaslMechanismInformation.Names.DIGEST_SHA_256:
+            case SaslMechanismInformation.Names.DIGEST_SHA_384:
+            case SaslMechanismInformation.Names.DIGEST_SHA_512:
+            case SaslMechanismInformation.Names.DIGEST_SHA_512_256: {
+<span class="nc" id="L66">                return true;</span>
+            }
+        }
+<span class="nc" id="L69">        return false;</span>
+    }
+
+    String select(String[] mechanismNames) {
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        for (String mechanismName : mechanismNames) {</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">            if (matchesMech(mechanismName)) return mechanismName;</span>
+        }
+<span class="nc" id="L76">        return null;</span>
+    }
+
+    public String[] getMechanismNames(final Map&lt;String, ?&gt; props) {
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        return matches(props, true) ? MECHS.clone() : NO_MECHS;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NodesRegistrationManagement.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-oidc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.oidc</a> &gt; <span class="el_source">NodesRegistrationManagement.java</span></div><h1>NodesRegistrationManagement.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2021 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.http.oidc;
+
+import static org.wildfly.security.http.oidc.ElytronMessages.log;
+import static org.wildfly.security.http.oidc.Oidc.getCurrentTimeInSeconds;
+
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.Collection;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+/**
+ * Used for clustering with Keycloak.
+ *
+ * @author &lt;a href=&quot;mailto:mposolda@redhat.com&quot;&gt;Marek Posolda&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+<span class="nc" id="L39">public class NodesRegistrationManagement {</span>
+
+<span class="nc" id="L41">    private final Map&lt;String, NodeRegistrationContext&gt; nodeRegistrations = new ConcurrentHashMap&lt;String, NodeRegistrationContext&gt;();</span>
+<span class="nc" id="L42">    private final ExecutorService executor = Executors.newSingleThreadExecutor();</span>
+
+    // Sending registration event during first request to application or if re-registration is needed
+    public void tryRegister(final OidcClientConfiguration resolvedDeployment) {
+<span class="nc bnc" id="L46" title="All 2 branches missed.">        if (resolvedDeployment.isRegisterNodeAtStartup()) {</span>
+<span class="nc" id="L47">            final String registrationUri = resolvedDeployment.getRegisterNodeUrl();</span>
+<span class="nc bnc" id="L48" title="All 2 branches missed.">            if (needRefreshRegistration(registrationUri, resolvedDeployment)) {</span>
+<span class="nc" id="L49">                Runnable runnable = new Runnable() {</span>
+
+                    @Override
+                    public void run() {
+                        // Need to check it again in case that executor triggered by other thread already finished computation in the meantime
+<span class="nc bnc" id="L54" title="All 2 branches missed.">                        if (needRefreshRegistration(registrationUri, resolvedDeployment)) {</span>
+<span class="nc" id="L55">                            sendRegistrationEvent(resolvedDeployment);</span>
+                        }
+<span class="nc" id="L57">                    }</span>
+                };
+<span class="nc" id="L59">                executor.execute(runnable);</span>
+            }
+        }
+<span class="nc" id="L62">    }</span>
+
+    private boolean needRefreshRegistration(String registrationUri, OidcClientConfiguration resolvedDeployment) {
+<span class="nc" id="L65">        NodeRegistrationContext currentRegistration = nodeRegistrations.get(registrationUri);</span>
+        /// We don't yet have any registration for this node
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        if (currentRegistration == null) {</span>
+<span class="nc" id="L68">            return true;</span>
+        }
+
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        return currentRegistration.lastRegistrationTime + resolvedDeployment.getRegisterNodePeriod() &lt; getCurrentTimeInSeconds();</span>
+    }
+
+    /**
+     * Called during undeployment or server stop. De-register from all previously registered deployments
+     */
+    public void stop() {
+<span class="nc" id="L78">        executor.shutdownNow();</span>
+
+<span class="nc" id="L80">        Collection&lt;NodeRegistrationContext&gt; allRegistrations = nodeRegistrations.values();</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        for (NodeRegistrationContext registration : allRegistrations) {</span>
+<span class="nc" id="L82">            sendUnregistrationEvent(registration.resolvedDeployment);</span>
+<span class="nc" id="L83">        }</span>
+<span class="nc" id="L84">    }</span>
+
+    protected void sendRegistrationEvent(OidcClientConfiguration deployment) {
+        // This method is invoked from single-thread executor, so no synchronization is needed
+        // However, it could happen that the same deployment was submitted more than once to that executor
+        // Hence we need to recheck that the registration is really needed
+<span class="nc" id="L90">        final String registrationUri = deployment.getRegisterNodeUrl();</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">        if (! needRefreshRegistration(registrationUri, deployment)) {</span>
+<span class="nc" id="L92">            return;</span>
+        }
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        if (Thread.currentThread().isInterrupted()) {</span>
+<span class="nc" id="L95">            return;</span>
+        }
+
+<span class="nc" id="L98">        log.debug(&quot;Sending registration event right now&quot;);</span>
+
+<span class="nc" id="L100">        String host = getHostName();</span>
+        try {
+<span class="nc" id="L102">            ServerRequest.invokeRegisterNodeForKeycloak(deployment, host);</span>
+<span class="nc" id="L103">            NodeRegistrationContext regContext = new NodeRegistrationContext(getCurrentTimeInSeconds(), deployment);</span>
+<span class="nc" id="L104">            nodeRegistrations.put(deployment.getRegisterNodeUrl(), regContext);</span>
+<span class="nc" id="L105">            log.debugf(&quot;Node '%s' successfully registered in Keycloak&quot;, host);</span>
+<span class="nc" id="L106">        } catch (ServerRequest.HttpFailure failure) {</span>
+<span class="nc" id="L107">            log.error(&quot;failed to register node to keycloak&quot;);</span>
+<span class="nc" id="L108">            log.error(&quot;status from server: &quot; + failure.getStatus());</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">            if (failure.getError() != null) {</span>
+<span class="nc" id="L110">                log.error(&quot;   &quot; + failure.getError());</span>
+            }
+<span class="nc" id="L112">        } catch (IOException e) {</span>
+<span class="nc" id="L113">            log.error(&quot;failed to register node to keycloak&quot;, e);</span>
+<span class="nc" id="L114">        }</span>
+<span class="nc" id="L115">    }</span>
+
+    protected boolean sendUnregistrationEvent(OidcClientConfiguration deployment) {
+<span class="nc" id="L118">        log.debug(&quot;Sending Unregistration event right now&quot;);</span>
+
+<span class="nc" id="L120">        String host = getHostName();</span>
+        try {
+<span class="nc" id="L122">            ServerRequest.invokeUnregisterNodeForKeycloak(deployment, host);</span>
+<span class="nc" id="L123">            log.debugf(&quot;Node '%s' successfully unregistered from Keycloak&quot;, host);</span>
+<span class="nc" id="L124">            return true;</span>
+<span class="nc" id="L125">        } catch (ServerRequest.HttpFailure failure) {</span>
+<span class="nc" id="L126">            log.error(&quot;failed to unregister node from keycloak&quot;);</span>
+<span class="nc" id="L127">            log.error(&quot;status from server: &quot; + failure.getStatus());</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">            if (failure.getError() != null) {</span>
+<span class="nc" id="L129">                log.error(&quot;   &quot; + failure.getError());</span>
+            }
+<span class="nc" id="L131">            return false;</span>
+<span class="nc" id="L132">        } catch (IOException e) {</span>
+<span class="nc" id="L133">            log.error(&quot;failed to unregister node from keycloak&quot;, e);</span>
+<span class="nc" id="L134">            return false;</span>
+        }
+    }
+
+    public static class NodeRegistrationContext {
+
+        private final Integer lastRegistrationTime;
+        // deployment instance used for registration request
+        private final OidcClientConfiguration resolvedDeployment;
+
+<span class="nc" id="L144">        public NodeRegistrationContext(Integer lastRegTime, OidcClientConfiguration deployment) {</span>
+<span class="nc" id="L145">            this.lastRegistrationTime = lastRegTime;</span>
+<span class="nc" id="L146">            this.resolvedDeployment = deployment;</span>
+<span class="nc" id="L147">        }</span>
+    }
+
+    private static String getHostName() {
+<span class="nc" id="L151">        return getHostNameImpl().trim().toLowerCase();</span>
+    }
+
+    private static String getHostNameImpl() {
+        // Return bind address if available
+<span class="nc" id="L156">        String bindAddr = System.getProperty(&quot;jboss.bind.address&quot;);</span>
+<span class="nc bnc" id="L157" title="All 4 branches missed.">        if (bindAddr != null &amp;&amp; !bindAddr.trim().equals(&quot;0.0.0.0&quot;)) {</span>
+<span class="nc" id="L158">            return bindAddr;</span>
+        }
+
+        // Fallback to qualified name
+<span class="nc" id="L162">        String qualifiedHostName = System.getProperty(&quot;jboss.qualified.host.name&quot;);</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        if (qualifiedHostName != null) {</span>
+<span class="nc" id="L164">            return qualifiedHostName;</span>
+        }
+
+        // If not on jboss env, let's try other possible fallbacks
+        // POSIX-like OSes including Mac should have this set
+<span class="nc" id="L169">        qualifiedHostName = System.getenv(&quot;HOSTNAME&quot;);</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">        if (qualifiedHostName != null) {</span>
+<span class="nc" id="L171">            return qualifiedHostName;</span>
+        }
+
+        // Certain versions of Windows
+<span class="nc" id="L175">        qualifiedHostName = System.getenv(&quot;COMPUTERNAME&quot;);</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        if (qualifiedHostName != null) {</span>
+<span class="nc" id="L177">            return qualifiedHostName;</span>
+        }
+
+        try {
+<span class="nc" id="L181">            return NetworkUtils.canonize(getLocalHost().getHostName());</span>
+<span class="nc" id="L182">        } catch (UnknownHostException uhe) {</span>
+<span class="nc" id="L183">            uhe.printStackTrace();</span>
+<span class="nc" id="L184">            return &quot;unknown-host.unknown-domain&quot;;</span>
+        }
+    }
+
+    /**
+     * Methods returns InetAddress for localhost
+     *
+     * @return InetAddress of the localhost
+     * @throws UnknownHostException if localhost could not be resolved
+     */
+    private static InetAddress getLocalHost() throws UnknownHostException {
+        InetAddress addr;
+        try {
+<span class="nc" id="L197">            addr = InetAddress.getLocalHost();</span>
+<span class="nc" id="L198">        } catch (ArrayIndexOutOfBoundsException e) {</span>
+<span class="nc" id="L199">            addr = InetAddress.getByName(null);</span>
+<span class="nc" id="L200">        }</span>
+<span class="nc" id="L201">        return addr;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

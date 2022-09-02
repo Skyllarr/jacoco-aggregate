@@ -1,0 +1,352 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractSaslParticipant.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.util</a> &gt; <span class="el_source">AbstractSaslParticipant.java</span></div><h1>AbstractSaslParticipant.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.util;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.mechanism._private.ElytronMessages;
+
+import java.util.Map;
+
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.sasl.SaslException;
+
+/**
+ * A common base class for SASL participants.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public abstract class AbstractSaslParticipant implements SaslWrapper {
+
+    /**
+     * An empty byte array.
+     */
+<span class="fc" id="L41">    public static final byte[] NO_BYTES = new byte[0];</span>
+
+    /**
+     * The SASL negotiation failure state.
+     */
+    public static final int FAILED_STATE = -1;
+
+    /**
+     * The SASL negotiation completed state.
+     */
+    public static final int COMPLETE_STATE = 0;
+
+    private final String mechanismName;
+    private final CallbackHandler callbackHandler;
+    private final String protocol;
+    private final String serverName;
+    private ElytronMessages log;
+    private org.wildfly.security.sasl._private.ElytronMessages legacyLog;
+
+<span class="pc" id="L60">    private int state = -1;</span>
+    private SaslWrapper wrapper;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param mechanismName the name of the defined mechanism
+     * @param protocol the protocol
+     * @param serverName the server name
+     * @param callbackHandler the callback handler
+     * @param log mechanism specific logger
+     */
+<span class="fc" id="L72">    protected AbstractSaslParticipant(final String mechanismName, final String protocol, final String serverName, final CallbackHandler callbackHandler, ElytronMessages log) {</span>
+<span class="fc" id="L73">        this.callbackHandler = callbackHandler;</span>
+<span class="fc" id="L74">        this.mechanismName = mechanismName;</span>
+<span class="fc" id="L75">        this.protocol = protocol;</span>
+<span class="fc" id="L76">        this.serverName = serverName;</span>
+<span class="fc" id="L77">        this.log = log;</span>
+<span class="fc" id="L78">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param mechanismName the name of the defined mechanism
+     * @param protocol the protocol
+     * @param serverName the server name
+     * @param callbackHandler the callback handler
+     */
+    @Deprecated
+<span class="nc" id="L89">    protected AbstractSaslParticipant(final String mechanismName, final String protocol, final String serverName, final CallbackHandler callbackHandler) {</span>
+<span class="nc" id="L90">        this.callbackHandler = callbackHandler;</span>
+<span class="nc" id="L91">        this.mechanismName = mechanismName;</span>
+<span class="nc" id="L92">        this.protocol = protocol;</span>
+<span class="nc" id="L93">        this.serverName = serverName;</span>
+<span class="nc" id="L94">        this.legacyLog = org.wildfly.security.sasl._private.ElytronMessages.sasl;</span>
+<span class="nc" id="L95">    }</span>
+
+    /**
+     * Handle callbacks, wrapping exceptions as needed (including unsupported callbacks).
+     *
+     * @param callbacks the callbacks to handle
+     * @throws SaslException if a callback failed
+     */
+    protected void handleCallbacks(Callback... callbacks) throws SaslException {
+        try {
+<span class="nc" id="L105">            tryHandleCallbacks(callbacks);</span>
+<span class="nc" id="L106">        } catch (UnsupportedCallbackException e) {</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">            throw log != null ? log.mechCallbackHandlerFailedForUnknownReason(e).toSaslException() : legacyLog.mechCallbackHandlerFailedForUnknownReason(e).toSaslException();</span>
+<span class="nc" id="L108">        }</span>
+<span class="nc" id="L109">    }</span>
+
+    /**
+     * Handle callbacks, wrapping exceptions as needed.
+     *
+     * @param callbacks the callbacks to handle
+     * @throws SaslException if a callback failed
+     * @throws UnsupportedCallbackException if a callback isn't supported
+     */
+    protected void tryHandleCallbacks(Callback... callbacks) throws SaslException, UnsupportedCallbackException {
+<span class="nc" id="L119">        Assert.checkNotNullParam(&quot;callbackHandler&quot;, callbackHandler);</span>
+        try {
+<span class="nc" id="L121">            callbackHandler.handle(callbacks);</span>
+<span class="nc" id="L122">        } catch (SaslException | UnsupportedCallbackException e) {</span>
+<span class="nc" id="L123">            throw e;</span>
+<span class="nc" id="L124">        } catch (Throwable t) {</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">            throw log != null ? log.mechCallbackHandlerFailedForUnknownReason(t).toSaslException() : legacyLog.mechCallbackHandlerFailedForUnknownReason(t).toSaslException();</span>
+<span class="nc" id="L126">        }</span>
+<span class="nc" id="L127">    }</span>
+
+<span class="nc" id="L129">    public void init() {}</span>
+
+    /**
+     * Get the name of this mechanism.
+     *
+     * @return the mechanism name
+     */
+    public String getMechanismName() {
+<span class="nc" id="L137">        return mechanismName;</span>
+    }
+
+    /**
+     * Get the protocol name.
+     *
+     * @return the protocol name
+     */
+    protected String getProtocol() {
+<span class="nc" id="L146">        return protocol;</span>
+    }
+
+    /**
+     * Get the server name.
+     *
+     * @return the server name
+     */
+    protected String getServerName() {
+<span class="nc" id="L155">        return serverName;</span>
+    }
+
+    /**
+     * Get the configured authentication callback handler.
+     *
+     * @return the callback handler
+     */
+    protected CallbackHandler getCallbackHandler() {
+<span class="nc" id="L164">        return callbackHandler;</span>
+    }
+
+    /**
+     * Get the current configured SASL wrapper, if any.
+     *
+     * @return the SASL wrapper, or {@code null} if none is configured
+     */
+    protected SaslWrapper getWrapper() {
+<span class="nc" id="L173">        return wrapper;</span>
+    }
+
+    /**
+     * Set the state to use for the next incoming message.
+     *
+     * @param newState the new state
+     */
+    public void setNegotiationState(final int newState) {
+<span class="nc" id="L182">        state = newState;</span>
+<span class="nc" id="L183">    }</span>
+
+    /**
+     * Indicate that negotiation is complete.  To re-initiate negotiation, call {@link #setNegotiationState(int)}.
+     */
+    public void negotiationComplete() {
+<span class="nc" id="L189">        state = COMPLETE_STATE;</span>
+<span class="nc" id="L190">        final String msg = &quot;SASL Negotiation Completed&quot;;</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        if (log != null) {</span>
+<span class="nc" id="L192">            log.tracef(msg);</span>
+        } else {
+<span class="nc" id="L194">            legacyLog.tracef(msg);</span>
+        }
+<span class="nc" id="L196">    }</span>
+
+    protected byte[] evaluateMessage(final byte[] message) throws SaslException {
+<span class="nc" id="L199">        boolean ok = false;</span>
+        try {
+<span class="nc bnc" id="L201" title="All 2 branches missed.">            if (state == COMPLETE_STATE) {</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">                throw log != null ? log.mechMessageAfterComplete().toSaslException() : legacyLog.mechMessageAfterComplete().toSaslException();</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">            } else if (state == FAILED_STATE) {</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">                throw log != null ? log.mechAuthenticationFailed().toSaslException() : legacyLog.mechAuthenticationFailed().toSaslException();</span>
+            }
+<span class="nc" id="L206">            byte[] result = evaluateMessage(state, message);</span>
+<span class="nc" id="L207">            ok = true;</span>
+<span class="nc" id="L208">            return result;</span>
+        } finally {
+<span class="nc bnc" id="L210" title="All 2 branches missed.">            if (! ok) {</span>
+<span class="nc" id="L211">                state = FAILED_STATE;</span>
+<span class="nc" id="L212">                final String msg = &quot;SASL Negotiation Failed&quot;;</span>
+<span class="nc bnc" id="L213" title="All 2 branches missed.">                if (log != null) {</span>
+<span class="nc" id="L214">                    log.tracef(msg);</span>
+                } else {
+<span class="nc" id="L216">                    legacyLog.tracef(msg);</span>
+                }
+            }
+        }
+    }
+
+    protected abstract byte[] evaluateMessage(int state, final byte[] message) throws SaslException;
+
+    /**
+     * Set the current configured SASL wrapper, if any.
+     *
+     * @param wrapper the SASL wrapper, or {@code null} to disable wrapping
+     */
+    protected void setWrapper(final SaslWrapper wrapper) {
+<span class="nc" id="L230">        this.wrapper = wrapper;</span>
+<span class="nc" id="L231">    }</span>
+
+    /**
+     * Wraps a byte array to be sent to the other participant.
+     *
+     * @param outgoing a non-{@code null} byte array containing the bytes to encode
+     * @param offset the first byte to encode
+     * @param len the number of bytes to use
+     * @return A non-{@code null} byte array containing the encoded bytes
+     * @exception SaslException if wrapping fails
+     * @exception IllegalStateException if wrapping is not configured
+     */
+    public byte[] wrap(final byte[] outgoing, final int offset, final int len) throws SaslException {
+<span class="nc bnc" id="L244" title="All 4 branches missed.">        if (isComplete() == false) throw log != null ? log.mechAuthenticationNotComplete() : legacyLog.mechAuthenticationNotComplete();</span>
+<span class="nc" id="L245">        SaslWrapper wrapper = this.wrapper;</span>
+<span class="nc bnc" id="L246" title="All 2 branches missed.">        if (wrapper == null) {</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">            throw log != null ? log.wrappingNotConfigured() : legacyLog.wrappingNotConfigured();</span>
+        }
+<span class="nc bnc" id="L249" title="All 2 branches missed.">        if(len == 0) {</span>
+<span class="nc" id="L250">            return NO_BYTES;</span>
+        }
+<span class="nc" id="L252">        return wrapper.wrap(outgoing, offset, len);</span>
+    }
+
+    /**
+     * Unwraps a byte array received from the other participant.
+     *
+     * @param incoming a non-{@code null} byte array containing the bytes to decode
+     * @param offset the first byte to decode
+     * @param len the number of bytes to use
+     * @return A non-{@code null} byte array containing the decoded bytes
+     * @exception SaslException if wrapping fails
+     * @exception IllegalStateException if wrapping is not configured
+     */
+    public byte[] unwrap(final byte[] incoming, final int offset, final int len) throws SaslException {
+<span class="nc bnc" id="L266" title="All 2 branches missed.">        if (isComplete() == false) throw log.mechAuthenticationNotComplete();</span>
+<span class="nc" id="L267">        SaslWrapper wrapper = this.wrapper;</span>
+<span class="nc bnc" id="L268" title="All 2 branches missed.">        if (wrapper == null) {</span>
+<span class="nc" id="L269">            throw log.wrappingNotConfigured();</span>
+        }
+<span class="nc bnc" id="L271" title="All 2 branches missed.">        if(len == 0) {</span>
+<span class="nc" id="L272">            return NO_BYTES;</span>
+        }
+<span class="nc" id="L274">        return wrapper.unwrap(incoming, offset, len);</span>
+    }
+
+    /**
+     * Determine whether the authentication exchange has completed.
+     *
+     * @return {@code true} if the exchange has completed
+     */
+    public boolean isComplete() {
+<span class="nc bnc" id="L283" title="All 2 branches missed.">        return state == COMPLETE_STATE;</span>
+    }
+
+    /**
+     * A convenience method to throw a {@link IllegalStateException} is authentication is not yet complete.
+     *
+     * To be called by methods that must only be called after authentication is complete.
+     */
+    protected void assertComplete() {
+<span class="nc bnc" id="L292" title="All 2 branches missed.">        if (isComplete() == false) {</span>
+<span class="nc" id="L293">            throw log.mechAuthenticationNotComplete();</span>
+        }
+<span class="nc" id="L295">    }</span>
+
+    /**
+     * Get a property negotiated between this participant and the other.
+     *
+     * @param propName the property name
+     * @return the property value or {@code null} if not defined
+     */
+    public Object getNegotiatedProperty(final String propName) {
+<span class="nc" id="L304">        assertComplete();</span>
+<span class="nc" id="L305">        return null;</span>
+    }
+
+    /**
+     * Get a string property value from the given map.
+     *
+     * @param map the property map
+     * @param key the property
+     * @param defaultVal the value to return if the key is not in the map
+     * @return the value
+     */
+    public String getStringProperty(Map&lt;String, ?&gt; map, String key, String defaultVal) {
+<span class="nc" id="L317">        final Object val = map.get(key);</span>
+<span class="nc bnc" id="L318" title="All 2 branches missed.">        if (val == null) {</span>
+<span class="nc" id="L319">            return defaultVal;</span>
+        } else {
+<span class="nc" id="L321">            return String.valueOf(val);</span>
+        }
+    }
+
+    /**
+     * Get a string property value from the given map.
+     *
+     * @param map the property map
+     * @param key the property
+     * @param defaultVal the value to return if the key is not in the map
+     * @return the value
+     */
+    public int getIntProperty(Map&lt;String, ?&gt; map, String key, int defaultVal) {
+<span class="nc" id="L334">        final Object val = map.get(key);</span>
+<span class="nc bnc" id="L335" title="All 2 branches missed.">        if (val == null) {</span>
+<span class="nc" id="L336">            return defaultVal;</span>
+        } else {
+<span class="nc" id="L338">            return Integer.parseInt(val.toString());</span>
+        }
+    }
+
+
+
+    /**
+     * Dispose of this participant.
+     *
+     * @throws SaslException if disposal failed
+     */
+    public void dispose() throws SaslException {
+<span class="nc" id="L350">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

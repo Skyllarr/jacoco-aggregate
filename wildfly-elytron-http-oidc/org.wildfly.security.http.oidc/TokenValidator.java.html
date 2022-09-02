@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TokenValidator.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-oidc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.oidc</a> &gt; <span class="el_source">TokenValidator.java</span></div><h1>TokenValidator.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2021 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.http.oidc;
+
+import static org.wildfly.security.http.oidc.ElytronMessages.log;
+import static org.wildfly.security.http.oidc.IDToken.AT_HASH;
+import static org.wildfly.security.http.oidc.Oidc.INVALID_AT_HASH_CLAIM;
+import static org.wildfly.security.http.oidc.Oidc.INVALID_ISSUED_FOR_CLAIM;
+import static org.wildfly.security.http.oidc.Oidc.INVALID_TYPE_CLAIM;
+import static org.wildfly.security.http.oidc.Oidc.getJavaAlgorithmForHash;
+import static org.wildfly.security.jose.jwk.JWKUtil.BASE64_URL;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
+
+import javax.crypto.SecretKey;
+
+import org.jose4j.jwa.AlgorithmConstraints;
+import org.jose4j.jwt.JwtClaims;
+import org.jose4j.jwt.MalformedClaimException;
+import org.jose4j.jwt.consumer.ErrorCodeValidator;
+import org.jose4j.jwt.consumer.InvalidJwtException;
+import org.jose4j.jwt.consumer.JwtConsumer;
+import org.jose4j.jwt.consumer.JwtConsumerBuilder;
+import org.jose4j.jwt.consumer.JwtContext;
+import org.wildfly.common.Assert;
+import org.wildfly.common.iteration.ByteIterator;
+
+/**
+ * Validator for an ID token or bearer token, as per &lt;a href=&quot;https://openid.net/specs/openid-connect-core-1_0.html&quot;&gt;OpenID Connect Core 1.0&lt;/a&gt;
+ * and &lt;a href=&quot;https://datatracker.ietf.org/doc/html/rfc7523&quot;&gt;RFC 7523&lt;/a&gt;&lt;/a&gt;.
+ *
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+public class TokenValidator {
+
+    private static final int HEADER_INDEX = 0;
+    private JwtConsumerBuilder jwtConsumerBuilder;
+    private OidcClientConfiguration clientConfiguration;
+
+<span class="nc" id="L59">    private TokenValidator(Builder builder) {</span>
+<span class="nc" id="L60">        this.jwtConsumerBuilder = builder.jwtConsumerBuilder;</span>
+<span class="nc" id="L61">        this.clientConfiguration = builder.clientConfiguration;</span>
+<span class="nc" id="L62">    }</span>
+
+    /**
+     * Parse and verify the given ID token.
+     *
+     * @param idToken the ID token
+     * @return the {@code VerifiedTokens} if the ID token was valid
+     * @throws OidcException if the ID token is invalid
+     */
+    public VerifiedTokens parseAndVerifyToken(final String idToken, final String accessToken) throws OidcException {
+        try {
+<span class="nc" id="L73">            JwtContext idJwtContext = setVerificationKey(idToken, jwtConsumerBuilder);</span>
+<span class="nc" id="L74">            jwtConsumerBuilder.setExpectedAudience(clientConfiguration.getResourceName());</span>
+<span class="nc" id="L75">            jwtConsumerBuilder.registerValidator(new AzpValidator(clientConfiguration.getResourceName()));</span>
+<span class="nc" id="L76">            jwtConsumerBuilder.registerValidator(new AtHashValidator(accessToken, clientConfiguration.getTokenSignatureAlgorithm()));</span>
+            // second pass to validate
+<span class="nc" id="L78">            jwtConsumerBuilder.build().processContext(idJwtContext);</span>
+<span class="nc" id="L79">            JwtClaims idJwtClaims = idJwtContext.getJwtClaims();</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">            if (idJwtClaims == null) {</span>
+<span class="nc" id="L81">                throw log.invalidIDTokenClaims();</span>
+            }
+<span class="nc" id="L83">            JwtClaims jwtClaims = new JwtConsumerBuilder().setSkipSignatureVerification().setSkipAllValidators().build().processToClaims(accessToken);</span>
+<span class="nc" id="L84">            return new VerifiedTokens(new IDToken(idJwtClaims), new AccessToken(jwtClaims));</span>
+<span class="nc" id="L85">        } catch (InvalidJwtException e) {</span>
+<span class="nc" id="L86">            log.tracef(&quot;Problem parsing ID token: &quot; + idToken, e);</span>
+<span class="nc" id="L87">            throw log.invalidIDToken(e);</span>
+        }
+    }
+
+    /**
+     * Parse and verify the given bearer token.
+     *
+     * @param bearerToken the bearer token
+     * @return the {@code AccessToken} if the bearer token was valid
+     * @throws OidcException if the bearer token is invalid
+     */
+    public AccessToken parseAndVerifyToken(final String bearerToken) throws OidcException {
+        try {
+<span class="nc" id="L100">            JwtContext jwtContext = setVerificationKey(bearerToken, jwtConsumerBuilder);</span>
+<span class="nc" id="L101">            jwtConsumerBuilder.setRequireSubject();</span>
+<span class="nc" id="L102">            jwtConsumerBuilder.registerValidator(new TypeValidator(&quot;Bearer&quot;));</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">            if (clientConfiguration.isVerifyTokenAudience()) {</span>
+<span class="nc" id="L104">                jwtConsumerBuilder.setExpectedAudience(clientConfiguration.getResourceName());</span>
+            } else {
+<span class="nc" id="L106">                jwtConsumerBuilder.setSkipDefaultAudienceValidation();</span>
+            }
+            // second pass to validate
+<span class="nc" id="L109">            jwtConsumerBuilder.build().processContext(jwtContext);</span>
+<span class="nc" id="L110">            JwtClaims jwtClaims = jwtContext.getJwtClaims();</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">            if (jwtClaims == null) {</span>
+<span class="nc" id="L112">                throw log.invalidBearerTokenClaims();</span>
+            }
+<span class="nc" id="L114">            return new AccessToken(jwtClaims);</span>
+<span class="nc" id="L115">        } catch (InvalidJwtException e) {</span>
+<span class="nc" id="L116">            log.tracef(&quot;Problem parsing bearer token: &quot; + bearerToken, e);</span>
+<span class="nc" id="L117">            throw log.invalidBearerToken(e);</span>
+        }
+    }
+
+    private JwtContext setVerificationKey(final String token, final JwtConsumerBuilder jwtConsumerBuilder) throws InvalidJwtException {
+        // first pass to determine the kid, if present
+<span class="nc" id="L123">        JwtConsumer firstPassJwtConsumer = new JwtConsumerBuilder()</span>
+<span class="nc" id="L124">                .setSkipAllValidators()</span>
+<span class="nc" id="L125">                .setDisableRequireSignature()</span>
+<span class="nc" id="L126">                .setSkipSignatureVerification()</span>
+<span class="nc" id="L127">                .build();</span>
+<span class="nc" id="L128">        JwtContext jwtContext = firstPassJwtConsumer.process(token);</span>
+<span class="nc" id="L129">        String kid =  jwtContext.getJoseObjects().get(HEADER_INDEX).getKeyIdHeaderValue();</span>
+<span class="nc bnc" id="L130" title="All 4 branches missed.">        if (kid != null &amp;&amp; clientConfiguration.getPublicKeyLocator() != null) {</span>
+<span class="nc" id="L131">            jwtConsumerBuilder.setVerificationKey(clientConfiguration.getPublicKeyLocator().getPublicKey(kid, clientConfiguration));</span>
+        } else {
+            // secret key
+<span class="nc" id="L134">            ClientSecretCredentialsProvider clientSecretCredentialsProvider = (ClientSecretCredentialsProvider) clientConfiguration.getClientAuthenticator();</span>
+<span class="nc" id="L135">            jwtConsumerBuilder.setVerificationKey(clientSecretCredentialsProvider.getClientSecret());</span>
+        }
+<span class="nc" id="L137">        return jwtContext;</span>
+    }
+
+    /**
+     * Construct a new builder instance.
+     *
+     * @param clientConfiguration the OIDC client configuration
+     * @return the new builder instance
+     */
+    public static Builder builder(OidcClientConfiguration clientConfiguration) {
+<span class="nc" id="L147">        return new Builder(clientConfiguration);</span>
+    }
+
+    public static class Builder {
+        private OidcClientConfiguration clientConfiguration;
+        private String expectedIssuer;
+        private String clientId;
+        private String expectedJwsAlgorithm;
+        private PublicKeyLocator publicKeyLocator;
+        private SecretKey clientSecretKey;
+        private JwtConsumerBuilder jwtConsumerBuilder;
+
+        /**
+         * Construct a new uninitialized instance.
+         *
+         * @param clientConfiguration the OIDC client configuration
+         */
+<span class="nc" id="L164">        Builder(OidcClientConfiguration clientConfiguration) {</span>
+<span class="nc" id="L165">            Assert.checkNotNullParam(&quot;clientConfiguration&quot;, clientConfiguration);</span>
+<span class="nc" id="L166">            this.clientConfiguration = clientConfiguration;</span>
+<span class="nc" id="L167">        }</span>
+
+        /**
+         * Create an ID token or bearer token validator.
+         *
+         * @return the newly created token validator
+         * @throws IllegalArgumentException if a required builder parameter is missing or invalid
+         */
+        public TokenValidator build() throws IllegalArgumentException {
+<span class="nc" id="L176">            expectedIssuer = clientConfiguration.getIssuerUrl();</span>
+<span class="nc bnc" id="L177" title="All 4 branches missed.">            if (expectedIssuer == null || expectedIssuer.length() == 0) {</span>
+<span class="nc" id="L178">                throw log.noExpectedIssuerGiven();</span>
+            }
+<span class="nc" id="L180">            clientId = clientConfiguration.getResourceName();</span>
+<span class="nc bnc" id="L181" title="All 4 branches missed.">            if (clientId == null || clientId.length() == 0) {</span>
+<span class="nc" id="L182">                throw log.noClientIDGiven();</span>
+            }
+<span class="nc" id="L184">            expectedJwsAlgorithm = clientConfiguration.getTokenSignatureAlgorithm();</span>
+<span class="nc bnc" id="L185" title="All 4 branches missed.">            if (expectedJwsAlgorithm == null || expectedJwsAlgorithm.length() == 0) {</span>
+<span class="nc" id="L186">                throw log.noExpectedJwsAlgorithmGiven();</span>
+            }
+<span class="nc" id="L188">            publicKeyLocator = clientConfiguration.getPublicKeyLocator();</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">            if (clientConfiguration.getClientAuthenticator() instanceof ClientSecretCredentialsProvider) {</span>
+<span class="nc" id="L190">                ClientSecretCredentialsProvider clientSecretCredentialsProvider = (ClientSecretCredentialsProvider) clientConfiguration.getClientAuthenticator();</span>
+<span class="nc" id="L191">                clientSecretKey = clientSecretCredentialsProvider.getClientSecret();</span>
+            }
+<span class="nc bnc" id="L193" title="All 4 branches missed.">            if (publicKeyLocator == null &amp;&amp; clientSecretKey == null) {</span>
+<span class="nc" id="L194">                throw log.noJwksPublicKeyOrClientSecretKeyGiven();</span>
+            }
+
+<span class="nc" id="L197">            jwtConsumerBuilder = new JwtConsumerBuilder()</span>
+<span class="nc" id="L198">                    .setExpectedIssuer(expectedIssuer)</span>
+<span class="nc" id="L199">                    .setJwsAlgorithmConstraints(</span>
+                            new AlgorithmConstraints(AlgorithmConstraints.ConstraintType.PERMIT, expectedJwsAlgorithm))
+<span class="nc" id="L201">                    .setRequireExpirationTime();</span>
+
+<span class="nc" id="L203">            return new TokenValidator(this);</span>
+        }
+    }
+
+    private static class AzpValidator implements ErrorCodeValidator {
+        public static final String AZP = &quot;azp&quot;;
+        private final String issuedFor;
+
+<span class="nc" id="L211">        public AzpValidator(String issuedFor) {</span>
+<span class="nc" id="L212">            this.issuedFor = issuedFor;</span>
+<span class="nc" id="L213">        }</span>
+
+        public ErrorCodeValidator.Error validate(JwtContext jwtContext) throws MalformedClaimException {
+<span class="nc" id="L216">            JwtClaims jwtClaims = jwtContext.getJwtClaims();</span>
+<span class="nc" id="L217">            boolean valid = false;</span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">            if (jwtClaims.getAudience().size() &gt; 1) {</span>
+                // if the ID token contains multiple audiences, then verify that an azp claim is present
+<span class="nc bnc" id="L220" title="All 2 branches missed.">                if (jwtClaims.hasClaim(AZP)) {</span>
+<span class="nc" id="L221">                    String azpValue = jwtClaims.getStringClaimValue(AZP);</span>
+<span class="nc bnc" id="L222" title="All 4 branches missed.">                    valid = azpValue != null &amp;&amp; jwtClaims.getClaimValueAsString(AZP).equals(issuedFor);</span>
+<span class="nc" id="L223">                }</span>
+            } else {
+<span class="nc" id="L225">                valid = true; // one audience</span>
+            }
+<span class="nc bnc" id="L227" title="All 2 branches missed.">            if (! valid) {</span>
+<span class="nc" id="L228">                return new ErrorCodeValidator.Error(INVALID_ISSUED_FOR_CLAIM, log.unexpectedValueForIssuedForClaim());</span>
+            }
+<span class="nc" id="L230">            return null;</span>
+        }
+    }
+
+    private static class AtHashValidator implements ErrorCodeValidator {
+        private final String accessTokenString;
+        private final String jwsAlgorithm;
+
+<span class="nc" id="L238">        public AtHashValidator(String accessTokenString, String jwsAlgorithm) {</span>
+<span class="nc" id="L239">            this.accessTokenString = accessTokenString;</span>
+<span class="nc" id="L240">            this.jwsAlgorithm = jwsAlgorithm;</span>
+<span class="nc" id="L241">        }</span>
+
+        public ErrorCodeValidator.Error validate(JwtContext jwtContext) throws MalformedClaimException {
+<span class="nc" id="L244">            JwtClaims jwtClaims = jwtContext.getJwtClaims();</span>
+<span class="nc" id="L245">            boolean valid = true;</span>
+<span class="nc bnc" id="L246" title="All 2 branches missed.">            if (jwtClaims.hasClaim(AT_HASH)) {</span>
+<span class="nc" id="L247">                String atHash = jwtClaims.getStringClaimValue(AT_HASH);</span>
+                String actualHash;
+                try {
+<span class="nc" id="L250">                    actualHash = getAccessTokenHash(accessTokenString, jwsAlgorithm);</span>
+<span class="nc" id="L251">                    valid = atHash.equals(actualHash);</span>
+<span class="nc" id="L252">                } catch (Exception e) {</span>
+<span class="nc" id="L253">                    valid = false;</span>
+<span class="nc" id="L254">                }</span>
+            }
+<span class="nc bnc" id="L256" title="All 2 branches missed.">            if (! valid) {</span>
+<span class="nc" id="L257">                return new ErrorCodeValidator.Error(INVALID_AT_HASH_CLAIM, log.unexpectedValueForAtHashClaim());</span>
+            }
+<span class="nc" id="L259">            return null;</span>
+        }
+    }
+
+    private static class TypeValidator implements ErrorCodeValidator {
+        public static final String TYPE = &quot;typ&quot;;
+        private final String expectedType;
+
+<span class="nc" id="L267">        public TypeValidator(String expectedType) {</span>
+<span class="nc" id="L268">            this.expectedType = expectedType;</span>
+<span class="nc" id="L269">        }</span>
+
+        public ErrorCodeValidator.Error validate(JwtContext jwtContext) throws MalformedClaimException {
+<span class="nc" id="L272">            JwtClaims jwtClaims = jwtContext.getJwtClaims();</span>
+<span class="nc" id="L273">            boolean valid = false;</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">            if (jwtClaims.hasClaim(TYPE)) {</span>
+<span class="nc" id="L275">                valid = jwtClaims.getStringClaimValue(TYPE).equals(expectedType);</span>
+            }
+<span class="nc bnc" id="L277" title="All 2 branches missed.">            if (! valid) {</span>
+<span class="nc" id="L278">                return new ErrorCodeValidator.Error(INVALID_TYPE_CLAIM, log.unexpectedValueForTypeClaim());</span>
+            }
+<span class="nc" id="L280">            return null;</span>
+        }
+    }
+
+    private static String getAccessTokenHash(String accessTokenString, String jwsAlgorithm) throws NoSuchAlgorithmException {
+<span class="nc" id="L285">        byte[] inputBytes = accessTokenString.getBytes(StandardCharsets.UTF_8);</span>
+<span class="nc" id="L286">        String javaAlgName = getJavaAlgorithmForHash(jwsAlgorithm);</span>
+<span class="nc" id="L287">        MessageDigest md = MessageDigest.getInstance(javaAlgName);</span>
+<span class="nc" id="L288">        md.update(inputBytes);</span>
+<span class="nc" id="L289">        byte[] hash = md.digest();</span>
+<span class="nc" id="L290">        int hashLength = hash.length / 2;</span>
+<span class="nc" id="L291">        byte[] hashInput = Arrays.copyOf(hash, hashLength); // leftmost half of the hash</span>
+<span class="nc" id="L292">        return ByteIterator.ofBytes(hashInput).base64Encode(BASE64_URL, false).drainToString();</span>
+    }
+
+    public static class VerifiedTokens {
+
+        private final AccessToken accessToken;
+        private final IDToken idToken;
+
+<span class="nc" id="L300">        public VerifiedTokens(final IDToken idToken, final AccessToken accessToken) {</span>
+<span class="nc" id="L301">            this.idToken = idToken;</span>
+<span class="nc" id="L302">            this.accessToken = accessToken;</span>
+<span class="nc" id="L303">        }</span>
+
+        public AccessToken getAccessToken() {
+<span class="nc" id="L306">            return accessToken;</span>
+        }
+
+        public IDToken getIdToken() {
+<span class="nc" id="L310">            return idToken;</span>
+        }
+    }
+}
+
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SSLQueryCallbackHandler.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.util</a> &gt; <span class="el_source">SSLQueryCallbackHandler.java</span></div><h1>SSLQueryCallbackHandler.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.util;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+
+import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
+
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.UnsupportedCallbackException;
+
+import org.wildfly.security.auth.callback.SSLCallback;
+import org.wildfly.security.ssl.SSLConnection;
+
+/**
+ * A callback handler which delegates to another callback handler, passing the authentication's SSL/TLS information to that
+ * callback handler on its first invocation.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class SSLQueryCallbackHandler implements CallbackHandler {
+    private final CallbackHandler delegate;
+    private final Supplier&lt;SSLConnection&gt; sslConnectionSupplier;
+
+<span class="nc" id="L44">    private final AtomicBoolean once = new AtomicBoolean(true);</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param delegate the delegate callback handler
+     * @param sslConnectionSupplier supplier for the current SSL connection
+     */
+<span class="nc" id="L52">    public SSLQueryCallbackHandler(final CallbackHandler delegate, final Supplier&lt;SSLConnection&gt; sslConnectionSupplier) {</span>
+<span class="nc" id="L53">        this.delegate = delegate;</span>
+<span class="nc" id="L54">        this.sslConnectionSupplier = checkNotNullParam(&quot;sslConnectionSupplier&quot;, sslConnectionSupplier);</span>
+<span class="nc" id="L55">    }</span>
+
+    public void handle(final Callback[] callbacks) throws IOException, UnsupportedCallbackException {
+        SSLConnection sslConnection;
+<span class="nc bnc" id="L59" title="All 4 branches missed.">        if (! once.compareAndSet(true, false) || (sslConnection = sslConnectionSupplier.get()) == null) {</span>
+<span class="nc" id="L60">            delegate.handle(callbacks);</span>
+<span class="nc" id="L61">            return;</span>
+        }
+<span class="nc" id="L63">        final int length = callbacks.length;</span>
+<span class="nc" id="L64">        final Callback[] newCallbacks = new Callback[length + 1];</span>
+<span class="nc" id="L65">        newCallbacks[0] = new SSLCallback(sslConnection);</span>
+<span class="nc" id="L66">        System.arraycopy(callbacks, 0, newCallbacks, 1, length);</span>
+        try {
+<span class="nc" id="L68">            delegate.handle(newCallbacks);</span>
+<span class="nc" id="L69">        } catch (UnsupportedCallbackException e) {</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">            if (e.getCallback() instanceof SSLCallback) {</span>
+<span class="nc" id="L71">                delegate.handle(callbacks);</span>
+<span class="nc" id="L72">                return;</span>
+            }
+<span class="nc" id="L74">            throw e;</span>
+<span class="nc" id="L75">        }</span>
+<span class="nc" id="L76">    }</span>
+
+    void activate () {
+<span class="nc" id="L79">        once.set(false);</span>
+<span class="nc" id="L80">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

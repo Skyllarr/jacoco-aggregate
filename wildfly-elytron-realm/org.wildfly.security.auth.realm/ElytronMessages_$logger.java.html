@@ -1,0 +1,377 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages_$logger.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-realm</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.realm</a> &gt; <span class="el_source">ElytronMessages_$logger.java</span></div><h1>ElytronMessages_$logger.java</h1><pre class="source lang-java linenums">package org.wildfly.security.auth.realm;
+
+import java.util.Locale;
+import java.nio.file.Path;
+import java.lang.IllegalStateException;
+import java.io.Serializable;
+import javax.annotation.Generated;
+import org.jboss.logging.DelegatingBasicLogger;
+import org.wildfly.security.auth.server.SecurityRealm;
+import org.wildfly.security.auth.realm.IntegrityException;
+import org.wildfly.security.auth.server.RealmUnavailableException;
+import java.lang.String;
+import java.io.IOException;
+import java.security.KeyStoreException;
+import org.jboss.logging.Logger;
+import java.lang.Exception;
+import javax.security.auth.callback.Callback;
+import org.jboss.logging.BasicLogger;
+import java.lang.Throwable;
+import java.lang.Class;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import java.util.Arrays;
+import java.security.Principal;
+import java.lang.IllegalArgumentException;
+import java.util.NoSuchElementException;
+
+
+import static org.jboss.logging.Logger.Level.DEBUG;
+import static org.jboss.logging.Logger.Level.WARN;
+
+/**
+ * Warning this class consists of generated code.
+ */
+@Generated(value = &quot;org.jboss.logging.processor.generator.model.MessageLoggerImplementor&quot;, date = &quot;2022-09-02T20:21:08+0200&quot;)
+public class ElytronMessages_$logger extends DelegatingBasicLogger implements ElytronMessages, BasicLogger, Serializable {
+    private static final long serialVersionUID = 1L;
+<span class="fc" id="L37">    private static final String FQCN = ElytronMessages_$logger.class.getName();</span>
+    public ElytronMessages_$logger(final Logger log) {
+<span class="fc" id="L39">        super(log);</span>
+<span class="fc" id="L40">    }</span>
+<span class="fc" id="L41">    private static final Locale LOCALE = Locale.ROOT;</span>
+    protected Locale getLoggingLocale() {
+<span class="nc" id="L43">        return LOCALE;</span>
+    }
+    protected String noRealmFoundInProperties$str() {
+<span class="nc" id="L46">        return &quot;ELY01006: No realm name found in users property file - non-plain-text users file must contain \&quot;#$REALM_NAME=RealmName$\&quot; line&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException noRealmFoundInProperties() {
+<span class="nc" id="L50">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), noRealmFoundInProperties$str()));</span>
+<span class="nc" id="L51">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L52">        return result;</span>
+    }
+    private static void _copyStackTraceMinusOne(final Throwable e) {
+<span class="nc" id="L55">        final StackTraceElement[] st = e.getStackTrace();</span>
+<span class="nc" id="L56">        e.setStackTrace(Arrays.copyOfRange(st, 1, st.length));</span>
+<span class="nc" id="L57">    }</span>
+    @Override
+    public final void debugInfoJaasAuthenticationFailure(final Principal principal, final Throwable cause) {
+<span class="nc" id="L60">        super.log.logf(FQCN, DEBUG, cause, debugInfoJaasAuthenticationFailure$str(), principal);</span>
+<span class="nc" id="L61">    }</span>
+    protected String debugInfoJaasAuthenticationFailure$str() {
+<span class="nc" id="L63">        return &quot;ELY01007: JAAS authentication failed for principal %s&quot;;</span>
+    }
+    protected String failedToCreateLoginContext$str() {
+<span class="nc" id="L66">        return &quot;ELY01008: Failed to create login context&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException failedToCreateLoginContext(final Throwable cause) {
+<span class="nc" id="L70">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), failedToCreateLoginContext$str()), cause);</span>
+<span class="nc" id="L71">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L72">        return result;</span>
+    }
+    protected String failedToInstantiateCustomHandler$str() {
+<span class="nc" id="L75">        return &quot;ELY01009: Failed to instantiate custom CallbackHandler&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException failedToInstantiateCustomHandler(final Throwable cause) {
+<span class="nc" id="L79">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), failedToInstantiateCustomHandler$str()), cause);</span>
+<span class="nc" id="L80">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L81">        return result;</span>
+    }
+    protected String fileSystemRealmFailedToOpen$str() {
+<span class="nc" id="L84">        return &quot;ELY01012: Filesystem-backed realm unexpectedly failed to open path \&quot;%s\&quot; for identity name \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException fileSystemRealmFailedToOpen(final Path path, final String finalName, final IOException cause) {
+<span class="nc" id="L88">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), fileSystemRealmFailedToOpen$str(), path, finalName), cause);</span>
+<span class="nc" id="L89">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L90">        return result;</span>
+    }
+    protected String fileSystemRealmFailedToRead$str() {
+<span class="nc" id="L93">        return &quot;ELY01013: Filesystem-backed realm unexpectedly failed to read path \&quot;%s\&quot; for identity name \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException fileSystemRealmFailedToRead(final Path path, final String finalName, final Exception cause) {
+<span class="nc" id="L97">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), fileSystemRealmFailedToRead$str(), path, finalName), cause);</span>
+<span class="nc" id="L98">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L99">        return result;</span>
+    }
+    protected String fileSystemRealmInvalidContent$str() {
+<span class="nc" id="L102">        return &quot;ELY01015: Filesystem-backed realm encountered invalid file content in path \&quot;%s\&quot; line %d for identity name \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException fileSystemRealmInvalidContent(final Path path, final int lineNumber, final String name) {
+<span class="nc" id="L106">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), fileSystemRealmInvalidContent$str(), path, lineNumber, name));</span>
+<span class="nc" id="L107">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L108">        return result;</span>
+    }
+    protected String fileSystemRealmMissingAttribute$str() {
+<span class="nc" id="L111">        return &quot;ELY01016: Filesystem-backed realm encountered missing required attribute \&quot;%s\&quot; in path \&quot;%s\&quot; line %d for identity name \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException fileSystemRealmMissingAttribute(final String attribute, final Path path, final int lineNumber, final String name) {
+<span class="nc" id="L115">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), fileSystemRealmMissingAttribute$str(), attribute, path, lineNumber, name));</span>
+<span class="nc" id="L116">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L117">        return result;</span>
+    }
+    protected String fileSystemRealmInvalidPasswordFormat$str() {
+<span class="nc" id="L120">        return &quot;ELY01017: Filesystem-backed realm encountered invalid password format \&quot;%s\&quot; in path \&quot;%s\&quot; line %d for identity name \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException fileSystemRealmInvalidPasswordFormat(final String format, final Path path, final int lineNumber, final String name) {
+<span class="nc" id="L124">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), fileSystemRealmInvalidPasswordFormat$str(), format, path, lineNumber, name));</span>
+<span class="nc" id="L125">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L126">        return result;</span>
+    }
+    protected String fileSystemRealmInvalidPasswordAlgorithm$str() {
+<span class="nc" id="L129">        return &quot;ELY01018: Filesystem-backed realm encountered invalid password algorithm \&quot;%s\&quot; in path \&quot;%s\&quot; line %d for identity name \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException fileSystemRealmInvalidPasswordAlgorithm(final String algorithm, final Path path, final int lineNumber, final String name) {
+<span class="nc" id="L133">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), fileSystemRealmInvalidPasswordAlgorithm$str(), algorithm, path, lineNumber, name));</span>
+<span class="nc" id="L134">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L135">        return result;</span>
+    }
+    protected String fileSystemUpdatedFailed$str() {
+<span class="nc" id="L138">        return &quot;ELY01020: Filesystem-backed realm failed to update identity \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException fileSystemUpdatedFailed(final String name, final Throwable cause) {
+<span class="nc" id="L142">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), fileSystemUpdatedFailed$str(), name), cause);</span>
+<span class="nc" id="L143">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L144">        return result;</span>
+    }
+    protected String fileSystemRealmDeleteFailed$str() {
+<span class="nc" id="L147">        return &quot;ELY01021: Filesystem-backed realm failed to delete identity \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException fileSystemRealmDeleteFailed(final String name, final IOException e) {
+<span class="nc" id="L151">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), fileSystemRealmDeleteFailed$str(), name), e);</span>
+<span class="nc" id="L152">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L153">        return result;</span>
+    }
+    protected String fileSystemRealmNotFound$str() {
+<span class="nc" id="L156">        return &quot;ELY01022: Filesystem-backed realm failed to find identity \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException fileSystemRealmNotFound(final String name) {
+<span class="nc" id="L160">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), fileSystemRealmNotFound$str(), name));</span>
+<span class="nc" id="L161">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L162">        return result;</span>
+    }
+    protected String fileSystemRealmFailedToWrite$str() {
+<span class="nc" id="L165">        return &quot;ELY01023: Filesystem-backed realm failed to write to file \&quot;%s\&quot; for identity \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException fileSystemRealmFailedToWrite(final Path tempPath, final String name, final Exception e) {
+<span class="nc" id="L169">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), fileSystemRealmFailedToWrite$str(), tempPath, name), e);</span>
+<span class="nc" id="L170">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L171">        return result;</span>
+    }
+    protected String fileSystemRealmAlreadyExists$str() {
+<span class="nc" id="L174">        return &quot;ELY01024: Filesystem-backed realm cannot create duplicate identity for identity \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException fileSystemRealmAlreadyExists(final String name, final Throwable e) {
+<span class="nc" id="L178">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), fileSystemRealmAlreadyExists$str(), name), e);</span>
+<span class="nc" id="L179">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L180">        return result;</span>
+    }
+    protected String fileSystemRealmCertificateReadError$str() {
+<span class="nc" id="L183">        return &quot;ELY01025: Filesystem-backed realm encountered invalid certificate format \&quot;%s\&quot; in path \&quot;%s\&quot; line %d for identity name \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException fileSystemRealmCertificateReadError(final String format, final Path path, final int lineNumber, final String name) {
+<span class="nc" id="L187">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), fileSystemRealmCertificateReadError$str(), format, path, lineNumber, name));</span>
+<span class="nc" id="L188">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L189">        return result;</span>
+    }
+    protected String fileSystemRealmUnsupportedKeyFormat$str() {
+<span class="nc" id="L192">        return &quot;ELY01026: Filesystem-backed realm encountered invalid key format \&quot;%s\&quot; in path \&quot;%s\&quot; line %d for identity name \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException fileSystemRealmUnsupportedKeyFormat(final String format, final Path path, final int lineNumber, final String name) {
+<span class="nc" id="L196">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), fileSystemRealmUnsupportedKeyFormat$str(), format, path, lineNumber, name));</span>
+<span class="nc" id="L197">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L198">        return result;</span>
+    }
+    protected String fileSystemRealmUnsupportedKeyAlgorithm$str() {
+<span class="nc" id="L201">        return &quot;ELY01027: Filesystem-backed realm encountered invalid key algorithm for format \&quot;%s\&quot; in path \&quot;%s\&quot; line %d for identity name \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException fileSystemRealmUnsupportedKeyAlgorithm(final String format, final Path path, final int lineNumber, final String name, final Exception e) {
+<span class="nc" id="L205">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), fileSystemRealmUnsupportedKeyAlgorithm$str(), format, path, lineNumber, name), e);</span>
+<span class="nc" id="L206">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L207">        return result;</span>
+    }
+    protected String invalidName$str() {
+<span class="nc" id="L210">        return &quot;ELY01064: Invalid identity name&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidName() {
+<span class="nc" id="L214">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidName$str()));</span>
+<span class="nc" id="L215">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L216">        return result;</span>
+    }
+    protected String fileSystemRealmInvalidOtpDefinition$str() {
+<span class="nc" id="L219">        return &quot;ELY01081: Filesystem-backed realm encountered invalid OTP definition in path \&quot;%s\&quot; line %d for identity name \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException fileSystemRealmInvalidOtpDefinition(final Path path, final int lineNumber, final String name, final Throwable cause) {
+<span class="nc" id="L223">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), fileSystemRealmInvalidOtpDefinition$str(), path, lineNumber, name), cause);</span>
+<span class="nc" id="L224">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L225">        return result;</span>
+    }
+    protected String fileSystemRealmInvalidOtpAlgorithm$str() {
+<span class="nc" id="L228">        return &quot;ELY01082: Filesystem-backed realm encountered invalid OTP algorithm \&quot;%s\&quot; in path \&quot;%s\&quot; line %d for identity name \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException fileSystemRealmInvalidOtpAlgorithm(final String algorithm, final Path path, final int lineNumber, final String name, final Throwable cause) {
+<span class="nc" id="L232">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), fileSystemRealmInvalidOtpAlgorithm$str(), algorithm, path, lineNumber, name), cause);</span>
+<span class="nc" id="L233">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L234">        return result;</span>
+    }
+    protected String decodingHashedPasswordFromPropertiesRealmFailed$str() {
+<span class="nc" id="L237">        return &quot;ELY01138: Decoding hashed password from users property file failed - should not be set as plain-text property file?&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException decodingHashedPasswordFromPropertiesRealmFailed(final Exception e) {
+<span class="nc" id="L241">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), decodingHashedPasswordFromPropertiesRealmFailed$str()), e);</span>
+<span class="nc" id="L242">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L243">        return result;</span>
+    }
+    protected String realmCacheUnexpectedType$str() {
+<span class="nc" id="L246">        return &quot;ELY01145: Security realm [%s] must implement [%s]&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException realmCacheUnexpectedType(final SecurityRealm realm, final Class&lt;? extends CacheableSecurityRealm&gt; expectedType) {
+<span class="nc" id="L250">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), realmCacheUnexpectedType$str(), realm, expectedType));</span>
+<span class="nc" id="L251">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L252">        return result;</span>
+    }
+    protected String transformedPrincipalCannotBeNull$str() {
+<span class="nc" id="L255">        return &quot;ELY13000: Authorization principal cannot be null after transformation&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException transformedPrincipalCannotBeNull() {
+<span class="nc" id="L259">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), transformedPrincipalCannotBeNull$str()));</span>
+<span class="nc" id="L260">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L261">        return result;</span>
+    }
+    protected String failedToReadKeyStore$str() {
+<span class="nc" id="L264">        return &quot;ELY01154: Failed to read key store&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException failedToReadKeyStore(final KeyStoreException e) {
+<span class="nc" id="L268">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), failedToReadKeyStore$str()), e);</span>
+<span class="nc" id="L269">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L270">        return result;</span>
+    }
+    protected String invalidUnicodeSequence$str() {
+<span class="nc" id="L273">        return &quot;ELY11005: Invalid unicode endoding, offending sequence: %s.&quot;;</span>
+    }
+    @Override
+    public final IOException invalidUnicodeSequence(final String s, final NoSuchElementException nsee) {
+<span class="nc" id="L277">        final IOException result = new IOException(String.format(getLoggingLocale(), invalidUnicodeSequence$str(), s), nsee);</span>
+<span class="nc" id="L278">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L279">        return result;</span>
+    }
+    @Override
+    public final void realmFailover(final RealmUnavailableException rue) {
+<span class="fc" id="L283">        super.log.logf(FQCN, WARN, rue, realmFailover$str());</span>
+<span class="fc" id="L284">    }</span>
+    protected String realmFailover$str() {
+<span class="fc" id="L286">        return &quot;ELY13001: Realm is failing over.&quot;;</span>
+    }
+    protected String unableToHandleCallback$str() {
+<span class="nc" id="L289">        return &quot;ELY13002: %s does not handle a callback of type %s&quot;;</span>
+    }
+    @Override
+    public final UnsupportedCallbackException unableToHandleCallback(final Callback callback, final String callbackHandler, final String callbackType) {
+<span class="nc" id="L293">        final UnsupportedCallbackException result = new UnsupportedCallbackException(callback, String.format(getLoggingLocale(), unableToHandleCallback$str(), callbackHandler, callbackType));</span>
+<span class="nc" id="L294">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L295">        return result;</span>
+    }
+    protected String failedToLoadJaasConfigFile$str() {
+<span class="nc" id="L298">        return &quot;ELY13003: Failed to load JAAS configuration file.&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException failedToLoadJaasConfigFile() {
+<span class="nc" id="L302">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), failedToLoadJaasConfigFile$str()));</span>
+<span class="nc" id="L303">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L304">        return result;</span>
+    }
+    @Override
+    public final void debugInfoJaasLogoutFailure(final Principal principal, final Throwable cause) {
+<span class="nc" id="L308">        super.log.logf(FQCN, DEBUG, cause, debugInfoJaasLogoutFailure$str(), principal);</span>
+<span class="nc" id="L309">    }</span>
+    protected String debugInfoJaasLogoutFailure$str() {
+<span class="nc" id="L311">        return &quot;ELY13004: JAAS logout failed for principal %s&quot;;</span>
+    }
+    protected String fileSystemRealmDecryptionFailed$str() {
+<span class="nc" id="L314">        return &quot;ELY13005: Filesystem-backed realm unable to decrypt identity&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException fileSystemRealmDecryptionFailed(final Throwable cause) {
+<span class="nc" id="L318">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), fileSystemRealmDecryptionFailed$str()), cause);</span>
+<span class="nc" id="L319">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L320">        return result;</span>
+    }
+    protected String fileSystemRealmEncryptionFailed$str() {
+<span class="nc" id="L323">        return &quot;ELY13006: Filesystem-backed realm unable to encrypt identity&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException fileSystemRealmEncryptionFailed(final Throwable cause) {
+<span class="nc" id="L327">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), fileSystemRealmEncryptionFailed$str()), cause);</span>
+<span class="nc" id="L328">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L329">        return result;</span>
+    }
+    protected String invalidIdentitySignature$str() {
+<span class="nc" id="L332">        return &quot;ELY13007: Signature for the following identity is invalid: %s.&quot;;</span>
+    }
+    @Override
+    public final org.wildfly.security.auth.realm.IntegrityException invalidIdentitySignature(final String s) {
+<span class="nc" id="L336">        final org.wildfly.security.auth.realm.IntegrityException result = new org.wildfly.security.auth.realm.IntegrityException(String.format(getLoggingLocale(), invalidIdentitySignature$str(), s));</span>
+<span class="nc" id="L337">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L338">        return result;</span>
+    }
+    protected String unableToGenerateSignature$str() {
+<span class="nc" id="L341">        return &quot;ELY13008: Unable to create a signature for the file: %s.&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException unableToGenerateSignature(final String s) {
+<span class="nc" id="L345">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), unableToGenerateSignature$str(), s));</span>
+<span class="nc" id="L346">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L347">        return result;</span>
+    }
+    protected String cannotFindSignature$str() {
+<span class="nc" id="L350">        return &quot;ELY13009: Unable to locate the signature element for the file: %s&quot;;</span>
+    }
+    @Override
+    public final RealmUnavailableException cannotFindSignature(final String s) {
+<span class="nc" id="L354">        final RealmUnavailableException result = new RealmUnavailableException(String.format(getLoggingLocale(), cannotFindSignature$str(), s));</span>
+<span class="nc" id="L355">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L356">        return result;</span>
+    }
+    protected String invalidKeyPairArgument$str() {
+<span class="nc" id="L359">        return &quot;ELY13010: Both PrivateKey and PublicKey must be defined for realm at: %s&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidKeyPairArgument(final String s) {
+<span class="nc" id="L363">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidKeyPairArgument$str(), s));</span>
+<span class="nc" id="L364">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L365">        return result;</span>
+    }
+    protected String integrityNotEnabled$str() {
+<span class="nc" id="L368">        return &quot;ELY13011: Integrity has not been enabled for the realm at: %s&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException integrityNotEnabled(final String s) {
+<span class="nc" id="L372">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), integrityNotEnabled$str(), s));</span>
+<span class="nc" id="L373">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L374">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

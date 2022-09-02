@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SecurityIdentityServerMechanismFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server-http</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.server.http</a> &gt; <span class="el_source">SecurityIdentityServerMechanismFactory.java</span></div><h1>SecurityIdentityServerMechanismFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.auth.server.http;
+
+import static org.wildfly.security.http.HttpConstants.SECURITY_IDENTITY;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+
+import java.io.IOException;
+import java.util.Map;
+
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.UnsupportedCallbackException;
+
+import org.wildfly.security.auth.callback.AuthenticationCompleteCallback;
+import org.wildfly.security.auth.callback.SecurityIdentityCallback;
+import org.wildfly.security.auth.server.SecurityIdentity;
+import org.wildfly.security.http.HttpAuthenticationException;
+import org.wildfly.security.http.HttpServerAuthenticationMechanism;
+import org.wildfly.security.http.HttpServerAuthenticationMechanismFactory;
+import org.wildfly.security.http.HttpServerRequest;
+
+/**
+ * A {@link HttpServerAuthenticationMechanismFactory} that wraps authentication mechanism from delegating factory, so
+ * any request for {@code SECURITY_IDENTITY} negotiated property is caught and {@link SecurityIdentity} from
+ * the callback handler is returned instead.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+class SecurityIdentityServerMechanismFactory implements HttpServerAuthenticationMechanismFactory {
+
+    private final HttpServerAuthenticationMechanismFactory delegate;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param delegate the {@link HttpServerAuthenticationMechanismFactory} calls are delegated to.
+     */
+<span class="nc" id="L55">    public SecurityIdentityServerMechanismFactory(HttpServerAuthenticationMechanismFactory delegate) {</span>
+<span class="nc" id="L56">        this.delegate = checkNotNullParam(&quot;delegate&quot;, delegate);</span>
+<span class="nc" id="L57">    }</span>
+
+    /**
+     * @see org.wildfly.security.http.HttpServerAuthenticationMechanismFactory#getMechanismNames(java.util.Map)
+     */
+    @Override
+    public String[] getMechanismNames(Map&lt;String, ?&gt; properties) {
+<span class="nc" id="L64">        return delegate.getMechanismNames(properties);</span>
+    }
+
+    /**
+     * @see org.wildfly.security.http.HttpServerAuthenticationMechanismFactory#createAuthenticationMechanism(java.lang.String, java.util.Map, javax.security.auth.callback.CallbackHandler)
+     */
+    @Override
+    public HttpServerAuthenticationMechanism createAuthenticationMechanism(String mechanismName, Map&lt;String, ?&gt; properties, CallbackHandler callbackHandler) throws HttpAuthenticationException {
+<span class="nc" id="L72">        SecurityIdentityCallbackHandler securityIdentityCallbackHandler = new SecurityIdentityCallbackHandler(callbackHandler);</span>
+<span class="nc" id="L73">        final HttpServerAuthenticationMechanism delegate = this.delegate.createAuthenticationMechanism(mechanismName, properties, securityIdentityCallbackHandler);</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">        if (delegate != null) {</span>
+<span class="nc" id="L75">            return new HttpServerAuthenticationMechanism() {</span>
+
+                @Override
+                public String getMechanismName() {
+<span class="nc" id="L79">                    return delegate.getMechanismName();</span>
+                }
+
+                @Override
+                public void evaluateRequest(HttpServerRequest request) throws HttpAuthenticationException {
+<span class="nc" id="L84">                    delegate.evaluateRequest(request);</span>
+<span class="nc" id="L85">                }</span>
+
+                @Override
+                public Object getNegotiatedProperty(String propertyName) {
+<span class="nc bnc" id="L89" title="All 2 branches missed.">                    return SECURITY_IDENTITY.equals(propertyName) ? securityIdentityCallbackHandler.getSecurityIdentity()</span>
+<span class="nc" id="L90">                            : delegate.getNegotiatedProperty(propertyName);</span>
+                }
+
+                @Override
+                public void dispose() {
+<span class="nc" id="L95">                    delegate.dispose();</span>
+<span class="nc" id="L96">                }</span>
+
+            };
+        }
+<span class="nc" id="L100">        return null;</span>
+    }
+
+    private static class SecurityIdentityCallbackHandler implements CallbackHandler {
+
+        private final CallbackHandler delegate;
+        private SecurityIdentity securityIdentity;
+
+<span class="nc" id="L108">        SecurityIdentityCallbackHandler(CallbackHandler delegate) {</span>
+<span class="nc" id="L109">            this.delegate = delegate;</span>
+<span class="nc" id="L110">        }</span>
+
+        @Override
+        public void handle(Callback[] callbacks) throws IOException, UnsupportedCallbackException {
+<span class="nc" id="L114">            Callback[] theCallbacks = callbacks;</span>
+<span class="nc" id="L115">            SecurityIdentityCallback securityIdentityCallback = null;</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">            for (Callback current : callbacks) {</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">                if (current instanceof AuthenticationCompleteCallback</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">                        &amp;&amp; ((AuthenticationCompleteCallback) current).succeeded()) {</span>
+<span class="nc" id="L119">                    theCallbacks = new Callback[callbacks.length + 1];</span>
+<span class="nc" id="L120">                    System.arraycopy(callbacks, 0, theCallbacks, 0, callbacks.length);</span>
+<span class="nc" id="L121">                    theCallbacks[theCallbacks.length - 1] = (securityIdentityCallback = new SecurityIdentityCallback());</span>
+                }
+            }
+
+<span class="nc" id="L125">            delegate.handle(theCallbacks);</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">            if (securityIdentityCallback != null) {</span>
+<span class="nc" id="L127">                securityIdentity = securityIdentityCallback.getSecurityIdentity();</span>
+            }
+<span class="nc" id="L129">        }</span>
+
+        SecurityIdentity getSecurityIdentity() {
+<span class="nc" id="L132">            return securityIdentity;</span>
+        }
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

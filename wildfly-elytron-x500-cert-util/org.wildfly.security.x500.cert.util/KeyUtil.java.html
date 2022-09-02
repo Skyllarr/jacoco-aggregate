@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>KeyUtil.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-x500-cert-util</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.x500.cert.util</a> &gt; <span class="el_source">KeyUtil.java</span></div><h1>KeyUtil.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2018 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.x500.cert.util;
+
+import static org.wildfly.security.x500.cert.util.ElytronMessages.log;
+
+import java.security.Key;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.interfaces.DSAKey;
+import java.security.interfaces.DSAParams;
+import java.security.interfaces.ECKey;
+import java.security.interfaces.RSAKey;
+import java.security.spec.ECParameterSpec;
+
+import org.wildfly.security.asn1.DERDecoder;
+
+/**
+ * Key utility methods.
+ *
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ * @since 1.5.0
+ */
+<span class="nc" id="L42">public final class KeyUtil {</span>
+
+
+    /**
+     * Get the default compatible signature algorithm name for the given private key.
+     *
+     * @param privateKey the private key
+     * @return the default compatible signature algorithm name for the given private key or {@code null}
+     * if the default compatible signature algorithm name cannot not be determined
+     * @throws IllegalArgumentException if the key size cannot be determined from the given private key
+     */
+    public static String getDefaultCompatibleSignatureAlgorithmName(final PrivateKey privateKey) throws IllegalArgumentException {
+<span class="fc" id="L54">        final int keySize = getKeySize(privateKey);</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if (keySize == -1) {</span>
+<span class="nc" id="L56">            throw log.unableToDetermineKeySize();</span>
+        }
+<span class="fc" id="L58">        return getDefaultCompatibleSignatureAlgorithmName(privateKey.getAlgorithm(), keySize);</span>
+    }
+
+    /**
+     * Get the default compatible signature algorithm name for the given key algorithm name and key size.
+     *
+     * @param keyAlgorithmName the key algorithm name
+     * @param keySize the key size
+     * @return the default compatible signature algorithm name for the given key algorithm name and key size
+     * or {@code null} if the default compatible signature algorithm name cannot not be determined
+     */
+    public static String getDefaultCompatibleSignatureAlgorithmName(final String keyAlgorithmName, final int keySize) {
+<span class="fc" id="L70">        final String messageDigestAlgorithmName = getDefaultMessageDigestAlgorithmName(keyAlgorithmName, keySize);</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        if (messageDigestAlgorithmName == null) {</span>
+<span class="nc" id="L72">            return null;</span>
+        }
+<span class="pc bpc" id="L74" title="1 of 4 branches missed.">        switch (keyAlgorithmName) {</span>
+            case &quot;DSA&quot;: {
+<span class="fc" id="L76">                return messageDigestAlgorithmName + &quot;withDSA&quot;;</span>
+            }
+            case &quot;RSA&quot;: {
+<span class="fc" id="L79">                return messageDigestAlgorithmName + &quot;withRSA&quot;;</span>
+            }
+            case &quot;EC&quot;: {
+<span class="fc" id="L82">                return messageDigestAlgorithmName + &quot;withECDSA&quot;;</span>
+            }
+            default: {
+<span class="nc" id="L85">                return null;</span>
+            }
+        }
+    }
+
+    /**
+     * Get the default message digest algorithm name for the given key algorithm name and key size.
+     *
+     * @param keyAlgorithmName the key algorithm name
+     * @param keySize the key size
+     * @return the default message digest algorithm name or {@code null} if the default message algorithm name cannot be determined
+     */
+    private static String getDefaultMessageDigestAlgorithmName(final String keyAlgorithmName, final int keySize) {
+        // These defaults are based on Tables 2 and 3 in NIST SP 800-57 Part 1 Revision 4
+        // (see https://csrc.nist.gov/publications/detail/sp/800-57-part-1/rev-4/final)
+<span class="pc bpc" id="L100" title="1 of 4 branches missed.">        switch (keyAlgorithmName) {</span>
+            case &quot;DSA&quot;: {
+<span class="fc" id="L102">                return &quot;SHA256&quot;;</span>
+            }
+            case &quot;RSA&quot;: {
+<span class="fc bfc" id="L105" title="All 2 branches covered.">                if (keySize &lt;= 3072) {</span>
+<span class="fc" id="L106">                    return &quot;SHA256&quot;;</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">                } else if (keySize &lt;= 7680) {</span>
+<span class="fc" id="L108">                    return &quot;SHA384&quot;;</span>
+                } else {
+<span class="nc" id="L110">                    return &quot;SHA512&quot;;</span>
+                }
+            }
+            case &quot;EC&quot;: {
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">                if (keySize &lt;= 383) {</span>
+<span class="fc" id="L115">                    return &quot;SHA256&quot;;</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">                } else if (keySize &lt;= 511) {</span>
+<span class="nc" id="L117">                    return &quot;SHA384&quot;;</span>
+                } else {
+<span class="nc" id="L119">                    return &quot;SHA512&quot;;</span>
+                }
+            }
+            default: {
+<span class="nc" id="L123">                return null;</span>
+            }
+        }
+    }
+
+    /**
+     * Get the key size for the given {@code Key}.
+     *
+     * @param key the key
+     * @return the key size or -1 if the key size cannot be determined
+     */
+    public static int getKeySize(final Key key) {
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        if (key instanceof ECKey) {</span>
+<span class="fc" id="L136">            ECParameterSpec params = ((ECKey) key).getParams();</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">            if (params != null) {</span>
+<span class="fc" id="L138">                return params.getOrder().bitLength();</span>
+            }
+<span class="pc bfc" id="L140" title="All 2 branches covered.">        } else if (key instanceof DSAKey) {</span>
+<span class="fc" id="L141">            DSAParams params = ((DSAKey) key).getParams();</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">            if (params != null) {</span>
+<span class="fc" id="L143">                return params.getP().bitLength();</span>
+            }
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        } else if (key instanceof RSAKey) {</span>
+<span class="fc" id="L146">            return ((RSAKey) key).getModulus().bitLength();</span>
+        }
+<span class="nc" id="L148">        return -1;</span>
+    }
+
+    /**
+     * Get the key identifier, which is composed of the 160-bit SHA-1 hash of the value of the BIT STRING
+     * {@code subjectPublicKey} (excluding the tag, length, and number of unused bits), as per
+     * &lt;a href=&quot;https://tools.ietf.org/html/rfc3280&quot;&gt;RFC 3280&lt;/a&gt;.
+     *
+     * @param publicKey the public key
+     * @return the key identifier
+     */
+    public static byte[] getKeyIdentifier(final PublicKey publicKey) {
+<span class="fc" id="L160">        DERDecoder decoder = new DERDecoder(publicKey.getEncoded());</span>
+<span class="fc" id="L161">        decoder.startSequence();</span>
+<span class="fc" id="L162">        decoder.skipElement(); // skip the algorithm</span>
+<span class="fc" id="L163">        byte[] subjectPublicKey = decoder.decodeBitString();</span>
+<span class="fc" id="L164">        decoder.endSequence();</span>
+
+        final MessageDigest messageDigest;
+        try {
+<span class="fc" id="L168">            messageDigest = MessageDigest.getInstance(&quot;SHA-1&quot;);</span>
+<span class="fc" id="L169">            messageDigest.update(subjectPublicKey);</span>
+<span class="fc" id="L170">            return messageDigest.digest();</span>
+<span class="nc" id="L171">        } catch (NoSuchAlgorithmException e) {</span>
+<span class="nc" id="L172">            throw new IllegalStateException(e);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

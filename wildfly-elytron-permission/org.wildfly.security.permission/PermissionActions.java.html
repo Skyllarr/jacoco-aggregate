@@ -1,0 +1,438 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PermissionActions.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-permission</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.permission</a> &gt; <span class="el_source">PermissionActions.java</span></div><h1>PermissionActions.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.permission;
+
+import static org.wildfly.security.permission.SecurityMessages.permission;
+
+import org.wildfly.common.Assert;
+
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.Iterator;
+
+/**
+ * A helper class for defining permissions which use a finite list of actions.  Define custom permissions using
+ * an {@code enum} of actions, where the string representation (via {@code toString()}) of each enum is one possible
+ * action name.  Typically the {@code enum} should be non-public, and the constant names should be lowercase.  If
+ * an action name contains a character which is not a valid Java identifier, then the {@code toString()} method of
+ * such constants should be overridden to report the correct string.  The actions may be stored on the permission as
+ * an {@code EnumSet}, an {@code int}, or a {@code long}.  The field should be marked {@code transient}, and
+ * the actions represented by a (possibly synthetic) field of type {@code String} which uses the canonical representation
+ * of the actions.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ *
+ * @deprecated Use one of the abstract permission classes like {@link AbstractActionSetPermission} instead.
+ */
+@Deprecated
+public final class PermissionActions {
+
+    private PermissionActions() {
+    }
+
+<span class="nc" id="L49">    static final class TrieNode&lt;E&gt; {</span>
+<span class="nc" id="L50">        private static final char[] C_EMPTY = new char[0];</span>
+<span class="nc" id="L51">        private static final TrieNode[] T_EMPTY = new TrieNode[0];</span>
+
+        private E result;
+<span class="nc" id="L54">        private char[] matches = C_EMPTY;</span>
+<span class="nc" id="L55">        @SuppressWarnings(&quot;unchecked&quot;)</span>
+        private TrieNode&lt;E&gt;[] children = T_EMPTY;
+
+        void put(String s, int idx, E value) {
+<span class="nc bnc" id="L59" title="All 2 branches missed.">            if (idx == s.length()) {</span>
+<span class="nc" id="L60">                result = value;</span>
+<span class="nc" id="L61">                return;</span>
+            }
+<span class="nc" id="L63">            char c = s.charAt(idx);</span>
+<span class="nc" id="L64">            final int i = Arrays.binarySearch(matches, c);</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">            if (i &lt; 0) {</span>
+                // copy and add
+<span class="nc" id="L67">                final int oldLength = matches.length;</span>
+<span class="nc" id="L68">                final char[] newMatches = Arrays.copyOf(matches, oldLength + 1);</span>
+<span class="nc" id="L69">                final TrieNode&lt;E&gt;[] newChildren = Arrays.copyOf(children, oldLength + 1);</span>
+                // i is the negated insertion index
+<span class="nc" id="L71">                final int insertIndex = -i - 1;</span>
+<span class="nc" id="L72">                System.arraycopy(newMatches, insertIndex, newMatches, insertIndex + 1, oldLength - insertIndex);</span>
+<span class="nc" id="L73">                System.arraycopy(newChildren, insertIndex, newChildren, insertIndex + 1, oldLength - insertIndex);</span>
+<span class="nc" id="L74">                newMatches[insertIndex] = c;</span>
+<span class="nc" id="L75">                final TrieNode&lt;E&gt; newNode = new TrieNode&lt;&gt;();</span>
+<span class="nc" id="L76">                newChildren[insertIndex] = newNode;</span>
+<span class="nc" id="L77">                matches = newMatches;</span>
+<span class="nc" id="L78">                children = newChildren;</span>
+<span class="nc" id="L79">                newNode.put(s, idx + 1, value);</span>
+<span class="nc" id="L80">            } else {</span>
+<span class="nc" id="L81">                children[i].put(s, idx + 1, value);</span>
+            }
+<span class="nc" id="L83">        }</span>
+
+        E get(String s, int idx, int end) {
+<span class="nc bnc" id="L86" title="All 2 branches missed.">            if (idx == end) {</span>
+<span class="nc" id="L87">                return result;</span>
+            }
+<span class="nc" id="L89">            final char c = s.charAt(idx);</span>
+<span class="nc" id="L90">            final int i = Arrays.binarySearch(matches, c);</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">            if (i &lt; 0) {</span>
+<span class="nc" id="L92">                return null;</span>
+            }
+<span class="nc" id="L94">            return children[i].get(s, idx + 1, end);</span>
+        }
+    }
+
+    static final class Info&lt;E&gt; {
+        final TrieNode&lt;E&gt; root;
+        final E[] constants;
+
+<span class="nc" id="L102">        Info(final TrieNode&lt;E&gt; root, final E[] constants) {</span>
+<span class="nc" id="L103">            this.root = root;</span>
+<span class="nc" id="L104">            this.constants = constants;</span>
+<span class="nc" id="L105">        }</span>
+    }
+
+<span class="nc" id="L108">    private static final ClassValue&lt;Info&lt;?&gt;&gt; storedInfo = new ClassValue&lt;Info&lt;?&gt;&gt;() {</span>
+        protected Info&lt;?&gt; computeValue(final Class&lt;?&gt; type) {
+<span class="nc" id="L110">            return computeReal(type);</span>
+        }
+
+        private &lt;E&gt; Info&lt;E&gt; computeReal(final Class&lt;E&gt; type) {
+<span class="nc" id="L114">            final TrieNode&lt;E&gt; root = new TrieNode&lt;&gt;();</span>
+<span class="nc" id="L115">            final E[] enumConstants = type.getEnumConstants();</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">            for (E e : enumConstants) {</span>
+<span class="nc" id="L117">                root.put(e.toString(), 0, e);</span>
+            }
+<span class="nc" id="L119">            return new Info&lt;&gt;(root, type.getEnumConstants());</span>
+        }
+    };
+
+    interface MatchAction&lt;E extends Enum&lt;E&gt;&gt; {
+        void matched(E item);
+
+        void matchedAll(Class&lt;E&gt; type);
+    }
+
+    static class SetMatchAction&lt;E extends Enum&lt;E&gt;&gt; implements MatchAction&lt;E&gt; {
+        private EnumSet&lt;E&gt; set;
+
+<span class="nc" id="L132">        SetMatchAction(final EnumSet&lt;E&gt; set) {</span>
+<span class="nc" id="L133">            this.set = set;</span>
+<span class="nc" id="L134">        }</span>
+
+        public void matched(final E item) {
+<span class="nc" id="L137">            set.add(item);</span>
+<span class="nc" id="L138">        }</span>
+
+        public void matchedAll(final Class&lt;E&gt; type) {
+<span class="nc" id="L141">            set = EnumSet.allOf(type);</span>
+<span class="nc" id="L142">        }</span>
+
+        public EnumSet&lt;E&gt; getSet() {
+<span class="nc" id="L145">            return set;</span>
+        }
+    }
+
+    static class IntMatchAction&lt;E extends Enum&lt;E&gt;&gt; implements MatchAction&lt;E&gt; {
+        private int result;
+
+<span class="nc" id="L152">        IntMatchAction() {</span>
+<span class="nc" id="L153">        }</span>
+
+        public void matched(final E item) {
+<span class="nc" id="L156">            result |= 1 &lt;&lt; item.ordinal();</span>
+<span class="nc" id="L157">        }</span>
+
+        public void matchedAll(final Class&lt;E&gt; type) {
+<span class="nc" id="L160">            result |= (1 &lt;&lt; storedInfo.get(type).constants.length) - 1;</span>
+<span class="nc" id="L161">        }</span>
+
+        public int getResult() {
+<span class="nc" id="L164">            return result;</span>
+        }
+    }
+
+    static class LongMatchAction&lt;E extends Enum&lt;E&gt;&gt; implements MatchAction&lt;E&gt; {
+        private long result;
+
+<span class="nc" id="L171">        LongMatchAction() {</span>
+<span class="nc" id="L172">        }</span>
+
+        public void matched(final E item) {
+<span class="nc" id="L175">            result |= 1L &lt;&lt; item.ordinal();</span>
+<span class="nc" id="L176">        }</span>
+
+        public void matchedAll(final Class&lt;E&gt; type) {
+<span class="nc" id="L179">            result |= (1L &lt;&lt; storedInfo.get(type).constants.length) - 1;</span>
+<span class="nc" id="L180">        }</span>
+
+        public long getResult() {
+<span class="nc" id="L183">            return result;</span>
+        }
+    }
+
+    /**
+     * Parse an action string using the given action type to an {@code EnumSet}.
+     *
+     * @param actionType the action {@code enum} type class
+     * @param actionString the string to parse
+     * @param &lt;E&gt; the action {@code enum} type
+     *
+     * @return the set of actions from the string
+     *
+     * @throws IllegalArgumentException if the string contained an invalid action
+     */
+    public static &lt;E extends Enum&lt;E&gt;&gt; EnumSet&lt;E&gt; parseActionStringToSet(Class&lt;E&gt; actionType, String actionString) throws IllegalArgumentException {
+<span class="nc" id="L199">        Assert.checkNotNullParam(&quot;actionType&quot;, actionType);</span>
+<span class="nc" id="L200">        Assert.checkNotNullParam(&quot;actionString&quot;, actionString);</span>
+<span class="nc" id="L201">        final SetMatchAction&lt;E&gt; matchAction = new SetMatchAction&lt;&gt;(EnumSet.noneOf(actionType));</span>
+<span class="nc" id="L202">        doParse(actionType, actionString, matchAction);</span>
+<span class="nc" id="L203">        return matchAction.getSet();</span>
+    }
+
+    /**
+     * Parse an action string using the given action type to an {@code int}.  The given {@code enum} type must have
+     * 32 or fewer constant values.
+     *
+     * @param actionType the action {@code enum} type class
+     * @param actionString the string to parse
+     * @param &lt;E&gt; the action {@code enum} type
+     *
+     * @return the set of actions from the string
+     *
+     * @throws IllegalArgumentException if the string contained an invalid action
+     */
+    public static &lt;E extends Enum&lt;E&gt;&gt; int parseActionStringToInt(Class&lt;E&gt; actionType, String actionString) throws IllegalArgumentException {
+<span class="nc" id="L219">        Assert.checkNotNullParam(&quot;actionType&quot;, actionType);</span>
+<span class="nc" id="L220">        Assert.checkNotNullParam(&quot;actionString&quot;, actionString);</span>
+<span class="nc" id="L221">        final IntMatchAction&lt;E&gt; matchAction = new IntMatchAction&lt;&gt;();</span>
+<span class="nc" id="L222">        doParse(actionType, actionString, matchAction);</span>
+<span class="nc" id="L223">        return matchAction.getResult();</span>
+    }
+
+    /**
+     * Parse an action string using the given action type to a {@code long}.  The given {@code enum} type must have
+     * 64 or fewer constant values.
+     *
+     * @param actionType the action {@code enum} type class
+     * @param actionString the string to parse
+     * @param &lt;E&gt; the action {@code enum} type
+     *
+     * @return the set of actions from the string
+     *
+     * @throws IllegalArgumentException if the string contained an invalid action
+     */
+    public static &lt;E extends Enum&lt;E&gt;&gt; long parseActionStringToLong(Class&lt;E&gt; actionType, String actionString) throws IllegalArgumentException {
+<span class="nc" id="L239">        Assert.checkNotNullParam(&quot;actionType&quot;, actionType);</span>
+<span class="nc" id="L240">        Assert.checkNotNullParam(&quot;actionString&quot;, actionString);</span>
+<span class="nc" id="L241">        final LongMatchAction&lt;E&gt; matchAction = new LongMatchAction&lt;&gt;();</span>
+<span class="nc" id="L242">        doParse(actionType, actionString, matchAction);</span>
+<span class="nc" id="L243">        return matchAction.getResult();</span>
+    }
+
+    private static &lt;E extends Enum&lt;E&gt;&gt; void doParse(final Class&lt;E&gt; actionType, final String actionString, final MatchAction&lt;E&gt; matchAction) {
+        @SuppressWarnings(&quot;unchecked&quot;)
+<span class="nc" id="L248">        final Info&lt;E&gt; info = (Info&lt;E&gt;) storedInfo.get(actionType);</span>
+<span class="nc" id="L249">        final TrieNode&lt;E&gt; rootNode = info.root;</span>
+        // begin parse
+        char c;
+<span class="nc" id="L252">        final int length = actionString.length();</span>
+<span class="nc" id="L253">        int i = 0;</span>
+        L0: for (;;) {
+<span class="nc bnc" id="L255" title="All 2 branches missed.">            if (i == length) {</span>
+                // OK
+<span class="nc" id="L257">                break L0;</span>
+            }
+<span class="nc" id="L259">            c = actionString.charAt(i);</span>
+<span class="nc bnc" id="L260" title="All 2 branches missed.">            if (Character.isWhitespace(c)) {</span>
+<span class="nc" id="L261">                i ++;</span>
+<span class="nc" id="L262">                continue L0;</span>
+            }
+<span class="nc bnc" id="L264" title="All 2 branches missed.">            if (c == ',') {</span>
+                // hmm, empty segment; ignore it
+<span class="nc" id="L266">                i ++;</span>
+<span class="nc" id="L267">                continue L0;</span>
+            }
+<span class="nc bnc" id="L269" title="All 2 branches missed.">            if (c == '*') {</span>
+                // potential star
+<span class="nc" id="L271">                matchAction.matchedAll(actionType);</span>
+                for (;;) {
+<span class="nc" id="L273">                    i ++;</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">                    if (i == length) {</span>
+                        // done
+<span class="nc" id="L276">                        break L0;</span>
+                    }
+<span class="nc" id="L278">                    c = actionString.charAt(i);</span>
+<span class="nc bnc" id="L279" title="All 2 branches missed.">                    if (c == ',') {</span>
+                        // pointless, but go on
+<span class="nc" id="L281">                        i ++;</span>
+<span class="nc" id="L282">                        continue L0;</span>
+                    }
+<span class="nc bnc" id="L284" title="All 2 branches missed.">                    if (! Character.isWhitespace(c)) {</span>
+<span class="nc" id="L285">                        throw permission.unexpectedActionCharacter(c, i, actionString);</span>
+                    }
+                }
+                // not reachable
+            }
+            // else it's a potentially valid character
+<span class="nc" id="L291">            int start = i;</span>
+            for (;;) {
+<span class="nc" id="L293">                i++;</span>
+<span class="nc bnc" id="L294" title="All 2 branches missed.">                c = i &lt; length ? actionString.charAt(i) : 0;</span>
+<span class="nc bnc" id="L295" title="All 6 branches missed.">                if (i == length || Character.isWhitespace(c) || c == ',') {</span>
+                    // action string ends here
+<span class="nc" id="L297">                    final E action = rootNode.get(actionString, start, i);</span>
+<span class="nc bnc" id="L298" title="All 2 branches missed.">                    if (action == null) {</span>
+<span class="nc" id="L299">                        throw permission.invalidAction(actionString.substring(start, i), start, actionString);</span>
+                    }
+<span class="nc" id="L301">                    matchAction.matched(action);</span>
+<span class="nc bnc" id="L302" title="All 2 branches missed.">                    if (i == length) {</span>
+                        // done
+<span class="nc" id="L304">                        break L0;</span>
+                    }
+<span class="nc bnc" id="L306" title="All 2 branches missed.">                    while (Character.isWhitespace(c)) {</span>
+<span class="nc" id="L307">                        i++;</span>
+<span class="nc bnc" id="L308" title="All 2 branches missed.">                        if (i == length) {</span>
+                            // done
+<span class="nc" id="L310">                            break L0;</span>
+                        }
+<span class="nc" id="L312">                        c = actionString.charAt(i);</span>
+                    }
+<span class="nc bnc" id="L314" title="All 2 branches missed.">                    if (c != ',') {</span>
+<span class="nc" id="L315">                        throw permission.unexpectedActionCharacter(c, i, actionString);</span>
+                    }
+<span class="nc" id="L317">                    i ++;</span>
+<span class="nc" id="L318">                    continue L0;</span>
+                }
+            }
+            // not reachable
+        }
+<span class="nc" id="L323">    }</span>
+
+    /**
+     * Get the canonical action string representation for the given action set.
+     *
+     * @param set the action set
+     * @param &lt;E&gt; the action type
+     * @return the canonical representation
+     */
+    public static &lt;E extends Enum&lt;E&gt;&gt; String getCanonicalActionString(EnumSet&lt;E&gt; set) {
+<span class="nc bnc" id="L333" title="All 4 branches missed.">        if (set == null || set.isEmpty()) return &quot;&quot;;</span>
+<span class="nc" id="L334">        final StringBuilder b = new StringBuilder();</span>
+<span class="nc" id="L335">        getCanonicalActionString(set, b);</span>
+<span class="nc" id="L336">        return b.toString();</span>
+    }
+
+    /**
+     * Get the canonical action string representation for the given action set, appending it to the given string builder.
+     *
+     * @param set the action set
+     * @param b the string builder
+     * @param &lt;E&gt; the action type
+     */
+    public static &lt;E extends Enum&lt;E&gt;&gt; void getCanonicalActionString(EnumSet&lt;E&gt; set, StringBuilder b) {
+<span class="nc bnc" id="L347" title="All 4 branches missed.">        if (set == null || set.isEmpty()) return;</span>
+<span class="nc" id="L348">        final Iterator&lt;E&gt; iterator = set.iterator();</span>
+<span class="nc bnc" id="L349" title="All 2 branches missed.">        if (iterator.hasNext()) {</span>
+<span class="nc" id="L350">            E e = iterator.next();</span>
+<span class="nc" id="L351">            b.append(e.toString());</span>
+<span class="nc bnc" id="L352" title="All 2 branches missed.">            while (iterator.hasNext()) {</span>
+<span class="nc" id="L353">                e = iterator.next();</span>
+<span class="nc" id="L354">                b.append(',');</span>
+<span class="nc" id="L355">                b.append(e.toString());</span>
+            }
+        }
+<span class="nc" id="L358">    }</span>
+
+    /**
+     * Get the canonical action string representation for the given action set.
+     *
+     * @param type the action {@code enum} type class
+     * @param set the action set
+     * @param &lt;E&gt; the action type
+     * @return the canonical representation
+     */
+    public static &lt;E extends Enum&lt;E&gt;&gt; String getCanonicalActionString(Class&lt;E&gt; type, int set) {
+<span class="nc bnc" id="L369" title="All 2 branches missed.">        if (set == 0) return &quot;&quot;;</span>
+<span class="nc" id="L370">        final StringBuilder b = new StringBuilder();</span>
+<span class="nc" id="L371">        getCanonicalActionString(type, set, b);</span>
+<span class="nc" id="L372">        return b.toString();</span>
+    }
+
+    /**
+     * Get the canonical action string representation for the given action set, appending it to the given string builder.
+     *
+     * @param type the action {@code enum} type class
+     * @param set the action set
+     * @param b the string builder
+     * @param &lt;E&gt; the action type
+     */
+    public static &lt;E extends Enum&lt;E&gt;&gt; void getCanonicalActionString(Class&lt;E&gt; type, int set, StringBuilder b) {
+<span class="nc bnc" id="L384" title="All 2 branches missed.">        if (set == 0) return;</span>
+        @SuppressWarnings(&quot;unchecked&quot;)
+<span class="nc" id="L386">        final E[] constants = (E[]) storedInfo.get(type).constants;</span>
+<span class="nc" id="L387">        int bit = Integer.lowestOneBit(set);</span>
+<span class="nc" id="L388">        E e = constants[Integer.numberOfTrailingZeros(bit)];</span>
+<span class="nc" id="L389">        b.append(e.toString());</span>
+<span class="nc" id="L390">        set &amp;= ~bit;</span>
+<span class="nc bnc" id="L391" title="All 2 branches missed.">        while (set != 0) {</span>
+<span class="nc" id="L392">            bit = Integer.lowestOneBit(set);</span>
+<span class="nc" id="L393">            e = constants[Integer.numberOfTrailingZeros(bit)];</span>
+<span class="nc" id="L394">            b.append(',').append(e.toString());</span>
+<span class="nc" id="L395">            set &amp;= ~bit;</span>
+        }
+<span class="nc" id="L397">    }</span>
+
+    /**
+     * Get the canonical action string representation for the given action set.
+     *
+     * @param type the action {@code enum} type class
+     * @param set the action set
+     * @param &lt;E&gt; the action type
+     * @return the canonical representation
+     */
+    public static &lt;E extends Enum&lt;E&gt;&gt; String getCanonicalActionString(Class&lt;E&gt; type, long set) {
+<span class="nc bnc" id="L408" title="All 2 branches missed.">        if (set == 0) return &quot;&quot;;</span>
+<span class="nc" id="L409">        final StringBuilder b = new StringBuilder();</span>
+<span class="nc" id="L410">        getCanonicalActionString(type, set, b);</span>
+<span class="nc" id="L411">        return b.toString();</span>
+    }
+
+    /**
+     * Get the canonical action string representation for the given action set, appending it to the given string builder.
+     *
+     * @param type the action {@code enum} type class
+     * @param set the action set
+     * @param b the string builder
+     * @param &lt;E&gt; the action type
+     */
+    public static &lt;E extends Enum&lt;E&gt;&gt; void getCanonicalActionString(Class&lt;E&gt; type, long set, StringBuilder b) {
+<span class="nc bnc" id="L423" title="All 2 branches missed.">        if (set == 0) return;</span>
+        @SuppressWarnings(&quot;unchecked&quot;)
+<span class="nc" id="L425">        final E[] constants = (E[]) storedInfo.get(type).constants;</span>
+<span class="nc" id="L426">        long bit = Long.lowestOneBit(set);</span>
+<span class="nc" id="L427">        E e = constants[Long.numberOfTrailingZeros(bit)];</span>
+<span class="nc" id="L428">        b.append(e.toString());</span>
+<span class="nc" id="L429">        set &amp;= ~bit;</span>
+<span class="nc bnc" id="L430" title="All 2 branches missed.">        while (set != 0) {</span>
+<span class="nc" id="L431">            bit = Long.lowestOneBit(set);</span>
+<span class="nc" id="L432">            e = constants[Long.numberOfTrailingZeros(bit)];</span>
+<span class="nc" id="L433">            b.append(',').append(e.toString());</span>
+<span class="nc" id="L434">            set &amp;= ~bit;</span>
+        }
+<span class="nc" id="L436">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

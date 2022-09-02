@@ -1,0 +1,541 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-mechanism</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.mechanism._private</a> &gt; <span class="el_source">ElytronMessages.java</span></div><h1>ElytronMessages.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.mechanism._private;
+
+import static org.jboss.logging.Logger.Level.WARN;
+
+import org.jboss.logging.BasicLogger;
+import org.jboss.logging.Logger;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.LogMessage;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageLogger;
+import org.jboss.logging.annotations.Param;
+import org.jboss.logging.annotations.ValidIdRange;
+import org.jboss.logging.annotations.ValidIdRanges;
+import org.wildfly.security.asn1.ASN1Exception;
+import org.wildfly.security.http.HttpAuthenticationException;
+import org.wildfly.security.mechanism.AuthenticationMechanismException;
+import org.wildfly.security.mechanism.ScramServerErrorCode;
+import org.wildfly.security.mechanism.ScramServerException;
+
+/**
+ * Log messages and exceptions for Elytron.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+@MessageLogger(projectCode = &quot;ELY&quot;, length = 5)
+@ValidIdRanges({
+    @ValidIdRange(min = 7, max = 7),
+    @ValidIdRange(min = 1151, max = 1151),
+    @ValidIdRange(min = 5001, max = 5177),
+    @ValidIdRange(min = 6001, max = 6022),
+    @ValidIdRange(min = 7001, max = 7004)
+})
+public interface ElytronMessages extends BasicLogger {
+
+<span class="fc" id="L53">    ElytronMessages log = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security&quot;);</span>
+<span class="fc" id="L54">    ElytronMessages sasl = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.sasl&quot;);</span>
+<span class="fc" id="L55">    ElytronMessages saslAnonymous = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.sasl.anonymous&quot;);</span>
+<span class="fc" id="L56">    ElytronMessages saslDigest = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.sasl.digest&quot;);</span>
+<span class="fc" id="L57">    ElytronMessages saslEntity = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.sasl.entity&quot;);</span>
+<span class="fc" id="L58">    ElytronMessages saslExternal = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.sasl.external&quot;);</span>
+<span class="fc" id="L59">    ElytronMessages saslGs2 = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.sasl.gs2&quot;);</span>
+<span class="fc" id="L60">    ElytronMessages saslGssapi = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.sasl.gssapi&quot;);</span>
+<span class="fc" id="L61">    ElytronMessages saslLocal = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.sasl.local&quot;);</span>
+<span class="fc" id="L62">    ElytronMessages saslOAuth2 = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.sasl.oauth2&quot;);</span>
+<span class="fc" id="L63">    ElytronMessages saslOTP = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.sasl.otp&quot;);</span>
+<span class="fc" id="L64">    ElytronMessages saslPlain = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.sasl.plain&quot;);</span>
+<span class="fc" id="L65">    ElytronMessages saslScram = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.sasl.scram&quot;);</span>
+<span class="fc" id="L66">    ElytronMessages httpSpnego = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.http.spnego&quot;);</span>
+<span class="fc" id="L67">    ElytronMessages httpClientCert = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.http.cert&quot;);</span>
+<span class="fc" id="L68">    ElytronMessages httpDigest = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.http.digest&quot;);</span>
+<span class="fc" id="L69">    ElytronMessages httpExternal = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.http.external&quot;);</span>
+<span class="fc" id="L70">    ElytronMessages httpUserPass = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.http.password&quot;);</span>
+<span class="fc" id="L71">    ElytronMessages httpForm = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.http.form&quot;);</span>
+<span class="fc" id="L72">    ElytronMessages httpBearer = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.http.bearer&quot;);</span>
+<span class="fc" id="L73">    ElytronMessages httpBasic = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.http.basic&quot;);</span>
+
+    @LogMessage(level = WARN)
+    @Message(id = 7, value = &quot;Credential destroying failed&quot;)
+    void credentialDestroyingFailed(@Cause Throwable cause);
+
+    @Message(id = 1151, value = &quot;Evidence Verification Failed.&quot;)
+    SecurityException authenticationFailedEvidenceVerification();
+
+    @Message(id = 5001, value = &quot;Authentication mechanism exchange received a message after authentication was already complete&quot;)
+    AuthenticationMechanismException mechMessageAfterComplete();
+
+    @Message(id = 5002, value = &quot;Authentication mechanism user name contains an invalid or disallowed character&quot;)
+    AuthenticationMechanismException mechUserNameContainsInvalidCharacter();
+
+    @Message(id = 5004, value = &quot;Authentication mechanism authorization failed&quot;)
+    AuthenticationMechanismException mechAuthorizationFailed(@Cause Throwable cause);
+
+    @Message(id = 5005, value = &quot;Authentication mechanism authentication is not yet complete&quot;)
+    IllegalStateException mechAuthenticationNotComplete();
+
+    @Message(id = 5006, value = &quot;Authentication mechanism does not support security layer (wrapping/unwrapping)&quot;)
+    IllegalStateException mechNoSecurityLayer();
+
+    @Message(id = 5007, value = &quot;Invalid authentication mechanism negotiation message received&quot;)
+    AuthenticationMechanismException mechInvalidMessageReceived();
+
+    @Message(id = 5008, value = &quot;No authentication mechanism login name was given&quot;)
+    AuthenticationMechanismException mechNoLoginNameGiven();
+
+    @Message(id = 5009, value = &quot;No authentication mechanism password was given&quot;)
+    AuthenticationMechanismException mechNoPasswordGiven();
+
+    @Message(id = 5010, value = &quot;Authentication mechanism authentication failed due to one or more malformed fields&quot;)
+    AuthenticationMechanismException mechMalformedFields(@Cause IllegalArgumentException ex);
+
+    @Message(id = 5011, value = &quot;Authentication mechanism message is too long&quot;)
+    AuthenticationMechanismException mechMessageTooLong();
+
+    @Message(id = 5012, value = &quot;Authentication mechanism server-side authentication failed&quot;)
+    AuthenticationMechanismException mechServerSideAuthenticationFailed(@Cause Exception e);
+
+    @Message(id = 5013, value = &quot;Authentication mechanism password not verified&quot;)
+    AuthenticationMechanismException mechPasswordNotVerified();
+
+    @Message(id = 5014, value = &quot;Authentication mechanism authorization failed: \&quot;%s\&quot; running as \&quot;%s\&quot;&quot;)
+    AuthenticationMechanismException mechAuthorizationFailed(String userName, String authorizationId);
+
+    @Message(id = 5018, value = &quot;Channel binding data changed&quot;)
+    AuthenticationMechanismException mechChannelBindingChanged();
+
+    @Message(id = 5019, value = &quot;No token was given&quot;)
+    AuthenticationMechanismException mechNoTokenGiven();
+
+    @Message(id = 5022, value = &quot;Initial challenge must be empty&quot;)
+    AuthenticationMechanismException mechInitialChallengeMustBeEmpty();
+
+    @Message(id = 5023, value = &quot;Unable to set channel binding&quot;)
+    AuthenticationMechanismException mechUnableToSetChannelBinding(@Cause Exception e);
+
+    @Message(id = 5024, value = &quot;Failed to determine channel binding status&quot;)
+    AuthenticationMechanismException mechFailedToDetermineChannelBindingStatus(@Cause Exception e);
+
+    @Message(id = 5025, value = &quot;Mutual authentication not enabled&quot;)
+    AuthenticationMechanismException mechMutualAuthenticationNotEnabled();
+
+    @Message(id = 5026, value = &quot;Unable to map SASL mechanism name to a GSS-API OID&quot;)
+    AuthenticationMechanismException mechMechanismToOidMappingFailed(@Cause Exception e);
+
+    @Message(id = 5027, value = &quot;Unable to dispose of GSSContext&quot;)
+    AuthenticationMechanismException mechUnableToDisposeGssContext(@Cause Exception e);
+
+    @Message(id = 5028, value = &quot;Unable to create name for acceptor&quot;)
+    AuthenticationMechanismException mechUnableToCreateNameForAcceptor(@Cause Exception e);
+
+    @Message(id = 5029, value = &quot;Unable to create GSSContext&quot;)
+    AuthenticationMechanismException mechUnableToCreateGssContext(@Cause Exception e);
+
+    @Message(id = 5030, value = &quot;Unable to set GSSContext request flags&quot;)
+    AuthenticationMechanismException mechUnableToSetGssContextRequestFlags(@Cause Exception e);
+
+    @Message(id = 5031, value = &quot;Unable to accept SASL client message&quot;)
+    AuthenticationMechanismException mechUnableToAcceptClientMessage(@Cause Exception e);
+
+    @Message(id = 5032, value = &quot;GSS-API mechanism mismatch between SASL client and server&quot;)
+    AuthenticationMechanismException mechGssApiMechanismMismatch();
+
+    @Message(id = 5033, value = &quot;Channel binding not supported for this SASL mechanism&quot;)
+    AuthenticationMechanismException mechChannelBindingNotSupported();
+
+    @Message(id = 5034, value = &quot;Channel binding type mismatch between SASL client and server&quot;)
+    AuthenticationMechanismException mechChannelBindingTypeMismatch();
+
+    @Message(id = 5035, value = &quot;Channel binding not provided by client&quot;)
+    AuthenticationMechanismException mechChannelBindingNotProvided();
+
+    @Message(id = 5036, value = &quot;Unable to determine peer name&quot;)
+    AuthenticationMechanismException mechUnableToDeterminePeerName(@Cause Exception e);
+
+    @Message(id = 5037, value = &quot;Authentication mechanism client refuses to initiate authentication&quot;)
+    AuthenticationMechanismException mechClientRefusesToInitiateAuthentication();
+
+    @Message(id = 5038, value = &quot;Nonces do not match&quot;)
+    AuthenticationMechanismException mechNoncesDoNotMatch();
+
+    @Message(id = 5039, value = &quot;Invalid length of nonce received&quot;)
+    AuthenticationMechanismException invalidNonceLength();
+
+    @Message(id = 5040, value = &quot;Iteration count %d is below the minimum of %d&quot;)
+    AuthenticationMechanismException mechIterationCountIsTooLow(int iterationCount, int minimumIterationCount);
+
+    @Message(id = 5041, value = &quot;Iteration count %d is above the maximum of %d&quot;)
+    AuthenticationMechanismException mechIterationCountIsTooHigh(int iterationCount, int maximumIterationCount);
+
+    @Message(id = 5043, value = &quot;Invalid server message&quot;)
+    AuthenticationMechanismException mechInvalidServerMessage();
+
+    @Message(id = 5044, value = &quot;Invalid server message&quot;)
+    AuthenticationMechanismException mechInvalidServerMessageWithCause(@Cause Throwable cause);
+
+    @Message(id = 5045, value = &quot;Invalid client message&quot;)
+    AuthenticationMechanismException mechInvalidClientMessage();
+
+    @Message(id = 5046, value = &quot;Invalid client message&quot;)
+    AuthenticationMechanismException mechInvalidClientMessageWithCause(@Cause Throwable cause);
+
+    @Message(id = 5047, value = &quot;[%s] Authentication mechanism message is for mismatched mechanism \&quot;%s\&quot;&quot;)
+    AuthenticationMechanismException mechUnmatchedMechanism(String mechName, String otherMechName);
+
+    @Message(id = 5049, value = &quot;Server authenticity cannot be verified&quot;)
+    AuthenticationMechanismException mechServerAuthenticityCannotBeVerified();
+
+    @Message(id = 5050, value = &quot;Callback handler does not support user name&quot;)
+    AuthenticationMechanismException mechCallbackHandlerDoesNotSupportUserName(@Cause Throwable cause);
+
+    @Message(id = 5051, value = &quot;Callback handler does not support credential acquisition&quot;)
+    AuthenticationMechanismException mechCallbackHandlerDoesNotSupportCredentialAcquisition(@Cause Throwable cause);
+
+    @Message(id = 5052, value = &quot;Callback handler does not support authorization&quot;)
+    AuthenticationMechanismException mechAuthorizationUnsupported(@Cause Throwable cause);
+
+    @Message(id = 5053, value = &quot;Callback handler failed for unknown reason&quot;)
+    AuthenticationMechanismException mechCallbackHandlerFailedForUnknownReason(@Cause Throwable cause);
+
+    @Message(id = 5055, value = &quot;Authentication rejected (invalid proof)&quot;)
+    AuthenticationMechanismException mechAuthenticationRejectedInvalidProof();
+
+    @Message(id = 5056, value = &quot;Client sent extra message&quot;)
+    AuthenticationMechanismException mechClientSentExtraMessage();
+
+    @Message(id = 5057, value = &quot;Server sent extra message&quot;)
+    AuthenticationMechanismException mechServerSentExtraMessage();
+
+    @Message(id = 5058, value = &quot;Authentication failed&quot;)
+    AuthenticationMechanismException mechAuthenticationFailed();
+
+    @Message(id = 5060, value = &quot;Empty number&quot;)
+    NumberFormatException emptyNumber();
+
+    @Message(id = 5061, value = &quot;Invalid numeric character&quot;)
+    NumberFormatException invalidNumericCharacter();
+
+    @Message(id = 5062, value = &quot;Too big number&quot;)
+    NumberFormatException tooBigNumber();
+
+    @Message(id = 5063, value = &quot;Cannot get clear password from two way password&quot;)
+    AuthenticationMechanismException mechCannotGetTwoWayPasswordChars(@Cause Throwable cause);
+
+    @Message(id = 5064, value = &quot;Hashing algorithm not supported&quot;)
+    AuthenticationMechanismException mechMacAlgorithmNotSupported(@Cause Throwable cause);
+
+    @Message(id = 5065, value = &quot;keyword cannot be empty&quot;)
+    AuthenticationMechanismException mechKeywordCannotBeEmpty();
+
+    @Message(id = 5066, value = &quot;No value found for keyword: %s&quot;)
+    AuthenticationMechanismException mechNoValueFoundForKeyword(String keyword);
+
+    @Message(id = 5067, value = &quot;'=' expected after keyword: %s&quot;)
+    AuthenticationMechanismException mechKeywordNotFollowedByEqual(String keyword);
+
+    @Message(id = 5068, value = &quot;Unmatched quote found for value: %s&quot;)
+    AuthenticationMechanismException mechUnmatchedQuoteFoundForValue(String value);
+
+    @Message(id = 5069, value = &quot;Expecting comma or linear whitespace after quoted string: %s&quot;)
+    AuthenticationMechanismException mechExpectingCommaOrLinearWhitespaceAfterQuoted(String value);
+
+    @Message(id = 5070, value = &quot;MessageType must equal to %d, but it is %d&quot;)
+    AuthenticationMechanismException mechMessageTypeMustEqual(int expected, int actual);
+
+    @Message(id = 5071, value = &quot;Bad sequence number while unwrapping: expected %d, but %d received&quot;)
+    AuthenticationMechanismException mechBadSequenceNumberWhileUnwrapping(int expected, int actual);
+
+    @Message(id = 5072, value = &quot;Problem during crypt&quot;)
+    AuthenticationMechanismException mechProblemDuringCrypt(@Cause Throwable cause);
+
+    @Message(id = 5073, value = &quot;Problem during decrypt&quot;)
+    AuthenticationMechanismException mechProblemDuringDecrypt(@Cause Throwable cause);
+
+    @Message(id = 5074, value = &quot;Unknown cipher \&quot;%s\&quot;&quot;)
+    AuthenticationMechanismException mechUnknownCipher(String cipher);
+
+    @Message(id = 5075, value = &quot;Authorization ID changed unexpectedly&quot;)
+    AuthenticationMechanismException mechAuthorizationIdChanged();
+
+    @Message(id = 5076, value = &quot;Problem getting required cipher. Check your transformation mapper settings.&quot;)
+    AuthenticationMechanismException mechProblemGettingRequiredCipher(@Cause Throwable cause);
+
+    @Message(id = 5077, value = &quot;No common protection layer between client and server&quot;)
+    AuthenticationMechanismException mechNoCommonProtectionLayer();
+
+    @Message(id = 5078, value = &quot;No common cipher between client and server&quot;)
+    AuthenticationMechanismException mechNoCommonCipher();
+
+    @Message(id = 5079, value = &quot;No ciphers offered by server&quot;)
+    AuthenticationMechanismException mechNoCiphersOfferedByServer();
+
+    @Message(id = 5080, value = &quot;Callback handler not provided user name&quot;)
+    AuthenticationMechanismException mechNotProvidedUserName();
+
+    @Message(id = 5083, value = &quot;Missing \&quot;%s\&quot; directive&quot;)
+    AuthenticationMechanismException mechMissingDirective(String directive);
+
+    @Message(id = 5084, value = &quot;nonce-count must equal to %d, but it is %d&quot;)
+    AuthenticationMechanismException mechNonceCountMustEqual(int expected, int actual);
+
+    @Message(id = 5085, value = &quot;Server is set to not support %s charset&quot;)
+    AuthenticationMechanismException mechUnsupportedCharset(String charset);
+
+    @Message(id = 5086, value = &quot;Charset can be only \&quot;utf-8\&quot; or unspecified (to use ISO 8859-1)&quot;)
+    AuthenticationMechanismException mechUnknownCharset();
+
+    @Message(id = 5087, value = &quot;Client selected realm not offered by server (%s)&quot;)
+    AuthenticationMechanismException mechDisallowedClientRealm(String clientRealm);
+
+    @Message(id = 5088, value = &quot;digest-uri \&quot;%s\&quot; not accepted&quot;)
+    AuthenticationMechanismException mechMismatchedWrongDigestUri(String actual);
+
+    @Message(id = 5089, value = &quot;Unexpected qop value: \&quot;%s\&quot;&quot;)
+    AuthenticationMechanismException mechUnexpectedQop(String qop);
+
+    @Message(id = 5090, value = &quot;Wrapping is not configured&quot;)
+    IllegalStateException wrappingNotConfigured();
+
+    @Message(id = 5091, value = &quot;Authentication name string is too long&quot;)
+    AuthenticationMechanismException mechAuthenticationNameTooLong();
+
+    @Message(id = 5092, value = &quot;Authentication name is empty&quot;)
+    AuthenticationMechanismException mechAuthenticationNameIsEmpty();
+
+    @Message(id = 5093, value = &quot;Authorization for anonymous access is denied&quot;)
+    AuthenticationMechanismException mechAnonymousAuthorizationDenied();
+
+    @Message(id = 5094, value = &quot;Required padded length (%d) is less than length of conversion result (%d)&quot;)
+    IllegalArgumentException requiredNegativePadding(int totalLength, int hexLength);
+
+    @Message(id = 5095, value = &quot;Invalid key provided for Digest HMAC computing&quot;)
+    AuthenticationMechanismException mechInvalidKeyForDigestHMAC();
+
+    @Message(id = 5097, value = &quot;Unable to determine subject name from X.509 certificate&quot;)
+    IllegalStateException unableToDetermineSubjectName(@Cause Throwable cause);
+
+    @Message(id = 5098, value = &quot;Unable to verify client signature&quot;)
+    AuthenticationMechanismException mechUnableToVerifyClientSignature(@Cause Throwable cause);
+
+    @Message(id = 5099, value = &quot;Unable to verify server signature&quot;)
+    AuthenticationMechanismException mechUnableToVerifyServerSignature(@Cause Throwable cause);
+
+    @Message(id = 5101, value = &quot;Callback handler not provided server certificate&quot;)
+    AuthenticationMechanismException mechCallbackHandlerNotProvidedServerCertificate();
+
+    @Message(id = 5102, value = &quot;Callback handler not provided client certificate&quot;)
+    AuthenticationMechanismException mechCallbackHandlerNotProvidedClientCertificate();
+
+    @Message(id = 5103, value = &quot;Server identifier mismatch&quot;)
+    AuthenticationMechanismException mechServerIdentifierMismatch();
+
+    @Message(id = 5104, value = &quot;Client identifier mismatch&quot;)
+    AuthenticationMechanismException mechClientIdentifierMismatch();
+
+    @Message(id = 5105, value = &quot;Unable to determine client name&quot;)
+    AuthenticationMechanismException mechUnableToDetermineClientName(@Cause Throwable cause);
+
+    @Message(id = 5106, value = &quot;Callback handler not provided private key&quot;)
+    AuthenticationMechanismException mechCallbackHandlerNotProvidedPrivateKey();
+
+    @Message(id = 5107, value = &quot;Unable to create signature&quot;)
+    AuthenticationMechanismException mechUnableToCreateSignature(@Cause Throwable cause);
+
+    @Message(id = 5108, value = &quot;Unable to create response token&quot;)
+    AuthenticationMechanismException mechUnableToCreateResponseToken(@Cause Throwable cause);
+
+    @Message(id = 5109, value = &quot;Unable to create response token&quot;)
+    AuthenticationMechanismException mechUnableToCreateResponseTokenWithCause(@Cause Throwable cause);
+
+    @Message(id = 5112, value = &quot;Getting authentication mechanisms supported by GSS-API failed&quot;)
+    AuthenticationMechanismException mechGettingSupportedMechanismsFailed(@Cause Throwable cause);
+
+    @Message(id = 5113, value = &quot;Unable to initialize OID of Kerberos V5&quot;)
+    RuntimeException unableToInitialiseOid(@Cause Throwable cause);
+
+    @Message(id = 5114, value = &quot;Receive buffer requested '%d' is greater than supported maximum '%d'&quot;)
+    AuthenticationMechanismException mechReceiveBufferIsGreaterThanMaximum(int requested, int maximum);
+
+    @Message(id = 5115, value = &quot;Unable to wrap message&quot;)
+    AuthenticationMechanismException mechUnableToWrapMessage(@Cause Throwable cause);
+
+    @Message(id = 5116, value = &quot;Unable to unwrap message&quot;)
+    AuthenticationMechanismException mechUnableToUnwrapMessage(@Cause Throwable cause);
+
+    @Message(id = 5117, value = &quot;Unable to unwrap security layer negotiation message&quot;)
+    AuthenticationMechanismException mechUnableToUnwrapSecurityLayerNegotiationMessage(@Cause Throwable cause);
+
+    @Message(id = 5118, value = &quot;Invalid message of length %d on unwrapping&quot;)
+    AuthenticationMechanismException mechInvalidMessageOnUnwrapping(int length);
+
+    @Message(id = 5119, value = &quot;Negotiated mechanism was not Kerberos V5&quot;)
+    AuthenticationMechanismException mechNegotiatedMechanismWasNotKerberosV5();
+
+    @Message(id = 5120, value = &quot;Insufficient levels of protection available for supported security layers&quot;)
+    AuthenticationMechanismException mechInsufficientQopsAvailable();
+
+    @Message(id = 5121, value = &quot;Unable to generate security layer challenge&quot;)
+    AuthenticationMechanismException mechUnableToGenerateChallenge(@Cause Throwable cause);
+
+    @Message(id = 5122, value = &quot;Client selected a security layer that was not offered by server&quot;)
+    AuthenticationMechanismException mechSelectedUnofferedQop();
+
+    @Message(id = 5123, value = &quot;No security layer selected but message length received&quot;)
+    AuthenticationMechanismException mechNoSecurityLayerButLengthReceived();
+
+    @Message(id = 5124, value = &quot;Unable to get maximum size of message before wrap&quot;)
+    AuthenticationMechanismException mechUnableToGetMaximumSizeOfMessage(@Cause Throwable cause);
+
+    @Message(id = 5125, value = &quot;Unable to handle response from server&quot;)
+    AuthenticationMechanismException mechUnableToHandleResponseFromServer(@Cause Throwable cause);
+
+    @Message(id = 5126, value = &quot;Bad length of message for negotiating security layer&quot;)
+    AuthenticationMechanismException mechBadLengthOfMessageForNegotiatingSecurityLayer();
+
+    @Message(id = 5127, value = &quot;No security layer supported by server but maximum message size received: \&quot;%d\&quot;&quot;)
+    AuthenticationMechanismException mechReceivedMaxMessageSizeWhenNoSecurityLayer(int length);
+
+    @Message(id = 5128, value = &quot;Failed to read challenge file&quot;)
+    AuthenticationMechanismException mechFailedToReadChallengeFile(@Cause Throwable cause);
+
+    @Message(id = 5129, value = &quot;Failed to create challenge file&quot;)
+    AuthenticationMechanismException mechFailedToCreateChallengeFile(@Cause Throwable cause);
+
+    @Message(id = 5150, value = &quot;Authentication mechanism authorization ID is too long&quot;)
+    AuthenticationMechanismException mechAuthorizationIdTooLong();
+
+    @Message(id = 5151, value = &quot;Invalid OTP algorithm \&quot;%s\&quot;&quot;)
+    AuthenticationMechanismException mechInvalidOTPAlgorithm(String algorithm);
+
+    @Message(id = 5152, value = &quot;Invalid OTP response type&quot;)
+    AuthenticationMechanismException mechInvalidOTPResponseType();
+
+    @Message(id = 5153, value = &quot;Incorrect parity in SASL client message&quot;)
+    AuthenticationMechanismException mechIncorrectParity();
+
+    @Message(id = 5154, value = &quot;Invalid character in seed&quot;)
+    AuthenticationMechanismException mechInvalidCharacterInSeed();
+
+    @Message(id = 5155, value = &quot;Invalid OTP seed, must be between 1 and 16 characters long&quot;)
+    AuthenticationMechanismException mechInvalidOTPSeed();
+
+    @Message(id = 5156, value = &quot;Invalid OTP pass phrase, must be between 10 and 63 characters long&quot;)
+    AuthenticationMechanismException mechInvalidOTPPassPhrase();
+
+    @Message(id = 5157, value = &quot;Invalid OTP sequence number&quot;)
+    AuthenticationMechanismException mechInvalidOTPSequenceNumber();
+
+    @Message(id = 5158, value = &quot;Invalid OTP&quot;)
+    AuthenticationMechanismException mechInvalidOTP();
+
+    @Message(id = 5159, value = &quot;OTP pass phrase and seed must not match&quot;)
+    AuthenticationMechanismException mechOTPPassPhraseAndSeedMustNotMatch();
+
+    @Message(id = 5160, value = &quot;Invalid OTP alternate dictionary&quot;)
+    AuthenticationMechanismException mechInvalidOTPAlternateDictionary();
+
+    @Message(id = 5161, value = &quot;Unable to retrieve password for \&quot;%s\&quot;&quot;)
+    AuthenticationMechanismException mechUnableToRetrievePassword(String userName);
+
+    @Message(id = 5162, value = &quot;Unable to update password for \&quot;%s\&quot;&quot;)
+    AuthenticationMechanismException mechUnableToUpdatePassword(String userName);
+
+    @Message(id = 5163, value = &quot;Authentication mechanism server timed out&quot;)
+    AuthenticationMechanismException mechServerTimedOut();
+
+    @Message(id = 5164, value = &quot;Unable to obtain exclusive access for \&quot;%s\&quot;&quot;)
+    AuthenticationMechanismException mechUnableToObtainExclusiveAccess(String userName);
+
+    @Message(id = 5165, value = &quot;OTP re-initialization failed&quot;)
+    AuthenticationMechanismException mechOTPReinitializationFailed(@Cause Throwable cause);
+
+    @Message(id = 5166, value = &quot;Server rejected authentication&quot;)
+    ScramServerException scramServerRejectedAuthentication(@Param ScramServerErrorCode errorCode);
+
+    @Message(id = 5167, value = &quot;Invalid OTP password format type&quot;)
+    AuthenticationMechanismException mechInvalidOTPPasswordFormatType();
+
+    @Message(id = 5168, value = &quot;Unsupported algorithm selected \&quot;%s\&quot;&quot;)
+    AuthenticationMechanismException mechUnsupportedAlgorithm(String algorithm);
+
+    @Message(id = 5169, value = &quot;[%s] Clients response token does not match expected token&quot;)
+    String mechResponseTokenMismatch(String mechName);
+
+    @Message(id = 5170, value = &quot;Problem during crypt: The encrypted result is null. The input data has a length of zero or too short to result in a new block.&quot;)
+    AuthenticationMechanismException mechProblemDuringCryptResultIsNull();
+
+    @Message(id = 5171, value = &quot;Problem during decrypt: The decrypted result is null. The input data has a length of zero or too short to result in a new block.&quot;)
+    AuthenticationMechanismException mechProblemDuringDecryptResultIsNull();
+
+    @Message(id = 5173, value = &quot;Unable to obtain server credential.&quot;)
+    AuthenticationMechanismException unableToObtainServerCredential();
+
+    @Message(id = 5174, value = &quot;Callback handler has not chosen realm&quot;)
+    AuthenticationMechanismException mechNotChosenRealm();
+
+    @Message(id = 5175, value = &quot;Unable to determine bound server name&quot;)
+    AuthenticationMechanismException mechUnableToDetermineBoundServerName(@Cause Exception e);
+
+    @Message(id = 5176, value = &quot;Unsupported callback&quot;)
+    AuthenticationMechanismException mechCallbackHandlerUnsupportedCallback(@Cause Throwable cause);
+
+    @Message(id = 5177, value = &quot;One of \&quot;%s\&quot; and \&quot;%s\&quot; directives has to be defined&quot;)
+    AuthenticationMechanismException mechOneOfDirectivesHasToBeDefined(String directive1, String directive2);
+
+    @Message(id = 6001, value = &quot;An incorrectly formatted '%s'header was encountered.&quot;)
+    String incorrectlyFormattedHeader(String headerName);
+
+    @Message(id = 6002, value = &quot;An authentication attempt for user '%s' failed validation using mechanism '%s'.&quot;)
+    String authenticationFailed(String username, String mechanismName);
+
+    @Message(id = 6003, value = &quot;An authentication attempt failed validation.&quot;)
+    String authenticationFailed();
+
+    @Message(id = 6006, value = &quot;An authorization check for user '%s' failed.&quot;)
+    String authorizationFailed(String username);
+
+    @Message(id = 6007, value = &quot;Username or password missing from authentication attempt.&quot;)
+    String usernameOrPasswordMissing();
+
+    @Message(id = 6015, value = &quot;Unable to authenticate using DIGEST mechanism - realm name needs to be specified&quot;)
+    HttpAuthenticationException digestMechanismRequireRealm();
+
+    @Message(id = 6019, value = &quot;Unable to authenticate using DIGEST mechanism - mechanism realm name (%s) is not valid&quot;)
+    HttpAuthenticationException digestMechanismInvalidRealm(String realm);
+
+    @Message(id = 6020, value = &quot;Scope unsuitable for use with authentication state '%s'&quot;)
+    IllegalArgumentException unsuitableScope(String scopeName);
+
+    @Message(id = 6021, value = &quot;Unable to identify suitable HttpScope for mechanism state storage&quot;)
+    IllegalArgumentException unableToIdentifyHttpScope();
+
+    @Message(id = 6022, value = &quot;Invalid nonce count %s&quot;)
+    HttpAuthenticationException invalidNonceCount(int nonceCount);
+
+    @Message(id = 7001, value = &quot;Unrecognized encoding algorithm [%s]&quot;)
+    ASN1Exception asnUnrecognisedAlgorithm(String algorithm);
+
+    @Message(id = 7002, value = &quot;Invalid general name type&quot;)
+    ASN1Exception asnInvalidGeneralNameType();
+
+    @Message(id = 7004, value = &quot;Unexpected ASN.1 tag encountered&quot;)
+    ASN1Exception asnUnexpectedTag();
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

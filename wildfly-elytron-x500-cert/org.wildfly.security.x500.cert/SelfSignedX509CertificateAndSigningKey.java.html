@@ -1,0 +1,409 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SelfSignedX509CertificateAndSigningKey.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-x500-cert</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.x500.cert</a> &gt; <span class="el_source">SelfSignedX509CertificateAndSigningKey.java</span></div><h1>SelfSignedX509CertificateAndSigningKey.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2017 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.x500.cert;
+
+import static org.wildfly.security.x500.cert.util.KeyUtil.getDefaultCompatibleSignatureAlgorithmName;
+import static org.wildfly.security.x500.cert.util.KeyUtil.getKeyIdentifier;
+import static org.wildfly.security.x500.cert.CertUtil.getX509CertificateExtension;
+import static org.wildfly.security.x500.cert._private.ElytronMessages.log;
+
+import java.math.BigInteger;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.PrivateKey;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
+import java.time.ZonedDateTime;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import javax.security.auth.x500.X500Principal;
+
+import org.wildfly.common.Assert;
+
+
+/**
+ * A self-signed X.509 certificate and the private key used to sign the certificate. This class can be used to
+ * generate a PKCS #10 certificate signing request.
+ *
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ * @since 1.2.0
+ */
+public final class SelfSignedX509CertificateAndSigningKey {
+
+    private final X509Certificate selfSignedcertificate;
+    private final PrivateKey signingKey;
+
+<span class="fc" id="L53">    private SelfSignedX509CertificateAndSigningKey(Builder builder) {</span>
+<span class="fc" id="L54">        this.selfSignedcertificate = builder.selfSignedCertificate;</span>
+<span class="fc" id="L55">        this.signingKey = builder.signingKey;</span>
+<span class="fc" id="L56">    }</span>
+
+    /**
+     * Get the self-signed X.509 certificate.
+     *
+     * @return the self-signed X.509 certificate
+     */
+    public X509Certificate getSelfSignedCertificate() {
+<span class="fc" id="L64">        return selfSignedcertificate;</span>
+    }
+
+    /**
+     * Get the private key used to sign the self-signed X.509 certificate.
+     *
+     * @return the private key used to sign the self-signed X.509 certificate
+     */
+    public PrivateKey getSigningKey() {
+<span class="fc" id="L73">        return signingKey;</span>
+    }
+
+    /**
+     * Generate a PKCS #10 certificate signing request using the self-signed X.509 certificate and the signing key.
+     *
+     * @return a PKCS #10 certificate signing request
+     */
+    public PKCS10CertificateSigningRequest generatePKCS10CertificateSigningRequest() {
+<span class="fc" id="L82">        return PKCS10CertificateSigningRequest.builder()</span>
+<span class="fc" id="L83">                .setCertificate(selfSignedcertificate)</span>
+<span class="fc" id="L84">                .setSigningKey(signingKey)</span>
+<span class="fc" id="L85">                .build();</span>
+    }
+
+    /**
+     * Construct a new builder instance.
+     *
+     * @return the new builder instance
+     */
+    public static Builder builder() {
+<span class="fc" id="L94">        return new Builder();</span>
+    }
+
+    /**
+     * A {@code Builder} to configure and generate a {@code SelfSignedX509CertificateAndSigningKey}.
+     * This {@code Builder} generates a key pair and then wraps the resulting public key into a
+     * self-signed X.509 certificate.
+     */
+    public static class Builder {
+
+        /**
+         * The default key algorithm name.
+         */
+        public static final String DEFAULT_KEY_ALGORITHM_NAME = &quot;DSA&quot;;
+
+        /**
+         * The default key size that will be used if the key algorithm name is EC.
+         */
+        public static final int DEFAULT_EC_KEY_SIZE = 256;
+
+        /**
+         * The default key size that will be used if the key algorithm name is not EC.
+         */
+        public static final int DEFAULT_KEY_SIZE = 2048;
+
+        private static final int VERSION = 3; // X.509 v3
+<span class="fc" id="L120">        private final Map&lt;String, X509CertificateExtension&gt; extensionsByOid = new LinkedHashMap&lt;&gt;();</span>
+        private String keyAlgorithmName;
+        private String signatureAlgorithmName;
+<span class="fc" id="L123">        private int keySize = -1;</span>
+        private X500Principal dn;
+        private ZonedDateTime notValidBefore;
+        private ZonedDateTime notValidAfter;
+        private X509Certificate selfSignedCertificate;
+        private PrivateKey signingKey;
+
+        /**
+         * Construct a new uninitialized instance.
+         */
+<span class="fc" id="L133">        Builder() {</span>
+<span class="fc" id="L134">        }</span>
+
+        /**
+         * Set the key algorithm name to use when generating the key pair.
+         *
+         * @param keyAlgorithmName the key algorithm name to use when generating the key pair (must not be {@code null})
+         * @return this builder instance
+         */
+        public Builder setKeyAlgorithmName(final String keyAlgorithmName) {
+<span class="fc" id="L143">            Assert.checkNotNullParam(&quot;keyAlgorithmName&quot;, keyAlgorithmName);</span>
+<span class="fc" id="L144">            this.keyAlgorithmName = keyAlgorithmName;</span>
+<span class="fc" id="L145">            return this;</span>
+        }
+
+        /**
+         * Set the key size to use when generating the key pair.
+         *
+         * @param keySize the key size to use when generating the key pair
+         * @return this builder instance
+         */
+        public Builder setKeySize(final int keySize) {
+<span class="fc" id="L155">            this.keySize = keySize;</span>
+<span class="fc" id="L156">            return this;</span>
+        }
+
+        /**
+         * Set the signature algorithm name to use when signing the self-signed certificate.
+         *
+         * @param signatureAlgorithmName the signature algorithm to use when signing the self-signed certificate (must not be {@code null})
+         * @return this builder instance
+         */
+        public Builder setSignatureAlgorithmName(final String signatureAlgorithmName) {
+<span class="fc" id="L166">            Assert.checkNotNullParam(&quot;signatureAlgorithmName&quot;, signatureAlgorithmName);</span>
+<span class="fc" id="L167">            this.signatureAlgorithmName = signatureAlgorithmName;</span>
+<span class="fc" id="L168">            return this;</span>
+        }
+
+        /**
+         * Set the DN.
+         *
+         * @param dn the DN to use as both the subject DN and the issuer DN (must not be {@code null})
+         * @return this builder instance
+         */
+        public Builder setDn(final X500Principal dn) {
+<span class="fc" id="L178">            Assert.checkNotNullParam(&quot;dn&quot;, dn);</span>
+<span class="fc" id="L179">            this.dn = dn;</span>
+<span class="fc" id="L180">            return this;</span>
+        }
+
+        /**
+         * Add an X.509 certificate extension. If an extension with the same OID already exists, an exception is thrown.
+         *
+         * @param extension the extension to add (must not be {@code null})
+         * @return this builder instance
+         * @throws IllegalArgumentException if an extension with the same OID has already been added
+         */
+        public Builder addExtension(X509CertificateExtension extension) throws IllegalArgumentException {
+<span class="fc" id="L191">            Assert.checkNotNullParam(&quot;extension&quot;, extension);</span>
+<span class="fc" id="L192">            final String oid = extension.getId();</span>
+<span class="fc" id="L193">            Assert.checkNotNullParam(&quot;extension.getOid()&quot;, oid);</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">            if (extensionsByOid.putIfAbsent(oid, extension) != null) {</span>
+<span class="nc" id="L195">                throw log.extensionAlreadyExists(oid);</span>
+            }
+<span class="fc" id="L197">            return this;</span>
+        }
+
+        /**
+         * Add an X.509 certificate extension using the given extension name and string value. If an extension with the same name already exists,
+         * an exception is thrown. The following extension names and values are supported:
+         *
+         * &lt;ul&gt;
+         *   &lt;li&gt; {@code name: BasicConstraints} &lt;br/&gt;
+         *        {@code value: ca:{true|false}[,pathlen:&lt;len&gt;]} where {@code ca} indicates whether or not the subject
+         *        is a CA. If {@code ca} is true, {@code pathlen} indicates the path length constraint.
+         *   &lt;/li&gt;
+         *   &lt;br/&gt;
+         *   &lt;li&gt; {@code name: KeyUsage} &lt;br/&gt;
+         *        {@code value: usage(,usage)*} where {@code value} is a list of the allowed key usages, where each
+         *        {@code usage} value must be one of the following ({@code usage} values are case-sensitive):
+         *        &lt;ul&gt;
+         *            &lt;li&gt;{@code digitalSignature}&lt;/li&gt;
+         *            &lt;li&gt;{@code nonRepudiation}&lt;/li&gt;
+         *            &lt;li&gt;{@code keyEncipherment}&lt;/li&gt;
+         *            &lt;li&gt;{@code dataEncipherment}&lt;/li&gt;
+         *            &lt;li&gt;{@code keyAgreement}&lt;/li&gt;
+         *            &lt;li&gt;{@code keyCertSign}&lt;/li&gt;
+         *            &lt;li&gt;{@code cRLSign}&lt;/li&gt;
+         *            &lt;li&gt;{@code encipherOnly}&lt;/li&gt;
+         *            &lt;li&gt;{@code decipherOnly}&lt;/li&gt;
+         *        &lt;/ul&gt;
+         *   &lt;/li&gt;
+         *   &lt;li&gt; {@code name: ExtendedKeyUsage} &lt;br/&gt;
+         *        {@code value: usage(,usage)*} where {@code value} is a list of the allowed key purposes, where each
+         *        {@code usage} value must be one of the following ({@code usage} values are case-sensitive):
+         *        &lt;ul&gt;
+         *            &lt;li&gt;{@code serverAuth}&lt;/li&gt;
+         *            &lt;li&gt;{@code clientAuth}&lt;/li&gt;
+         *            &lt;li&gt;{@code codeSigning}&lt;/li&gt;
+         *            &lt;li&gt;{@code emailProtection}&lt;/li&gt;
+         *            &lt;li&gt;{@code timeStamping}&lt;/li&gt;
+         *            &lt;li&gt;{@code OCSPSigning}&lt;/li&gt;
+         *            &lt;li&gt;any OID string&lt;/li&gt;
+         *        &lt;/ul&gt;
+         *   &lt;/li&gt;
+         *   &lt;li&gt; {@code name SubjectAlternativeName} &lt;br/&gt;
+         *        {@code value: type:val(,type:val)*} where {@code value} is a list of {@code type:val} pairs, where
+         *        {@code type} can be {@code EMAIL}, {@code URI}, {@code DNS}, {@code IP}, or {@code OID} and {@code val}
+         *        is a string value for the {@code type}.
+         *   &lt;/li&gt;
+         *   &lt;br/&gt;
+         *   &lt;li&gt; {@code name: IssuerAlternativeName} &lt;br/&gt;
+         *        {@code value: type:val(,type:val)*} where {@code value} is a list of {@code type:val} pairs, where
+         *        {@code type} can be {@code EMAIL}, {@code URI}, {@code DNS}, {@code IP}, or {@code OID} and {@code val}
+         *        is a string value for the {@code type}.
+         *   &lt;/li&gt;
+         *   &lt;br/&gt;
+         *   &lt;li&gt; {@code name: AuthorityInformationAccess} &lt;br/&gt;
+         *        {@code value: method:location-type:location-value(,method:location-type:location-value)*} where
+         *        {@code value} is a list of {@code method:location-type:location-value} triples, where {@code method} can be
+         *        {@code ocsp}, {@code caIssuers}, or any OID and {@code location-type:location-value} can be any
+         *        {@code type:val} pair as defined for the {@code SubjectAlternativeName} extension.
+         *   &lt;/li&gt;
+         *   &lt;br/&gt;
+         *   &lt;li&gt; {@code name: SubjectInformationAccess} &lt;br/&gt;
+         *        {@code value: method:location-type:location-value(,method:location-type:location-value)*} where
+         *        {@code value} is a list of {@code method:location-type:location-value} triples, where {@code method} can be
+         *        {@code timeStamping}, {@code caRepository}, or any OID and {@code location-type:location-value} can be
+         *        any {@code type:val} pair as defined for the {@code SubjectAlternativeName} extension.
+         *   &lt;/li&gt;
+         * &lt;/ul&gt;
+         *
+         * @param critical whether the extension should be marked as critical
+         * @param extensionName the extension name (must not be {@code null})
+         * @param extensionValue the extension value, as a string (must not be {@code null})
+         * @return this builder instance
+         * @throws IllegalArgumentException if an extension with the same name has already been added or if an
+         * error occurs while attempting to add the extension
+         */
+        public Builder addExtension(boolean critical, String extensionName, String extensionValue) throws IllegalArgumentException {
+<span class="fc" id="L273">            Assert.checkNotNullParam(&quot;name&quot;, extensionName);</span>
+<span class="fc" id="L274">            Assert.checkNotNullParam(&quot;value&quot;, extensionValue);</span>
+<span class="fc" id="L275">            return addExtension(getX509CertificateExtension(critical, extensionName, extensionValue));</span>
+        }
+
+        /**
+         * Add or replace an X.509 certificate extension. If an extension with the same OID already exists, it is replaced
+         * and returned.
+         *
+         * @param extension the extension to add (must not be {@code null})
+         * @return the existing extension or {@code null} if no other extension with the same OID existed
+         */
+        public X509CertificateExtension addOrReplaceExtension(X509CertificateExtension extension) {
+<span class="nc" id="L286">            Assert.checkNotNullParam(&quot;extension&quot;, extension);</span>
+<span class="nc" id="L287">            final String oid = extension.getId();</span>
+<span class="nc" id="L288">            Assert.checkNotNullParam(&quot;extension.getOid()&quot;, oid);</span>
+<span class="nc" id="L289">            return extensionsByOid.put(oid, extension);</span>
+        }
+
+        /**
+         * Add or replace an X.509 certificate extension. If an extension with the same name already exists, it is replaced
+         * and returned. See {@link SelfSignedX509CertificateAndSigningKey.Builder#addExtension(boolean, String, String)}
+         * for the supported extension names and values.
+         *
+         * @param critical whether the extension should be marked as critical
+         * @param extensionName the extension name (must not be {@code null})
+         * @param extensionValue the extension value, as a string (must not be {@code null})
+         * @return the existing extension or {@code null} if no other extension with the same OID existed or if an
+         * error occurs while attempting to add the extension
+         */
+        public X509CertificateExtension addOrReplaceExtension(boolean critical, String extensionName, String extensionValue) {
+<span class="nc" id="L304">            Assert.checkNotNullParam(&quot;name&quot;, extensionName);</span>
+<span class="nc" id="L305">            return addOrReplaceExtension(getX509CertificateExtension(critical, extensionName, extensionValue));</span>
+        }
+
+        /**
+         * Remove the X.509 extension with the given OID, if it is registered.
+         *
+         * @param oid the OID of the extension to remove (must not be {@code null})
+         * @return the extension or {@code null} if no extension with the same OID existed
+         */
+        public X509CertificateExtension removeExtension(String oid) {
+<span class="nc" id="L315">            Assert.checkNotNullParam(&quot;oid&quot;, oid);</span>
+<span class="nc" id="L316">            return extensionsByOid.remove(oid);</span>
+        }
+
+        /**
+         * Set the not-valid-before date.
+         *
+         * @param notValidBefore the not-valid-before date (must not be {@code null})
+         * @return this builder instance
+         */
+        public Builder setNotValidBefore(final ZonedDateTime notValidBefore) {
+<span class="fc" id="L326">            Assert.checkNotNullParam(&quot;notValidBefore&quot;, notValidBefore);</span>
+<span class="fc" id="L327">            this.notValidBefore = notValidBefore;</span>
+<span class="fc" id="L328">            return this;</span>
+        }
+
+        /**
+         * Set the not-valid-after date.
+         *
+         * @param notValidAfter the not-valid-after date (must not be {@code null})
+         * @return this builder instance
+         */
+        public Builder setNotValidAfter(final ZonedDateTime notValidAfter) {
+<span class="fc" id="L338">            Assert.checkNotNullParam(&quot;notValidAfter&quot;, notValidAfter);</span>
+<span class="fc" id="L339">            this.notValidAfter = notValidAfter;</span>
+<span class="fc" id="L340">            return this;</span>
+        }
+
+        /**
+         * Attempt to generate a key pair and wrap the resulting public key into a self-signed X.509 certificate.
+         *
+         * @return the self-signed X.509 certificate and signing key
+         * @throws IllegalArgumentException if a required builder parameter is missing or invalid or if an
+         * error occurs while attempting to generate the self-signed X.509 certificate
+         */
+        public SelfSignedX509CertificateAndSigningKey build() throws IllegalArgumentException {
+<span class="fc bfc" id="L351" title="All 2 branches covered.">            if (dn == null) {</span>
+<span class="fc" id="L352">                throw log.noDnGiven();</span>
+            }
+<span class="fc bfc" id="L354" title="All 2 branches covered.">            if (keyAlgorithmName == null) {</span>
+<span class="fc" id="L355">                keyAlgorithmName = DEFAULT_KEY_ALGORITHM_NAME;</span>
+            }
+<span class="fc bfc" id="L357" title="All 2 branches covered.">            if (keySize == -1) {</span>
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">                if (keyAlgorithmName.equals(&quot;EC&quot;)) {</span>
+<span class="nc" id="L359">                    keySize = DEFAULT_EC_KEY_SIZE;</span>
+                } else {
+<span class="fc" id="L361">                    keySize = DEFAULT_KEY_SIZE;</span>
+                }
+            }
+
+            try {
+                // generate a key pair
+<span class="fc" id="L367">                KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance(keyAlgorithmName);</span>
+<span class="fc" id="L368">                keyPairGenerator.initialize(keySize, new SecureRandom());</span>
+<span class="fc" id="L369">                KeyPair keyPair = keyPairGenerator.generateKeyPair();</span>
+<span class="fc" id="L370">                signingKey = keyPair.getPrivate();</span>
+<span class="fc bfc" id="L371" title="All 2 branches covered.">                if (signatureAlgorithmName == null) {</span>
+<span class="fc" id="L372">                    signatureAlgorithmName = getDefaultCompatibleSignatureAlgorithmName(signingKey.getAlgorithm(), keySize);</span>
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">                    if (signatureAlgorithmName == null) {</span>
+<span class="nc" id="L374">                        throw log.unableToDetermineDefaultCompatibleSignatureAlgorithmName(signingKey.getAlgorithm());</span>
+                    }
+                }
+
+                // add the Subject Key Identifier extension if it's not already present
+<span class="fc" id="L379">                final X509CertificateExtension subjectKeyIdentifierExtension = new SubjectKeyIdentifierExtension(getKeyIdentifier(keyPair.getPublic()));</span>
+<span class="fc" id="L380">                addExtension(subjectKeyIdentifierExtension);</span>
+
+                // generate the self-signed certificate
+<span class="fc" id="L383">                X509CertificateBuilder certificateBuilder = new X509CertificateBuilder();</span>
+<span class="fc" id="L384">                certificateBuilder.setIssuerDn(dn);</span>
+<span class="fc" id="L385">                certificateBuilder.setSubjectDn(dn);</span>
+<span class="fc" id="L386">                certificateBuilder.setPublicKey(keyPair.getPublic());</span>
+<span class="fc" id="L387">                certificateBuilder.setSigningKey(signingKey);</span>
+<span class="fc" id="L388">                certificateBuilder.setSignatureAlgorithmName(signatureAlgorithmName);</span>
+<span class="fc" id="L389">                certificateBuilder.setVersion(VERSION);</span>
+<span class="fc" id="L390">                BigInteger serialNumber = new BigInteger(64, new SecureRandom());</span>
+<span class="fc" id="L391">                certificateBuilder.setSerialNumber(serialNumber);</span>
+<span class="fc bfc" id="L392" title="All 2 branches covered.">                for (X509CertificateExtension extension : extensionsByOid.values()) {</span>
+<span class="fc" id="L393">                    certificateBuilder.addExtension(extension);</span>
+<span class="fc" id="L394">                }</span>
+<span class="fc bfc" id="L395" title="All 2 branches covered.">                if (notValidBefore != null) {</span>
+<span class="fc" id="L396">                    certificateBuilder.setNotValidBefore(notValidBefore);</span>
+                }
+<span class="fc bfc" id="L398" title="All 2 branches covered.">                if (notValidAfter != null) {</span>
+<span class="fc" id="L399">                    certificateBuilder.setNotValidAfter(notValidAfter);</span>
+                }
+<span class="fc" id="L401">                selfSignedCertificate = certificateBuilder.build();</span>
+<span class="fc" id="L402">                return new SelfSignedX509CertificateAndSigningKey(this);</span>
+<span class="fc" id="L403">            } catch (Exception e) {</span>
+<span class="fc" id="L404">                throw log.selfSignedCertificateGenerationFailed(e);</span>
+            }
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,508 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>JwtValidator.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-realm-token</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.realm.token.validator</a> &gt; <span class="el_source">JwtValidator.java</span></div><h1>JwtValidator.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.realm.token.validator;
+
+import org.wildfly.common.iteration.ByteIterator;
+import org.wildfly.common.iteration.CodePointIterator;
+import org.wildfly.security.auth.realm.token.TokenValidator;
+import org.wildfly.security.auth.server.RealmUnavailableException;
+import org.wildfly.security.authz.Attributes;
+import org.wildfly.security.evidence.BearerTokenEvidence;
+import org.wildfly.security.pem.Pem;
+import org.wildfly.security.pem.PemEntry;
+
+import javax.json.Json;
+import javax.json.JsonArray;
+import javax.json.JsonObject;
+import javax.json.JsonReader;
+import javax.json.JsonString;
+import javax.json.JsonValue;
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
+import java.security.Signature;
+import java.security.SignatureException;
+import java.util.Base64;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Set;
+
+import static java.util.Arrays.asList;
+import static org.wildfly.common.Assert.checkNotNullParam;
+import static org.wildfly.security.auth.realm.token._private.ElytronMessages.log;
+import static org.wildfly.security.json.util.JsonUtil.toAttributes;
+
+/**
+ * &lt;p&gt;A {@link TokenValidator} capable of validating and parsing JWT. Most of the validations performed by this validator are
+ * based on RFC-7523 (JSON Web Token (JWT) Profile for OAuth 2.0 Client Authentication and Authorization Grants).
+ *
+ * &lt;p&gt;This validator can also be used as a JWT parser only. In this case, for security reasons, you need to make sure that
+ * JWT validations such as issuer, audience and signature checks are performed before obtaining identities from this realm.
+ *
+ * @author &lt;a href=&quot;mailto:psilva@redhat.com&quot;&gt;Pedro Igor&lt;/a&gt;
+ */
+public class JwtValidator implements TokenValidator {
+
+    /**
+     * Returns a {@link Builder} instance that can be used to configure and create a {@link JwtValidator}.
+     *
+     * @return a {@link Builder} instance
+     */
+    public static Builder builder() {
+<span class="nc" id="L75">        return new Builder();</span>
+    }
+
+    private final Set&lt;String&gt; issuers;
+    private final Set&lt;String&gt; audiences;
+    private final JwkManager jwkManager;
+    private final Map&lt;String, PublicKey&gt; namedKeys;
+
+    private final PublicKey defaultPublicKey;
+
+<span class="nc" id="L85">    JwtValidator(Builder configuration) {</span>
+<span class="nc" id="L86">        this.issuers = checkNotNullParam(&quot;issuers&quot;, configuration.issuers);</span>
+<span class="nc" id="L87">        this.audiences = checkNotNullParam(&quot;audience&quot;, configuration.audience);</span>
+<span class="nc" id="L88">        this.defaultPublicKey = configuration.publicKey;</span>
+<span class="nc" id="L89">        this.namedKeys = configuration.namedKeys;</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">        if (configuration.sslContext != null) {</span>
+<span class="nc" id="L91">            this.jwkManager = new JwkManager(configuration.sslContext,</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">                                            configuration.hostnameVerifier != null ? configuration.hostnameVerifier : HttpsURLConnection.getDefaultHostnameVerifier(),</span>
+<span class="nc" id="L93">                                            configuration.updateTimeout, configuration.connectionTimeout, configuration.readTimeout, configuration.minTimeBetweenRequests);</span>
+        }
+        else {
+<span class="nc" id="L96">            log.tokenRealmJwtNoSSLIgnoringJku();</span>
+<span class="nc" id="L97">            this.jwkManager = null;</span>
+        }
+<span class="nc bnc" id="L99" title="All 6 branches missed.">        if (defaultPublicKey == null &amp;&amp; jwkManager == null &amp;&amp; namedKeys.isEmpty()) {</span>
+<span class="nc" id="L100">            log.tokenRealmJwtWarnNoPublicKeyIgnoringSignatureCheck();</span>
+        }
+
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        if (issuers.isEmpty()) {</span>
+<span class="nc" id="L104">            log.tokenRealmJwtWarnNoIssuerIgnoringIssuerCheck();</span>
+        }
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        if (audiences.isEmpty()) {</span>
+<span class="nc" id="L107">            log.tokenRealmJwtWarnNoAudienceIgnoringAudienceCheck();</span>
+        }
+
+<span class="nc" id="L110">    }</span>
+
+    @Override
+    public Attributes validate(BearerTokenEvidence evidence) throws RealmUnavailableException {
+<span class="nc" id="L114">        checkNotNullParam(&quot;evidence&quot;, evidence);</span>
+<span class="nc" id="L115">        String jwt = evidence.getToken();</span>
+<span class="nc" id="L116">        String[] parts = jwt.split(&quot;\\.&quot;, -1);</span>
+
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        if (parts.length &lt; 3) {</span>
+<span class="nc" id="L119">            throw log.tokenRealmJwtInvalidFormat();</span>
+        }
+
+<span class="nc" id="L122">        String encodedHeader = parts[0];</span>
+<span class="nc" id="L123">        String encodedClaims = parts[1];</span>
+<span class="nc" id="L124">        String encodedSignature = parts[2];</span>
+
+<span class="nc" id="L126">        JsonObject claims = extractClaims(encodedClaims);</span>
+
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        if (verifySignature(encodedHeader, encodedClaims, encodedSignature)</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">                &amp;&amp; hasValidIssuer(claims)</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">                &amp;&amp; hasValidAudience(claims)</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">                &amp;&amp; verifyTimeConstraints(claims)) {</span>
+<span class="nc" id="L132">            return toAttributes(claims);</span>
+        }
+
+<span class="nc" id="L135">        return null;</span>
+    }
+
+    private boolean verifyTimeConstraints(JsonObject claims) {
+<span class="nc" id="L139">        long currentTime = currentTimeInSeconds();</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">        if (claims.containsKey(&quot;exp&quot;)) {</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">            boolean expired = currentTime &gt; claims.getJsonNumber(&quot;exp&quot;).longValue();</span>
+
+<span class="nc bnc" id="L143" title="All 2 branches missed.">            if (expired) {</span>
+<span class="nc" id="L144">                log.debug(&quot;Token expired&quot;);</span>
+<span class="nc" id="L145">                return false;</span>
+            }
+        }
+<span class="nc bnc" id="L148" title="All 2 branches missed.">        if (claims.containsKey(&quot;nbf&quot;)) {</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">            boolean notBefore = currentTime &gt;= claims.getJsonNumber(&quot;nbf&quot;).longValue();</span>
+
+<span class="nc bnc" id="L151" title="All 2 branches missed.">            if (!notBefore) {</span>
+<span class="nc" id="L152">                log.debugf(&quot;Token is before [%s]&quot;, notBefore);</span>
+<span class="nc" id="L153">                return false;</span>
+            }
+        }
+
+<span class="nc" id="L157">        return true;</span>
+    }
+
+    private JsonObject extractClaims(String encodedClaims) throws RealmUnavailableException {
+<span class="nc" id="L161">        JsonObject retValue = null;</span>
+<span class="nc" id="L162">        JsonReader jsonReader = null;</span>
+        try {
+<span class="nc" id="L164">            Base64.Decoder urlDecoder = Base64.getUrlDecoder();</span>
+<span class="nc" id="L165">            CodePointIterator decodedClaims = CodePointIterator.ofUtf8Bytes(urlDecoder.decode(encodedClaims));</span>
+<span class="nc" id="L166">            jsonReader = Json.createReader(decodedClaims.asUtf8().asInputStream());</span>
+<span class="nc" id="L167">            retValue = jsonReader.readObject();</span>
+<span class="nc" id="L168">        } catch (Exception cause) {</span>
+<span class="nc" id="L169">            throw log.tokenRealmJwtParseFailed(cause);</span>
+        } finally {
+<span class="nc bnc" id="L171" title="All 2 branches missed.">            if (jsonReader != null) {</span>
+<span class="nc" id="L172">                jsonReader.close();</span>
+            }
+        }
+<span class="nc" id="L175">        return retValue;</span>
+    }
+
+    private boolean verifySignature(String encodedHeader, String encodedClaims, String encodedSignature) throws RealmUnavailableException {
+<span class="nc bnc" id="L179" title="All 6 branches missed.">        if (defaultPublicKey == null &amp;&amp; jwkManager == null &amp;&amp; namedKeys.isEmpty()) {</span>
+<span class="nc" id="L180">            return true;</span>
+        }
+
+        try {
+<span class="nc" id="L184">            Base64.Decoder urlDecoder = Base64.getUrlDecoder();</span>
+<span class="nc" id="L185">            byte[] decodedSignature = urlDecoder.decode(encodedSignature);</span>
+
+<span class="nc" id="L187">            Signature signature = createSignature(encodedHeader, encodedClaims);</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">            boolean verify = signature != null ? ByteIterator.ofBytes(decodedSignature).verify(signature) : false;</span>
+
+<span class="nc bnc" id="L190" title="All 2 branches missed.">            if (!verify) {</span>
+<span class="nc" id="L191">                log.debug(&quot;Signature verification failed&quot;);</span>
+            }
+
+<span class="nc" id="L194">            return verify;</span>
+<span class="nc" id="L195">        } catch (Exception cause) {</span>
+<span class="nc" id="L196">            throw log.tokenRealmJwtSignatureCheckFailed(cause);</span>
+        }
+    }
+
+    private boolean hasValidAudience(JsonObject claims) throws RealmUnavailableException {
+<span class="nc bnc" id="L201" title="All 2 branches missed.">        if (this.audiences.isEmpty()) return true;</span>
+
+<span class="nc" id="L203">        JsonValue audience = claims.get(&quot;aud&quot;);</span>
+
+<span class="nc bnc" id="L205" title="All 2 branches missed.">        if (audience == null) {</span>
+<span class="nc" id="L206">            log.debug(&quot;Token does not contain an audience claim&quot;);</span>
+<span class="nc" id="L207">            return false;</span>
+        }
+
+        JsonArray audClaimArray;
+
+<span class="nc bnc" id="L212" title="All 2 branches missed.">        if (JsonValue.ValueType.STRING.equals(audience.getValueType())) {</span>
+<span class="nc" id="L213">            audClaimArray = Json.createArrayBuilder().add(audience).build();</span>
+        } else {
+<span class="nc" id="L215">            audClaimArray = (JsonArray) audience;</span>
+        }
+
+<span class="nc" id="L218">        boolean valid = audClaimArray.stream()</span>
+<span class="nc" id="L219">                .map(jsonValue -&gt; (JsonString) jsonValue)</span>
+<span class="nc" id="L220">                .anyMatch(audience1 -&gt; audiences.contains(audience1.getString()));</span>
+
+<span class="nc bnc" id="L222" title="All 2 branches missed.">        if (!valid) {</span>
+<span class="nc" id="L223">            log.debugf(&quot;Audience check failed. Provided [%s] but was expected [%s].&quot;, audClaimArray.toArray(), this.audiences);</span>
+        }
+
+<span class="nc" id="L226">        return valid;</span>
+    }
+
+    private boolean hasValidIssuer(JsonObject claims) throws RealmUnavailableException {
+<span class="nc bnc" id="L230" title="All 2 branches missed.">        if (this.issuers.isEmpty()) return true;</span>
+
+<span class="nc" id="L232">        String issuer = claims.getString(&quot;iss&quot;, null);</span>
+
+<span class="nc bnc" id="L234" title="All 2 branches missed.">        if (issuer == null) {</span>
+<span class="nc" id="L235">            log.debug(&quot;Token does not contain an issuer claim&quot;);</span>
+<span class="nc" id="L236">            return false;</span>
+        }
+
+<span class="nc" id="L239">        boolean valid = this.issuers.contains(issuer);</span>
+
+<span class="nc bnc" id="L241" title="All 2 branches missed.">        if (!valid) {</span>
+<span class="nc" id="L242">            log.debugf(&quot;Issuer check failed. Provided [%s] but was expected [%s].&quot;, issuer, this.issuers);</span>
+        }
+
+<span class="nc" id="L245">        return valid;</span>
+    }
+
+    private Signature createSignature(String encodedHeader, String encodedClaims) throws NoSuchAlgorithmException, SignatureException, RealmUnavailableException {
+
+<span class="nc" id="L250">        byte[] headerDecoded = Base64.getUrlDecoder().decode(encodedHeader);</span>
+<span class="nc" id="L251">        JsonObject headers = null;</span>
+<span class="nc" id="L252">        try (final JsonReader jsonReader = Json.createReader(ByteIterator.ofBytes(headerDecoded).asInputStream())) {</span>
+<span class="nc" id="L253">            headers = jsonReader.readObject();</span>
+        }
+
+<span class="nc" id="L256">        String headerAlg = resolveAlgorithm(headers);</span>
+<span class="nc" id="L257">        Signature signature = Signature.getInstance(headerAlg);</span>
+        try {
+<span class="nc" id="L259">            PublicKey publicKey = resolvePublicKey(headers);</span>
+<span class="nc bnc" id="L260" title="All 2 branches missed.">            if (publicKey == null) {</span>
+<span class="nc" id="L261">                log.debug(&quot;Public key could not be resolved.&quot;);</span>
+<span class="nc" id="L262">                return null;</span>
+            }
+<span class="nc" id="L264">            signature.initVerify(publicKey);</span>
+<span class="nc" id="L265">        } catch (InvalidKeyException e) {</span>
+<span class="nc" id="L266">            e.printStackTrace();</span>
+<span class="nc" id="L267">            return null;</span>
+<span class="nc" id="L268">        }</span>
+
+<span class="nc" id="L270">        signature.update((encodedHeader + &quot;.&quot; + encodedClaims).getBytes());</span>
+
+<span class="nc" id="L272">        return signature;</span>
+    }
+
+    private String resolveAlgorithm(JsonObject headers) {
+<span class="nc" id="L276">        JsonString algClaim = (JsonString) headers.get(&quot;alg&quot;);</span>
+
+<span class="nc bnc" id="L278" title="All 2 branches missed.">        if (algClaim == null) {</span>
+<span class="nc" id="L279">            throw log.tokenRealmJwtSignatureInvalidAlgorithm(&quot;not_provided&quot;);</span>
+        }
+
+<span class="nc" id="L282">        String algorithm = algClaim.getString();</span>
+
+<span class="nc" id="L284">        log.debugf(&quot;Token is using algorithm [%s]&quot;, algorithm);</span>
+
+<span class="nc bnc" id="L286" title="All 4 branches missed.">        switch (algorithm) {</span>
+            case &quot;RS256&quot;:
+<span class="nc" id="L288">                return &quot;SHA256withRSA&quot;;</span>
+            case &quot;RS384&quot;:
+<span class="nc" id="L290">                return &quot;SHA384withRSA&quot;;</span>
+            case &quot;RS512&quot;:
+<span class="nc" id="L292">                return &quot;SHA512withRSA&quot;;</span>
+            default:
+<span class="nc" id="L294">                throw log.tokenRealmJwtSignatureInvalidAlgorithm(algorithm);</span>
+        }
+    }
+
+    private PublicKey resolvePublicKey(JsonObject headers) {
+<span class="nc" id="L299">        JsonString kid = headers.getJsonString(&quot;kid&quot;);</span>
+<span class="nc" id="L300">        JsonString jku = headers.getJsonString(&quot;jku&quot;);</span>
+
+<span class="nc bnc" id="L302" title="All 2 branches missed.">        if (kid == null) {</span>
+<span class="nc bnc" id="L303" title="All 2 branches missed.">            if (defaultPublicKey == null) {</span>
+<span class="nc" id="L304">                log.debug(&quot;Default public key not configured. Cannot validate token without kid claim.&quot;);</span>
+<span class="nc" id="L305">                return null;</span>
+            }
+<span class="nc" id="L307">            return defaultPublicKey;</span>
+        }
+<span class="nc bnc" id="L309" title="All 2 branches missed.">        if (jku != null) {</span>
+<span class="nc bnc" id="L310" title="All 2 branches missed.">            if (jwkManager == null) {</span>
+<span class="nc" id="L311">                log.debugf(&quot;Cannot validate token with jku [%s]. SSL is not configured and jku claim is not supported.&quot;, jku);</span>
+<span class="nc" id="L312">                return null;</span>
+            }
+            try {
+<span class="nc" id="L315">                return jwkManager.getPublicKey(kid.getString(), new URL(jku.getString()));</span>
+<span class="nc" id="L316">            } catch (MalformedURLException e) {</span>
+<span class="nc" id="L317">                log.debug(&quot;Invalid jku URL.&quot;);</span>
+<span class="nc" id="L318">                return null;</span>
+            }
+        } else {
+<span class="nc bnc" id="L321" title="All 2 branches missed.">            if (namedKeys.isEmpty()) {</span>
+<span class="nc" id="L322">                log.debug(&quot;Cannot validate token with kid claim.&quot;);</span>
+<span class="nc" id="L323">                return null;</span>
+            }
+<span class="nc" id="L325">            PublicKey res = namedKeys.get(kid.getString());</span>
+<span class="nc bnc" id="L326" title="All 2 branches missed.">            if (res == null) {</span>
+<span class="nc" id="L327">                log.debug(&quot;Unknown kid.&quot;);</span>
+            }
+<span class="nc" id="L329">            return res;</span>
+        }
+    }
+
+    private static long currentTimeInSeconds() {
+<span class="nc" id="L334">        return System.currentTimeMillis() / 1000;</span>
+    }
+
+    public static class Builder {
+        private static final int CONNECTION_TIMEOUT = 2000;//2s
+        private static final int MIN_TIME_BETWEEN_REQUESTS = 10000; // 10s
+
+<span class="nc" id="L341">        private Set&lt;String&gt; issuers = new LinkedHashSet&lt;&gt;();</span>
+<span class="nc" id="L342">        private Set&lt;String&gt; audience = new LinkedHashSet&lt;&gt;();</span>
+        private PublicKey publicKey;
+<span class="nc" id="L344">        private Map&lt;String, PublicKey&gt; namedKeys = new LinkedHashMap&lt;&gt;();</span>
+        private HostnameVerifier hostnameVerifier;
+        private SSLContext sslContext;
+<span class="nc" id="L347">        private long updateTimeout = 120000;</span>
+<span class="nc" id="L348">        private int connectionTimeout = CONNECTION_TIMEOUT;</span>
+<span class="nc" id="L349">        private int readTimeout = CONNECTION_TIMEOUT;</span>
+<span class="nc" id="L350">        private int minTimeBetweenRequests = MIN_TIME_BETWEEN_REQUESTS;</span>
+
+<span class="nc" id="L352">        private Builder() {</span>
+<span class="nc" id="L353">        }</span>
+
+        /**
+         * &lt;p&gt;Defines one or more string values representing an unique identifier for the entities that are allowed as issuers of a given JWT. During validation
+         * JWT tokens must have a &lt;code&gt;iss&lt;/code&gt; claim that contains one of the values defined here.
+         *
+         * &lt;p&gt;If not provided, the validator will not perform validations based on the issuer claim.
+         *
+         * @param issuer one or more string values representing the valid issuers
+         * @return this instance
+         */
+        public Builder issuer(String... issuer) {
+<span class="nc" id="L365">            this.issuers.addAll(asList(issuer));</span>
+<span class="nc" id="L366">            return this;</span>
+        }
+
+        /**
+         * &lt;p&gt;Defines one or more string values representing the audiences supported by this configuration. During validation JWT tokens
+         * must have an &lt;code&gt;aud&lt;/code&gt; claim that contains one of the values defined here.
+         *
+         * &lt;p&gt;If not provided, the validator will not perform validations based on the audience claim.
+         *
+         * @param audience one or more string values representing the valid audiences
+         * @return this instance
+         */
+        public Builder audience(String... audience) {
+<span class="nc" id="L379">            this.audience.addAll(asList(audience));</span>
+<span class="nc" id="L380">            return this;</span>
+        }
+
+        /**
+         * &lt;p&gt;A default public key in its PEM format used to validate the signature of tokens without &lt;code&gt;kid&lt;/code&gt; header parameter.
+         *
+         * &lt;p&gt;If not provided, the validator will not validate signatures.
+         *
+         * @param publicKeyPem the public key in its PEM format
+         * @return this instance
+         */
+        public Builder publicKey(byte[] publicKeyPem) {
+<span class="nc" id="L392">            Iterator&lt;PemEntry&lt;?&gt;&gt; pemEntryIterator = Pem.parsePemContent(CodePointIterator.ofUtf8Bytes(publicKeyPem));</span>
+<span class="nc" id="L393">            PublicKey publicKey = pemEntryIterator.next().tryCast(PublicKey.class);</span>
+
+<span class="nc bnc" id="L395" title="All 2 branches missed.">            if (publicKey == null) {</span>
+<span class="nc" id="L396">                throw log.tokenRealmJwtInvalidPublicKeyPem();</span>
+            }
+
+<span class="nc" id="L399">            this.publicKey = publicKey;</span>
+
+<span class="nc" id="L401">            return this;</span>
+        }
+
+        /**
+         * &lt;p&gt;A default {@link PublicKey} format used to validate the signature of tokens without &lt;code&gt;kid&lt;/code&gt; header parameter.
+         *
+         * &lt;p&gt;If not provided, the validator will not validate signatures.
+         *
+         * @param publicKey the public key in its PEM format
+         * @return this instance
+         */
+        public Builder publicKey(PublicKey publicKey) {
+<span class="nc" id="L413">            this.publicKey = publicKey;</span>
+<span class="nc" id="L414">            return this;</span>
+        }
+
+        /**
+         * &lt;p&gt;A {@link PublicKey} map, which is used for validating tokens with &lt;code&gt;kid&lt;/code&gt; and without &lt;code&gt;jku&lt;/code&gt; header parameter.
+         *
+         * @param namedKeys map of public keys for toen verification, where the maps key stand for kid
+         * @return this instance
+         */
+        public Builder publicKeys(Map&lt;String, PublicKey&gt; namedKeys) {
+<span class="nc" id="L424">            this.namedKeys.putAll(namedKeys);</span>
+<span class="nc" id="L425">            return this;</span>
+        }
+
+        /**
+         * &lt;p&gt;A predefined {@link SSLContext} that will be used to connect to the jku endpoint when retrieving remote keys. This configuration is mandatory
+         * if using jku claims.
+         *
+         * @param sslContext the SSL context
+         * @return this instance
+         */
+        public Builder useSslContext(SSLContext sslContext) {
+<span class="nc" id="L436">            this.sslContext = sslContext;</span>
+<span class="nc" id="L437">            return this;</span>
+        }
+
+        /**
+         * &lt;p&gt;A {@link HostnameVerifier} that will be used to validate the hostname when using SSL/TLS. This configuration is mandatory
+         * if using jku claims.
+         *
+         * @param hostnameVerifier the hostname verifier
+         * @return this instance
+         */
+        public Builder useSslHostnameVerifier(HostnameVerifier hostnameVerifier) {
+<span class="nc" id="L448">            this.hostnameVerifier = hostnameVerifier;</span>
+<span class="nc" id="L449">            return this;</span>
+        }
+
+        /**
+         * &lt;p&gt;A timeout for cached jwks when using jku claim. After this timeout, the keys of need to be re-cached before use.
+         * Default value is 2 minutes.
+         *
+         * @param timeout timeout in ms before keys needs to be re-cached
+         * @return this instance
+         */
+        public Builder setJkuTimeout(long timeout) {
+<span class="nc" id="L460">            this.updateTimeout = timeout;</span>
+<span class="nc" id="L461">            return this;</span>
+        }
+
+        /**
+         * Sets the connection timeout to a specified timeout, in milliseconds. A non-zero value specifies the timeout when connecting
+         * to a resource. A timeout of zero is interpreted as an infinite timeout.
+         * @param connectionTimeout the connection timeout
+         * @return this instance
+         */
+        public Builder connectionTimeout(int connectionTimeout) {
+<span class="nc" id="L471">            this.connectionTimeout = connectionTimeout;</span>
+<span class="nc" id="L472">            return this;</span>
+        }
+
+        /**
+         * Sets the read timeout to a specified timeout, in milliseconds. A non-zero value specifies the timeout when reading
+         * from Input stream when a connection is established to a resource. A timeout of zero is interpreted as an infinite timeout.
+         * @param readTimeout the read timeout
+         * @return this instance
+         */
+        public Builder readTimeout(int readTimeout) {
+<span class="nc" id="L482">            this.readTimeout = readTimeout;</span>
+<span class="nc" id="L483">            return this;</span>
+        }
+
+        /**
+         * &lt;p&gt;The time in which there will be no more requests to retrieve
+         * the keys from the jkws URL.&lt;/p&gt;
+         *
+         * @param minTimeBetweenRequests The time in millis
+         * @return this instance
+         */
+        public Builder setJkuMinTimeBetweenRequests(int minTimeBetweenRequests) {
+<span class="nc" id="L494">            this.minTimeBetweenRequests = minTimeBetweenRequests;</span>
+<span class="nc" id="L495">            return this;</span>
+        }
+
+        /**
+         * Returns a {@link JwtValidator} instance based on all the configuration provided with this builder.
+         *
+         * @return a new {@link JwtValidator} instance with all the given configuration
+         */
+        public JwtValidator build() {
+<span class="nc" id="L504">            return new JwtValidator(this);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

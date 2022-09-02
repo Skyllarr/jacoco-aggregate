@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DefaultSingleSignOnSessionFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-sso</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.util.sso</a> &gt; <span class="el_source">DefaultSingleSignOnSessionFactory.java</span></div><h1>DefaultSingleSignOnSessionFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.http.util.sso;
+
+import org.wildfly.common.iteration.ByteIterator;
+import org.wildfly.security.http.HttpServerRequest;
+
+import javax.net.ssl.HttpsURLConnection;
+import java.net.HttpURLConnection;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.KeyPair;
+import java.security.NoSuchAlgorithmException;
+import java.security.Signature;
+import java.security.SignatureException;
+import java.util.Base64;
+import java.util.function.Consumer;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+import static org.wildfly.security.http.util.sso.ElytronMessages.log;
+
+/**
+ * {@link SingleSignOnSessionFactory} that delegates the management of single sign-on entries to a {@link SingleSignOnManager}.
+ *
+ * @author &lt;a href=&quot;mailto:psilva@redhat.com&quot;&gt;Pedro Igor&lt;/a&gt;
+ * @author Paul Ferraro
+ */
+public class DefaultSingleSignOnSessionFactory implements SingleSignOnSessionFactory, SingleSignOnSessionContext {
+
+    private static final String DEFAULT_SIGNATURE_ALGORITHM = &quot;SHA512withRSA&quot;;
+
+    private final SingleSignOnManager manager;
+    private final KeyPair keyPair;
+    private final Consumer&lt;HttpsURLConnection&gt; logoutConnectionConfigurator;
+
+    public DefaultSingleSignOnSessionFactory(SingleSignOnManager manager, KeyPair keyPair) {
+<span class="nc" id="L53">        this(manager, keyPair, connection -&gt; {});</span>
+<span class="nc" id="L54">    }</span>
+
+<span class="nc" id="L56">    public DefaultSingleSignOnSessionFactory(SingleSignOnManager manager, KeyPair keyPair, Consumer&lt;HttpsURLConnection&gt; logoutConnectionConfigurator) {</span>
+<span class="nc" id="L57">        this.manager = checkNotNullParam(&quot;manager&quot;, manager);</span>
+<span class="nc" id="L58">        this.keyPair = checkNotNullParam(&quot;keyPair&quot;, keyPair);</span>
+<span class="nc" id="L59">        this.logoutConnectionConfigurator = checkNotNullParam(&quot;logoutConnectionConfigurator&quot;, logoutConnectionConfigurator);</span>
+<span class="nc" id="L60">    }</span>
+
+    @Override
+    public SingleSignOnSession find(String id, HttpServerRequest request) {
+<span class="nc" id="L64">        checkNotNullParam(&quot;id&quot;, id);</span>
+<span class="nc" id="L65">        checkNotNullParam(&quot;request&quot;, request);</span>
+
+<span class="nc" id="L67">        SingleSignOn sso = this.manager.find(id);</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">        return (sso != null) ? new DefaultSingleSignOnSession(this, request, sso) : null;</span>
+    }
+
+    @Override
+    public SingleSignOnSession create(HttpServerRequest request, String mechanismName, boolean programmatic) {
+<span class="nc" id="L73">        checkNotNullParam(&quot;request&quot;, request);</span>
+<span class="nc" id="L74">        checkNotNullParam(&quot;mechanismName&quot;, mechanismName);</span>
+
+<span class="nc" id="L76">        return new DefaultSingleSignOnSession(this, request, mechanismName, programmatic);</span>
+    }
+
+    @Override
+    public SingleSignOnManager getSingleSignOnManager() {
+<span class="nc" id="L81">        return this.manager;</span>
+    }
+
+    @Override
+    public String createLogoutParameter(String sessionId) {
+        try {
+<span class="nc" id="L87">            Signature signature = Signature.getInstance(DEFAULT_SIGNATURE_ALGORITHM);</span>
+
+<span class="nc" id="L89">            signature.initSign(this.keyPair.getPrivate());</span>
+
+<span class="nc" id="L91">            Base64.Encoder urlEncoder = Base64.getUrlEncoder();</span>
+
+<span class="nc" id="L93">            return sessionId + &quot;.&quot; + ByteIterator.ofBytes(urlEncoder.encode(ByteIterator.ofBytes(sessionId.getBytes(StandardCharsets.UTF_8)).sign(signature).drain())).asUtf8String().drainToString();</span>
+<span class="nc" id="L94">        } catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {</span>
+<span class="nc" id="L95">            throw new IllegalStateException(e);</span>
+        }
+    }
+
+    @Override
+    public String verifyLogoutParameter(String parameter) {
+<span class="nc" id="L101">        String[] parts = parameter.split(&quot;\\.&quot;);</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        if (parts.length != 2) {</span>
+<span class="nc" id="L103">            throw new IllegalArgumentException(parameter);</span>
+        }
+        try {
+<span class="nc" id="L106">            String localSessionId = ByteIterator.ofBytes(parts[0].getBytes(StandardCharsets.UTF_8)).asUtf8String().drainToString();</span>
+<span class="nc" id="L107">            Signature signature = Signature.getInstance(DEFAULT_SIGNATURE_ALGORITHM);</span>
+
+<span class="nc" id="L109">            signature.initVerify(this.keyPair.getPublic());</span>
+<span class="nc" id="L110">            signature.update(localSessionId.getBytes(StandardCharsets.UTF_8));</span>
+
+<span class="nc" id="L112">            Base64.Decoder urlDecoder = Base64.getUrlDecoder();</span>
+
+<span class="nc bnc" id="L114" title="All 2 branches missed.">            if (!ByteIterator.ofBytes(urlDecoder.decode(parts[1].getBytes(StandardCharsets.UTF_8))).verify(signature)) {</span>
+<span class="nc" id="L115">                throw log.httpMechSsoInvalidLogoutMessage(localSessionId);</span>
+            }
+
+<span class="nc" id="L118">            return localSessionId;</span>
+<span class="nc" id="L119">        } catch (NoSuchAlgorithmException | InvalidKeyException e) {</span>
+<span class="nc" id="L120">            throw new IllegalStateException(e);</span>
+<span class="nc" id="L121">        } catch (SignatureException e) {</span>
+<span class="nc" id="L122">            throw new IllegalArgumentException(parameter, e);</span>
+        }
+    }
+
+    @Override
+    public void configureLogoutConnection(HttpURLConnection connection) {
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        if (connection.getURL().getProtocol().equalsIgnoreCase(&quot;https&quot;)) {</span>
+<span class="nc" id="L129">            HttpsURLConnection secureConnection = (HttpsURLConnection) connection;</span>
+<span class="nc" id="L130">            this.logoutConnectionConfigurator.accept(secureConnection);</span>
+        }
+<span class="nc" id="L132">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NameConstraintsExtension.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-x500-cert</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.x500.cert</a> &gt; <span class="el_source">NameConstraintsExtension.java</span></div><h1>NameConstraintsExtension.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.x500.cert;
+
+import java.util.List;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.asn1.ASN1Encodable;
+import org.wildfly.security.asn1.ASN1Encoder;
+import org.wildfly.security.x500.GeneralName;
+import org.wildfly.security.x500.X500;
+
+/**
+ * A name constraints extension as defined by &lt;a href=&quot;https://tools.ietf.org/html/rfc5280#section-4.2.1.10&quot;&gt;RFC 5280 § 4.2.1.10&lt;/a&gt;.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class NameConstraintsExtension extends X509CertificateExtension {
+    private final List&lt;GeneralSubtree&gt; permittedSubtrees;
+    private final List&lt;GeneralSubtree&gt; excludedSubtrees;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param permittedSubtrees the permitted subtrees list (must not be {@code null}, may be empty)
+     * @param excludedSubtrees the excluded subtrees list (must not be {@code null}, may be empty)
+     */
+    public NameConstraintsExtension(final List&lt;GeneralSubtree&gt; permittedSubtrees, final List&lt;GeneralSubtree&gt; excludedSubtrees) {
+<span class="nc" id="L45">        super(true);</span>
+<span class="nc" id="L46">        Assert.checkNotNullParam(&quot;permittedSubtrees&quot;, permittedSubtrees);</span>
+<span class="nc" id="L47">        Assert.checkNotNullParam(&quot;excludedSubtrees&quot;, excludedSubtrees);</span>
+<span class="nc" id="L48">        this.permittedSubtrees = permittedSubtrees;</span>
+<span class="nc" id="L49">        this.excludedSubtrees = excludedSubtrees;</span>
+<span class="nc" id="L50">    }</span>
+
+    public String getId() {
+<span class="nc" id="L53">        return X500.OID_CE_NAME_CONSTRAINTS;</span>
+    }
+
+    public void encodeTo(final ASN1Encoder encoder) {
+<span class="nc" id="L57">        encoder.startSequence();</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">        if (! permittedSubtrees.isEmpty()) {</span>
+<span class="nc" id="L59">            encoder.encodeImplicit(0);</span>
+<span class="nc" id="L60">            encoder.startSequence();</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">            for (GeneralSubtree subtree : permittedSubtrees) {</span>
+<span class="nc" id="L62">                subtree.encodeTo(encoder);</span>
+<span class="nc" id="L63">            }</span>
+<span class="nc" id="L64">            encoder.endSequence();</span>
+        }
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        if (! excludedSubtrees.isEmpty()) {</span>
+<span class="nc" id="L67">            encoder.encodeImplicit(1);</span>
+<span class="nc" id="L68">            encoder.startSequence();</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">            for (GeneralSubtree subtree : excludedSubtrees) {</span>
+<span class="nc" id="L70">                subtree.encodeTo(encoder);</span>
+<span class="nc" id="L71">            }</span>
+<span class="nc" id="L72">            encoder.endSequence();</span>
+        }
+<span class="nc" id="L74">        encoder.endSequence();</span>
+<span class="nc" id="L75">    }</span>
+
+    /**
+     * A general subtree for a name constraint.
+     */
+    public static final class GeneralSubtree implements ASN1Encodable {
+        private final GeneralName base;
+        private final int minimumDistance;
+        private final int maximumDistance;
+
+        /**
+         * Construct a new instance.
+         *
+         * @param base the base name (must not be {@code null})
+         * @param minimumDistance the minimum distance (must be &amp;gt;= 0)
+         * @param maximumDistance the maximum distance (must be -1 indicating &quot;not specified&quot; or &amp;gt;= {@code minimumDistance})
+         */
+<span class="nc" id="L92">        public GeneralSubtree(final GeneralName base, final int minimumDistance, final int maximumDistance) {</span>
+<span class="nc" id="L93">            this.base = base;</span>
+<span class="nc" id="L94">            Assert.checkMinimumParameter(&quot;minimumDistance&quot;, 0, minimumDistance);</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">            if (maximumDistance != -1) {</span>
+<span class="nc" id="L96">                Assert.checkMinimumParameter(&quot;maximumDistance&quot;, minimumDistance, maximumDistance);</span>
+            }
+<span class="nc" id="L98">            this.minimumDistance = minimumDistance;</span>
+<span class="nc" id="L99">            this.maximumDistance = maximumDistance;</span>
+<span class="nc" id="L100">        }</span>
+
+        public void encodeTo(final ASN1Encoder encoder) {
+<span class="nc" id="L103">            encoder.startSequence();</span>
+<span class="nc" id="L104">            base.encodeTo(encoder);</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">            if (minimumDistance &gt; 0) {</span>
+<span class="nc" id="L106">                encoder.encodeImplicit(0);</span>
+<span class="nc" id="L107">                encoder.encodeInteger(minimumDistance);</span>
+            }
+<span class="nc bnc" id="L109" title="All 2 branches missed.">            if (maximumDistance &gt;= 0) {</span>
+<span class="nc" id="L110">                encoder.encodeImplicit(1);</span>
+<span class="nc" id="L111">                encoder.encodeInteger(maximumDistance);</span>
+            }
+<span class="nc" id="L113">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

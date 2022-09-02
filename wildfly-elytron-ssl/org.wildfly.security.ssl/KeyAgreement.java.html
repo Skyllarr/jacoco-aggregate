@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>KeyAgreement.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-ssl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.ssl</a> &gt; <span class="el_source">KeyAgreement.java</span></div><h1>KeyAgreement.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.ssl;
+
+import static org.wildfly.security.ssl.ElytronMessages.log;
+
+import java.util.EnumSet;
+
+/**
+ * The key agreement type for SSL/TLS cipher suite selection.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+<span class="fc" id="L30">public enum KeyAgreement {</span>
+    /**
+     * Ephemeral elliptic-curve Diffie-Hellman key agreement.
+     */
+<span class="fc" id="L34">    ECDHE,</span>
+    /**
+     * RSA key agreement.
+     */
+<span class="fc" id="L38">    RSA,</span>
+    /**
+     * Diffie-Hellman key agreement using RSA-signed keys.
+     */
+<span class="fc" id="L42">    DHr,</span>
+    /**
+     * Diffie-Hellman key agreement using DSS-signed keys.
+     */
+<span class="fc" id="L46">    DHd,</span>
+    /**
+     * Ephemeral Diffie-Hellman key agreement.
+     */
+<span class="fc" id="L50">    DHE,</span>
+    /**
+     * Pre-shared key (&quot;PSK&quot;) key agreement.
+     */
+<span class="fc" id="L54">    PSK,</span>
+    /**
+     * Fortezza key agreement.
+     */
+<span class="fc" id="L58">    FZA,</span>
+    /**
+     * Kerberos V5 key agreement.
+     */
+<span class="fc" id="L62">    KRB5,</span>
+    /**
+     * Elliptic-curve Diffie-Hellman (&quot;ECDH&quot;) key agreement using RSA-signed keys.
+     */
+<span class="fc" id="L66">    ECDHr,</span>
+    /**
+     * Elliptic-curve Diffie-Hellman (&quot;ECDH&quot;) key agreement using ECDH-signed keys.
+     */
+<span class="fc" id="L70">    ECDHe,</span>
+    /**
+     * VKA 34.10 key agreement as per &lt;a href=&quot;https://tools.ietf.org/html/rfc4357&quot;&gt;RFC 4357&lt;/a&gt;.
+     */
+<span class="fc" id="L74">    GOST,</span>
+    /**
+     * Secure remote password (&quot;SRP&quot;) key agreement as per &lt;a href=&quot;http://tools.ietf.org/html/rfc5054&quot;&gt;RFC 5054&lt;/a&gt;.
+     */
+<span class="fc" id="L78">    SRP,</span>
+    /**
+     * RSA pre-shared key (&quot;PSK&quot;) key agreement.
+     */
+<span class="fc" id="L82">    RSAPSK,</span>
+    /**
+     * Ephemeral Diffie-Hellman pre-shared key (&quot;PSK&quot;) key agreement.
+     */
+<span class="fc" id="L86">    DHEPSK,</span>
+    /**
+     * RSA pre-shared key (&quot;PSK&quot;) key agreement.
+     */
+<span class="fc" id="L90">    ECDHEPSK,</span>
+    ;
+<span class="fc" id="L92">    static final int fullSize = values().length;</span>
+
+    static KeyAgreement forName(final String name) {
+<span class="fc bfc" id="L95" title="All 16 branches covered.">        switch (name) {</span>
+<span class="fc" id="L96">            case &quot;EECDH&quot;: case &quot;ECDHE&quot;: return ECDHE;</span>
+<span class="fc" id="L97">            case &quot;RSA&quot;: return RSA;</span>
+<span class="fc" id="L98">            case &quot;DHr&quot;: return DHr;</span>
+<span class="fc" id="L99">            case &quot;DHd&quot;: return DHd;</span>
+<span class="fc" id="L100">            case &quot;EDH&quot;: case &quot;DHE&quot;: return DHE;</span>
+<span class="fc" id="L101">            case &quot;PSK&quot;: return PSK;</span>
+<span class="fc" id="L102">            case &quot;FZA&quot;: return FZA;</span>
+<span class="fc" id="L103">            case &quot;KRB5&quot;: return KRB5;</span>
+<span class="fc" id="L104">            case &quot;ECDHr&quot;: return ECDHr;</span>
+<span class="fc" id="L105">            case &quot;ECDHe&quot;: return ECDHe;</span>
+<span class="fc" id="L106">            case &quot;GOST&quot;: return GOST;</span>
+<span class="fc" id="L107">            case &quot;SRP&quot;: return SRP;</span>
+<span class="fc" id="L108">            case &quot;RSAPSK&quot;: return RSAPSK;</span>
+<span class="fc" id="L109">            case &quot;EDHPSK&quot;: case &quot;DHEPSK&quot;: return DHEPSK;</span>
+<span class="fc" id="L110">            case &quot;ECDHEPSK&quot;: case &quot;EECDHPSK&quot;: return ECDHEPSK;</span>
+<span class="fc" id="L111">            default: return null;</span>
+        }
+    }
+
+    static KeyAgreement require(final String name) {
+<span class="nc" id="L116">        final KeyAgreement keyAgreement = forName(name);</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        if (keyAgreement == null) {</span>
+<span class="nc" id="L118">            throw log.unknownKeyExchangeName(name);</span>
+        }
+<span class="nc" id="L120">        return keyAgreement;</span>
+    }
+
+    /**
+     * Determine whether the given set is &quot;full&quot; (meaning it contains all possible values).
+     *
+     * @param keyAgreements the set
+     * @return {@code true} if the set is full, {@code false} otherwise
+     */
+    public static boolean isFull(final EnumSet&lt;KeyAgreement&gt; keyAgreements) {
+<span class="nc bnc" id="L130" title="All 4 branches missed.">        return keyAgreements != null &amp;&amp; keyAgreements.size() == fullSize;</span>
+    }
+
+    /**
+     * Determine whether this instance is equal to one of the given instances.
+     *
+     * @param value1 the first instance
+     * @param value2 the second instance
+     * @return {@code true} if one of the instances matches this one, {@code false} otherwise
+     */
+    public boolean in(final KeyAgreement value1, final KeyAgreement value2) {
+<span class="nc bnc" id="L141" title="All 4 branches missed.">        return this == value1 || this == value2;</span>
+    }
+
+    /**
+     * Determine whether this instance is equal to one of the given instances.
+     *
+     * @param value1 the first instance
+     * @param value2 the second instance
+     * @param value3 the third instance
+     * @return {@code true} if one of the instances matches this one, {@code false} otherwise
+     */
+    public boolean in(final KeyAgreement value1, final KeyAgreement value2, final KeyAgreement value3) {
+<span class="nc bnc" id="L153" title="All 6 branches missed.">        return this == value1 || this == value2 || this == value3;</span>
+    }
+
+    /**
+     * Determine whether this instance is equal to one of the given instances.
+     *
+     * @param values the values to match against
+     * @return {@code true} if one of the instances matches this one, {@code false} otherwise
+     */
+    public boolean in(final KeyAgreement... values) {
+<span class="nc bnc" id="L163" title="All 4 branches missed.">        if (values != null) for (KeyAgreement value : values) {</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">            if (this == value) return true;</span>
+        }
+<span class="nc" id="L166">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-oidc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.oidc</a> &gt; <span class="el_source">ElytronMessages.java</span></div><h1>ElytronMessages.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2020 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.http.oidc;
+
+import static org.jboss.logging.Logger.Level.ERROR;
+import static org.jboss.logging.Logger.Level.WARN;
+import static org.jboss.logging.annotations.Message.NONE;
+
+import java.io.IOException;
+
+import org.jboss.logging.BasicLogger;
+import org.jboss.logging.Logger;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.LogMessage;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageLogger;
+import org.jboss.logging.annotations.ValidIdRange;
+import org.jboss.logging.annotations.ValidIdRanges;
+
+/**
+ * Log messages and exceptions for Elytron.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+@MessageLogger(projectCode = &quot;ELY&quot;, length = 5)
+@ValidIdRanges({
+        @ValidIdRange(min = 23000, max = 23999)
+})
+interface ElytronMessages extends BasicLogger {
+
+<span class="fc" id="L48">    ElytronMessages log = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security.http.oidc&quot;);</span>
+
+    @Message(id = 23000, value = &quot;Unexpected HTTP status code in response from OIDC provider \&quot;%d\&quot;&quot;)
+    OidcException unexpectedResponseCodeFromOidcProvider(int responseCode);
+
+    @Message(id = 23001, value = &quot;No entity in response from OIDC provider&quot;)
+    OidcException noEntityInResponse();
+
+    @Message(id = 23002, value = &quot;Unexpected error sending request to OIDC provider&quot;)
+    OidcException unexpectedErrorSendingRequestToOidcProvider(@Cause Exception cause);
+
+    @Message(id = 23003, value = &quot;Either provider-url or auth-server-url needs to be configured&quot;)
+    IllegalArgumentException providerUrlOrAuthServerUrlNeedsToBeConfigured();
+
+    @LogMessage
+    @Message(id = 23004, value = &quot;Loaded OpenID provider metadata from '%s'&quot;)
+    void loadedOpenIdProviderMetadata(String discoveryUrl);
+
+    @LogMessage(level = WARN)
+    @Message(id = 23005, value = &quot;Unable to load OpenID provider metadata from %s&quot;)
+    void unableToLoadOpenIdProviderMetadata(String discoveryUrl);
+
+    @Message(id = 23006, value = &quot;Failed to decode request URI&quot;)
+    RuntimeException failedToDecodeRequestUri(@Cause Exception cause);
+
+    @Message(id = 23007, value = &quot;Failed to write to response output stream&quot;)
+    RuntimeException failedToWriteToResponseOutputStream(@Cause Exception cause);
+
+    @Message(id = 23008, value = &quot;Unable to parse token&quot;)
+    IllegalArgumentException unableToParseToken();
+
+    @Message(id = 23009, value = &quot;OIDC client configuration file not found&quot;)
+    RuntimeException oidcConfigFileNotFound(@Cause Exception cause);
+
+    @LogMessage(level = ERROR)
+    @Message(id = 23010, value = &quot;Failed to invoke remote logout&quot;)
+    void failedToInvokeRemoteLogout(@Cause Throwable cause);
+
+    @LogMessage(level = ERROR)
+    @Message(id = 23011, value = &quot;Refresh token failure&quot;)
+    void refreshTokenFailure(@Cause Throwable cause);
+
+    @LogMessage(level = ERROR)
+    @Message(id = 23012, value = &quot;Refresh token failure status: %d %s&quot;)
+    void refreshTokenFailureStatus(int status, String error);
+
+    @LogMessage(level = ERROR)
+    @Message(id = 23013, value = &quot;Failed verification of token: %s&quot;)
+    void failedVerificationOfToken(String error);
+
+    @LogMessage(level = ERROR)
+    @Message(id = 23014, value = &quot;Failed to refresh the token with a longer time-to-live than the minimum&quot;)
+    void failedToRefreshTokenWithALongerTTLThanMin();
+
+    @Message(id = 23015, value = &quot;No expected issuer given&quot;)
+    IllegalArgumentException noExpectedIssuerGiven();
+
+    @Message(id = 23016, value = &quot;No client ID given&quot;)
+    IllegalArgumentException noClientIDGiven();
+
+    @Message(id = 23017, value = &quot;No expected JWS algorithm given&quot;)
+    IllegalArgumentException noExpectedJwsAlgorithmGiven();
+
+    @Message(id = 23018, value = &quot;No JWKS public key or client secret key given&quot;)
+    IllegalArgumentException noJwksPublicKeyOrClientSecretKeyGiven();
+
+    @Message(id = 23019, value = &quot;Invalid ID token&quot;)
+    OidcException invalidIDToken(@Cause Throwable cause);
+
+    @Message(id = NONE, value = &quot;Unexpected value for azp (issued for) claim&quot;)
+    String unexpectedValueForIssuedForClaim();
+
+    @Message(id = 23020, value = &quot;Invalid token claim value&quot;)
+    IllegalArgumentException invalidTokenClaimValue();
+
+    @Message(id = 23021, value = &quot;Invalid ID token claims&quot;)
+    OidcException invalidIDTokenClaims();
+
+    @Message(id = 23022, value = &quot;Must set 'realm' in config&quot;)
+    RuntimeException keycloakRealmMissing();
+
+    @Message(id = 23023, value = &quot;Must set 'resource' or 'client-id'&quot;)
+    RuntimeException resourceOrClientIdMustBeSet();
+
+    @Message(id = 23024, value = &quot;For bearer auth, you must set the 'realm-public-key' or one of 'auth-server-url' and 'provider-url'&quot;)
+    IllegalArgumentException invalidConfigurationForBearerAuth();
+
+    @Message(id = 23025, value = &quot;Must set 'auth-server-url' or 'provider-url'&quot;)
+    RuntimeException authServerUrlOrProviderUrlMustBeSet();
+
+    @LogMessage(level = WARN)
+    @Message(id = 23026, value = &quot;Client '%s' does not have a secret configured&quot;)
+    void noClientSecretConfigured(String clientId);
+
+    @Message(id = 23027, value = &quot;Unsupported public key&quot;)
+    IllegalArgumentException unsupportedPublicKey();
+
+    @Message(id = 23028, value = &quot;Unable to create signed token&quot;)
+    IllegalArgumentException unableToCreateSignedToken();
+
+    @Message(id = 23029, value = &quot;Configuration of jwt credentials is missing or incorrect for client '%s'&quot;)
+    RuntimeException invalidJwtClientCredentialsConfig(String clientId);
+
+    @Message(id = 23030, value = &quot;Missing parameter '%s' in jwt credentials for client %s&quot;)
+    RuntimeException missingParameterInJwtClientCredentialsConfig(String parameter, String clientId);
+
+    @Message(id = 23031, value = &quot;Unable to parse key '%s' with value '%s'&quot;)
+    IllegalArgumentException unableToParseKeyWithValue(String key, Object value);
+
+    @Message(id = 23032, value = &quot;Unable to load key with alias '%s' from keystore&quot;)
+    RuntimeException unableToLoadKeyWithAlias(String alias);
+
+    @Message(id = 23033, value = &quot;Unable to load private key from keystore&quot;)
+    RuntimeException unableToLoadPrivateKey(@Cause Throwable cause);
+
+    @Message(id = 23034, value = &quot;Unable to find keystore file '%s'&quot;)
+    RuntimeException unableToFindKeystoreFile(String keystoreFile);
+
+    @Message(id = 23035, value = &quot;Configuration of secret jwt client credentials is missing or incorrect for client '%s'&quot;)
+    RuntimeException invalidJwtClientCredentialsUsingSecretConfig(String clientId);
+
+    @Message(id = 23036, value = &quot;Invalid value for 'algorithm' in secret jwt client credentials configuration for client '%s'&quot;)
+    RuntimeException invalidAlgorithmInJwtClientCredentialsConfig(String clientId);
+
+    @Message(id = 23037, value = &quot;Unable to determine client credentials provider type for client '%s'&quot;)
+    RuntimeException unableToDetermineClientCredentialsProviderType(String clientId);
+
+    @Message(id = 23038, value = &quot;Unable to find client credentials provider '%s'&quot;)
+    RuntimeException unableToFindClientCredentialsProvider(String provider);
+
+    @Message(id = 23039, value = &quot;Unable to load keystore&quot;)
+    RuntimeException unableToLoadKeyStore(@Cause Throwable cause);
+
+    @Message(id = 23040, value = &quot;Unable to load truststore&quot;)
+    RuntimeException unableToLoadTrustStore(@Cause Throwable cause);
+
+    @Message(id = 23041, value = &quot;Unable to find truststore file '%s'&quot;)
+    RuntimeException unableToFindTrustStoreFile(String trustStoreFile);
+
+    @Message(id = 23042, value = &quot;Unexpected value for at_hash claim&quot;)
+    String unexpectedValueForAtHashClaim();
+
+    @Message(id = 23043, value = &quot;Uknown algorithm: '%s'&quot;)
+    IllegalArgumentException unknownAlgorithm(String algorithm);
+
+    @LogMessage(level = WARN)
+    @Message(id = 23044, value = &quot;Failed to parse token from cookie&quot;)
+    void failedToParseTokenFromCookie(@Cause Throwable cause);
+
+    @Message(id = 23045, value = &quot;Unable to create redirect response&quot;)
+    IllegalArgumentException unableToCreateRedirectResponse(@Cause Throwable cause);
+
+    @Message(id = 23046, value = &quot;Unable to set auth server URL&quot;)
+    RuntimeException unableToSetAuthServerUrl(@Cause Throwable cause);
+
+    @Message(id = 23047, value = &quot;Unable resolve a relative URL&quot;)
+    RuntimeException unableToResolveARelativeUrl();
+
+    @Message(id = 23048, value = &quot;Invalid URI: '%s'&quot;)
+    RuntimeException invalidUri(String uri);
+
+    @LogMessage(level = WARN)
+    @Message(id = 23049, value = &quot;Invalid 'auth-server-url' or 'provider-url': '%s'&quot;)
+    void invalidAuthServerUrlOrProviderUrl(String url);
+
+    @Message(id = 23050, value = &quot;Invalid bearer token claims&quot;)
+    OidcException invalidBearerTokenClaims();
+
+    @Message(id = 23051, value = &quot;Invalid bearer token&quot;)
+    OidcException invalidBearerToken(@Cause Throwable cause);
+
+    @LogMessage(level = WARN)
+    @Message(id = 23052, value = &quot;No trusted certificates in token&quot;)
+    void noTrustedCertificatesInToken();
+
+    @LogMessage(level = WARN)
+    @Message(id = 23053, value = &quot;No peer certificates established on the connection&quot;)
+    void noPeerCertificatesEstablishedOnConnection();
+
+    @Message(id = 23054, value = &quot;Unexpected value for typ claim&quot;)
+    String unexpectedValueForTypeClaim();
+
+    @Message(id = 23055, value = &quot;Unable to obtain token: %d&quot;)
+    IOException unableToObtainToken(int status);
+
+    @Message(id = 23056, value = &quot;No message entity&quot;)
+    IOException noMessageEntity();
+
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

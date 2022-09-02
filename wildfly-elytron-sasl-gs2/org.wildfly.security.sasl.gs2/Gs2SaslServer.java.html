@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Gs2SaslServer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl-gs2</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.gs2</a> &gt; <span class="el_source">Gs2SaslServer.java</span></div><h1>Gs2SaslServer.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.gs2;
+
+import static org.wildfly.security.asn1.ASN1.APPLICATION_SPECIFIC_MASK;
+import static org.wildfly.security.mechanism._private.ElytronMessages.saslGs2;
+
+import java.io.IOException;
+
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.sasl.AuthorizeCallback;
+import javax.security.sasl.Sasl;
+import javax.security.sasl.SaslException;
+
+import org.ietf.jgss.ChannelBinding;
+import org.ietf.jgss.GSSContext;
+import org.ietf.jgss.GSSCredential;
+import org.ietf.jgss.GSSException;
+import org.ietf.jgss.GSSManager;
+import org.ietf.jgss.GSSName;
+import org.ietf.jgss.Oid;
+import org.wildfly.common.Assert;
+import org.wildfly.common.bytes.ByteStringBuilder;
+import org.wildfly.common.iteration.ByteIterator;
+import org.wildfly.common.iteration.CodePointIterator;
+import org.wildfly.security.asn1.ASN1Exception;
+import org.wildfly.security.asn1.DEREncoder;
+import org.wildfly.security.auth.callback.IdentityCredentialCallback;
+import org.wildfly.security.auth.callback.ServerCredentialCallback;
+import org.wildfly.security.credential.GSSKerberosCredential;
+import org.wildfly.security.sasl.util.AbstractSaslServer;
+
+/**
+ * SaslServer for the GS2 mechanism family as defined by
+ * &lt;a href=&quot;https://tools.ietf.org/html/rfc5801&quot;&gt;RFC 5801&lt;/a&gt;.
+ *
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+<span class="nc bnc" id="L57" title="All 2 branches missed.">final class Gs2SaslServer extends AbstractSaslServer {</span>
+
+    private static final int ST_NO_MESSAGE = 1;
+    private static final int ST_FIRST_MESSAGE = 2;
+    private static final int ST_ACCEPTOR = 3;
+
+    private final boolean plus;
+    private final String bindingType;
+    private final byte[] bindingData;
+    private final Oid mechanism;
+    private GSSContext gssContext;
+    private String authorizationID;
+    private String boundServerName;
+
+    Gs2SaslServer(final String mechanismName, final String protocol, final String serverName, final CallbackHandler callbackHandler,
+            final GSSManager gssManager, final boolean plus, final String bindingType, final byte[] bindingData) throws SaslException {
+<span class="nc" id="L73">        super(mechanismName, protocol, serverName, callbackHandler, saslGs2);</span>
+<span class="nc" id="L74">        this.plus = plus;</span>
+<span class="nc" id="L75">        this.bindingType = bindingType;</span>
+<span class="nc" id="L76">        this.bindingData = bindingData;</span>
+
+        try {
+<span class="nc" id="L79">            mechanism = Gs2.getMechanismForSaslName(gssManager, mechanismName);</span>
+<span class="nc" id="L80">        } catch (GSSException e) {</span>
+<span class="nc" id="L81">            throw saslGs2.mechMechanismToOidMappingFailed(e).toSaslException();</span>
+<span class="nc" id="L82">        }</span>
+
+        // Attempt to obtain a credential
+<span class="nc" id="L85">        GSSCredential credential = null;</span>
+<span class="nc" id="L86">        ServerCredentialCallback credentialCallback = new ServerCredentialCallback(GSSKerberosCredential.class);</span>
+
+        try {
+<span class="nc" id="L89">            saslGs2.trace(&quot;Obtaining GSSCredential for the service from callback handler&quot;);</span>
+<span class="nc" id="L90">            callbackHandler.handle(new Callback[] { credentialCallback });</span>
+<span class="nc" id="L91">            credential = credentialCallback.applyToCredential(GSSKerberosCredential.class, GSSKerberosCredential::getGssCredential);</span>
+<span class="nc" id="L92">        } catch (IOException e) {</span>
+<span class="nc" id="L93">            throw saslGs2.mechCallbackHandlerFailedForUnknownReason(e).toSaslException();</span>
+<span class="nc" id="L94">        } catch (UnsupportedCallbackException e) {</span>
+<span class="nc" id="L95">            saslGs2.trace(&quot;Unable to obtain GSSCredential from callback handler&quot;, e);</span>
+<span class="nc" id="L96">        }</span>
+
+        try {
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            if (credential == null) {</span>
+                GSSName ourName;
+
+<span class="nc bnc" id="L102" title="All 2 branches missed.">                if (serverName != null) {</span>
+<span class="nc" id="L103">                    String localName = protocol + &quot;@&quot; + serverName;</span>
+<span class="nc" id="L104">                    saslGs2.tracef(&quot;Our name is '%s'&quot;, localName);</span>
+<span class="nc" id="L105">                    ourName = gssManager.createName(localName, GSSName.NT_HOSTBASED_SERVICE, mechanism);</span>
+<span class="nc" id="L106">                } else {</span>
+<span class="nc" id="L107">                    saslGs2.tracef(&quot;Our name is unbound&quot;);</span>
+<span class="nc" id="L108">                    ourName = null;</span>
+                }
+
+<span class="nc" id="L111">                credential = gssManager.createCredential(ourName, GSSContext.INDEFINITE_LIFETIME, mechanism, GSSCredential.ACCEPT_ONLY);</span>
+            }
+<span class="nc" id="L113">            gssContext = gssManager.createContext(credential);</span>
+<span class="nc" id="L114">        } catch (GSSException e) {</span>
+<span class="nc" id="L115">            throw saslGs2.mechUnableToCreateGssContext(e).toSaslException();</span>
+<span class="nc" id="L116">        }</span>
+<span class="nc" id="L117">    }</span>
+
+    public void init() {
+<span class="nc" id="L120">        setNegotiationState(ST_NO_MESSAGE);</span>
+<span class="nc" id="L121">    }</span>
+
+    public String getAuthorizationID() {
+<span class="nc" id="L124">        return authorizationID;</span>
+    }
+
+    protected byte[] evaluateMessage(final int state, final byte[] message) throws SaslException {
+<span class="nc bnc" id="L128" title="All 5 branches missed.">        switch (state) {</span>
+            case ST_NO_MESSAGE: {
+<span class="nc bnc" id="L130" title="All 4 branches missed.">                if (message == null || message.length == 0) {</span>
+<span class="nc" id="L131">                    setNegotiationState(ST_ACCEPTOR);</span>
+                    // Initial challenge
+<span class="nc" id="L133">                    return NO_BYTES;</span>
+                }
+                // Fall through
+            }
+            case ST_FIRST_MESSAGE: {
+<span class="nc bnc" id="L138" title="All 4 branches missed.">                assert gssContext.isEstablished() == false;</span>
+<span class="nc bnc" id="L139" title="All 4 branches missed.">                if (message == null || message.length == 0) {</span>
+<span class="nc" id="L140">                    throw saslGs2.mechClientRefusesToInitiateAuthentication().toSaslException();</span>
+                }
+<span class="nc" id="L142">                ByteIterator bi = ByteIterator.ofBytes(message);</span>
+<span class="nc" id="L143">                ByteIterator di = bi.delimitedBy(',');</span>
+<span class="nc" id="L144">                CodePointIterator cpi = di.asUtf8String();</span>
+<span class="nc" id="L145">                boolean gs2CbFlagPUsed = false;</span>
+
+                // == Parse message ==
+<span class="nc" id="L148">                boolean nonStd = false;</span>
+<span class="nc" id="L149">                int b = bi.next();</span>
+
+                // gs2-nonstd-flag
+<span class="nc bnc" id="L152" title="All 2 branches missed.">                if (b == 'F') {</span>
+<span class="nc" id="L153">                    skipDelimiter(bi);</span>
+<span class="nc" id="L154">                    nonStd = true;</span>
+<span class="nc" id="L155">                    b = bi.next();</span>
+                }
+
+                // gs2-cb-flag
+<span class="nc bnc" id="L159" title="All 2 branches missed.">                if (b == 'p') {</span>
+<span class="nc" id="L160">                    gs2CbFlagPUsed = true;</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">                    if (! plus) {</span>
+<span class="nc" id="L162">                        throw saslGs2.mechChannelBindingNotSupported().toSaslException();</span>
+                    }
+<span class="nc bnc" id="L164" title="All 2 branches missed.">                    if (bi.next() != '=') {</span>
+<span class="nc" id="L165">                        throw saslGs2.mechInvalidMessageReceived().toSaslException();</span>
+                    }
+<span class="nc bnc" id="L167" title="All 4 branches missed.">                    assert bindingType != null;</span>
+<span class="nc bnc" id="L168" title="All 4 branches missed.">                    assert bindingData != null;</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">                    if (! bindingType.equals(cpi.drainToString())) {</span>
+<span class="nc" id="L170">                        throw saslGs2.mechChannelBindingTypeMismatch().toSaslException();</span>
+                    }
+<span class="nc" id="L172">                    skipDelimiter(bi);</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">                } else if (b == 'y') {</span>
+<span class="nc bnc" id="L174" title="All 6 branches missed.">                    if (plus || (bindingType != null &amp;&amp; bindingData != null)) {</span>
+                        // server supports channel binding
+<span class="nc" id="L176">                        throw saslGs2.mechChannelBindingNotProvided().toSaslException();</span>
+                    }
+<span class="nc" id="L178">                    skipDelimiter(bi);</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">                } else if (b == 'n') {</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">                    if (plus) {</span>
+<span class="nc" id="L181">                        throw saslGs2.mechChannelBindingNotProvided().toSaslException();</span>
+                    }
+<span class="nc" id="L183">                    skipDelimiter(bi);</span>
+                } else {
+<span class="nc" id="L185">                    throw saslGs2.mechInvalidMessageReceived().toSaslException();</span>
+                }
+
+                // gs2-authzid
+<span class="nc" id="L189">                b = bi.next();</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">                if (b == 'a') {</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">                    if (bi.next() != '=') {</span>
+<span class="nc" id="L192">                        throw saslGs2.mechInvalidMessageReceived().toSaslException();</span>
+                    }
+<span class="nc" id="L194">                    authorizationID = cpi.drainToString();</span>
+<span class="nc" id="L195">                    skipDelimiter(bi);</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">                } else if (b != ',') {</span>
+<span class="nc" id="L197">                    throw saslGs2.mechInvalidMessageReceived().toSaslException();</span>
+                }
+
+                // Restore the initial context token header, if necessary
+                byte[] token;
+                int gs2HeaderStartIndex;
+                int gs2HeaderLength;
+<span class="nc bnc" id="L204" title="All 2 branches missed.">                if (nonStd) {</span>
+<span class="nc" id="L205">                    gs2HeaderStartIndex = 2;</span>
+<span class="nc" id="L206">                    gs2HeaderLength = (int) (bi.getIndex() - 2);</span>
+<span class="nc" id="L207">                    token = bi.drain();</span>
+                } else {
+<span class="nc" id="L209">                    gs2HeaderStartIndex = 0;</span>
+<span class="nc" id="L210">                    gs2HeaderLength = (int) bi.getIndex();</span>
+                    try {
+<span class="nc" id="L212">                        token = restoreTokenHeader(bi.drain());</span>
+<span class="nc" id="L213">                    } catch (ASN1Exception e) {</span>
+<span class="nc" id="L214">                        throw saslGs2.mechUnableToCreateResponseTokenWithCause(e).toSaslException();</span>
+<span class="nc" id="L215">                    }</span>
+                }
+
+<span class="nc" id="L218">                ByteStringBuilder gs2HeaderExcludingNonStdFlag = new ByteStringBuilder();</span>
+<span class="nc" id="L219">                gs2HeaderExcludingNonStdFlag.append(message, gs2HeaderStartIndex, gs2HeaderLength);</span>
+                try {
+<span class="nc" id="L221">                    ChannelBinding channelBinding = Gs2Util.createChannelBinding(gs2HeaderExcludingNonStdFlag.toArray(), gs2CbFlagPUsed, bindingData);</span>
+<span class="nc" id="L222">                    gssContext.setChannelBinding(channelBinding);</span>
+<span class="nc" id="L223">                } catch (GSSException e) {</span>
+<span class="nc" id="L224">                    throw saslGs2.mechUnableToSetChannelBinding(e).toSaslException();</span>
+<span class="nc" id="L225">                }</span>
+
+                try {
+<span class="nc" id="L228">                    byte[] response = gssContext.acceptSecContext(token, 0, token.length);</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">                    if (gssContext.isEstablished()) {</span>
+<span class="nc" id="L230">                        Oid actualMechanism = gssContext.getMech();</span>
+<span class="nc bnc" id="L231" title="All 2 branches missed.">                        if (! mechanism.equals(actualMechanism)) {</span>
+<span class="nc" id="L232">                            throw saslGs2.mechGssApiMechanismMismatch().toSaslException();</span>
+                        }
+<span class="nc" id="L234">                        storeBoundServerName();</span>
+<span class="nc" id="L235">                        checkAuthorizationID();</span>
+<span class="nc" id="L236">                        storeDelegatedGSSCredential();</span>
+<span class="nc" id="L237">                        negotiationComplete();</span>
+<span class="nc" id="L238">                    } else {</span>
+                        // Expecting subsequent exchanges
+<span class="nc" id="L240">                        setNegotiationState(ST_ACCEPTOR);</span>
+                    }
+<span class="nc" id="L242">                    return response;</span>
+<span class="nc" id="L243">                } catch (GSSException e) {</span>
+<span class="nc" id="L244">                    throw saslGs2.mechUnableToAcceptClientMessage(e).toSaslException();</span>
+                }
+            }
+            case ST_ACCEPTOR: {
+<span class="nc bnc" id="L248" title="All 4 branches missed.">                assert gssContext.isEstablished() == false;</span>
+                try {
+<span class="nc" id="L250">                    byte[] response = gssContext.acceptSecContext(message, 0, message.length);</span>
+<span class="nc bnc" id="L251" title="All 2 branches missed.">                    if (gssContext.isEstablished()) {</span>
+<span class="nc" id="L252">                        Oid actualMechanism = gssContext.getMech();</span>
+<span class="nc bnc" id="L253" title="All 2 branches missed.">                        if (! mechanism.equals(actualMechanism)) {</span>
+<span class="nc" id="L254">                            throw saslGs2.mechGssApiMechanismMismatch().toSaslException();</span>
+                        }
+<span class="nc" id="L256">                        storeBoundServerName();</span>
+<span class="nc" id="L257">                        checkAuthorizationID();</span>
+<span class="nc" id="L258">                        storeDelegatedGSSCredential();</span>
+<span class="nc" id="L259">                        negotiationComplete();</span>
+                    }
+<span class="nc" id="L261">                    return response;</span>
+<span class="nc" id="L262">                } catch (GSSException e) {</span>
+<span class="nc" id="L263">                    throw saslGs2.mechUnableToAcceptClientMessage(e).toSaslException();</span>
+                }
+            }
+            case COMPLETE_STATE: {
+<span class="nc bnc" id="L267" title="All 4 branches missed.">                if (message != null &amp;&amp; message.length != 0) {</span>
+<span class="nc" id="L268">                    throw saslGs2.mechMessageAfterComplete().toSaslException();</span>
+                }
+<span class="nc" id="L270">                return null;</span>
+            }
+        }
+<span class="nc" id="L273">        throw Assert.impossibleSwitchCase(state);</span>
+    }
+
+    public void dispose() throws SaslException {
+        try {
+<span class="nc" id="L278">            gssContext.dispose();</span>
+<span class="nc" id="L279">        } catch (GSSException e) {</span>
+<span class="nc" id="L280">            throw saslGs2.mechUnableToDisposeGssContext(e).toSaslException();</span>
+        } finally {
+<span class="nc" id="L282">            gssContext = null;</span>
+        }
+<span class="nc" id="L284">    }</span>
+
+    /**
+     * Recompute and restore the initial context token header for the given token.
+     *
+     * @param token the initial context token without the token header
+     * @return the initial context token with the token header restored
+     * @throws ASN1Exception if the mechanism OID cannot be DER encoded
+     */
+    private byte[] restoreTokenHeader(byte[] token) throws ASN1Exception {
+<span class="nc" id="L294">        final DEREncoder encoder = new DEREncoder();</span>
+<span class="nc" id="L295">        encoder.encodeImplicit(APPLICATION_SPECIFIC_MASK, 0);</span>
+<span class="nc" id="L296">        encoder.startSequence();</span>
+        try {
+<span class="nc" id="L298">            encoder.writeEncoded(mechanism.getDER());</span>
+<span class="nc" id="L299">        } catch (GSSException e) {</span>
+<span class="nc" id="L300">            throw new ASN1Exception(e);</span>
+<span class="nc" id="L301">        }</span>
+<span class="nc" id="L302">        encoder.writeEncoded(token);</span>
+<span class="nc" id="L303">        encoder.endSequence();</span>
+<span class="nc" id="L304">        return encoder.getEncoded();</span>
+    }
+
+    private void storeBoundServerName() throws SaslException {
+        try {
+<span class="nc" id="L309">            String targetName = gssContext.getTargName().toString();</span>
+<span class="nc" id="L310">            String[] targetNameParts = targetName.split(&quot;[/@]&quot;);</span>
+<span class="nc bnc" id="L311" title="All 2 branches missed.">            boundServerName = targetNameParts.length &gt; 1 ? targetNameParts[1] : targetName;</span>
+<span class="nc" id="L312">        } catch (GSSException e) {</span>
+<span class="nc" id="L313">            throw saslGs2.mechUnableToDetermineBoundServerName(e).toSaslException();</span>
+<span class="nc" id="L314">        }</span>
+<span class="nc" id="L315">    }</span>
+
+    private void checkAuthorizationID() throws SaslException {
+        final String authenticationID;
+        try {
+<span class="nc" id="L320">            authenticationID = gssContext.getSrcName().toString();</span>
+<span class="nc" id="L321">        } catch (GSSException e) {</span>
+<span class="nc" id="L322">            throw saslGs2.mechUnableToDeterminePeerName(e).toSaslException();</span>
+<span class="nc" id="L323">        }</span>
+<span class="nc" id="L324">        saslGs2.tracef(&quot;checking if [%s] is authorized to act as [%s]...&quot;, authenticationID, authorizationID);</span>
+<span class="nc bnc" id="L325" title="All 4 branches missed.">        if (authorizationID == null || authorizationID.isEmpty()) {</span>
+<span class="nc" id="L326">            authorizationID = authenticationID;</span>
+        }
+<span class="nc" id="L328">        AuthorizeCallback authorizeCallback = new AuthorizeCallback(authenticationID, authorizationID);</span>
+<span class="nc" id="L329">        handleCallbacks(authorizeCallback);</span>
+<span class="nc bnc" id="L330" title="All 2 branches missed.">        if (! authorizeCallback.isAuthorized()) {</span>
+<span class="nc" id="L331">            throw saslGs2.mechAuthorizationFailed(authenticationID, authorizationID).toSaslException();</span>
+        }
+<span class="nc" id="L333">        saslGs2.trace(&quot;authorization id check successful&quot;);</span>
+<span class="nc" id="L334">    }</span>
+
+    private void storeDelegatedGSSCredential() throws SaslException {
+        try {
+<span class="nc" id="L338">            GSSCredential gssCredential = gssContext.getDelegCred();</span>
+<span class="nc bnc" id="L339" title="All 2 branches missed.">            if (gssCredential != null) {</span>
+<span class="nc" id="L340">                tryHandleCallbacks(new IdentityCredentialCallback(new GSSKerberosCredential(gssCredential), true));</span>
+            } else {
+<span class="nc" id="L342">                saslGs2.trace(&quot;No GSSCredential delegated during authentication.&quot;);</span>
+            }
+<span class="nc" id="L344">        } catch (UnsupportedCallbackException | GSSException e) {</span>
+            // ignored
+<span class="nc" id="L346">        }</span>
+<span class="nc" id="L347">    }</span>
+
+    private void skipDelimiter(ByteIterator bi) throws SaslException {
+<span class="nc bnc" id="L350" title="All 2 branches missed.">        if (bi.next() != ',') {</span>
+<span class="nc" id="L351">            throw saslGs2.mechInvalidMessageReceived().toSaslException();</span>
+        }
+<span class="nc" id="L353">    }</span>
+
+    @Override
+    public Object getNegotiatedProperty(String propName) {
+<span class="nc" id="L357">        assertComplete();</span>
+<span class="nc bnc" id="L358" title="All 2 branches missed.">        if (Sasl.BOUND_SERVER_NAME.equals(propName)) {</span>
+<span class="nc" id="L359">            return boundServerName;</span>
+        }
+<span class="nc" id="L361">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,422 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FormAuthenticationMechanism.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-form</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.form</a> &gt; <span class="el_source">FormAuthenticationMechanism.java</span></div><h1>FormAuthenticationMechanism.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.http.form;
+
+import static java.util.Arrays.fill;
+import static org.wildfly.common.Assert.checkNotNullParam;
+import static org.wildfly.security.http.HttpConstants.CONFIG_CONTEXT_PATH;
+import static org.wildfly.security.http.HttpConstants.CONFIG_ERROR_PAGE;
+import static org.wildfly.security.http.HttpConstants.CONFIG_LOGIN_PAGE;
+import static org.wildfly.security.http.HttpConstants.CONFIG_POST_LOCATION;
+import static org.wildfly.security.http.HttpConstants.DISABLE_SESSION_ID_CHANGE;
+import static org.wildfly.security.http.HttpConstants.FORM_NAME;
+import static org.wildfly.security.http.HttpConstants.FOUND;
+import static org.wildfly.security.http.HttpConstants.HTTP;
+import static org.wildfly.security.http.HttpConstants.HTTPS;
+import static org.wildfly.security.http.HttpConstants.LOCATION;
+import static org.wildfly.security.http.HttpConstants.POST;
+import static org.wildfly.security.mechanism._private.ElytronMessages.httpForm;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.URI;
+import java.util.Map;
+
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.UnsupportedCallbackException;
+
+import org.wildfly.security.auth.callback.CachedIdentityAuthorizeCallback;
+import org.wildfly.security.auth.server.SecurityIdentity;
+import org.wildfly.security.cache.CachedIdentity;
+import org.wildfly.security.cache.IdentityCache;
+import org.wildfly.security.http.HttpAuthenticationException;
+import org.wildfly.security.http.HttpScope;
+import org.wildfly.security.http.HttpServerMechanismsResponder;
+import org.wildfly.security.http.HttpServerRequest;
+import org.wildfly.security.http.HttpServerResponse;
+import org.wildfly.security.http.Scope;
+import org.wildfly.security.mechanism.http.UsernamePasswordAuthenticationMechanism;
+
+/**
+ * A generic FORM authentication mechanism which is usable in a number of different scenarios.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+final class FormAuthenticationMechanism extends UsernamePasswordAuthenticationMechanism {
+
+    /*
+     * These two could also be made configurable but defer until proven demand.
+     */
+
+    private static final String USERNAME = &quot;j_username&quot;;
+    private static final String PASSWORD = &quot;j_password&quot;;
+
+<span class="nc" id="L71">    private static final String LOCATION_KEY = FormAuthenticationMechanism.class.getName() + &quot;.Location&quot;;</span>
+<span class="nc" id="L72">    private static final String CACHED_IDENTITY_KEY = FormAuthenticationMechanism.class.getName() + &quot;.elytron-identity&quot;;</span>
+
+    private static final String DEFAULT_POST_LOCATION = &quot;j_security_check&quot;;
+
+    private final String contextPath;
+    private final String loginPage;
+    private final String errorPage;
+    private final String postLocation;
+    private final boolean disableSessionIdChange;
+
+    FormAuthenticationMechanism(final CallbackHandler callbackHandler, final Map&lt;String, ?&gt; properties) {
+<span class="nc" id="L83">        super(checkNotNullParam(&quot;callbackHandler&quot;, callbackHandler));</span>
+<span class="nc" id="L84">        checkNotNullParam(&quot;properties&quot;, properties);</span>
+
+<span class="nc" id="L86">        String postLocation = (String) properties.get(CONFIG_POST_LOCATION);</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        this.postLocation = postLocation != null ? postLocation : DEFAULT_POST_LOCATION;</span>
+
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        contextPath = properties.containsKey(CONFIG_CONTEXT_PATH) ? (String) properties.get(CONFIG_CONTEXT_PATH) : &quot;&quot;;</span>
+<span class="nc" id="L90">        loginPage = (String) properties.get(CONFIG_LOGIN_PAGE);</span>
+<span class="nc" id="L91">        errorPage = (String) properties.get(CONFIG_ERROR_PAGE);</span>
+<span class="nc" id="L92">        disableSessionIdChange = Boolean.valueOf((String) properties.get(DISABLE_SESSION_ID_CHANGE));</span>
+<span class="nc" id="L93">    }</span>
+
+    @Override
+    public String getMechanismName() {
+<span class="nc" id="L97">        return FORM_NAME;</span>
+    }
+
+    /**
+     * @see org.wildfly.security.http.HttpServerAuthenticationMechanism#evaluateRequest(org.wildfly.security.http.HttpServerRequest)
+     */
+    @Override
+    public void evaluateRequest(final HttpServerRequest request) throws HttpAuthenticationException {
+        // Is current request an authentication attempt?
+<span class="nc bnc" id="L106" title="All 4 branches missed.">        if (POST.equals(request.getRequestMethod()) &amp;&amp; isAuthenticationRequest(request.getRequestURI().getPath())) {</span>
+<span class="nc" id="L107">            attemptAuthentication(request);</span>
+<span class="nc" id="L108">            return;</span>
+        }
+
+        // try to re-authenticate based on a previously cached identity
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        if (attemptReAuthentication(request)) {</span>
+<span class="nc" id="L113">            return;</span>
+        }
+
+        // Register challenger
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        if (loginPage != null) {</span>
+<span class="nc" id="L118">            request.noAuthenticationInProgress((response) -&gt; sendLogin(request, response));</span>
+        }
+<span class="nc" id="L120">    }</span>
+
+    private boolean isAuthenticationRequest(final String path) {
+<span class="nc" id="L123">        int lastSlash = path.lastIndexOf('/');</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        int pathParam = path.indexOf(';', lastSlash &gt; 0 ? lastSlash : 0);</span>
+<span class="nc bnc" id="L125" title="All 4 branches missed.">        String target = path.substring(lastSlash &gt;= 0 ? lastSlash + 1 : 0, pathParam &gt; 0 ? pathParam : path.length());</span>
+
+<span class="nc" id="L127">        return target.equals(postLocation);</span>
+    }
+
+    private IdentityCache createIdentityCache(HttpServerRequest request) {
+<span class="nc" id="L131">        return new IdentityCache() {</span>
+            @Override
+            public void put(SecurityIdentity  identity) {
+<span class="nc" id="L134">                HttpScope session = getSessionScope(request, true);</span>
+
+<span class="nc bnc" id="L136" title="All 4 branches missed.">                if (session == null || !session.exists()) {</span>
+<span class="nc" id="L137">                    return;</span>
+                }
+
+                /*
+                 * If we are associating an identity with the session for the first time we need to
+                 * change the ID of the session, in other cases we can continue with the same ID.
+                 */
+<span class="nc bnc" id="L144" title="All 6 branches missed.">                if (!disableSessionIdChange &amp;&amp; session.supportsChangeID() &amp;&amp; session.getAttachment(CACHED_IDENTITY_KEY) == null) {</span>
+<span class="nc" id="L145">                    String originalSessionID = session.getID();</span>
+<span class="nc" id="L146">                    session.changeID();</span>
+<span class="nc" id="L147">                    String newSessionID = session.getID();</span>
+<span class="nc" id="L148">                    fixCachedLocation(session, originalSessionID, newSessionID);</span>
+                }
+
+<span class="nc" id="L151">                session.setAttachment(CACHED_IDENTITY_KEY, new CachedIdentity(getMechanismName(), false, identity));</span>
+<span class="nc" id="L152">            }</span>
+
+            @Override
+            public CachedIdentity get() {
+<span class="nc" id="L156">                HttpScope session = getSessionScope(request, false);</span>
+
+<span class="nc bnc" id="L158" title="All 4 branches missed.">                if (session == null || !session.exists()) {</span>
+<span class="nc" id="L159">                    return null;</span>
+                }
+
+<span class="nc" id="L162">                return (CachedIdentity) session.getAttachment(CACHED_IDENTITY_KEY);</span>
+            }
+
+            @Override
+            public CachedIdentity remove() {
+<span class="nc" id="L167">                HttpScope session = getSessionScope(request, false);</span>
+
+<span class="nc bnc" id="L169" title="All 4 branches missed.">                if (session == null || !session.exists()) {</span>
+<span class="nc" id="L170">                    return null;</span>
+                }
+
+<span class="nc" id="L173">                CachedIdentity cachedIdentity = get();</span>
+
+<span class="nc" id="L175">                session.setAttachment(CACHED_IDENTITY_KEY, null);</span>
+
+<span class="nc" id="L177">                return cachedIdentity;</span>
+            }
+        };
+    }
+
+    private void fixCachedLocation(HttpScope scope, String originalSessionID, String newSessionID) {
+<span class="nc" id="L183">        String originalPath = scope.getAttachment(LOCATION_KEY, String.class);</span>
+<span class="nc bnc" id="L184" title="All 6 branches missed.">        if (originalPath != null &amp;&amp; originalPath.contains(originalSessionID) &amp;&amp; !originalSessionID.equals(newSessionID)) {</span>
+<span class="nc" id="L185">            String newPath = originalPath.replace(originalSessionID, newSessionID);</span>
+<span class="nc" id="L186">            scope.setAttachment(LOCATION_KEY, newPath);</span>
+        }
+<span class="nc" id="L188">    }</span>
+
+    private void error(String message, HttpServerRequest request) {
+<span class="nc" id="L191">        request.authenticationFailed(message, (response) -&gt; sendPage(errorPage, request, response));</span>
+<span class="nc" id="L192">    }</span>
+
+    private void attemptAuthentication(HttpServerRequest request) throws HttpAuthenticationException {
+<span class="nc" id="L195">        String username = request.getFirstParameterValue(USERNAME);</span>
+<span class="nc" id="L196">        String password = request.getFirstParameterValue(PASSWORD);</span>
+
+<span class="nc bnc" id="L198" title="All 6 branches missed.">        if (username == null || username.length() == 0 || password == null) {</span>
+<span class="nc" id="L199">            error(httpForm.usernameOrPasswordMissing(), request);</span>
+<span class="nc" id="L200">            return;</span>
+        }
+
+<span class="nc" id="L203">        char[] passwordChars = password.toCharArray();</span>
+        try {
+<span class="nc bnc" id="L205" title="All 2 branches missed.">            if (authenticate(null, username, passwordChars)) {</span>
+<span class="nc" id="L206">                IdentityCache identityCache = createIdentityCache(request);</span>
+<span class="nc" id="L207">                identityCache.remove();  // We are mid NEW authentication so don't want to import an old identity.</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">                if (authorize(username, request, identityCache)) {</span>
+<span class="nc" id="L209">                    httpForm.debugf(&quot;User [%s] authenticated successfully&quot;, username);</span>
+<span class="nc" id="L210">                    succeed();</span>
+
+<span class="nc" id="L212">                    HttpScope session = getSessionScope(request, true);</span>
+<span class="nc" id="L213">                    HttpServerMechanismsResponder responder = null;</span>
+<span class="nc bnc" id="L214" title="All 4 branches missed.">                    if (session != null &amp;&amp; session.exists()) {</span>
+                        String postAuthenticationPath;
+<span class="nc" id="L216">                        String originalPath = session.getAttachment(LOCATION_KEY, String.class);</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">                        if (originalPath != null) {</span>
+<span class="nc" id="L218">                            postAuthenticationPath = originalPath;</span>
+<span class="nc" id="L219">                            httpForm.tracef(&quot;User redirected to original path [%s]&quot;, postAuthenticationPath);</span>
+                        } else {
+<span class="nc" id="L221">                            URI requestUri = request.getRequestURI();</span>
+<span class="nc" id="L222">                            String currentPath = requestUri.getPath();</span>
+
+<span class="nc" id="L224">                            StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L225">                            String scheme = requestUri.getScheme();</span>
+<span class="nc" id="L226">                            sb.append(scheme);</span>
+<span class="nc" id="L227">                            sb.append(&quot;://&quot;);</span>
+<span class="nc" id="L228">                            sb.append(requestUri.getHost());</span>
+<span class="nc" id="L229">                            int port = requestUri.getPort();</span>
+<span class="nc bnc" id="L230" title="All 2 branches missed.">                            if (appendPort(scheme, port)) {</span>
+<span class="nc" id="L231">                                sb.append(':').append(port);</span>
+                            }
+<span class="nc" id="L233">                            sb.append(currentPath.substring(0, currentPath.indexOf(DEFAULT_POST_LOCATION)));</span>
+
+<span class="nc" id="L235">                            postAuthenticationPath = sb.toString();</span>
+<span class="nc" id="L236">                            httpForm.tracef(&quot;User redirected to default path [%s]&quot;, postAuthenticationPath);</span>
+                        }
+<span class="nc" id="L238">                        session.setAttachment(LOCATION_KEY, null);</span>
+<span class="nc" id="L239">                        responder = (response) -&gt; sendRedirect(response, postAuthenticationPath);</span>
+                    }
+
+<span class="nc" id="L242">                    request.authenticationComplete(responder, identityCache::remove);</span>
+                    // no resumeRequest here, need to redirect first
+<span class="nc" id="L244">                    return;</span>
+                } else {
+<span class="nc" id="L246">                    httpForm.debugf(&quot;User [%s] authorization failed&quot;, username);</span>
+<span class="nc" id="L247">                    failAndRedirectToErrorPage(request, username);</span>
+<span class="nc" id="L248">                    return;</span>
+                }
+
+            } else {
+<span class="nc" id="L252">                httpForm.debugf(&quot;User [%s] authentication failed&quot;, username);</span>
+<span class="nc" id="L253">                failAndRedirectToErrorPage(request, username);</span>
+<span class="nc" id="L254">                return;</span>
+            }
+<span class="nc" id="L256">        } catch (IOException | UnsupportedCallbackException e) {</span>
+<span class="nc" id="L257">            throw new HttpAuthenticationException(e);</span>
+        } finally {
+<span class="nc" id="L259">            fill(passwordChars, (char) 0x00);</span>
+        }
+    }
+
+    private boolean authorize(String username, HttpServerRequest request, IdentityCache identityCache) throws HttpAuthenticationException {
+<span class="nc" id="L264">        httpForm.tracef(&quot;Authorizing username: [%s], Request URI: [%s], Context path: [%s]&quot;, username, request.getRequestURI(), this.contextPath);</span>
+
+<span class="nc bnc" id="L266" title="All 2 branches missed.">        if (identityCache != null) {</span>
+<span class="nc" id="L267">            CachedIdentityAuthorizeCallback authorizeCallback = new CachedIdentityAuthorizeCallback(username, identityCache);</span>
+            try {
+<span class="nc" id="L269">                callbackHandler.handle(new Callback[]{authorizeCallback});</span>
+<span class="nc" id="L270">                return authorizeCallback.isAuthorized();</span>
+<span class="nc" id="L271">            } catch (IOException | UnsupportedCallbackException e) {</span>
+<span class="nc" id="L272">                throw new HttpAuthenticationException(e);</span>
+            }
+        }
+<span class="nc" id="L275">        return super.authorize(username);</span>
+    }
+
+    private boolean attemptReAuthentication(HttpServerRequest request) throws HttpAuthenticationException {
+<span class="nc bnc" id="L279" title="All 2 branches missed.">        if (httpForm.isTraceEnabled()) {</span>
+<span class="nc" id="L280">            HttpScope sessionScope = getSessionScope(request, false);</span>
+<span class="nc bnc" id="L281" title="All 4 branches missed.">            if (sessionScope != null &amp;&amp; sessionScope.exists()) {</span>
+<span class="nc" id="L282">                httpForm.tracef(&quot;Trying to re-authenticate session %s. Request URI: [%s], Context path: [%s]&quot;,</span>
+<span class="nc" id="L283">                        sessionScope.getID(), request.getRequestURI(), this.contextPath);</span>
+            } else {
+<span class="nc" id="L285">                httpForm.tracef(&quot;Trying to re-authenticate. There is no session attached to the following request. &quot; +</span>
+<span class="nc" id="L286">                        &quot;Request URI: [%s], Context path: [%s]&quot;, request.getRequestURI(), this.contextPath);</span>
+            }
+        }
+
+<span class="nc" id="L290">        IdentityCache identityCache = createIdentityCache(request);</span>
+<span class="nc bnc" id="L291" title="All 2 branches missed.">        if (identityCache != null) {</span>
+<span class="nc" id="L292">            CachedIdentityAuthorizeCallback authorizeCallback = new CachedIdentityAuthorizeCallback(identityCache);</span>
+            try {
+<span class="nc" id="L294">                callbackHandler.handle(new Callback[]{authorizeCallback});</span>
+<span class="nc" id="L295">            } catch (IOException | UnsupportedCallbackException e) {</span>
+<span class="nc" id="L296">                throw new HttpAuthenticationException(e);</span>
+<span class="nc" id="L297">            }</span>
+<span class="nc bnc" id="L298" title="All 2 branches missed.">            if (authorizeCallback.isAuthorized()) {</span>
+                try {
+<span class="nc" id="L300">                    succeed();</span>
+<span class="nc" id="L301">                } catch (IOException | UnsupportedCallbackException e) {</span>
+<span class="nc" id="L302">                    throw new HttpAuthenticationException(e);</span>
+<span class="nc" id="L303">                }</span>
+<span class="nc" id="L304">                request.authenticationComplete(null, identityCache::remove);</span>
+<span class="nc" id="L305">                request.resumeRequest();</span>
+<span class="nc" id="L306">                return true;</span>
+            }
+        }
+<span class="nc" id="L309">        return false;</span>
+    }
+
+    private void failAndRedirectToErrorPage(HttpServerRequest request, String username) throws IOException, UnsupportedCallbackException {
+<span class="nc" id="L313">        IdentityCache identityCache = createIdentityCache(request);</span>
+<span class="nc bnc" id="L314" title="All 2 branches missed.">        if (identityCache != null) {</span>
+<span class="nc" id="L315">            identityCache.remove();</span>
+        }
+<span class="nc" id="L317">        fail();</span>
+<span class="nc" id="L318">        error(httpForm.authorizationFailed(username), request);</span>
+<span class="nc" id="L319">    }</span>
+
+    private void sendLogin(HttpServerRequest request, HttpServerResponse response) throws HttpAuthenticationException {
+<span class="nc bnc" id="L322" title="All 4 branches missed.">        if (request.getRequestPath().isEmpty() &amp;&amp; !contextPath.isEmpty()) {</span>
+<span class="nc" id="L323">            sendRedirect(response, getCompleteRedirectLocation(request, &quot;/&quot;));</span>
+<span class="nc" id="L324">            return;</span>
+        }
+
+        // Save the current request.
+<span class="nc" id="L328">        URI requestURI = request.getRequestURI();</span>
+<span class="nc" id="L329">        HttpScope session = getSessionScope(request, true);</span>
+<span class="nc bnc" id="L330" title="All 4 branches missed.">        if (session != null &amp;&amp; session.supportsAttachments()) {</span>
+<span class="nc" id="L331">            StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L332">            String scheme = requestURI.getScheme();</span>
+<span class="nc" id="L333">            sb.append(scheme);</span>
+<span class="nc" id="L334">            sb.append(&quot;://&quot;);</span>
+<span class="nc" id="L335">            sb.append(requestURI.getHost());</span>
+<span class="nc" id="L336">            int port = requestURI.getPort();</span>
+<span class="nc bnc" id="L337" title="All 2 branches missed.">            if (appendPort(scheme, port)) {</span>
+<span class="nc" id="L338">                sb.append(':').append(port);</span>
+            }
+<span class="nc" id="L340">            sb.append(requestURI.getPath());</span>
+<span class="nc bnc" id="L341" title="All 2 branches missed.">            if(requestURI.getRawQuery() != null) {</span>
+<span class="nc" id="L342">                sb.append(&quot;?&quot;);</span>
+<span class="nc" id="L343">                sb.append(requestURI.getRawQuery());</span>
+            }
+<span class="nc bnc" id="L345" title="All 2 branches missed.">            if(requestURI.getRawFragment() != null) {</span>
+<span class="nc" id="L346">                sb.append(&quot;#&quot;);</span>
+<span class="nc" id="L347">                sb.append(requestURI.getRawFragment());</span>
+            }
+            //TODO: we need to have some way up updating the jsessionid path parameter if the session ID changes
+            //see UNDERTOW-958 for more details
+<span class="nc" id="L351">            session.setAttachment(LOCATION_KEY, sb.toString());</span>
+<span class="nc" id="L352">            request.suspendRequest();</span>
+        }
+
+<span class="nc" id="L355">        sendPage(loginPage, request, response);</span>
+<span class="nc" id="L356">    }</span>
+
+    private void sendPage(String page, HttpServerRequest request, HttpServerResponse response) throws HttpAuthenticationException {
+<span class="nc bnc" id="L359" title="All 2 branches missed.">        if (response.forward(page)) {</span>
+<span class="nc" id="L360">            return;</span>
+        }
+        // Work out how and send the login page.
+<span class="nc" id="L363">        HttpScope application = request.getScope(Scope.APPLICATION);</span>
+<span class="nc bnc" id="L364" title="All 4 branches missed.">        if (application != null &amp;&amp; application.supportsResources()) {</span>
+<span class="nc" id="L365">            try (InputStream pageStream = application.getResource(page)) {</span>
+<span class="nc bnc" id="L366" title="All 2 branches missed.">                if (pageStream != null) {</span>
+<span class="nc" id="L367">                    OutputStream responseStream = response.getOutputStream();</span>
+<span class="nc bnc" id="L368" title="All 2 branches missed.">                    if (responseStream != null) {</span>
+<span class="nc" id="L369">                        byte[] content = new byte[1024];</span>
+                        int length;
+<span class="nc bnc" id="L371" title="All 2 branches missed.">                        while ((length = pageStream.read(content)) &gt; 0) {</span>
+<span class="nc" id="L372">                            responseStream.write(content, 0, length);</span>
+                        }
+
+<span class="nc" id="L375">                        return;</span>
+                    }
+                }
+<span class="nc bnc" id="L378" title="All 2 branches missed.">            } catch (IOException e) {</span>
+<span class="nc" id="L379">                throw new HttpAuthenticationException(e);</span>
+<span class="nc" id="L380">            }</span>
+        }
+
+<span class="nc" id="L383">        sendRedirect(response, getCompleteRedirectLocation(request, page));</span>
+<span class="nc" id="L384">    }</span>
+
+    private String getCompleteRedirectLocation(HttpServerRequest request, String location) {
+<span class="nc" id="L387">        URI requestURI = request.getRequestURI();</span>
+<span class="nc" id="L388">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L389">        String scheme = requestURI.getScheme();</span>
+<span class="nc" id="L390">        sb.append(scheme);</span>
+<span class="nc" id="L391">        sb.append(&quot;://&quot;);</span>
+<span class="nc" id="L392">        sb.append(requestURI.getHost());</span>
+<span class="nc" id="L393">        int port = requestURI.getPort();</span>
+<span class="nc bnc" id="L394" title="All 2 branches missed.">        if (appendPort(scheme, port)) {</span>
+<span class="nc" id="L395">            sb.append(':').append(port);</span>
+        }
+<span class="nc" id="L397">        sb.append(contextPath);</span>
+<span class="nc" id="L398">        sb.append(location);</span>
+
+<span class="nc" id="L400">        return sb.toString();</span>
+    }
+
+    private void sendRedirect(HttpServerResponse response, String location) {
+<span class="nc" id="L404">        response.addResponseHeader(LOCATION, location);</span>
+<span class="nc" id="L405">        response.setStatusCode(FOUND);</span>
+<span class="nc" id="L406">    }</span>
+
+    private HttpScope getSessionScope(HttpServerRequest request, boolean createSession) {
+<span class="nc" id="L409">        HttpScope scope = request.getScope(Scope.SESSION);</span>
+
+<span class="nc bnc" id="L411" title="All 6 branches missed.">        if (scope != null &amp;&amp;!scope.exists() &amp;&amp; createSession) {</span>
+<span class="nc" id="L412">            scope.create();</span>
+        }
+
+<span class="nc" id="L415">        return scope;</span>
+    }
+
+    private static boolean appendPort(final String scheme, final int port) {
+<span class="nc bnc" id="L419" title="All 10 branches missed.">        return port &gt; -1 &amp;&amp; ((HTTP.equalsIgnoreCase(scheme) &amp;&amp; port != 80) || (HTTPS.equalsIgnoreCase(scheme) &amp;&amp; port != 443));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

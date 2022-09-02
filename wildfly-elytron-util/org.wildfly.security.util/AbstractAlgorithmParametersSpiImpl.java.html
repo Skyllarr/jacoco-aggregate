@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractAlgorithmParametersSpiImpl.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-util</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.util</a> &gt; <span class="el_source">AbstractAlgorithmParametersSpiImpl.java</span></div><h1>AbstractAlgorithmParametersSpiImpl.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.util;
+
+import static org.wildfly.security.util.ElytronMessages.log;
+
+import java.io.IOException;
+import java.security.AlgorithmParametersSpi;
+import java.security.spec.AlgorithmParameterSpec;
+import java.security.spec.InvalidParameterSpecException;
+
+import org.wildfly.security.asn1.ASN1Decoder;
+import org.wildfly.security.asn1.ASN1Encoder;
+import org.wildfly.security.asn1.ASN1Exception;
+import org.wildfly.security.asn1.DERDecoder;
+import org.wildfly.security.asn1.DEREncoder;
+
+/**
+ * A base class for classes which implement {@link AlgorithmParametersSpi} that encode parameters using ASN.1.
+ *
+ * @param &lt;P&gt; the parameter type represented by the subclass
+ */
+public abstract class AbstractAlgorithmParametersSpiImpl&lt;P extends AlgorithmParameterSpec&gt; extends AlgorithmParametersSpi {
+
+    private P parameterSpec;
+    private byte[] encoded;
+
+    /**
+     * Construct a new instance.
+     */
+<span class="nc" id="L47">    protected AbstractAlgorithmParametersSpiImpl() {</span>
+<span class="nc" id="L48">    }</span>
+
+    /**
+     * Get the type of parameters for this class.
+     *
+     * @return the type of parameters for this class (must not be {@code null})
+     */
+    protected abstract Class&lt;P&gt; getParameterType();
+
+    /**
+     * Implementation of the {@code engineInit} method.
+     *
+     * @param paramSpec the parameter specification
+     * @throws InvalidParameterSpecException if an argument is invalid or encoding failed
+     */
+    protected final void engineInit(final AlgorithmParameterSpec paramSpec) throws InvalidParameterSpecException {
+<span class="nc" id="L64">        final Class&lt;P&gt; parameterType = getParameterType();</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        if (parameterType.isInstance(paramSpec)) try {</span>
+<span class="nc" id="L66">            DEREncoder encoder = new DEREncoder();</span>
+<span class="nc" id="L67">            final P cast = parameterType.cast(paramSpec);</span>
+<span class="nc" id="L68">            engineEncode(encoder, cast);</span>
+<span class="nc" id="L69">            encoded = encoder.getEncoded();</span>
+<span class="nc" id="L70">            this.parameterSpec = cast;</span>
+<span class="nc" id="L71">        } catch (ASN1Exception e) {</span>
+<span class="nc" id="L72">            throw log.failedToEncode(e);</span>
+<span class="nc" id="L73">        } else {</span>
+<span class="nc" id="L74">            throw log.invalidParameterSpec(parameterType, paramSpec.getClass());</span>
+        }
+<span class="nc" id="L76">    }</span>
+
+    /**
+     * Implementation of the {@code engineInit} method.
+     *
+     * @param params the encoded parameter specification
+     * @throws IOException if decoding failed
+     */
+    protected final void engineInit(final byte[] params) throws IOException {
+<span class="nc" id="L85">        final DERDecoder decoder = new DERDecoder(params);</span>
+        try {
+<span class="nc" id="L87">            parameterSpec = engineDecode(decoder);</span>
+<span class="nc" id="L88">            encoded = params;</span>
+<span class="nc" id="L89">        } catch (ASN1Exception e) {</span>
+<span class="nc" id="L90">            throw log.failedToDecode(e);</span>
+<span class="nc" id="L91">        }</span>
+<span class="nc" id="L92">    }</span>
+
+    /**
+     * Implementation of the {@code engineInit} method.
+     *
+     * @param params the encoded parameter specification
+     * @param format the format (must be {@code ASN.1})
+     * @throws IOException if decoding failed or the format is not equal to {@code ASN.1}
+     */
+    protected final void engineInit(final byte[] params, final String format) throws IOException {
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        if (&quot;ASN.1&quot;.equalsIgnoreCase(format)) {</span>
+<span class="nc" id="L103">            engineInit(params);</span>
+        } else {
+<span class="nc" id="L105">            throw log.invalidFormat(&quot;ASN.1&quot;, format);</span>
+        }
+<span class="nc" id="L107">    }</span>
+
+    /**
+     * Encode a parameter instance.
+     *
+     * @param encoder the encoder to use (not {@code null})
+     * @param parameters the parameter instance (not {@code null})
+     * @throws ASN1Exception if there is an encoding problem (usually thrown directly by the {@code ASN1Encoder})
+     * @throws InvalidParameterSpecException if some other encoding error occurred
+     */
+    protected abstract void engineEncode(final ASN1Encoder encoder, final P parameters) throws ASN1Exception, InvalidParameterSpecException;
+
+    /**
+     * Decode a parameter instance.  Subclasses should ensure that all elements are consumed (including sequence terminators
+     * and so forth).
+     *
+     * @param decoder the decoder to use (not {@code null})
+     * @return the parameter instance (must not be {@code null})
+     * @throws ASN1Exception if there is a decoding problem (usually thrown directly by the {@code ASN1Decoder})
+     * @throws IOException if some other decoding error occurred
+     */
+    protected abstract P engineDecode(final ASN1Decoder decoder) throws ASN1Exception, IOException;
+
+    /**
+     * Implementation of the {@code engineGetParameterSpec} method.
+     *
+     * @param type the parameter specification type class (must not be {@code null})
+     * @param &lt;T&gt; the parameter specification type
+     * @return the parameter specification (must not be {@code null})
+     * @throws InvalidParameterSpecException if the type is not supported
+     */
+    protected final &lt;T extends AlgorithmParameterSpec&gt; T engineGetParameterSpec(final Class&lt;T&gt; type) throws InvalidParameterSpecException {
+<span class="nc" id="L139">        checkInit();</span>
+<span class="nc bnc" id="L140" title="All 4 branches missed.">        if (type.isAssignableFrom(getParameterType()) &amp;&amp; type.isInstance(parameterSpec)) {</span>
+<span class="nc" id="L141">            return type.cast(parameterSpec);</span>
+        } else {
+<span class="nc" id="L143">            throw log.invalidParameterSpec(getParameterType(), type);</span>
+        }
+    }
+
+    /**
+     * Implementation of the {@code engineGetEncoded} method.
+     *
+     * @return the encoded representation (not {@code null})
+     */
+    protected final byte[] engineGetEncoded() {
+<span class="nc" id="L153">        checkInit();</span>
+<span class="nc" id="L154">        return encoded;</span>
+    }
+
+    /**
+     * Implementation of the {@code engineGetEncoded} method.
+     *
+     * @param format the format string (must not be {@code null})
+     * @return the encoded representation (not {@code null})
+     * @throws IOException if the given format is not {@code ASN.1}
+     */
+    protected final byte[] engineGetEncoded(final String format) throws IOException {
+<span class="nc" id="L165">        checkInit();</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">        if (&quot;ASN.1&quot;.equalsIgnoreCase(format)) {</span>
+<span class="nc" id="L167">            return engineGetEncoded();</span>
+        } else {
+<span class="nc" id="L169">            throw log.invalidFormat(&quot;ASN.1&quot;, format);</span>
+        }
+    }
+
+    private void checkInit() {
+<span class="nc bnc" id="L174" title="All 4 branches missed.">        if (parameterSpec == null || encoded == null) {</span>
+<span class="nc" id="L175">            throw log.algorithmParametersNotInitialized();</span>
+        }
+<span class="nc" id="L177">    }</span>
+
+    /**
+     * Implementation of the {@code engineToString} method.
+     *
+     * @return the string representation
+     */
+    protected String engineToString() {
+<span class="nc" id="L185">        return &quot;AlgorithmParametersSpi for &quot; + getParameterType();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

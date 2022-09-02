@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AcmeChallenge.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-x500-cert-acme</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.x500.cert.acme</a> &gt; <span class="el_source">AcmeChallenge.java</span></div><h1>AcmeChallenge.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2018 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.x500.cert.acme;
+
+import static org.wildfly.security.x500.cert.acme.Acme.base64UrlEncode;
+import static org.wildfly.security.x500.cert.acme.Acme.getJwk;
+import static org.wildfly.security.x500.cert.acme.ElytronMessages.acme;
+
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+
+import javax.json.JsonObject;
+
+import org.wildfly.common.Assert;
+import org.wildfly.common.iteration.CodePointIterator;
+
+/**
+ * A class that represents an &lt;a href=&quot;https://www.ietf.org/id/draft-ietf-acme-acme-14.txt&quot;&gt;Automatic Certificate
+ * Management Environment (ACME)&lt;/a&gt; challenge.
+ *
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ * @since 1.5.0
+ */
+public final class AcmeChallenge {
+
+    private final Type type;
+    private final String url;
+    private final String token;
+    private final String identifierType;
+    private final String identifierValue;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param type the challenge type (must not be {@code null})
+     * @param url the challenge URL (must not be {@code null})
+     * @param token the challenge token (must not be {@code null})
+     * @param identifierType the identifier type associated with the challenge (must not be {@code null})
+     * @param identifierValue the identifier value associated with the challenge (must not be {@code null})
+     */
+<span class="fc" id="L57">    public AcmeChallenge(Type type, String url, String token, String identifierType, String identifierValue) {</span>
+<span class="fc" id="L58">        Assert.checkNotNullParam(&quot;type&quot;, type);</span>
+<span class="fc" id="L59">        Assert.checkNotNullParam(&quot;url&quot;, url);</span>
+<span class="fc" id="L60">        Assert.checkNotNullParam(&quot;token&quot;, token);</span>
+<span class="fc" id="L61">        Assert.checkNotNullParam(&quot;identifierType&quot;, identifierType);</span>
+<span class="fc" id="L62">        Assert.checkNotNullParam(&quot;identifierValue&quot;, identifierValue);</span>
+<span class="fc" id="L63">        this.type = type;</span>
+<span class="fc" id="L64">        this.url = url;</span>
+<span class="fc" id="L65">        this.token = token;</span>
+<span class="fc" id="L66">        this.identifierType = identifierType;</span>
+<span class="fc" id="L67">        this.identifierValue = identifierValue;</span>
+<span class="fc" id="L68">    }</span>
+
+    /**
+     * Get the challenge type.
+     *
+     * @return the challenge type
+     */
+    public Type getType() {
+<span class="fc" id="L76">        return type;</span>
+    }
+
+    /**
+     * Get the challenge URL.
+     *
+     * @return the challenge URL
+     */
+    public String getUrl() {
+<span class="fc" id="L85">        return url;</span>
+    }
+
+    /**
+     * Get the challenge token.
+     *
+     * @return the challenge token
+     */
+    public String getToken() {
+<span class="fc" id="L94">        return token;</span>
+    }
+
+    /**
+     * Get the identifier type associated with the challenge.
+     *
+     * @return the identifier type associated with the challenge
+     */
+    public String getIdentifierType() {
+<span class="nc" id="L103">        return identifierType;</span>
+    }
+
+    /**
+     * Get the identifier value associated with the challenge.
+     *
+     * @return the identifier value associated with the challenge
+     */
+    public String getIdentifierValue() {
+<span class="nc" id="L112">        return identifierValue;</span>
+    }
+
+    /**
+     * Get the key authorization string for this challenge.
+     *
+     * @param account the ACME account information to use (must not be {@code null})
+     * @return the key authorization string for this challenge
+     * @throws AcmeException if the key authorization string cannot be determined
+     */
+    public String getKeyAuthorization(AcmeAccount account) throws AcmeException {
+<span class="fc" id="L123">        Assert.checkNotNullParam(&quot;account&quot;, account);</span>
+<span class="fc" id="L124">        JsonObject jwk = getJwk(account.getPublicKey(), account.getAlgHeader());</span>
+<span class="fc" id="L125">        byte[] jwkWithoutWhitespace = CodePointIterator.ofString(jwk.toString()).skip(Character::isWhitespace).skipCrLf().asUtf8().drain();</span>
+        try {
+<span class="fc" id="L127">            MessageDigest messageDigest = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+<span class="fc" id="L128">            messageDigest.update(jwkWithoutWhitespace);</span>
+<span class="fc" id="L129">            byte[] jwkThumbprint = messageDigest.digest();</span>
+<span class="fc" id="L130">            return token + &quot;.&quot; + base64UrlEncode(jwkThumbprint);</span>
+<span class="nc" id="L131">        } catch (NoSuchAlgorithmException e) {</span>
+<span class="nc" id="L132">            throw acme.unableToDetermineKeyAuthorizationString(e);</span>
+        }
+    }
+
+    /**
+     * An Automatic Certificate Management Environment (ACME) challenge type.
+     */
+    public static class Type {
+
+        /**
+         * The various Automatic Certificate Management Environment (ACME) challenge types.
+         */
+<span class="fc" id="L144">        public static final Type HTTP_01 = new Type(&quot;http-01&quot;);</span>
+<span class="fc" id="L145">        public static final Type DNS_01 = new Type(&quot;dns-01&quot;);</span>
+<span class="fc" id="L146">        public static final Type TLS_SNI_01 = new Type(&quot;tls-sni-01&quot;);</span>
+<span class="fc" id="L147">        public static final Type TLS_SNI_02 = new Type(&quot;tls-sni-02&quot;);</span>
+<span class="fc" id="L148">        public static final Type TLS_ALPN_01 = new Type(&quot;tls-alpn-01&quot;);</span>
+
+        private final String value;
+
+<span class="fc" id="L152">        Type(String value) {</span>
+<span class="fc" id="L153">            this.value = value;</span>
+<span class="fc" id="L154">        }</span>
+
+        /**
+         * Get the string value of this challenge type.
+         *
+         * @return the string value of this challenge type
+         */
+        public String getValue() {
+<span class="nc" id="L162">            return value;</span>
+        }
+
+        static Type forName(String name) {
+<span class="pc bpc" id="L166" title="3 of 6 branches missed.">            switch (name) {</span>
+<span class="fc" id="L167">                case &quot;http-01&quot;: return HTTP_01;</span>
+<span class="fc" id="L168">                case &quot;dns-01&quot;: return DNS_01;</span>
+<span class="nc" id="L169">                case &quot;tls-sni-01&quot;: return TLS_SNI_01;</span>
+<span class="nc" id="L170">                case &quot;tls-sni-02&quot;: return TLS_SNI_02;</span>
+<span class="fc" id="L171">                case &quot;tls-alpn-01&quot;: return TLS_ALPN_01;</span>
+<span class="nc" id="L172">                default: return new UnknownType(name);</span>
+            }
+        }
+    }
+
+    /**
+     * An unknown challenge type.
+     */
+    public static class UnknownType extends Type {
+
+        UnknownType(String value) {
+<span class="nc" id="L183">            super(value);</span>
+<span class="nc" id="L184">        }</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

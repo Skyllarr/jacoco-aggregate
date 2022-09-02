@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AggregateSaslClientFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.util</a> &gt; <span class="el_source">AggregateSaslClientFactory.java</span></div><h1>AggregateSaslClientFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.util;
+
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Map;
+
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.sasl.SaslClient;
+import javax.security.sasl.SaslClientFactory;
+import javax.security.sasl.SaslException;
+
+import org.wildfly.common.Assert;
+
+/**
+ * A {@link SaslClientFactory} which aggregates other {@code SaslClientFactory} instances into one.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class AggregateSaslClientFactory implements SaslClientFactory {
+    private final SaslClientFactory[] factories;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param factories the factories to aggregate (must not be {@code null})
+     */
+<span class="nc" id="L46">    public AggregateSaslClientFactory(final SaslClientFactory... factories) {</span>
+<span class="nc" id="L47">        Assert.checkNotNullParam(&quot;factories&quot;, factories);</span>
+<span class="nc" id="L48">        this.factories = factories.clone();</span>
+<span class="nc" id="L49">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param factories the factories to aggregate (must not be {@code null})
+     */
+<span class="nc" id="L56">    public AggregateSaslClientFactory(final Collection&lt;SaslClientFactory&gt; factories) {</span>
+<span class="nc" id="L57">        Assert.checkNotNullParam(&quot;factories&quot;, factories);</span>
+<span class="nc" id="L58">        this.factories = factories.toArray(new SaslClientFactory[factories.size()]);</span>
+<span class="nc" id="L59">    }</span>
+
+    public SaslClient createSaslClient(final String[] mechanisms, final String authorizationId, final String protocol, final String serverName, final Map&lt;String, ?&gt; props, final CallbackHandler cbh) throws SaslException {
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        for (SaslClientFactory factory : factories) {</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">            if (factory != null) {</span>
+<span class="nc" id="L64">                final SaslClient saslClient = factory.createSaslClient(mechanisms, authorizationId, protocol, serverName, props, cbh);</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">                if (saslClient != null) {</span>
+<span class="nc" id="L66">                    return saslClient;</span>
+                }
+            }
+        }
+<span class="nc" id="L70">        return null;</span>
+    }
+
+    public String[] getMechanismNames(final Map&lt;String, ?&gt; props) {
+<span class="nc" id="L74">        final LinkedHashSet&lt;String&gt; names = new LinkedHashSet&lt;String&gt;();</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        for (SaslClientFactory factory : factories) {</span>
+<span class="nc" id="L76">            Collections.addAll(names, factory.getMechanismNames(props));</span>
+        }
+<span class="nc" id="L78">        return names.toArray(new String[names.size()]);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

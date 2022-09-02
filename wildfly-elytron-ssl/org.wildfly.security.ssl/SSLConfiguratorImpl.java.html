@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SSLConfiguratorImpl.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-ssl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.ssl</a> &gt; <span class="el_source">SSLConfiguratorImpl.java</span></div><h1>SSLConfiguratorImpl.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.ssl;
+
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLSocket;
+
+import org.wildfly.common.Assert;
+
+final class SSLConfiguratorImpl implements SSLConfigurator {
+
+    private final ProtocolSelector protocolSelector;
+    private final CipherSuiteSelector cipherSuiteSelector;
+    private final boolean wantClientAuth;
+    private final boolean needClientAuth;
+    private final boolean useCipherSuitesOrder;
+    private final boolean clientMode;
+
+    /**
+     * Construct a new instance in server mode.
+     *
+     * @param protocolSelector    the protocol selector (must not be {@code null})
+     * @param cipherSuiteSelector the cipher suite selector (must not be {@code null})
+     * @param wantClientAuth      {@code true} to request client authentication
+     * @param needClientAuth      {@code true} to require client authentication
+     */
+<span class="nc" id="L46">    SSLConfiguratorImpl(final ProtocolSelector protocolSelector, final CipherSuiteSelector cipherSuiteSelector, final boolean wantClientAuth, final boolean needClientAuth, final boolean useCipherSuitesOrder) {</span>
+<span class="nc" id="L47">        this.protocolSelector = protocolSelector;</span>
+<span class="nc" id="L48">        this.cipherSuiteSelector = cipherSuiteSelector;</span>
+<span class="nc" id="L49">        this.useCipherSuitesOrder = useCipherSuitesOrder;</span>
+<span class="nc" id="L50">        this.wantClientAuth = wantClientAuth;</span>
+<span class="nc" id="L51">        this.needClientAuth = needClientAuth;</span>
+<span class="nc" id="L52">        clientMode = false;</span>
+<span class="nc" id="L53">    }</span>
+
+    /**
+     * Construct a new instance in client mode.
+     *
+     * @param protocolSelector    the protocol selector (must not be {@code null})
+     * @param cipherSuiteSelector the cipher suite selector (must not be {@code null})
+     */
+<span class="fc" id="L61">    SSLConfiguratorImpl(final ProtocolSelector protocolSelector, final CipherSuiteSelector cipherSuiteSelector, final boolean useCipherSuitesOrder) {</span>
+<span class="fc" id="L62">        this.protocolSelector = protocolSelector;</span>
+<span class="fc" id="L63">        this.cipherSuiteSelector = cipherSuiteSelector;</span>
+<span class="fc" id="L64">        this.useCipherSuitesOrder = useCipherSuitesOrder;</span>
+<span class="fc" id="L65">        this.wantClientAuth = false;</span>
+<span class="fc" id="L66">        this.needClientAuth = false;</span>
+<span class="fc" id="L67">        clientMode = true;</span>
+<span class="fc" id="L68">    }</span>
+
+    void configure(SSLParameters params, String[] supportedProtocols, String[] supportedCipherSuites) {
+<span class="fc" id="L71">        Assert.checkNotNullParam(&quot;supportedProtocols&quot;, supportedProtocols);</span>
+<span class="fc" id="L72">        Assert.checkNotNullParam(&quot;supportedCipherSuites&quot;, supportedCipherSuites);</span>
+<span class="fc" id="L73">        params.setProtocols(protocolSelector.evaluate(supportedProtocols));</span>
+<span class="fc" id="L74">        params.setCipherSuites(cipherSuiteSelector.evaluate(supportedCipherSuites));</span>
+<span class="fc" id="L75">        params.setUseCipherSuitesOrder(useCipherSuitesOrder);</span>
+<span class="fc" id="L76">        params.setWantClientAuth(wantClientAuth); // unsets need</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (needClientAuth) params.setNeedClientAuth(needClientAuth); // unsets want</span>
+<span class="fc" id="L78">    }</span>
+
+    public void configure(final SSLContext context, final SSLServerSocket sslServerSocket) {
+<span class="nc" id="L81">        sslServerSocket.setUseClientMode(clientMode);</span>
+<span class="nc" id="L82">        final SSLParameters sslParameters = sslServerSocket.getSSLParameters();</span>
+<span class="nc" id="L83">        configure(sslParameters, sslServerSocket.getSupportedProtocols(), sslServerSocket.getSupportedCipherSuites());</span>
+<span class="nc" id="L84">        sslServerSocket.setSSLParameters(sslParameters);</span>
+<span class="nc" id="L85">    }</span>
+
+    public void configure(final SSLContext context, final SSLSocket sslSocket) {
+<span class="nc" id="L88">        sslSocket.setUseClientMode(clientMode);</span>
+<span class="nc" id="L89">        final SSLParameters sslParameters = sslSocket.getSSLParameters();</span>
+<span class="nc" id="L90">        configure(sslParameters, sslSocket.getSupportedProtocols(), sslSocket.getSupportedCipherSuites());</span>
+<span class="nc" id="L91">        sslSocket.setSSLParameters(sslParameters);</span>
+<span class="nc" id="L92">    }</span>
+
+    public void configure(final SSLContext context, final SSLEngine sslEngine) {
+<span class="fc" id="L95">        sslEngine.setUseClientMode(clientMode);</span>
+<span class="fc" id="L96">        final SSLParameters sslParameters = sslEngine.getSSLParameters();</span>
+<span class="fc" id="L97">        configure(sslParameters, sslEngine.getSupportedProtocols(), sslEngine.getSupportedCipherSuites());</span>
+<span class="fc" id="L98">        sslEngine.setSSLParameters(sslParameters);</span>
+<span class="fc" id="L99">    }</span>
+
+    public SSLParameters getDefaultSSLParameters(final SSLContext sslContext, final SSLParameters original) {
+<span class="fc" id="L102">        final SSLParameters supportedSSLParameters = sslContext.getSupportedSSLParameters();</span>
+<span class="fc" id="L103">        configure(original, supportedSSLParameters.getProtocols(), supportedSSLParameters.getCipherSuites());</span>
+<span class="fc" id="L104">        return original;</span>
+    }
+
+    public SSLParameters getSupportedSSLParameters(final SSLContext sslContext, final SSLParameters original) {
+<span class="fc" id="L108">        return getDefaultSSLParameters(sslContext, original);</span>
+    }
+
+    public void setWantClientAuth(final SSLContext context, final SSLSocket sslSocket, final boolean value) {
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        if (value) sslSocket.setWantClientAuth(value);</span>
+<span class="nc" id="L113">    }</span>
+
+    public void setWantClientAuth(final SSLContext context, final SSLEngine sslEngine, final boolean value) {
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        if (value) sslEngine.setWantClientAuth(value);</span>
+<span class="nc" id="L117">    }</span>
+
+    public void setWantClientAuth(final SSLContext sslContext, final SSLServerSocket sslServerSocket, final boolean value) {
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        if (value) sslServerSocket.setWantClientAuth(value);</span>
+<span class="nc" id="L121">    }</span>
+
+    public void setNeedClientAuth(final SSLContext context, final SSLSocket sslSocket, final boolean value) {
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        if (value) sslSocket.setNeedClientAuth(value);</span>
+<span class="nc" id="L125">    }</span>
+
+    public void setNeedClientAuth(final SSLContext context, final SSLEngine sslEngine, final boolean value) {
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        if (value) sslEngine.setNeedClientAuth(value);</span>
+<span class="nc" id="L129">    }</span>
+
+    public void setNeedClientAuth(final SSLContext sslContext, final SSLServerSocket sslServerSocket, final boolean value) {
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        if (value) sslServerSocket.setNeedClientAuth(value);</span>
+<span class="nc" id="L133">    }</span>
+
+    public void setEnabledCipherSuites(final SSLContext sslContext, final SSLSocket sslSocket, final String[] cipherSuites) {
+<span class="nc" id="L136">        sslSocket.setEnabledCipherSuites(cipherSuiteSelector.evaluate(cipherSuites));</span>
+<span class="nc" id="L137">    }</span>
+
+    public void setEnabledCipherSuites(final SSLContext sslContext, final SSLEngine sslEngine, final String[] cipherSuites) {
+<span class="nc" id="L140">        sslEngine.setEnabledCipherSuites(cipherSuiteSelector.evaluate(cipherSuites));</span>
+<span class="nc" id="L141">    }</span>
+
+    public void setEnabledCipherSuites(final SSLContext sslContext, final SSLServerSocket sslServerSocket, final String[] cipherSuites) {
+<span class="nc" id="L144">        sslServerSocket.setEnabledCipherSuites(cipherSuiteSelector.evaluate(cipherSuites));</span>
+<span class="nc" id="L145">    }</span>
+
+    public void setEnabledProtocols(final SSLContext sslContext, final SSLSocket sslSocket, final String[] protocols) {
+<span class="nc" id="L148">        sslSocket.setEnabledProtocols(protocolSelector.evaluate(protocols));</span>
+<span class="nc" id="L149">    }</span>
+
+    public void setEnabledProtocols(final SSLContext sslContext, final SSLEngine sslEngine, final String[] protocols) {
+<span class="nc" id="L152">        sslEngine.setEnabledProtocols(protocolSelector.evaluate(protocols));</span>
+<span class="nc" id="L153">    }</span>
+
+    public void setEnabledProtocols(final SSLContext sslContext, final SSLServerSocket sslServerSocket, final String[] protocols) {
+<span class="nc" id="L156">        sslServerSocket.setEnabledProtocols(protocolSelector.evaluate(protocols));</span>
+<span class="nc" id="L157">    }</span>
+
+    private SSLParameters redefine(SSLParameters original) {
+<span class="nc" id="L160">        SSLParameters params = JDKSpecific.setSSLParameters(original);</span>
+<span class="nc" id="L161">        params.setProtocols(protocolSelector.evaluate(params.getProtocols()));</span>
+<span class="nc" id="L162">        params.setCipherSuites(cipherSuiteSelector.evaluate(params.getCipherSuites()));</span>
+<span class="nc" id="L163">        return params;</span>
+    }
+
+    public void setSSLParameters(final SSLContext sslContext, final SSLSocket sslSocket, final SSLParameters parameters) {
+<span class="nc" id="L167">        sslSocket.setSSLParameters(redefine(parameters));</span>
+<span class="nc" id="L168">    }</span>
+
+    public void setSSLParameters(final SSLContext sslContext, final SSLEngine sslEngine, final SSLParameters parameters) {
+<span class="nc" id="L171">        sslEngine.setSSLParameters(redefine(parameters));</span>
+<span class="nc" id="L172">    }</span>
+
+    public void setSSLParameters(final SSLContext sslContext, final SSLServerSocket sslServerSocket, final SSLParameters parameters) {
+<span class="nc" id="L175">        sslServerSocket.setSSLParameters(redefine(parameters));</span>
+<span class="nc" id="L176">    }</span>
+
+    public void setUseClientMode(final SSLContext sslContext, final SSLSocket sslSocket, final boolean mode) {
+<span class="nc bnc" id="L179" title="All 2 branches missed.">        if (mode != clientMode) {</span>
+<span class="nc" id="L180">            throw ElytronMessages.log.invalidClientMode(clientMode, mode);</span>
+        }
+        // ignored
+<span class="nc" id="L183">    }</span>
+
+    public void setUseClientMode(final SSLContext sslContext, final SSLEngine sslEngine, final boolean mode) {
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        if (mode != clientMode) {</span>
+<span class="nc" id="L187">            throw ElytronMessages.log.invalidClientMode(clientMode, mode);</span>
+        }
+        // ignored
+<span class="nc" id="L190">    }</span>
+
+    public void setUseClientMode(final SSLContext sslContext, final SSLServerSocket sslServerSocket, final boolean mode) {
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        if (mode != clientMode) {</span>
+<span class="nc" id="L194">            throw ElytronMessages.log.invalidClientMode(clientMode, mode);</span>
+        }
+        // ignored
+<span class="nc" id="L197">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

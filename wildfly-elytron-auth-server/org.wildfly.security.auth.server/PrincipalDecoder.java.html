@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PrincipalDecoder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.server</a> &gt; <span class="el_source">PrincipalDecoder.java</span></div><h1>PrincipalDecoder.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.server;
+
+import java.security.Principal;
+import java.util.StringJoiner;
+import java.util.function.Function;
+import java.util.function.UnaryOperator;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.auth.principal.NamePrincipal;
+
+/**
+ * A decoder for extracting a simple name from a principal.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+@FunctionalInterface
+public interface PrincipalDecoder extends Function&lt;Principal, String&gt; {
+
+    /**
+     * Get the name from a principal.  If this decoder cannot understand the given principal type or contents,
+     * {@code null} is returned.
+     *
+     * @param principal the principal to decode
+     * @return the name, or {@code null} if this decoder does not understand the principal
+     */
+    String getName(Principal principal);
+
+    default String apply(Principal principal) {
+<span class="nc" id="L47">        return getName(principal);</span>
+    }
+
+    /**
+     * Get this principal decoder as a principal rewriter that produces a {@link NamePrincipal} if the decode succeeds.
+     *
+     * @return the rewriter (not {@code null})
+     */
+    default UnaryOperator&lt;Principal&gt; asPrincipalRewriter() {
+<span class="nc" id="L56">        return principal -&gt; {</span>
+<span class="nc" id="L57">            String result = PrincipalDecoder.this.getName(principal);</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">            return result == null ? principal : new NamePrincipal(result);</span>
+        };
+    }
+
+    /**
+     * Add a name rewriter to this principal decoder.  If the name is decoded, it will then be rewritten with the
+     * given rewriter.  If the rewriter deems the name invalid, then the name will be considered not decoded.
+     *
+     * @param nameRewriter the name rewriter
+     * @return the combined decoder
+     */
+    default PrincipalDecoder withRewriter(NameRewriter nameRewriter) {
+<span class="nc" id="L70">        return principal -&gt; {</span>
+<span class="nc" id="L71">            final String name = this.getName(principal);</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">            return name == null ? null : nameRewriter.rewriteName(name);</span>
+        };
+    }
+
+    /**
+     * Create an aggregated credential decoder.  The aggregated decoder will check each credential decoder until one
+     * matches the credential; this result will be returned.
+     *
+     * @param decoders the constituent decoders
+     * @return the aggregated decoder
+     */
+    static PrincipalDecoder aggregate(final PrincipalDecoder... decoders) {
+<span class="nc" id="L84">        Assert.checkNotNullParam(&quot;decoders&quot;, decoders);</span>
+<span class="nc" id="L85">        return principal -&gt; {</span>
+            String result;
+<span class="nc bnc" id="L87" title="All 2 branches missed.">            for (PrincipalDecoder decoder : decoders) {</span>
+<span class="nc" id="L88">                result = decoder.getName(principal);</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">                if (result != null) {</span>
+<span class="nc" id="L90">                    return result;</span>
+                }
+            }
+<span class="nc" id="L93">            return null;</span>
+        };
+    }
+
+    /**
+     * Create a principal decoder which concatenates the results of two principal decoders.  If one decoder is not able
+     * to decode the principal, {@code null} is returned.
+     *
+     * @param former the former decoder
+     * @param joinString the string to use to join the results
+     * @param latter the latter decoder
+     * @return the concatenated result
+     */
+    static PrincipalDecoder concatenating(final PrincipalDecoder former, final String joinString, final PrincipalDecoder latter) {
+<span class="nc" id="L107">        Assert.checkNotNullParam(&quot;former&quot;, former);</span>
+<span class="nc" id="L108">        Assert.checkNotNullParam(&quot;joinString&quot;, joinString);</span>
+<span class="nc" id="L109">        Assert.checkNotNullParam(&quot;latter&quot;, latter);</span>
+<span class="nc" id="L110">        return principal -&gt; {</span>
+<span class="nc" id="L111">            final String formerName = former.getName(principal);</span>
+<span class="nc" id="L112">            final String latterName = latter.getName(principal);</span>
+<span class="nc bnc" id="L113" title="All 4 branches missed.">            if (formerName == null || latterName == null) {</span>
+<span class="nc" id="L114">                return null;</span>
+            } else {
+<span class="nc" id="L116">                return formerName + joinString + latterName;</span>
+            }
+        };
+    }
+
+    /**
+     * Create a principal decoder that concatenates the results of the given principal decoders in the order in which
+     * they're given. If any decoder is not able to decode the principal, then {@code null} is returned.
+     *
+     * @param joinString the string to use to join the results
+     * @param decoders the principal decoders (must not be {@code null}, cannot have {@code null} elements)
+     * @return the concatenating decoder
+     */
+    static PrincipalDecoder concatenating(final String joinString, final PrincipalDecoder... decoders) {
+<span class="nc" id="L130">        Assert.checkNotNullParam(&quot;joinString&quot;, joinString);</span>
+<span class="nc" id="L131">        Assert.checkNotNullParam(&quot;decoders&quot;, decoders);</span>
+<span class="nc" id="L132">        return principal -&gt; {</span>
+<span class="nc" id="L133">            final StringJoiner concatenatedResult = new StringJoiner(joinString);</span>
+            String result;
+<span class="nc bnc" id="L135" title="All 2 branches missed.">            for (PrincipalDecoder decoder : decoders) {</span>
+<span class="nc" id="L136">                result = decoder.getName(principal);</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">                if (result == null) {</span>
+<span class="nc" id="L138">                    return null;</span>
+                }
+<span class="nc" id="L140">                concatenatedResult.add(result);</span>
+            }
+<span class="nc" id="L142">            return concatenatedResult.toString();</span>
+        };
+    }
+
+    /**
+     * Create a principal decoder which always returns the same name.
+     *
+     * @param name the name to return
+     * @return the constant decoder
+     */
+    static PrincipalDecoder constant(String name) {
+<span class="nc" id="L153">        return principal -&gt; name;</span>
+    }
+
+    /**
+     * The default decoder, which just calls {@link Principal#getName()}.
+     */
+<span class="nc" id="L159">    PrincipalDecoder DEFAULT = Principal::getName;</span>
+
+    /**
+     * A principal decoder which cannot decode any principal.
+     */
+<span class="nc" id="L164">    PrincipalDecoder UNKNOWN = p -&gt; null;</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

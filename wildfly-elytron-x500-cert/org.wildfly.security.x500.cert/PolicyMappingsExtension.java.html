@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PolicyMappingsExtension.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-x500-cert</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.x500.cert</a> &gt; <span class="el_source">PolicyMappingsExtension.java</span></div><h1>PolicyMappingsExtension.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.x500.cert;
+
+import java.util.List;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.asn1.ASN1Encodable;
+import org.wildfly.security.asn1.ASN1Encoder;
+import org.wildfly.security.x500.X500;
+
+/**
+ * The policy mappings extension as defined by &lt;a href=&quot;https://tools.ietf.org/html/rfc5280#section-4.2.1.5&quot;&gt;RFC 5280 § 4.2.1.5&lt;/a&gt;.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class PolicyMappingsExtension extends X509CertificateExtension {
+    private final List&lt;PolicyMapping&gt; policyMappings;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param critical {@code true} if the extension should be marked critical (recommended) or {@code false} otherwise
+     * @param policyMappings the list of policy mappings (must not be {@code null})
+     */
+    public PolicyMappingsExtension(final boolean critical, final List&lt;PolicyMapping&gt; policyMappings) {
+<span class="nc" id="L43">        super(critical);</span>
+<span class="nc" id="L44">        Assert.checkNotNullParam(&quot;policyMappings&quot;, policyMappings);</span>
+<span class="nc" id="L45">        this.policyMappings = policyMappings;</span>
+<span class="nc" id="L46">    }</span>
+
+    public String getId() {
+<span class="nc" id="L49">        return X500.OID_CE_POLICY_MAPPINGS;</span>
+    }
+
+    public void encodeTo(final ASN1Encoder encoder) {
+<span class="nc" id="L53">        encoder.startSequence();</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        for (PolicyMapping policyMapping : policyMappings) {</span>
+<span class="nc" id="L55">            policyMapping.encodeTo(encoder);</span>
+<span class="nc" id="L56">        }</span>
+<span class="nc" id="L57">        encoder.endSequence();</span>
+<span class="nc" id="L58">    }</span>
+
+    /**
+     * A single policy mapping.
+     */
+    public static final class PolicyMapping implements ASN1Encodable {
+        private final String issuerDomainPolicyOid;
+        private final String subjectDomainPolicyOid;
+
+        /**
+         * Construct a new instance.
+         *
+         * @param issuerDomainPolicyOid the OID of the issuer domain policy (must not be {@code null})
+         * @param subjectDomainPolicyOid the OID of the subject domain policy (must not be {@code null})
+         */
+<span class="nc" id="L73">        public PolicyMapping(final String issuerDomainPolicyOid, final String subjectDomainPolicyOid) {</span>
+<span class="nc" id="L74">            Assert.checkNotNullParam(&quot;issuerDomainPolicyOid&quot;, issuerDomainPolicyOid);</span>
+<span class="nc" id="L75">            Assert.checkNotNullParam(&quot;subjectDomainPolicyOid&quot;, subjectDomainPolicyOid);</span>
+<span class="nc" id="L76">            this.issuerDomainPolicyOid = issuerDomainPolicyOid;</span>
+<span class="nc" id="L77">            this.subjectDomainPolicyOid = subjectDomainPolicyOid;</span>
+<span class="nc" id="L78">        }</span>
+
+        /**
+         * Get the issuer domain policy OID.
+         *
+         * @return the issuer domain policy OID
+         */
+        public String getIssuerDomainPolicyOid() {
+<span class="nc" id="L86">            return issuerDomainPolicyOid;</span>
+        }
+
+        /**
+         * Get the subject domain policy OID.
+         *
+         * @return the subject domain policy OID
+         */
+        public String getSubjectDomainPolicyOid() {
+<span class="nc" id="L95">            return subjectDomainPolicyOid;</span>
+        }
+
+        public void encodeTo(final ASN1Encoder encoder) {
+<span class="nc" id="L99">            encoder.startSequence();</span>
+<span class="nc" id="L100">            encoder.encodeObjectIdentifier(issuerDomainPolicyOid);</span>
+<span class="nc" id="L101">            encoder.encodeObjectIdentifier(subjectDomainPolicyOid);</span>
+<span class="nc" id="L102">            encoder.endSequence();</span>
+<span class="nc" id="L103">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

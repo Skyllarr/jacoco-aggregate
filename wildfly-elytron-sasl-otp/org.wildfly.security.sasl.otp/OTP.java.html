@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OTP.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl-otp</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.otp</a> &gt; <span class="el_source">OTP.java</span></div><h1>OTP.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.otp;
+
+import java.util.Map;
+import java.util.function.BiPredicate;
+import java.util.function.Predicate;
+
+import javax.security.auth.callback.ChoiceCallback;
+import javax.security.sasl.Sasl;
+
+import org.wildfly.security.auth.callback.ExtendedChoiceCallback;
+import org.wildfly.security.password.spec.OneTimePasswordAlgorithmSpec;
+import org.wildfly.security.sasl.WildFlySasl;
+
+/**
+ * Constants for the OTP SASL mechanism.
+ *
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+<span class="nc" id="L37">public final class OTP {</span>
+
+    public static final String OTP_PREFIX = &quot;otp-&quot;;
+    public static final String EXT = &quot;ext&quot;;
+
+    // Supported algorithms
+    public static final String MD5 = &quot;md5&quot;;
+    public static final String SHA1 = &quot;sha1&quot;;
+    public static final String SHA256 = &quot;sha256&quot;;
+    public static final String SHA384 = &quot;sha384&quot;;
+    public static final String SHA512 = &quot;sha512&quot;;
+
+    // Response types
+    public static final String HEX_RESPONSE = &quot;hex&quot;;
+    public static final String WORD_RESPONSE = &quot;word&quot;;
+    public static final String INIT_HEX_RESPONSE = &quot;init-hex&quot;;
+    public static final String INIT_WORD_RESPONSE = &quot;init-word&quot;;
+
+    /**
+     * Pass phrase format.
+     */
+    public static final String PASS_PHRASE = &quot;pass-phrase&quot;;
+
+    /**
+     * Direct OTP format (either hexadecimal or multi-word OTP).
+     */
+    public static final String DIRECT_OTP = &quot;direct-otp&quot;;
+
+    // OTP parameters
+    public static final int MAX_AUTHORIZATION_ID_LENGTH = 255;
+    public static final int MAX_AUTHENTICATION_ID_LENGTH = 255;
+    public static final int MIN_SEED_LENGTH = 1;
+    public static final int MAX_SEED_LENGTH = 16;
+    public static final int DEFAULT_SEED_LENGTH = 10;
+    public static final int MIN_PASS_PHRASE_LENGTH = 10;
+    public static final int MAX_PASS_PHRASE_LENGTH = 63;
+    public static final int MIN_SEQUENCE_NUMBER = 10;
+    public static final int DEFAULT_SEQUENCE_NUMBER = 499;
+    public static final char DICTIONARY_DELIMITER = ' ';
+    public static final int DICTIONARY_SIZE = 2048;
+
+    // OTP prompts
+    public static final String RESPONSE_TYPE_PROMPT = &quot;One-time password response type&quot;;
+    public static final String PASSWORD_FORMAT_TYPE_PROMPT = &quot;One-time password format type&quot;;
+    public static final String NEW_PASSWORD_FORMAT_TYPE_PROMPT = &quot;New one-time password format type&quot;;
+    public static final String PASSWORD_PROMPT = &quot;Pass phrase or one-time password&quot;;
+    public static final String NEW_PASSWORD_PROMPT = &quot;New pass phrase or one-time password&quot;;
+
+    /**
+     * A predicate which is true when the given callback type and prompt match the OTP response type choice callback.
+     */
+<span class="nc" id="L88">    public static final BiPredicate&lt;Class&lt;? extends ChoiceCallback&gt;, String&gt; MATCH_RESPONSE_CHOICE =</span>
+<span class="nc bnc" id="L89" title="All 4 branches missed.">            (choiceCallbackType, prompt) -&gt; ExtendedChoiceCallback.class.isAssignableFrom(choiceCallbackType) &amp;&amp; RESPONSE_TYPE_PROMPT.equals(prompt);</span>
+
+    /**
+     * A predicate which is true when the given callback type and prompt match the OTP password format type choice callback.
+     */
+<span class="nc" id="L94">    public static final BiPredicate&lt;Class&lt;? extends ChoiceCallback&gt;, String&gt; MATCH_PASSWORD_FORMAT_CHOICE =</span>
+<span class="nc bnc" id="L95" title="All 4 branches missed.">            (choiceCallbackType, prompt) -&gt; ExtendedChoiceCallback.class.isAssignableFrom(choiceCallbackType) &amp;&amp; PASSWORD_FORMAT_TYPE_PROMPT.equals(prompt);</span>
+
+    /**
+     * A predicate which is true when the given callback type and prompt match the OTP new password format type choice callback.
+     */
+<span class="nc" id="L100">    public static final BiPredicate&lt;Class&lt;? extends ChoiceCallback&gt;, String&gt; MATCH_NEW_PASSWORD_FORMAT_CHOICE =</span>
+<span class="nc bnc" id="L101" title="All 4 branches missed.">            (choiceCallbackType, prompt) -&gt; ExtendedChoiceCallback.class.isAssignableFrom(choiceCallbackType) &amp;&amp; NEW_PASSWORD_FORMAT_TYPE_PROMPT.equals(prompt);</span>
+
+    /**
+     * A predicate which is true when the given callback type and prompt match the OTP password callback.
+     */
+<span class="nc" id="L106">    public static final Predicate&lt;String&gt; MATCH_PASSWORD = (prompt) -&gt; PASSWORD_PROMPT.equals(prompt);</span>
+
+    /**
+     * A predicate which is true when the given callback type and prompt match the OTP new password callback.
+     */
+<span class="nc" id="L111">    public static final Predicate&lt;String&gt; MATCH_NEW_PASSWORD = (prompt) -&gt; NEW_PASSWORD_PROMPT.equals(prompt);</span>
+
+    /**
+     * Get the parameter specification for a one-time password generated using the given algorithm, seed, and sequence number.
+     *
+     * @param algorithm the algorithm
+     * @param seed the seed
+     * @param sequenceNumber the sequence number
+     * @return the parameter specification for a one-time password generated using the given algorithm, seed, and sequence number
+     */
+    public static OneTimePasswordAlgorithmSpec getOTPParameterSpec(final String algorithm, final String seed, final int sequenceNumber) {
+<span class="nc" id="L122">        return new OneTimePasswordAlgorithmSpec(algorithm, seed, sequenceNumber);</span>
+    }
+
+    static boolean isMatched(final Map&lt;String, ?&gt; props, final boolean query) {
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (props == null) {</span>
+<span class="nc" id="L127">            return true;</span>
+        }
+<span class="nc bnc" id="L129" title="All 4 branches missed.">        if (&quot;true&quot;.equals(props.get(WildFlySasl.MECHANISM_QUERY_ALL)) &amp;&amp; query) {</span>
+<span class="nc" id="L130">            return true;</span>
+        }
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        if (&quot;true&quot;.equals(props.get(Sasl.POLICY_NOACTIVE))) {</span>
+<span class="nc" id="L133">            return false;</span>
+        }
+<span class="nc bnc" id="L135" title="All 2 branches missed.">        if (&quot;true&quot;.equals(props.get(Sasl.POLICY_PASS_CREDENTIALS))) {</span>
+<span class="nc" id="L136">            return false;</span>
+        }
+<span class="nc bnc" id="L138" title="All 2 branches missed.">        if (&quot;true&quot;.equals(props.get(Sasl.POLICY_NODICTIONARY))) {</span>
+<span class="nc" id="L139">            return false;</span>
+        }
+<span class="nc" id="L141">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

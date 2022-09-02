@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SaslFactories.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.util</a> &gt; <span class="el_source">SaslFactories.java</span></div><h1>SaslFactories.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.util;
+
+import static org.wildfly.security.provider.util.ProviderUtil.INSTALLED_PROVIDERS;
+
+import java.security.Provider;
+import java.util.Map;
+import java.util.function.BiPredicate;
+
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.sasl.SaslClient;
+import javax.security.sasl.SaslClientFactory;
+import javax.security.sasl.SaslException;
+import javax.security.sasl.SaslServer;
+import javax.security.sasl.SaslServerFactory;
+
+import org.wildfly.common.Assert;
+
+/**
+ * A utility class for discovering SASL client and server factories.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class SaslFactories {
+
+    private SaslFactories() {
+    }
+
+<span class="nc" id="L46">    private static final SecurityProviderSaslClientFactory providerSaslClientFactory = new SecurityProviderSaslClientFactory(INSTALLED_PROVIDERS);</span>
+<span class="nc" id="L47">    private static final SecurityProviderSaslServerFactory providerSaslServerFactory = new SecurityProviderSaslServerFactory(INSTALLED_PROVIDERS);</span>
+
+<span class="nc" id="L49">    static final String[] NO_STRINGS = new String[0];</span>
+    static final String PROVIDER_FILTER_KEY = &quot;org.wildfly.internal.PFK&quot;;
+
+<span class="nc" id="L52">    private static final SaslClientFactory EMPTY_SASL_CLIENT_FACTORY = new SaslClientFactory() {</span>
+        public SaslClient createSaslClient(final String[] mechanisms, final String authorizationId, final String protocol, final String serverName, final Map&lt;String, ?&gt; props, final CallbackHandler cbh) throws SaslException {
+<span class="nc" id="L54">            return null;</span>
+        }
+
+        public String[] getMechanismNames(final Map&lt;String, ?&gt; props) {
+<span class="nc" id="L58">            return NO_STRINGS;</span>
+        }
+    };
+
+<span class="nc" id="L62">    private static final SaslServerFactory EMPTY_SASL_SERVER_FACTORY = new SaslServerFactory() {</span>
+        public SaslServer createSaslServer(final String mechanism, final String protocol, final String serverName, final Map&lt;String, ?&gt; props, final CallbackHandler cbh) throws SaslException {
+<span class="nc" id="L64">            return null;</span>
+        }
+
+        public String[] getMechanismNames(final Map&lt;String, ?&gt; props) {
+<span class="nc" id="L68">            return NO_STRINGS;</span>
+        }
+    };
+
+    /**
+     * Get a SASL client factory which returns an Elytron-provided mechanism.
+     *
+     * @return the SASL client factory (not {@code null})
+     */
+    public static SaslClientFactory getElytronSaslClientFactory() {
+<span class="nc" id="L78">        return new ServiceLoaderSaslClientFactory(SaslFactories.class.getClassLoader());</span>
+    }
+
+    /**
+     * Get a SASL server factory which returns an Elytron-provided mechanism.
+     *
+     * @return the SASL server factory (not {@code null})
+     */
+    public static SaslServerFactory getElytronSaslServerFactory() {
+<span class="nc" id="L87">        return new ServiceLoaderSaslServerFactory(SaslFactories.class.getClassLoader());</span>
+    }
+
+    /**
+     * Get a SASL client factory which searches all the given class loaders in order for mechanisms.
+     *
+     * @param classLoaders the class loaders to search
+     * @return the SASL client factory (not {@code null})
+     */
+    public static SaslClientFactory getSearchSaslClientFactory(ClassLoader... classLoaders) {
+<span class="nc" id="L97">        Assert.checkNotNullParam(&quot;classLoaders&quot;, classLoaders);</span>
+<span class="nc" id="L98">        SaslClientFactory[] factories = new SaslClientFactory[classLoaders.length];</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        for (int i = 0, classLoadersLength = classLoaders.length; i &lt; classLoadersLength; i++) {</span>
+<span class="nc" id="L100">            factories[i] = new ServiceLoaderSaslClientFactory(classLoaders[i]);</span>
+        }
+<span class="nc" id="L102">        return new AggregateSaslClientFactory(factories);</span>
+    }
+
+    /**
+     * Get a SASL server factory which searches all the given class loaders in order for mechanisms.
+     *
+     * @param classLoaders the class loaders to search
+     * @return the SASL server factory (not {@code null})
+     */
+    public static SaslServerFactory getSearchSaslServerFactory(ClassLoader... classLoaders) {
+<span class="nc" id="L112">        Assert.checkNotNullParam(&quot;classLoaders&quot;, classLoaders);</span>
+<span class="nc" id="L113">        SaslServerFactory[] factories = new SaslServerFactory[classLoaders.length];</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        for (int i = 0, classLoadersLength = classLoaders.length; i &lt; classLoadersLength; i++) {</span>
+<span class="nc" id="L115">            factories[i] = new ServiceLoaderSaslServerFactory(classLoaders[i]);</span>
+        }
+<span class="nc" id="L117">        return new AggregateSaslServerFactory(factories);</span>
+    }
+
+    /**
+     * Get a SASL client factory which uses the currently installed security providers to locate mechanisms.
+     *
+     * @return the SASL client factory (not {@code null})
+     */
+    public static SecurityProviderSaslClientFactory getProviderSaslClientFactory() {
+<span class="nc" id="L126">        return providerSaslClientFactory;</span>
+    }
+
+    /**
+     * Get a SASL server factory which uses the currently installed security providers to locate mechanisms.
+     *
+     * @return the SASL server factory (not {@code null})
+     */
+    public static SecurityProviderSaslServerFactory getProviderSaslServerFactory() {
+<span class="nc" id="L135">        return providerSaslServerFactory;</span>
+    }
+
+    /**
+     * Get a {@link SaslClientFactory} which does not provide any mechanisms.
+     */
+    public static SaslClientFactory getEmptySaslClientFactory() {
+<span class="nc" id="L142">        return EMPTY_SASL_CLIENT_FACTORY;</span>
+    }
+
+    /**
+     * Get a {@link SaslServerFactory} which does not provide any mechanisms.
+     */
+    public static SaslServerFactory getEmptySaslServerFactory() {
+<span class="nc" id="L149">        return EMPTY_SASL_SERVER_FACTORY;</span>
+    }
+
+    /**
+     * Efficiently, recursively filter mechanisms by provider.  If the filter accepts all array elements, the original
+     * array is returned unchanged.  If the filter accepts none of the array elements, an empty array is returned.
+     *
+     * @param orig the original mech array
+     * @param idx the recursive read index (start from 0)
+     * @param len the recursive write length (start from 0)
+     * @param currentProvider the provider being tested
+     * @param mechFilter the filter predicate
+     * @return the filtered array
+     */
+    static String[] filterMechanismsByProvider(String[] orig, int idx, int len, final Provider currentProvider, final BiPredicate&lt;String, Provider&gt; mechFilter) {
+<span class="nc bnc" id="L164" title="All 2 branches missed.">        if (idx == orig.length) {</span>
+            // end of array
+<span class="nc bnc" id="L166" title="All 2 branches missed.">            if (len == 0) {</span>
+                // no mechs
+<span class="nc" id="L168">                return NO_STRINGS;</span>
+            } else {
+<span class="nc bnc" id="L170" title="All 2 branches missed.">                return idx == len ? orig : new String[len];</span>
+            }
+<span class="nc bnc" id="L172" title="All 2 branches missed.">        } else if (mechFilter.test(orig[idx], currentProvider)) {</span>
+            // ok
+<span class="nc" id="L174">            String[] filtered = filterMechanismsByProvider(orig, idx + 1, len + 1, currentProvider, mechFilter);</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">            if (orig != filtered) {</span>
+                // we made a copy; populate it
+<span class="nc" id="L177">                filtered[len] = orig[idx];</span>
+            }
+<span class="nc" id="L179">            return filtered;</span>
+        } else {
+            // skip this element
+<span class="nc" id="L182">            return filterMechanismsByProvider(orig, idx + 1, len, currentProvider, mechFilter);</span>
+        }
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    static BiPredicate&lt;String, Provider&gt; getProviderFilterPredicate(final Map&lt;String, ?&gt; props) {
+<span class="nc" id="L188">        final Object filterObj = props.get(PROVIDER_FILTER_KEY);</span>
+        final BiPredicate&lt;String, Provider&gt; mechFilter;
+<span class="nc bnc" id="L190" title="All 2 branches missed.">        if (filterObj instanceof BiPredicate) {</span>
+<span class="nc" id="L191">            mechFilter = (BiPredicate&lt;String, Provider&gt;) filterObj;</span>
+        } else {
+<span class="nc" id="L193">            mechFilter = (s, provider) -&gt; true;</span>
+        }
+<span class="nc" id="L195">        return mechFilter;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,438 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>JsonWebToken.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-oidc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.oidc</a> &gt; <span class="el_source">JsonWebToken.java</span></div><h1>JsonWebToken.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2021 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.http.oidc;
+
+import static org.wildfly.security.http.oidc.ElytronMessages.log;
+
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import javax.json.Json;
+import javax.json.JsonArray;
+import javax.json.JsonArrayBuilder;
+import javax.json.JsonObject;
+import javax.json.JsonObjectBuilder;
+import javax.json.JsonValue;
+
+import org.jose4j.jwt.JwtClaims;
+import org.jose4j.jwt.MalformedClaimException;
+import org.wildfly.common.Assert;
+
+/**
+ * Representation of a JSON Web Token, as per &lt;a href=&quot;https://tools.ietf.org/html/rfc7519&quot;&gt;RFC 7519&lt;/a&gt;.
+ *
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+public class JsonWebToken {
+
+    public static final String EMAIL = &quot;email&quot;;
+    public static final String EXP = &quot;exp&quot;;
+    public static final String FAMILY_NAME = &quot;family_name&quot;;
+    public static final String GIVEN_NAME = &quot;given_name&quot;;
+    public static final String IAT = &quot;iat&quot;;
+    public static final String MIDDLE_NAME = &quot;middle_name&quot;;
+    public static final String NAME = &quot;name&quot;;
+    public static final String NICKNAME = &quot;nickname&quot;;
+    public static final String NBF = &quot;nbf&quot;;
+    public static final String PREFERRED_USERNAME = &quot;preferred_username&quot;;
+    public static final String SUB = &quot;sub&quot;;
+
+    private final JwtClaims jwtClaims;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param jwtClaims the JWT claims for this instance (may not be {@code null})
+     */
+<span class="fc" id="L66">    public JsonWebToken(JwtClaims jwtClaims) {</span>
+<span class="fc" id="L67">        Assert.checkNotNullParam(&quot;jwtClaims&quot;, jwtClaims);</span>
+<span class="fc" id="L68">        this.jwtClaims = jwtClaims;</span>
+<span class="fc" id="L69">    }</span>
+
+    /**
+     * Get the issuer claim.
+     *
+     * @return the issuer claim
+     * @throws IllegalArgumentException if the issuer claim is malformed
+     */
+    public String getIssuer() {
+        try {
+<span class="nc" id="L79">            return jwtClaims.getIssuer();</span>
+<span class="nc" id="L80">        } catch (MalformedClaimException e) {</span>
+<span class="nc" id="L81">            throw log.invalidTokenClaimValue();</span>
+        }
+    }
+
+    /**
+     * Get the subject claim.
+     *
+     * @return the subject claim
+     * @throws IllegalArgumentException if the subject claim is malformed
+     */
+    public String getSubject() {
+        try {
+<span class="nc" id="L93">            return jwtClaims.getSubject();</span>
+<span class="nc" id="L94">        } catch (MalformedClaimException e) {</span>
+<span class="nc" id="L95">            throw log.invalidTokenClaimValue();</span>
+        }
+    }
+
+    /**
+     * Get the audience claim.
+     *
+     * @return the audience claim
+     * @throws IllegalArgumentException if the audience claim is malformed
+     */
+    public List&lt;String&gt; getAudience() {
+        try {
+<span class="nc" id="L107">            return jwtClaims.getAudience();</span>
+<span class="nc" id="L108">        } catch (MalformedClaimException e) {</span>
+<span class="nc" id="L109">            throw log.invalidTokenClaimValue();</span>
+        }
+    }
+
+    /**
+     * Get the expiration claim.
+     *
+     * @return the expiration claim
+     * @throws IllegalArgumentException if the expiration claim is malformed
+     */
+    public Long getExpiration() {
+<span class="fc" id="L120">        return getClaimValueAsLong(EXP);</span>
+    }
+
+    /**
+     * Return whether this JWT is expired.
+     *
+     * @return {@code true} if this JWT is expired and {@code false} otherwise
+     * @throws IllegalArgumentException if the issuer claim is malformed
+     */
+    public boolean isExpired() {
+<span class="fc" id="L130">        Long expiration = getExpiration();</span>
+<span class="pc bpc" id="L131" title="4 of 6 branches missed.">        return expiration != null &amp;&amp; expiration != 0 ? getCurrentTimeInSeconds() &gt; expiration : false;</span>
+    }
+
+    /**
+     * Get the not before claim.
+     *
+     * @return the not before claim
+     * @throws IllegalArgumentException if the not before claim is malformed
+     */
+    public Long getNotBefore() {
+<span class="fc" id="L141">        return getClaimValueAsLong(NBF);</span>
+    }
+
+    /**
+     * Return whether the current time is greater than or equal to the value of the
+     * not before claim.
+     *
+     * @return {@code true} if the not before claim is null or if the current time is greater than or equal to the value
+     * of the not before claim and {@code false} otherwise
+     * @throws IllegalArgumentException if the not before claim is malformed
+     */
+    public boolean isNotBefore() {
+<span class="fc" id="L153">        Long notBefore = getNotBefore();</span>
+<span class="pc bpc" id="L154" title="2 of 4 branches missed.">        return notBefore != null ? getCurrentTimeInSeconds() &gt;= notBefore : true;</span>
+    }
+
+    /**
+     * Checks that the token is not expired and isn't prior to the not before time.
+     *
+     * @return {@code true} if the token is active and {@code false} otherwise
+     */
+    public boolean isActive() {
+<span class="pc bpc" id="L163" title="2 of 4 branches missed.">        return ! isExpired() &amp;&amp; isNotBefore();</span>
+    }
+
+    /**
+     * Get the issued at claim.
+     *
+     * @return the issued at claim
+     * @throws IllegalArgumentException if the issued at claim is malformed
+     */
+    public Long getIssuedAt() {
+<span class="fc" id="L173">        return getClaimValueAsLong(IAT);</span>
+    }
+
+    /**
+     * Get the ID claim.
+     *
+     * @return the ID claim
+     * @throws IllegalArgumentException if the ID claim is malformed
+     */
+    public String getID() {
+        try {
+<span class="nc" id="L184">            return jwtClaims.getJwtId();</span>
+<span class="nc" id="L185">        } catch (MalformedClaimException e) {</span>
+<span class="nc" id="L186">            throw log.invalidTokenClaimValue();</span>
+        }
+    }
+
+    /**
+     * Get the claim names.
+     *
+     * @return the claim names
+     */
+    public Set&lt;String&gt; getClaimNames() {
+<span class="nc" id="L196">        return new HashSet&lt;&gt;(jwtClaims.getClaimNames());</span>
+    }
+
+    /**
+     * Return whether this token has the given claim.
+     *
+     * @param claimName the claim name to check
+     * @return {@code true} if this token has the given claim and {@code false} otherwise
+     */
+    public boolean hasClaim(String claimName) {
+<span class="nc" id="L206">        Assert.checkNotNullParam(&quot;claimName&quot;, claimName);</span>
+<span class="nc" id="L207">        return jwtClaims.hasClaim(claimName);</span>
+    }
+
+    /**
+     * Get the value of the given claim.
+     *
+     * @param claimName the claim to retrieve
+     * @return the value of the given claim
+     */
+    public Object getClaimValue(String claimName) {
+<span class="fc" id="L217">        Assert.checkNotNullParam(&quot;claimName&quot;, claimName);</span>
+<span class="fc" id="L218">        return jwtClaims.getClaimValue(claimName);</span>
+    }
+
+    /**
+     * Get the value of the given claim.
+     *
+     * @param claimName the claim to retrieve
+     * @param type the type that should be returned
+     * @param &lt;T&gt; the type of the value
+     * @return the value of the given claim
+     * @throws IllegalArgumentException if the claim is malformed
+     */
+    public &lt;T&gt; T getClaimValue(String claimName, Class&lt;T&gt; type) {
+<span class="nc" id="L231">        Assert.checkNotNullParam(&quot;claimName&quot;, claimName);</span>
+        try {
+<span class="nc" id="L233">            return jwtClaims.getClaimValue(claimName, type);</span>
+<span class="nc" id="L234">        } catch (MalformedClaimException e) {</span>
+<span class="nc" id="L235">            throw log.invalidTokenClaimValue();</span>
+        }
+    }
+
+    /**
+     * Get the value of the given claim.
+     *
+     * @param claimName the claim to retrieve
+     * @return the value of the given claim as a string
+     */
+    public String getClaimValueAsString(String claimName) {
+<span class="nc" id="L246">        Assert.checkNotNullParam(&quot;claimName&quot;, claimName);</span>
+<span class="nc" id="L247">        return jwtClaims.getClaimValueAsString(claimName);</span>
+    }
+
+    /**
+     * Get the value of the given claim as a string list.
+     *
+     * @param claimName the claim to retrieve
+     * @return the value of the given claim as a string list
+     */
+    public List&lt;String&gt; getStringListClaimValue(String claimName) {
+<span class="nc" id="L257">        Assert.checkNotNullParam(&quot;claimName&quot;, claimName);</span>
+        try {
+<span class="nc" id="L259">        return jwtClaims.getStringListClaimValue(claimName);</span>
+<span class="nc" id="L260">        } catch (MalformedClaimException e) {</span>
+<span class="nc" id="L261">            throw log.invalidTokenClaimValue();</span>
+        }
+    }
+
+    /**
+     * Get the name claim.
+     *
+     * @return the name claim
+     */
+    public String getName() {
+<span class="nc" id="L271">        return getClaimValueAsString(NAME);</span>
+    }
+
+    /**
+     * Get the principal name.
+     * @param deployment the OIDC client configuration that should be used to determine the principal
+     * @return the principal name
+     */
+    public String getPrincipalName(OidcClientConfiguration deployment) {
+<span class="nc" id="L280">        String attr = SUB;</span>
+<span class="nc bnc" id="L281" title="All 2 branches missed.">        if (deployment.getPrincipalAttribute() != null) {</span>
+<span class="nc" id="L282">            attr = deployment.getPrincipalAttribute();</span>
+        }
+<span class="nc bnc" id="L284" title="All 8 branches missed.">        switch (attr) {</span>
+            case SUB:
+<span class="nc" id="L286">                return getSubject();</span>
+            case EMAIL:
+<span class="nc" id="L288">                return getEmail();</span>
+            case PREFERRED_USERNAME:
+<span class="nc" id="L290">                return getPreferredUsername();</span>
+            case NAME:
+<span class="nc" id="L292">                return getName();</span>
+            case GIVEN_NAME:
+<span class="nc" id="L294">                return getGivenName();</span>
+            case FAMILY_NAME:
+<span class="nc" id="L296">                return getFamilyName();</span>
+            case NICKNAME:
+<span class="nc" id="L298">                return getNickName();</span>
+            default:
+<span class="nc" id="L300">                return getSubject();</span>
+        }
+    }
+
+    /**
+     * Get the given name claim.
+     *
+     * @return the given name claim
+     */
+    public String getGivenName() {
+<span class="nc" id="L310">        return getClaimValueAsString(GIVEN_NAME);</span>
+    }
+
+    /**
+     * Get the family name claim.
+     *
+     * @return the family name claim
+     */
+    public String getFamilyName() {
+<span class="nc" id="L319">        return getClaimValueAsString(FAMILY_NAME);</span>
+    }
+
+    /**
+     * Get the middle name claim.
+     *
+     * @return the middle name claim
+     */
+    public String getMiddleName() {
+<span class="nc" id="L328">        return getClaimValueAsString(MIDDLE_NAME);</span>
+    }
+
+    /**
+     * Get the nick name claim.
+     *
+     * @return the nick name claim
+     */
+    public String getNickName() {
+<span class="nc" id="L337">        return getClaimValueAsString(NICKNAME);</span>
+    }
+
+    /**
+     * Get the preferred username claim.
+     *
+     * @return the preferred username claim
+     */
+    public String getPreferredUsername() {
+<span class="nc" id="L346">        return getClaimValueAsString(PREFERRED_USERNAME);</span>
+    }
+
+    /**
+     * Get the email claim.
+     *
+     * @return the email claim
+     */
+    public String getEmail() {
+<span class="nc" id="L355">        return getClaimValueAsString(EMAIL);</span>
+    }
+
+    private static int getCurrentTimeInSeconds() {
+<span class="fc" id="L359">        return ((int) (System.currentTimeMillis() / 1000));</span>
+    }
+
+    Long getClaimValueAsLong(String claimName) {
+        try {
+<span class="fc" id="L364">            Long claimValue = jwtClaims.getClaimValue(claimName, Long.class);</span>
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">            if (claimValue == null) {</span>
+<span class="fc" id="L366">                claimValue = 0L;</span>
+            }
+<span class="fc" id="L368">            return claimValue;</span>
+<span class="nc" id="L369">        } catch (MalformedClaimException e) {</span>
+<span class="nc" id="L370">            throw log.invalidTokenClaimValue();</span>
+        }
+    }
+
+    public static JsonValue wrapValue(Object value) {
+<span class="nc" id="L375">        JsonValue jsonValue = null;</span>
+<span class="nc bnc" id="L376" title="All 2 branches missed.">        if (value instanceof JsonValue) {</span>
+            // This may already be a JsonValue
+<span class="nc" id="L378">            jsonValue = (JsonValue) value;</span>
+<span class="nc bnc" id="L379" title="All 2 branches missed.">        } else if (value instanceof String) {</span>
+<span class="nc" id="L380">            jsonValue = Json.createValue(value.toString());</span>
+<span class="nc bnc" id="L381" title="All 4 branches missed.">        } else if ((value instanceof Long) || (value instanceof Integer)) {</span>
+<span class="nc" id="L382">            jsonValue = Json.createValue(((Number) value).longValue());</span>
+<span class="nc bnc" id="L383" title="All 2 branches missed.">        } else if (value instanceof Number) {</span>
+<span class="nc" id="L384">            jsonValue = Json.createValue(((Number) value).doubleValue());</span>
+<span class="nc bnc" id="L385" title="All 2 branches missed.">        } else if (value instanceof Boolean) {</span>
+<span class="nc bnc" id="L386" title="All 2 branches missed.">            jsonValue = (Boolean) value ? JsonValue.TRUE : JsonValue.FALSE;</span>
+<span class="nc bnc" id="L387" title="All 2 branches missed.">        } else if (value instanceof Collection) {</span>
+<span class="nc" id="L388">            jsonValue = toJsonArray((Collection&lt;?&gt;) value);</span>
+<span class="nc bnc" id="L389" title="All 2 branches missed.">        } else if (value instanceof Map) {</span>
+<span class="nc" id="L390">            JsonObject entryJsonObject = replaceMap((Map&lt;String, Object&gt;) value);</span>
+<span class="nc" id="L391">            jsonValue = entryJsonObject;</span>
+        }
+<span class="nc" id="L393">        return jsonValue;</span>
+    }
+
+    public static JsonObject replaceMap(Map&lt;String, Object&gt; map) {
+<span class="nc" id="L397">        JsonObjectBuilder builder = Json.createObjectBuilder();</span>
+<span class="nc bnc" id="L398" title="All 2 branches missed.">        for (Map.Entry&lt;String, Object&gt; entry : map.entrySet()) {</span>
+<span class="nc" id="L399">            Object entryValue = entry.getValue();</span>
+<span class="nc bnc" id="L400" title="All 2 branches missed.">            if (entryValue instanceof Map) {</span>
+<span class="nc" id="L401">                JsonObject entryJsonObject = replaceMap((Map&lt;String, Object&gt;) entryValue);</span>
+<span class="nc" id="L402">                builder.add(entry.getKey(), entryJsonObject);</span>
+<span class="nc bnc" id="L403" title="All 2 branches missed.">            } else if (entryValue instanceof List) {</span>
+<span class="nc" id="L404">                JsonArray array = (JsonArray) wrapValue(entryValue);</span>
+<span class="nc" id="L405">                builder.add(entry.getKey(), array);</span>
+<span class="nc bnc" id="L406" title="All 4 branches missed.">            } else if (entryValue instanceof Long || entryValue instanceof Integer) {</span>
+<span class="nc" id="L407">                long lvalue = ((Number) entryValue).longValue();</span>
+<span class="nc" id="L408">                builder.add(entry.getKey(), lvalue);</span>
+<span class="nc bnc" id="L409" title="All 4 branches missed.">            } else if (entryValue instanceof Double || entryValue instanceof Float) {</span>
+<span class="nc" id="L410">                double dvalue = ((Number) entryValue).doubleValue();</span>
+<span class="nc" id="L411">                builder.add(entry.getKey(), dvalue);</span>
+<span class="nc bnc" id="L412" title="All 2 branches missed.">            } else if (entryValue instanceof Boolean) {</span>
+<span class="nc" id="L413">                boolean flag = ((Boolean) entryValue).booleanValue();</span>
+<span class="nc" id="L414">                builder.add(entry.getKey(), flag);</span>
+<span class="nc bnc" id="L415" title="All 2 branches missed.">            } else if (entryValue instanceof String) {</span>
+<span class="nc" id="L416">                builder.add(entry.getKey(), entryValue.toString());</span>
+            }
+<span class="nc" id="L418">        }</span>
+<span class="nc" id="L419">        return builder.build();</span>
+    }
+
+    private static JsonArray toJsonArray(Collection&lt;?&gt; collection) {
+<span class="nc" id="L423">        JsonArrayBuilder arrayBuilder = Json.createArrayBuilder();</span>
+<span class="nc bnc" id="L424" title="All 2 branches missed.">        for (Object element : collection) {</span>
+<span class="nc bnc" id="L425" title="All 2 branches missed.">            if (element instanceof String) {</span>
+<span class="nc" id="L426">                arrayBuilder.add(element.toString());</span>
+<span class="nc bnc" id="L427" title="All 2 branches missed.">            } else if (element == null) {</span>
+<span class="nc" id="L428">                arrayBuilder.add(JsonValue.NULL);</span>
+            } else {
+<span class="nc" id="L430">                JsonValue jvalue = wrapValue(element);</span>
+<span class="nc" id="L431">                arrayBuilder.add(jvalue);</span>
+            }
+<span class="nc" id="L433">        }</span>
+<span class="nc" id="L434">        return arrayBuilder.build();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

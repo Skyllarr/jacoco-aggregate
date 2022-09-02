@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Permission.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-oidc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.oidc</a> &gt; <span class="el_source">Permission.java</span></div><h1>Permission.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2021 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.http.oidc;
+
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+/**
+ * @author &lt;a href=&quot;mailto:psilva@redhat.com&quot;&gt;Pedro Igor&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class Permission {
+
+    @JsonProperty(&quot;rsid&quot;)
+    private String resourceId;
+
+    @JsonProperty(&quot;rsname&quot;)
+    private String resourceName;
+
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    private Set&lt;String&gt; scopes;
+
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    private Map&lt;String, Set&lt;String&gt;&gt; claims;
+
+    public Permission() {
+<span class="nc" id="L50">        this(null, null, null, null);</span>
+<span class="nc" id="L51">    }</span>
+
+    public Permission(final String resourceId, final Set&lt;String&gt; scopes) {
+<span class="nc" id="L54">        this(resourceId, null, scopes, null);</span>
+<span class="nc" id="L55">    }</span>
+
+<span class="nc" id="L57">    public Permission(final String resourceId, String resourceName, final Set&lt;String&gt; scopes, Map&lt;String, Set&lt;String&gt;&gt; claims) {</span>
+<span class="nc" id="L58">        this.resourceId = resourceId;</span>
+<span class="nc" id="L59">        this.resourceName = resourceName;</span>
+<span class="nc" id="L60">        this.scopes = scopes;</span>
+<span class="nc" id="L61">        this.claims = claims;</span>
+<span class="nc" id="L62">    }</span>
+
+    public void setResourceId(String resourceId) {
+<span class="nc" id="L65">        this.resourceId = resourceId;</span>
+<span class="nc" id="L66">    }</span>
+
+    public String getResourceId() {
+<span class="nc bnc" id="L69" title="All 4 branches missed.">        if (resourceId == null || &quot;&quot;.equals(resourceId.trim())) {</span>
+<span class="nc" id="L70">            return null;</span>
+        }
+<span class="nc" id="L72">        return this.resourceId;</span>
+    }
+
+    public void setResourceName(String resourceName) {
+<span class="nc" id="L76">        this.resourceName = resourceName;</span>
+<span class="nc" id="L77">    }</span>
+
+    public String getResourceName() {
+<span class="nc" id="L80">        return this.resourceName;</span>
+    }
+
+    public Set&lt;String&gt; getScopes() {
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (this.scopes == null) {</span>
+<span class="nc" id="L85">            this.scopes = new HashSet&lt;&gt;();</span>
+        }
+
+<span class="nc" id="L88">        return this.scopes;</span>
+    }
+
+    public Map&lt;String, Set&lt;String&gt;&gt; getClaims() {
+<span class="nc" id="L92">        return claims;</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        if (this == o) return true;</span>
+<span class="nc bnc" id="L98" title="All 4 branches missed.">        if (o == null || !getClass().isAssignableFrom(o.getClass())) return false;</span>
+
+<span class="nc" id="L100">        Permission that = (Permission) o;</span>
+
+<span class="nc bnc" id="L102" title="All 4 branches missed.">        if (getResourceId() != null || getResourceName() != null) {</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">            if (!getResourceId().equals(that.resourceId)) {</span>
+<span class="nc" id="L104">                return false;</span>
+            }
+
+<span class="nc bnc" id="L107" title="All 4 branches missed.">            if (getScopes().isEmpty() &amp;&amp; that.getScopes().isEmpty()) {</span>
+<span class="nc" id="L108">                return true;</span>
+            }
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        } else if (that.resourceId != null) {</span>
+<span class="nc" id="L111">            return false;</span>
+        }
+
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        for (String scope : that.getScopes()) {</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">            if (getScopes().contains(scope)) {</span>
+<span class="nc" id="L116">                return true;</span>
+            }
+<span class="nc" id="L118">        }</span>
+
+<span class="nc" id="L120">        return false;</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L125">        return Objects.hash(resourceId);</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L130">        StringBuilder builder = new StringBuilder();</span>
+
+<span class="nc" id="L132">        builder.append(&quot;Permission {&quot;).append(&quot;id=&quot;).append(resourceId).append(&quot;, name=&quot;).append(resourceName)</span>
+<span class="nc" id="L133">                .append(&quot;, scopes=&quot;).append(scopes).append(&quot;}&quot;);</span>
+
+<span class="nc" id="L135">        return builder.toString();</span>
+    }
+
+    public void setScopes(Set&lt;String&gt; scopes) {
+<span class="nc" id="L139">        this.scopes = scopes;</span>
+<span class="nc" id="L140">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

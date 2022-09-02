@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SupportLevel.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth</a> &gt; <span class="el_source">SupportLevel.java</span></div><h1>SupportLevel.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth;
+
+import java.util.EnumSet;
+
+import org.wildfly.common.Assert;
+
+/**
+ * The different support levels.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+<span class="fc" id="L30">public enum SupportLevel {</span>
+
+    /**
+     * The given credential type is definitely not supported.
+     */
+<span class="fc" id="L35">    UNSUPPORTED,</span>
+    /**
+     * The given credential type may be supported.
+     */
+<span class="fc" id="L39">    POSSIBLY_SUPPORTED,</span>
+    /**
+     * The given credential type is definitely supported.
+     */
+<span class="fc" id="L43">    SUPPORTED,</span>
+    ;
+
+    /**
+     * Determine if this object represents definite support.
+     *
+     * @return {@code true} if this object represents definite support, {@code false} otherwise
+     */
+    public boolean isDefinitelySupported() {
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        return this == SUPPORTED;</span>
+    }
+
+    /**
+     * Determine if this object represents possible &lt;em&gt;or&lt;/em&gt; definite support.
+     *
+     * @return {@code true} if this object represents possible &lt;em&gt;or&lt;/em&gt; definite support, {@code false} otherwise
+     */
+    public boolean mayBeSupported() {
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        return this != UNSUPPORTED;</span>
+    }
+
+    /**
+     * Determine if this object represents definite lack of support.
+     *
+     * @return {@code true} if this object represents definite lack of support, {@code false} otherwise
+     */
+    public boolean isNotSupported() {
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        return this == UNSUPPORTED;</span>
+    }
+
+<span class="fc" id="L73">    private static final int fullSize = values().length;</span>
+
+    /**
+     * Determine whether the given set is fully populated (or &quot;full&quot;), meaning it contains all possible values.
+     *
+     * @param set the set
+     *
+     * @return {@code true} if the set is full, {@code false} otherwise
+     */
+    public static boolean isFull(final EnumSet&lt;SupportLevel&gt; set) {
+<span class="nc bnc" id="L83" title="All 4 branches missed.">        return set != null &amp;&amp; set.size() == fullSize;</span>
+    }
+
+    /**
+     * Determine whether this instance is equal to one of the given instances.
+     *
+     * @param v1 the first instance
+     *
+     * @return {@code true} if one of the instances matches this one, {@code false} otherwise
+     */
+    public boolean in(final SupportLevel v1) {
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        return this == v1;</span>
+    }
+
+    /**
+     * Determine whether this instance is equal to one of the given instances.
+     *
+     * @param v1 the first instance
+     * @param v2 the second instance
+     *
+     * @return {@code true} if one of the instances matches this one, {@code false} otherwise
+     */
+    public boolean in(final SupportLevel v1, final SupportLevel v2) {
+<span class="nc bnc" id="L106" title="All 4 branches missed.">        return this == v1 || this == v2;</span>
+    }
+
+    /**
+     * Determine whether this instance is equal to one of the given instances.
+     *
+     * @param v1 the first instance
+     * @param v2 the second instance
+     * @param v3 the third instance
+     *
+     * @return {@code true} if one of the instances matches this one, {@code false} otherwise
+     */
+    public boolean in(final SupportLevel v1, final SupportLevel v2, final SupportLevel v3) {
+<span class="nc bnc" id="L119" title="All 6 branches missed.">        return this == v1 || this == v2 || this == v3;</span>
+    }
+
+    /**
+     * Determine whether this instance is equal to one of the given instances.
+     *
+     * @param values the possible values
+     *
+     * @return {@code true} if one of the instances matches this one, {@code false} otherwise
+     */
+    public boolean in(final SupportLevel... values) {
+<span class="nc bnc" id="L130" title="All 4 branches missed.">        if (values != null) for (SupportLevel value : values) {</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">            if (this == value) return true;</span>
+        }
+<span class="nc" id="L133">        return false;</span>
+    }
+
+    /**
+     * Get the maximum support level between two candidates.
+     *
+     * @param o1 the first support level (must not be {@code null})
+     * @param o2 the second support level (must not be {@code null})
+     * @return the maximum support level (not {@code null})
+     */
+    public static SupportLevel max(SupportLevel o1, SupportLevel o2) {
+<span class="nc" id="L144">        Assert.checkNotNullParam(&quot;o1&quot;, o1);</span>
+<span class="nc" id="L145">        Assert.checkNotNullParam(&quot;o2&quot;, o2);</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        return o1.compareTo(o2) &lt; 0 ? o2 : o1;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RefreshableOidcSecurityContext.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-oidc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.oidc</a> &gt; <span class="el_source">RefreshableOidcSecurityContext.java</span></div><h1>RefreshableOidcSecurityContext.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2021 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.http.oidc;
+
+import static org.wildfly.security.http.oidc.ElytronMessages.log;
+import static org.wildfly.security.http.oidc.Oidc.getCurrentTimeInSeconds;
+import static org.wildfly.security.http.oidc.Oidc.logToken;
+
+import java.io.IOException;
+
+
+/**
+ * @author &lt;a href=&quot;mailto:bill@burkecentral.com&quot;&gt;Bill Burke&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+public class RefreshableOidcSecurityContext extends OidcSecurityContext {
+
+    protected transient OidcClientConfiguration clientConfiguration;
+    protected transient OidcTokenStore tokenStore;
+    protected String refreshToken;
+
+<span class="fc" id="L38">    public RefreshableOidcSecurityContext() {</span>
+<span class="fc" id="L39">    }</span>
+
+    public RefreshableOidcSecurityContext(OidcClientConfiguration clientConfiguration, OidcTokenStore tokenStore, String tokenString,
+                                          AccessToken token, String idTokenString, IDToken idToken, String refreshToken) {
+<span class="fc" id="L43">        super(tokenString, token, idTokenString, idToken);</span>
+<span class="fc" id="L44">        this.clientConfiguration = clientConfiguration;</span>
+<span class="fc" id="L45">        this.tokenStore = tokenStore;</span>
+<span class="fc" id="L46">        this.refreshToken = refreshToken;</span>
+<span class="fc" id="L47">    }</span>
+
+    @Override
+    public AccessToken getToken() {
+<span class="fc" id="L51">        refreshToken(true);</span>
+<span class="fc" id="L52">        return super.getToken();</span>
+    }
+
+    @Override
+    public String getTokenString() {
+<span class="nc" id="L57">        refreshToken(true);</span>
+<span class="nc" id="L58">        return super.getTokenString();</span>
+    }
+
+    @Override
+    public IDToken getIDToken() {
+<span class="nc" id="L63">        refreshToken(true);</span>
+<span class="nc" id="L64">        return super.getIDToken();</span>
+    }
+
+    @Override
+    public String getIDTokenString() {
+<span class="nc" id="L69">        refreshToken(true);</span>
+<span class="nc" id="L70">        return super.getIDTokenString();</span>
+    }
+
+    public String getRefreshToken() {
+<span class="nc" id="L74">        return refreshToken;</span>
+    }
+
+    public void logout(OidcClientConfiguration clientConfiguration) {
+        try {
+<span class="nc" id="L79">            ServerRequest.invokeLogout(clientConfiguration, refreshToken);</span>
+<span class="nc" id="L80">        } catch (Exception e) {</span>
+<span class="nc" id="L81">            log.failedToInvokeRemoteLogout(e);</span>
+<span class="nc" id="L82">        }</span>
+<span class="nc" id="L83">    }</span>
+
+    public boolean isActive() {
+<span class="pc bpc" id="L86" title="3 of 8 branches missed.">        return token != null &amp;&amp; this.token.isActive() &amp;&amp; clientConfiguration != null &amp;&amp; this.token.getIssuedAt() &gt;= clientConfiguration.getNotBefore();</span>
+    }
+
+    public boolean isTokenTimeToLiveSufficient(AccessToken token) {
+<span class="pc bpc" id="L90" title="2 of 4 branches missed.">        return token != null &amp;&amp; (token.getExpiration() - this.clientConfiguration.getTokenMinimumTimeToLive()) &gt; getCurrentTimeInSeconds();</span>
+    }
+
+    public OidcClientConfiguration getOidcClientConfiguration() {
+<span class="fc" id="L94">        return clientConfiguration;</span>
+    }
+
+    public void setCurrentRequestInfo(OidcClientConfiguration clientConfiguration, OidcTokenStore tokenStore) {
+<span class="fc" id="L98">        this.clientConfiguration = clientConfiguration;</span>
+<span class="fc" id="L99">        this.tokenStore = tokenStore;</span>
+<span class="fc" id="L100">    }</span>
+
+    /**
+     * Refresh a token if needed.
+     *
+     * @param checkActive if true, then we won't send refresh request if current accessToken is still active.
+     * @return true if accessToken is active or was successfully refreshed
+     */
+    public boolean refreshToken(boolean checkActive) {
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (checkActive) {</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">            if (log.isTraceEnabled()) {</span>
+<span class="fc" id="L111">                log.trace(&quot;checking whether to refresh.&quot;);</span>
+            }
+<span class="pc bpc" id="L113" title="1 of 4 branches missed.">            if (isActive() &amp;&amp; isTokenTimeToLiveSufficient(this.token)) return true;</span>
+        }
+
+<span class="pc bpc" id="L116" title="2 of 4 branches missed.">        if (this.clientConfiguration == null || refreshToken == null) return false;</span>
+
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L119">            log.trace(&quot;Doing refresh&quot;);</span>
+        }
+
+        // block requests if the refresh accessToken herein stored is already being used to refresh the accessToken so that subsequent requests
+        // can use the last refresh accessToken issued by the server. Note that this will only work for deployments using the session store
+        // and, when running in a cluster, sticky sessions must be used.
+        //
+<span class="nc" id="L126">        synchronized (this) {</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">            if (checkActive) {</span>
+<span class="nc" id="L128">                log.trace(&quot;Checking whether accessToken has been refreshed in another thread already.&quot;);</span>
+<span class="nc bnc" id="L129" title="All 4 branches missed.">                if (isActive() &amp;&amp; isTokenTimeToLiveSufficient(this.token)) return true;</span>
+            }
+            AccessAndIDTokenResponse response;
+            try {
+<span class="nc" id="L133">                log.trace(&quot;Invoking token refresh&quot;);</span>
+<span class="nc" id="L134">                response = ServerRequest.invokeRefresh(clientConfiguration, refreshToken);</span>
+<span class="nc" id="L135">            } catch (IOException e) {</span>
+<span class="nc" id="L136">                log.refreshTokenFailure(e);</span>
+<span class="nc" id="L137">                return false;</span>
+<span class="nc" id="L138">            } catch (ServerRequest.HttpFailure httpFailure) {</span>
+<span class="nc" id="L139">                log.refreshTokenFailureStatus(httpFailure.getStatus(), httpFailure.getError());</span>
+<span class="nc" id="L140">                return false;</span>
+<span class="nc" id="L141">            }</span>
+<span class="nc" id="L142">            log.trace(&quot;Received refresh response&quot;);</span>
+<span class="nc" id="L143">            String accessTokenString = response.getAccessToken();</span>
+<span class="nc" id="L144">            String idTokenString = response.getIDToken();</span>
+<span class="nc" id="L145">            logToken(&quot;\taccess_token&quot;, accessTokenString);</span>
+<span class="nc" id="L146">            logToken(&quot;\tid_token&quot;, idTokenString);</span>
+
+            AccessToken accessToken;
+            IDToken idToken;
+            try {
+<span class="nc" id="L151">                TokenValidator tokenValidator = TokenValidator.builder(clientConfiguration).build();</span>
+<span class="nc" id="L152">                TokenValidator.VerifiedTokens verifiedTokens = tokenValidator.parseAndVerifyToken(idTokenString, accessTokenString);</span>
+<span class="nc" id="L153">                idToken = verifiedTokens.getIdToken();</span>
+<span class="nc" id="L154">                accessToken = verifiedTokens.getAccessToken();</span>
+<span class="nc" id="L155">                log.debug(&quot;Token Verification succeeded!&quot;);</span>
+<span class="nc" id="L156">            } catch (OidcException e) {</span>
+<span class="nc" id="L157">                log.failedVerificationOfToken(e.getMessage());</span>
+<span class="nc" id="L158">                return false;</span>
+<span class="nc" id="L159">            }</span>
+            // If the TTL is greater-or-equal to the expire time on the refreshed accessToken, have to abort or go into an infinite refresh loop
+<span class="nc bnc" id="L161" title="All 2 branches missed.">            if (!isTokenTimeToLiveSufficient(accessToken)) {</span>
+<span class="nc" id="L162">                log.failedToRefreshTokenWithALongerTTLThanMin();</span>
+<span class="nc" id="L163">                return false;</span>
+            }
+<span class="nc bnc" id="L165" title="All 2 branches missed.">            if (idToken != null) {</span>
+<span class="nc" id="L166">                this.idToken = idToken;</span>
+<span class="nc" id="L167">                this.idTokenString = response.getIDToken();</span>
+            }
+<span class="nc" id="L169">            this.token = accessToken;</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">            if (response.getRefreshToken() != null) {</span>
+<span class="nc" id="L171">                log.trace(&quot;Setup new refresh accessToken to the security context&quot;);</span>
+<span class="nc" id="L172">                this.refreshToken = response.getRefreshToken();</span>
+<span class="nc" id="L173">                logToken(&quot;\trefresh_token&quot;, refreshToken);</span>
+            }
+<span class="nc" id="L175">            this.tokenString = accessTokenString;</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">            if (tokenStore != null) {</span>
+<span class="nc" id="L177">                tokenStore.refreshCallback(this);</span>
+            }
+<span class="nc" id="L179">        }</span>
+
+<span class="nc" id="L181">        return true;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

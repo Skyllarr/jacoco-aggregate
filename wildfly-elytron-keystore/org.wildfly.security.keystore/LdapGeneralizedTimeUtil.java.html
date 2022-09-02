@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LdapGeneralizedTimeUtil.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-keystore</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.keystore</a> &gt; <span class="el_source">LdapGeneralizedTimeUtil.java</span></div><h1>LdapGeneralizedTimeUtil.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.keystore;
+
+import java.text.ParseException;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.TimeZone;
+
+/**
+ * LDAP timestamp (Generalized time as defined in RFC 4517) util
+ *
+ * @author &lt;a href=&quot;mailto:jkalina@redhat.com&quot;&gt;Jan Kalina&lt;/a&gt;
+ */
+<span class="nc" id="L31">class LdapGeneralizedTimeUtil {</span>
+    /**
+     * Convert Generalized Time as defined in RFC4517 to the Date
+     */
+    static Date generalizedTimeToDate(String generalized) throws ParseException {
+
+<span class="fc" id="L37">        String[] parts = generalized.split(&quot;[Z+-]&quot;);</span>
+<span class="fc" id="L38">        String[] timeFraction = parts[0].split(&quot;[.,]&quot;);</span>
+<span class="fc" id="L39">        String time = timeFraction[0];</span>
+
+<span class="fc" id="L41">        Calendar calendar = Calendar.getInstance();</span>
+<span class="fc" id="L42">        calendar.setTimeInMillis(0);</span>
+<span class="fc" id="L43">        calendar.setLenient(false);</span>
+
+<span class="fc" id="L45">        calendar.set(Calendar.YEAR, Integer.parseInt(time.substring(0, 4)));</span>
+<span class="fc" id="L46">        calendar.set(Calendar.MONTH, Integer.parseInt(time.substring(4, 6)) - 1);</span>
+<span class="fc" id="L47">        calendar.set(Calendar.DAY_OF_MONTH, Integer.parseInt(time.substring(6, 8)));</span>
+<span class="fc" id="L48">        calendar.set(Calendar.HOUR_OF_DAY, Integer.parseInt(time.substring(8, 10)));</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        if (time.length() &gt;= 12) calendar.set(Calendar.MINUTE, Integer.parseInt(time.substring(10, 12)));</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        if (time.length() &gt;= 14) calendar.set(Calendar.SECOND, Integer.parseInt(time.substring(12, 14)));</span>
+
+        // fraction
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        if (timeFraction.length &gt;= 2) {</span>
+<span class="fc" id="L54">            double fraction = Double.parseDouble(&quot;0.&quot; + timeFraction[1]);</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">            if (time.length() &gt;= 14) { // fraction of second</span>
+<span class="fc" id="L56">                calendar.set(Calendar.MILLISECOND, (int) Math.round(fraction * 1000));</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">            } else if (time.length() &gt;= 12) { // fraction of minute</span>
+<span class="fc" id="L58">                calendar.set(Calendar.SECOND, (int) Math.round(fraction * 60));</span>
+            } else { // fraction of hour
+<span class="fc" id="L60">                calendar.set(Calendar.MINUTE, (int) Math.round(fraction * 60));</span>
+            }
+        }
+
+        // timezone
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (generalized.length() &gt; parts[0].length()) {</span>
+<span class="fc" id="L66">            char delimiter = generalized.charAt(parts[0].length());</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">            if (delimiter == 'Z') {</span>
+<span class="fc" id="L68">                calendar.setTimeZone(TimeZone.getTimeZone(&quot;GMT&quot;));</span>
+            } else {
+<span class="fc" id="L70">                calendar.setTimeZone(TimeZone.getTimeZone(&quot;GMT&quot; + delimiter + parts[1]));</span>
+            }
+        }
+
+<span class="fc" id="L74">        return calendar.getTime();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages_$logger.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-jacc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.authz.jacc</a> &gt; <span class="el_source">ElytronMessages_$logger.java</span></div><h1>ElytronMessages_$logger.java</h1><pre class="source lang-java linenums">package org.wildfly.security.authz.jacc;
+
+import java.util.Locale;
+import java.security.ProtectionDomain;
+import java.lang.IllegalStateException;
+import java.io.Serializable;
+import javax.annotation.Generated;
+import org.jboss.logging.DelegatingBasicLogger;
+import java.lang.SecurityException;
+import java.lang.String;
+import org.jboss.logging.Logger;
+import org.jboss.logging.BasicLogger;
+import java.security.Permission;
+import java.lang.Throwable;
+import javax.security.jacc.PolicyContextException;
+import java.util.Arrays;
+import java.lang.IllegalArgumentException;
+import java.lang.UnsupportedOperationException;
+
+
+import static org.jboss.logging.Logger.Level.ERROR;
+import static org.jboss.logging.Logger.Level.DEBUG;
+
+/**
+ * Warning this class consists of generated code.
+ */
+@Generated(value = &quot;org.jboss.logging.processor.generator.model.MessageLoggerImplementor&quot;, date = &quot;2022-09-02T20:27:28+0200&quot;)
+public class ElytronMessages_$logger extends DelegatingBasicLogger implements ElytronMessages, BasicLogger, Serializable {
+    private static final long serialVersionUID = 1L;
+<span class="fc" id="L30">    private static final String FQCN = ElytronMessages_$logger.class.getName();</span>
+    public ElytronMessages_$logger(final Logger log) {
+<span class="fc" id="L32">        super(log);</span>
+<span class="fc" id="L33">    }</span>
+<span class="fc" id="L34">    private static final Locale LOCALE = Locale.ROOT;</span>
+    protected Locale getLoggingLocale() {
+<span class="fc" id="L36">        return LOCALE;</span>
+    }
+    protected String readOnlyPermissionCollection$str() {
+<span class="nc" id="L39">        return &quot;ELY03018: Cannot add permissions to a read-only permission collection&quot;;</span>
+    }
+    @Override
+    public final SecurityException readOnlyPermissionCollection() {
+<span class="nc" id="L43">        final SecurityException result = new SecurityException(String.format(getLoggingLocale(), readOnlyPermissionCollection$str()));</span>
+<span class="nc" id="L44">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L45">        return result;</span>
+    }
+    private static void _copyStackTraceMinusOne(final Throwable e) {
+<span class="fc" id="L48">        final StackTraceElement[] st = e.getStackTrace();</span>
+<span class="fc" id="L49">        e.setStackTrace(Arrays.copyOfRange(st, 1, st.length));</span>
+<span class="fc" id="L50">    }</span>
+    @Override
+    public final void authzFailedToCheckPermission(final ProtectionDomain domain, final Permission permission, final Throwable cause) {
+<span class="fc" id="L53">        super.log.logf(FQCN, ERROR, cause, authzFailedToCheckPermission$str(), domain, permission);</span>
+<span class="fc" id="L54">    }</span>
+    protected String authzFailedToCheckPermission$str() {
+<span class="fc" id="L56">        return &quot;ELY08500: Failed to check permissions for protection domain [%s] and permission [%s].&quot;;</span>
+    }
+    protected String authzInvalidStateForOperation$str() {
+<span class="fc" id="L59">        return &quot;ELY08501: Invalid state [%s] for operation.&quot;;</span>
+    }
+    @Override
+    public final UnsupportedOperationException authzInvalidStateForOperation(final String actualState) {
+<span class="fc" id="L63">        final UnsupportedOperationException result = new UnsupportedOperationException(String.format(getLoggingLocale(), authzInvalidStateForOperation$str(), actualState));</span>
+<span class="fc" id="L64">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L65">        return result;</span>
+    }
+    protected String authzLinkSamePolicyConfiguration$str() {
+<span class="nc" id="L68">        return &quot;ELY08502: Can't link policy configuration [%s] to itself.&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException authzLinkSamePolicyConfiguration(final String contextID) {
+<span class="nc" id="L72">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), authzLinkSamePolicyConfiguration$str(), contextID));</span>
+<span class="nc" id="L73">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L74">        return result;</span>
+    }
+    protected String authzContextIdentifierNotSet$str() {
+<span class="nc" id="L77">        return &quot;ELY08503: ContextID not set. Check if the context id was set using PolicyContext.setContextID.&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException authzContextIdentifierNotSet() {
+<span class="nc" id="L81">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), authzContextIdentifierNotSet$str()));</span>
+<span class="nc" id="L82">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L83">        return result;</span>
+    }
+    protected String authzInvalidPolicyContextIdentifier$str() {
+<span class="nc" id="L86">        return &quot;ELY08504: Invalid policy context identifier [%s].&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException authzInvalidPolicyContextIdentifier(final String contextID) {
+<span class="nc" id="L90">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), authzInvalidPolicyContextIdentifier$str(), contextID));</span>
+<span class="nc" id="L91">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L92">        return result;</span>
+    }
+    protected String authzUnableToObtainPolicyConfiguration$str() {
+<span class="fc" id="L95">        return &quot;ELY08505: Could not obtain PolicyConfiguration for contextID [%s].&quot;;</span>
+    }
+    @Override
+    public final PolicyContextException authzUnableToObtainPolicyConfiguration(final String contextId, final Throwable cause) {
+<span class="fc" id="L99">        final PolicyContextException result = new PolicyContextException(String.format(getLoggingLocale(), authzUnableToObtainPolicyConfiguration$str(), contextId), cause);</span>
+<span class="fc" id="L100">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L101">        return result;</span>
+    }
+    protected String authzPolicyConfigurationNotInService$str() {
+<span class="fc" id="L104">        return &quot;ELY08506: Policy configuration with contextID [%s] is not in service state.&quot;;</span>
+    }
+    @Override
+    public final IllegalStateException authzPolicyConfigurationNotInService(final String contextID) {
+<span class="fc" id="L108">        final IllegalStateException result = new IllegalStateException(String.format(getLoggingLocale(), authzPolicyConfigurationNotInService$str(), contextID));</span>
+<span class="fc" id="L109">        _copyStackTraceMinusOne(result);</span>
+<span class="fc" id="L110">        return result;</span>
+    }
+    @Override
+    public final void authzCouldNotObtainSecurityIdentity(final Throwable cause) {
+<span class="fc" id="L114">        super.log.logf(FQCN, DEBUG, cause, authzCouldNotObtainSecurityIdentity$str());</span>
+<span class="fc" id="L115">    }</span>
+    protected String authzCouldNotObtainSecurityIdentity$str() {
+<span class="fc" id="L117">        return &quot;ELY08508: Could not obtain authorized identity.&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

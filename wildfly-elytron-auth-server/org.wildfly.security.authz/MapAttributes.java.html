@@ -1,0 +1,357 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MapAttributes.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.authz</a> &gt; <span class="el_source">MapAttributes.java</span></div><h1>MapAttributes.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.authz;
+
+import java.util.AbstractCollection;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.wildfly.common.Assert;
+
+/**
+ * A map-backed attributes collection.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public class MapAttributes implements Attributes {
+    // backing map
+
+    private final Map&lt;String, EntriesList&gt; map;
+
+    // cache fields
+
+    private HashMap&lt;String, Entry&gt; entryCache;
+    private Collection&lt;Entry&gt; entries;
+    private Collection&lt;String&gt; values;
+
+    /**
+     * Construct an instance using a hash map for backing store.
+     */
+<span class="fc" id="L52">    public MapAttributes() {</span>
+<span class="fc" id="L53">        this.map = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L54">    }</span>
+
+    /**
+     * Construct a new instance copying mappings from an original map.
+     *
+     * @param original the original map
+     */
+<span class="fc" id="L61">    public MapAttributes(Map&lt;String, ? extends Collection&lt;String&gt;&gt; original) {</span>
+<span class="fc" id="L62">        Assert.checkNotNullParam(&quot;original&quot;, original);</span>
+<span class="fc" id="L63">        Map&lt;String, EntriesList&gt; map = new HashMap&lt;&gt;(original.size());</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        for (Map.Entry&lt;String, ? extends Collection&lt;String&gt;&gt; entry : original.entrySet()) {</span>
+<span class="fc" id="L65">            map.put(entry.getKey(), new EntriesList(entry.getValue()));</span>
+<span class="fc" id="L66">        }</span>
+<span class="fc" id="L67">        this.map = map;</span>
+<span class="fc" id="L68">    }</span>
+
+    /**
+     * Construct a new instance copying mappings from an original attributes collection.
+     *
+     * @param original the original collection
+     */
+<span class="nc" id="L75">    public MapAttributes(Attributes original) {</span>
+<span class="nc" id="L76">        Assert.checkNotNullParam(&quot;original&quot;, original);</span>
+<span class="nc" id="L77">        Map&lt;String, EntriesList&gt; map = new HashMap&lt;&gt;(original.size());</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        for (Entry entry : original.entries()) {</span>
+<span class="nc" id="L79">            final EntriesList entriesList = new EntriesList(entry);</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">            if (! entriesList.isEmpty()) map.put(entry.getKey(), entriesList);</span>
+<span class="nc" id="L81">        }</span>
+<span class="nc" id="L82">        this.map = map;</span>
+<span class="nc" id="L83">    }</span>
+
+    public Set&lt;String&gt; keySet() {
+<span class="nc" id="L86">        return map.keySet();</span>
+    }
+
+    public Collection&lt;String&gt; values() {
+<span class="nc" id="L90">        final Collection&lt;String&gt; values = this.values;</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">        if (values != null) {</span>
+<span class="nc" id="L92">            return values;</span>
+        }
+<span class="nc" id="L94">        return this.values = Attributes.super.values();</span>
+    }
+
+    public Collection&lt;Entry&gt; entries() {
+<span class="fc" id="L98">        final Collection&lt;Entry&gt; entries = this.entries;</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (entries != null) {</span>
+<span class="nc" id="L100">            return entries;</span>
+        }
+<span class="fc" id="L102">        return this.entries = new AbstractCollection&lt;Entry&gt;() {</span>
+            public Iterator&lt;Entry&gt; iterator() {
+<span class="fc" id="L104">                final Iterator&lt;String&gt; iterator = map.keySet().iterator();</span>
+<span class="fc" id="L105">                return new Iterator&lt;Entry&gt;() {</span>
+
+                    public boolean hasNext() {
+<span class="fc" id="L108">                        return iterator.hasNext();</span>
+                    }
+
+                    public Entry next() {
+<span class="fc" id="L112">                        return get(iterator.next());</span>
+                    }
+
+                    public void remove() {
+<span class="nc" id="L116">                        iterator.remove();</span>
+<span class="nc" id="L117">                    }</span>
+                };
+            }
+
+            public int size() {
+<span class="nc" id="L122">                return MapAttributes.this.size();</span>
+            }
+        };
+    }
+
+    public int size(final String key) {
+<span class="fc" id="L128">        final EntriesList list = map.get(key);</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        return list == null ? 0 : list.size();</span>
+    }
+
+    public boolean remove(final String key) {
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        return map.remove(key) != null;</span>
+    }
+
+    public void add(final String key, final int idx, final String value) {
+<span class="fc" id="L137">        EntriesList list = map.get(key);</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (list == null) {</span>
+<span class="fc" id="L139">            map.put(key, list = new EntriesList());</span>
+        }
+<span class="fc" id="L141">        list.add(idx, value);</span>
+<span class="fc" id="L142">    }</span>
+
+    public String get(final String key, final int idx) {
+<span class="fc" id="L145">        EntriesList list = map.get(key);</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        return list == null ? null : list.get(idx);</span>
+    }
+
+    public String set(final String key, final int idx, final String value) {
+<span class="nc" id="L150">        EntriesList list = map.get(key);</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (list == null) {</span>
+<span class="nc" id="L152">            throw new IndexOutOfBoundsException();</span>
+        }
+<span class="nc" id="L154">        return list.set(idx, value);</span>
+    }
+
+    public String remove(final String key, final int idx) {
+<span class="nc" id="L158">        EntriesList list = map.get(key);</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">        if (list == null) {</span>
+<span class="nc" id="L160">            throw new IndexOutOfBoundsException();</span>
+        }
+<span class="nc" id="L162">        final String result = list.remove(idx);</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        if (list.isEmpty()) {</span>
+<span class="nc" id="L164">            map.remove(key);</span>
+        }
+<span class="nc" id="L166">        return result;</span>
+    }
+
+    public List&lt;String&gt; copyAndRemove(final String key) {
+<span class="nc" id="L170">        final EntriesList old = map.remove(key);</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">        return old == null ? new ArrayList&lt;&gt;(0) : old;</span>
+    }
+
+    public List&lt;String&gt; copyAndReplace(final String key, final Collection&lt;String&gt; values) {
+<span class="nc" id="L175">        final EntriesList old = map.replace(key, new EntriesList(values));</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        return old == null ? new ArrayList&lt;&gt;(0) : old;</span>
+    }
+
+    public boolean containsKey(final String key) {
+<span class="fc" id="L180">        return map.containsKey(key);</span>
+    }
+
+    public boolean containsValue(final String key, final String value) {
+<span class="fc" id="L184">        final EntriesList list = map.get(key);</span>
+<span class="pc bpc" id="L185" title="2 of 4 branches missed.">        return list != null &amp;&amp; list.contains(value);</span>
+    }
+
+    public void removeRange(final String key, final int from, final int to) {
+<span class="nc" id="L189">        final EntriesList list = map.get(key);</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">        if (list == null) {</span>
+<span class="nc" id="L191">            throw new IndexOutOfBoundsException();</span>
+        }
+<span class="nc" id="L193">        list.removeRange(from, to);</span>
+<span class="nc" id="L194">    }</span>
+
+    public int indexOf(final String key, final String value) {
+<span class="nc" id="L197">        EntriesList list = map.get(key);</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">        return list == null ? -1 : list.indexOf(value);</span>
+    }
+
+    public int lastIndexOf(final String key, final String value) {
+<span class="nc" id="L202">        EntriesList list = map.get(key);</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">        return list == null ? -1 : list.lastIndexOf(value);</span>
+    }
+
+    public boolean set(final String key, final int idx, final String expect, final String update) {
+<span class="nc" id="L207">        EntriesList list = map.get(key);</span>
+<span class="nc bnc" id="L208" title="All 4 branches missed.">        if (list == null || !list.get(idx).equals(expect)) {</span>
+<span class="nc" id="L209">            return false;</span>
+        }
+<span class="nc" id="L211">        list.set(idx, update);</span>
+<span class="nc" id="L212">        return true;</span>
+    }
+
+    public String getFirst(final String key) {
+<span class="fc" id="L216">        EntriesList list = map.get(key);</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        return list == null ? null : list.get(0);</span>
+    }
+
+    public String getLast(final String key) {
+<span class="nc" id="L221">        EntriesList list = map.get(key);</span>
+<span class="nc bnc" id="L222" title="All 2 branches missed.">        return list == null ? null : list.get(list.size() - 1);</span>
+    }
+
+    public void addFirst(final String key, final String value) {
+<span class="fc" id="L226">        EntriesList list = map.get(key);</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (list == null) {</span>
+<span class="fc" id="L228">            map.put(key, list = new EntriesList());</span>
+        }
+<span class="fc" id="L230">        list.add(0, value);</span>
+<span class="fc" id="L231">    }</span>
+
+    public void addLast(final String key, final String value) {
+<span class="fc" id="L234">        EntriesList list = map.get(key);</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">        if (list == null) {</span>
+<span class="fc" id="L236">            map.put(key, list = new EntriesList());</span>
+        }
+<span class="fc" id="L238">        list.add(value);</span>
+<span class="fc" id="L239">    }</span>
+
+    public boolean removeFirst(final String key, final String value) {
+<span class="nc" id="L242">        EntriesList list = map.get(key);</span>
+<span class="nc bnc" id="L243" title="All 2 branches missed.">        if (list == null) {</span>
+<span class="nc" id="L244">            return false;</span>
+        }
+<span class="nc" id="L246">        int idx = list.indexOf(value);</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">        if (idx == -1) {</span>
+<span class="nc" id="L248">            return false;</span>
+        }
+<span class="nc" id="L250">        list.remove(idx);</span>
+<span class="nc bnc" id="L251" title="All 2 branches missed.">        if (list.isEmpty()) {</span>
+<span class="nc" id="L252">            map.remove(key);</span>
+        }
+<span class="nc" id="L254">        return true;</span>
+    }
+
+    public boolean removeLast(final String key, final String value) {
+<span class="nc" id="L258">        EntriesList list = map.get(key);</span>
+<span class="nc bnc" id="L259" title="All 2 branches missed.">        if (list == null) {</span>
+<span class="nc" id="L260">            return false;</span>
+        }
+<span class="nc" id="L262">        int idx = list.lastIndexOf(value);</span>
+<span class="nc bnc" id="L263" title="All 2 branches missed.">        if (idx == -1) {</span>
+<span class="nc" id="L264">            return false;</span>
+        }
+<span class="nc" id="L266">        list.remove(idx);</span>
+<span class="nc bnc" id="L267" title="All 2 branches missed.">        if (list.isEmpty()) {</span>
+<span class="nc" id="L268">            map.remove(key);</span>
+        }
+<span class="nc" id="L270">        return true;</span>
+    }
+
+    public String removeFirst(final String key) {
+<span class="nc" id="L274">        EntriesList list = map.get(key);</span>
+<span class="nc bnc" id="L275" title="All 2 branches missed.">        if (list == null) {</span>
+<span class="nc" id="L276">            return null;</span>
+        }
+<span class="nc" id="L278">        final String removed = list.remove(0);</span>
+<span class="nc bnc" id="L279" title="All 2 branches missed.">        if (list.isEmpty()) {</span>
+<span class="nc" id="L280">            map.remove(key);</span>
+        }
+<span class="nc" id="L282">        return removed;</span>
+    }
+
+    public String removeLast(final String key) {
+<span class="nc" id="L286">        EntriesList list = map.get(key);</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">        if (list == null) {</span>
+<span class="nc" id="L288">            return null;</span>
+        }
+<span class="nc" id="L290">        final String removed = list.remove(list.size() - 1);</span>
+<span class="nc bnc" id="L291" title="All 2 branches missed.">        if (list.isEmpty()) {</span>
+<span class="nc" id="L292">            map.remove(key);</span>
+        }
+<span class="nc" id="L294">        return removed;</span>
+    }
+
+    public boolean remove(final String key, final int idx, final String value) {
+<span class="nc" id="L298">        EntriesList list = map.get(key);</span>
+<span class="nc bnc" id="L299" title="All 2 branches missed.">        if (list == null) {</span>
+<span class="nc" id="L300">            return false;</span>
+        }
+<span class="nc bnc" id="L302" title="All 2 branches missed.">        if (! list.get(idx).equals(value)) {</span>
+<span class="nc" id="L303">            return false;</span>
+        }
+<span class="nc" id="L305">        list.remove(idx);</span>
+<span class="nc bnc" id="L306" title="All 2 branches missed.">        if (list.isEmpty()) {</span>
+<span class="nc" id="L307">            map.remove(key);</span>
+        }
+<span class="nc" id="L309">        return true;</span>
+    }
+
+    public boolean removeAll(final String key, final String value) {
+<span class="nc" id="L313">        EntriesList list = map.get(key);</span>
+<span class="nc bnc" id="L314" title="All 4 branches missed.">        return list != null &amp;&amp; list.removeAll(Collections.singleton(value));</span>
+    }
+
+    public Entry get(final String key) {
+<span class="fc" id="L318">        HashMap&lt;String, Entry&gt; entryCache = this.entryCache;</span>
+<span class="fc bfc" id="L319" title="All 2 branches covered.">        if (entryCache == null) {</span>
+<span class="fc" id="L320">            entryCache = this.entryCache = new HashMap&lt;&gt;();</span>
+        }
+<span class="fc" id="L322">        return entryCache.computeIfAbsent(key, s -&gt; new SimpleAttributesEntry(this, s));</span>
+    }
+
+    public int size() {
+<span class="fc" id="L326">        return map.size();</span>
+    }
+
+    public boolean isEmpty() {
+<span class="fc" id="L330">        return map.isEmpty();</span>
+    }
+
+    public void clear() {
+<span class="nc" id="L334">        map.clear();</span>
+<span class="nc" id="L335">    }</span>
+
+    static final class EntriesList extends ArrayList&lt;String&gt; implements Set&lt;String&gt; {
+
+        private static final long serialVersionUID = 8113580421577650775L;
+
+        EntriesList(final int initialCapacity) {
+<span class="nc" id="L342">            super(initialCapacity);</span>
+<span class="nc" id="L343">        }</span>
+
+<span class="fc" id="L345">        EntriesList() {</span>
+<span class="fc" id="L346">        }</span>
+
+        EntriesList(final Collection&lt;? extends String&gt; c) {
+<span class="fc" id="L349">            super(c);</span>
+<span class="fc" id="L350">        }</span>
+
+        public void removeRange(final int fromIndex, final int toIndex) {
+<span class="nc" id="L353">            super.removeRange(fromIndex, toIndex);</span>
+<span class="nc" id="L354">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

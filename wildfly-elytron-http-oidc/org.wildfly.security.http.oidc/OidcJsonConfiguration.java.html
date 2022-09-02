@@ -1,0 +1,516 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OidcJsonConfiguration.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-oidc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.oidc</a> &gt; <span class="el_source">OidcJsonConfiguration.java</span></div><h1>OidcJsonConfiguration.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2020 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.http.oidc;
+
+import static org.wildfly.security.http.oidc.Oidc.DEFAULT_TOKEN_SIGNATURE_ALGORITHM;
+
+import java.util.Map;
+import java.util.TreeMap;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+
+/**
+ * Configuration for Java based adapters
+ *
+ * @author &lt;a href=&quot;mailto:bill@burkecentral.com&quot;&gt;Bill Burke&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:brad.culley@spartasystems.com&quot;&gt;Brad Culley&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:john.ament@spartasystems.com&quot;&gt;John D. Ament&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+@JsonPropertyOrder({&quot;realm&quot;, &quot;realm-public-key&quot;, &quot;auth-server-url&quot;, &quot;ssl-required&quot;,
+        &quot;resource&quot;, &quot;public-client&quot;, &quot;credentials&quot;,
+        &quot;use-resource-role-mappings&quot;, &quot;use-realm-role-mappings&quot;,
+        &quot;enable-cors&quot;, &quot;cors-max-age&quot;, &quot;cors-allowed-methods&quot;, &quot;cors-exposed-headers&quot;,
+        &quot;expose-token&quot;, &quot;bearer-only&quot;, &quot;autodetect-bearer-only&quot;,
+        &quot;connection-pool-size&quot;,
+        &quot;allow-any-hostname&quot;, &quot;disable-trust-manager&quot;, &quot;truststore&quot;, &quot;truststore-password&quot;,
+        &quot;client-keystore&quot;, &quot;client-keystore-password&quot;, &quot;client-key-password&quot;,
+        &quot;always-refresh-token&quot;,
+        &quot;register-node-at-startup&quot;, &quot;register-node-period&quot;, &quot;token-store&quot;, &quot;adapter-state-cookie-path&quot;, &quot;principal-attribute&quot;,
+        &quot;proxy-url&quot;, &quot;turn-off-change-session-id-on-login&quot;, &quot;token-minimum-time-to-live&quot;,
+        &quot;min-time-between-jwks-requests&quot;, &quot;public-key-cache-ttl&quot;,
+        &quot;ignore-oauth-query-parameter&quot;, &quot;verify-token-audience&quot;, &quot;token-signature-algorithm&quot;
+})
+<span class="nc" id="L51">public class OidcJsonConfiguration {</span>
+
+    @JsonProperty(&quot;allow-any-hostname&quot;)
+    protected boolean allowAnyHostname;
+    @JsonProperty(&quot;disable-trust-manager&quot;)
+    protected boolean disableTrustManager;
+    @JsonProperty(&quot;truststore&quot;)
+    protected String truststore;
+    @JsonProperty(&quot;truststore-password&quot;)
+    protected String truststorePassword;
+    @JsonProperty(&quot;client-keystore&quot;)
+    protected String clientKeystore;
+    @JsonProperty(&quot;client-keystore-password&quot;)
+    protected String clientKeystorePassword;
+    @JsonProperty(&quot;client-key-password&quot;)
+    protected String clientKeyPassword;
+<span class="nc" id="L67">    @JsonProperty(&quot;connection-pool-size&quot;)</span>
+    protected int connectionPoolSize = 20;
+<span class="nc" id="L69">    @JsonProperty(&quot;always-refresh-token&quot;)</span>
+    protected boolean alwaysRefreshToken = false;
+<span class="nc" id="L71">    @JsonProperty(&quot;register-node-at-startup&quot;)</span>
+    protected boolean registerNodeAtStartup = false;
+<span class="nc" id="L73">    @JsonProperty(&quot;register-node-period&quot;)</span>
+    protected int registerNodePeriod = -1;
+    @JsonProperty(&quot;token-store&quot;)
+    protected String tokenStore;
+    @JsonProperty(&quot;adapter-state-cookie-path&quot;)
+    protected String tokenCookiePath;
+    @JsonProperty(&quot;principal-attribute&quot;)
+    protected String principalAttribute;
+    @JsonProperty(&quot;turn-off-change-session-id-on-login&quot;)
+    protected Boolean turnOffChangeSessionIdOnLogin;
+<span class="nc" id="L83">    @JsonProperty(&quot;token-minimum-time-to-live&quot;)</span>
+    protected int tokenMinimumTimeToLive = 0;
+<span class="nc" id="L85">    @JsonProperty(&quot;min-time-between-jwks-requests&quot;)</span>
+    protected int minTimeBetweenJwksRequests = 10;
+<span class="nc" id="L87">    @JsonProperty(&quot;public-key-cache-ttl&quot;)</span>
+    protected int publicKeyCacheTtl = 86400; // 1 day
+    // https://tools.ietf.org/html/rfc7636
+<span class="nc" id="L90">    @JsonProperty(&quot;enable-pkce&quot;)</span>
+    protected boolean pkce = false;
+<span class="nc" id="L92">    @JsonProperty(&quot;ignore-oauth-query-parameter&quot;)</span>
+    protected boolean ignoreOAuthQueryParameter = false;
+<span class="nc" id="L94">    @JsonProperty(&quot;verify-token-audience&quot;)</span>
+    protected boolean verifyTokenAudience = false;
+    @JsonProperty(&quot;confidential-port&quot;)
+    protected int confidentialPort;
+    @JsonProperty(&quot;resource&quot;)
+    protected String resource;
+    @JsonProperty(&quot;use-resource-role-mappings&quot;)
+    protected boolean useResourceRoleMappings;
+<span class="nc" id="L102">    @JsonProperty(&quot;use-realm-role-mappings&quot;)</span>
+    protected boolean useRealmRoleMappings = true;
+    @JsonProperty(&quot;enable-cors&quot;)
+    protected boolean cors;
+<span class="nc" id="L106">    @JsonProperty(&quot;cors-max-age&quot;)</span>
+    protected int corsMaxAge = -1;
+    @JsonProperty(&quot;cors-allowed-headers&quot;)
+    protected String corsAllowedHeaders;
+    @JsonProperty(&quot;cors-allowed-methods&quot;)
+    protected String corsAllowedMethods;
+    @JsonProperty(&quot;cors-exposed-headers&quot;)
+    protected String corsExposedHeaders;
+    @JsonProperty(&quot;expose-token&quot;)
+    protected boolean exposeToken;
+    @JsonProperty(&quot;bearer-only&quot;)
+    protected boolean bearerOnly;
+    @JsonProperty(&quot;autodetect-bearer-only&quot;)
+    protected boolean autodetectBearerOnly;
+    @JsonProperty(&quot;enable-basic-auth&quot;)
+    protected boolean enableBasicAuth;
+    @JsonProperty(&quot;public-client&quot;)
+    protected boolean publicClient;
+<span class="nc" id="L124">    @JsonProperty(&quot;credentials&quot;)</span>
+    protected Map&lt;String, Object&gt; credentials = new TreeMap&lt;&gt;(String.CASE_INSENSITIVE_ORDER);
+    @JsonProperty(&quot;redirect-rewrite-rules&quot;)
+    protected Map&lt;String, String&gt; redirectRewriteRules;
+    @JsonProperty(&quot;realm&quot;)
+    protected String realm;
+    @JsonProperty(&quot;realm-public-key&quot;)
+    protected String realmKey;
+    @JsonProperty(&quot;auth-server-url&quot;)
+    protected String authServerUrl;
+    @JsonProperty(&quot;ssl-required&quot;)
+    protected String sslRequired;
+    @JsonProperty(&quot;provider-url&quot;)
+    protected String providerUrl;
+    @JsonProperty(&quot;client-id&quot;)
+    protected String clientId;
+<span class="nc" id="L140">    @JsonProperty(&quot;token-signature-algorithm&quot;)</span>
+    protected String tokenSignatureAlgorithm = DEFAULT_TOKEN_SIGNATURE_ALGORITHM;
+
+    /**
+     * The Proxy url to use for requests to the auth-server, configurable via the adapter config property {@code proxy-url}.
+     */
+    @JsonProperty(&quot;proxy-url&quot;)
+    protected String proxyUrl;
+
+    public boolean isAllowAnyHostname() {
+<span class="nc" id="L150">        return allowAnyHostname;</span>
+    }
+
+    public void setAllowAnyHostname(boolean allowAnyHostname) {
+<span class="nc" id="L154">        this.allowAnyHostname = allowAnyHostname;</span>
+<span class="nc" id="L155">    }</span>
+
+    public boolean isDisableTrustManager() {
+<span class="nc" id="L158">        return disableTrustManager;</span>
+    }
+
+    public void setDisableTrustManager(boolean disableTrustManager) {
+<span class="nc" id="L162">        this.disableTrustManager = disableTrustManager;</span>
+<span class="nc" id="L163">    }</span>
+
+    public String getTruststore() {
+<span class="nc" id="L166">        return truststore;</span>
+    }
+
+    public void setTruststore(String truststore) {
+<span class="nc" id="L170">        this.truststore = truststore;</span>
+<span class="nc" id="L171">    }</span>
+
+    public String getTruststorePassword() {
+<span class="nc" id="L174">        return truststorePassword;</span>
+    }
+
+    public void setTruststorePassword(String truststorePassword) {
+<span class="nc" id="L178">        this.truststorePassword = truststorePassword;</span>
+<span class="nc" id="L179">    }</span>
+
+    public String getClientKeystore() {
+<span class="nc" id="L182">        return clientKeystore;</span>
+    }
+
+    public void setClientKeystore(String clientKeystore) {
+<span class="nc" id="L186">        this.clientKeystore = clientKeystore;</span>
+<span class="nc" id="L187">    }</span>
+
+    public String getClientKeystorePassword() {
+<span class="nc" id="L190">        return clientKeystorePassword;</span>
+    }
+
+    public void setClientKeystorePassword(String clientKeystorePassword) {
+<span class="nc" id="L194">        this.clientKeystorePassword = clientKeystorePassword;</span>
+<span class="nc" id="L195">    }</span>
+
+    public String getClientKeyPassword() {
+<span class="nc" id="L198">        return clientKeyPassword;</span>
+    }
+
+    public void setClientKeyPassword(String clientKeyPassword) {
+<span class="nc" id="L202">        this.clientKeyPassword = clientKeyPassword;</span>
+<span class="nc" id="L203">    }</span>
+
+    public int getConnectionPoolSize() {
+<span class="nc" id="L206">        return connectionPoolSize;</span>
+    }
+
+    public void setConnectionPoolSize(int connectionPoolSize) {
+<span class="nc" id="L210">        this.connectionPoolSize = connectionPoolSize;</span>
+<span class="nc" id="L211">    }</span>
+
+    public boolean isAlwaysRefreshToken() {
+<span class="nc" id="L214">        return alwaysRefreshToken;</span>
+    }
+
+    public void setAlwaysRefreshToken(boolean alwaysRefreshToken) {
+<span class="nc" id="L218">        this.alwaysRefreshToken = alwaysRefreshToken;</span>
+<span class="nc" id="L219">    }</span>
+
+    public boolean isRegisterNodeAtStartup() {
+<span class="nc" id="L222">        return registerNodeAtStartup;</span>
+    }
+
+    public void setRegisterNodeAtStartup(boolean registerNodeAtStartup) {
+<span class="nc" id="L226">        this.registerNodeAtStartup = registerNodeAtStartup;</span>
+<span class="nc" id="L227">    }</span>
+
+    public int getRegisterNodePeriod() {
+<span class="nc" id="L230">        return registerNodePeriod;</span>
+    }
+
+    public void setRegisterNodePeriod(int registerNodePeriod) {
+<span class="nc" id="L234">        this.registerNodePeriod = registerNodePeriod;</span>
+<span class="nc" id="L235">    }</span>
+
+    public String getTokenStore() {
+<span class="nc" id="L238">        return tokenStore;</span>
+    }
+
+    public void setTokenStore(String tokenStore) {
+<span class="nc" id="L242">        this.tokenStore = tokenStore;</span>
+<span class="nc" id="L243">    }</span>
+
+    public String getTokenCookiePath() {
+<span class="nc" id="L246">        return tokenCookiePath;</span>
+    }
+
+    public void setTokenCookiePath(String tokenCookiePath) {
+<span class="nc" id="L250">        this.tokenCookiePath = tokenCookiePath;</span>
+<span class="nc" id="L251">    }</span>
+
+    public String getPrincipalAttribute() {
+<span class="nc" id="L254">        return principalAttribute;</span>
+    }
+
+    public void setPrincipalAttribute(String principalAttribute) {
+<span class="nc" id="L258">        this.principalAttribute = principalAttribute;</span>
+<span class="nc" id="L259">    }</span>
+
+    public Boolean getTurnOffChangeSessionIdOnLogin() {
+<span class="nc" id="L262">        return turnOffChangeSessionIdOnLogin;</span>
+    }
+
+    public void setTurnOffChangeSessionIdOnLogin(Boolean turnOffChangeSessionIdOnLogin) {
+<span class="nc" id="L266">        this.turnOffChangeSessionIdOnLogin = turnOffChangeSessionIdOnLogin;</span>
+<span class="nc" id="L267">    }</span>
+
+    public String getProxyUrl() {
+<span class="nc" id="L270">        return proxyUrl;</span>
+    }
+
+    public void setProxyUrl(String proxyUrl) {
+<span class="nc" id="L274">        this.proxyUrl = proxyUrl;</span>
+<span class="nc" id="L275">    }</span>
+
+    public int getTokenMinimumTimeToLive() {
+<span class="nc" id="L278">        return tokenMinimumTimeToLive;</span>
+    }
+
+    public void setTokenMinimumTimeToLive(final int tokenMinimumTimeToLive) {
+<span class="nc" id="L282">        this.tokenMinimumTimeToLive = tokenMinimumTimeToLive;</span>
+<span class="nc" id="L283">    }</span>
+
+    public int getMinTimeBetweenJwksRequests() {
+<span class="nc" id="L286">        return minTimeBetweenJwksRequests;</span>
+    }
+
+    public void setMinTimeBetweenJwksRequests(int minTimeBetweenJwksRequests) {
+<span class="nc" id="L290">        this.minTimeBetweenJwksRequests = minTimeBetweenJwksRequests;</span>
+<span class="nc" id="L291">    }</span>
+
+    public int getPublicKeyCacheTtl() {
+<span class="nc" id="L294">        return publicKeyCacheTtl;</span>
+    }
+
+    public void setPublicKeyCacheTtl(int publicKeyCacheTtl) {
+<span class="nc" id="L298">        this.publicKeyCacheTtl = publicKeyCacheTtl;</span>
+<span class="nc" id="L299">    }</span>
+
+    // https://tools.ietf.org/html/rfc7636
+    public boolean isPkce() {
+<span class="nc" id="L303">        return pkce;</span>
+    }
+
+    public void setPkce(boolean pkce) {
+<span class="nc" id="L307">        this.pkce = pkce;</span>
+<span class="nc" id="L308">    }</span>
+
+    public boolean isIgnoreOAuthQueryParameter() {
+<span class="nc" id="L311">        return ignoreOAuthQueryParameter;</span>
+    }
+
+    public void setIgnoreOAuthQueryParameter(boolean ignoreOAuthQueryParameter) {
+<span class="nc" id="L315">        this.ignoreOAuthQueryParameter = ignoreOAuthQueryParameter;</span>
+<span class="nc" id="L316">    }</span>
+
+    public boolean isVerifyTokenAudience() {
+<span class="nc" id="L319">        return verifyTokenAudience;</span>
+    }
+
+    public void setVerifyTokenAudience(boolean verifyTokenAudience) {
+<span class="nc" id="L323">        this.verifyTokenAudience = verifyTokenAudience;</span>
+<span class="nc" id="L324">    }</span>
+
+    public String getSslRequired() {
+<span class="nc" id="L327">        return sslRequired;</span>
+    }
+
+    public void setSslRequired(String sslRequired) {
+<span class="nc" id="L331">        this.sslRequired = sslRequired;</span>
+<span class="nc" id="L332">    }</span>
+
+    public String getRealm() {
+<span class="nc" id="L335">        return realm;</span>
+    }
+
+    public void setRealm(String realm) {
+<span class="nc" id="L339">        this.realm = realm;</span>
+<span class="nc" id="L340">    }</span>
+
+    public String getRealmKey() {
+<span class="nc" id="L343">        return realmKey;</span>
+    }
+
+    public void setRealmKey(String realmKey) {
+<span class="nc" id="L347">        this.realmKey = realmKey;</span>
+<span class="nc" id="L348">    }</span>
+
+    public String getAuthServerUrl() {
+<span class="nc" id="L351">        return authServerUrl;</span>
+    }
+
+    public void setAuthServerUrl(String authServerUrl) {
+<span class="nc" id="L355">        this.authServerUrl = authServerUrl;</span>
+<span class="nc" id="L356">    }</span>
+
+    public String getProviderUrl() {
+<span class="nc" id="L359">        return providerUrl;</span>
+    }
+
+    public void setProviderUrl(String providerUrl) {
+<span class="nc" id="L363">        this.providerUrl = providerUrl;</span>
+<span class="nc" id="L364">    }</span>
+
+    public int getConfidentialPort() {
+<span class="nc" id="L367">        return confidentialPort;</span>
+    }
+
+    public void setConfidentialPort(int confidentialPort) {
+<span class="nc" id="L371">        this.confidentialPort = confidentialPort;</span>
+<span class="nc" id="L372">    }</span>
+
+    public String getResource() {
+<span class="nc" id="L375">        return resource;</span>
+    }
+
+    public void setResource(String resource) {
+<span class="nc" id="L379">        this.resource = resource;</span>
+<span class="nc" id="L380">    }</span>
+
+    public String getClientId() {
+<span class="nc" id="L383">        return clientId;</span>
+    }
+
+    public void setClientId(String clientId) {
+<span class="nc" id="L387">        this.clientId = clientId;</span>
+<span class="nc" id="L388">    }</span>
+
+    public String getResourceName() {
+<span class="nc bnc" id="L391" title="All 2 branches missed.">        return resource != null ? resource : clientId;</span>
+    }
+
+    public boolean isUseResourceRoleMappings() {
+<span class="nc" id="L395">        return useResourceRoleMappings;</span>
+    }
+
+    public void setUseResourceRoleMappings(boolean useResourceRoleMappings) {
+<span class="nc" id="L399">        this.useResourceRoleMappings = useResourceRoleMappings;</span>
+<span class="nc" id="L400">    }</span>
+
+    public boolean isUseRealmRoleMappings() {
+<span class="nc" id="L403">        return useRealmRoleMappings;</span>
+    }
+
+    public void setUseRealmRoleMappings(boolean useRealmRoleMappings) {
+<span class="nc" id="L407">        this.useRealmRoleMappings = useRealmRoleMappings;</span>
+<span class="nc" id="L408">    }</span>
+
+    public boolean isCors() {
+<span class="nc" id="L411">        return cors;</span>
+    }
+
+    public void setCors(boolean cors) {
+<span class="nc" id="L415">        this.cors = cors;</span>
+<span class="nc" id="L416">    }</span>
+
+    public int getCorsMaxAge() {
+<span class="nc" id="L419">        return corsMaxAge;</span>
+    }
+
+    public void setCorsMaxAge(int corsMaxAge) {
+<span class="nc" id="L423">        this.corsMaxAge = corsMaxAge;</span>
+<span class="nc" id="L424">    }</span>
+
+    public String getCorsAllowedHeaders() {
+<span class="nc" id="L427">        return corsAllowedHeaders;</span>
+    }
+
+    public void setCorsAllowedHeaders(String corsAllowedHeaders) {
+<span class="nc" id="L431">        this.corsAllowedHeaders = corsAllowedHeaders;</span>
+<span class="nc" id="L432">    }</span>
+
+    public String getCorsAllowedMethods() {
+<span class="nc" id="L435">        return corsAllowedMethods;</span>
+    }
+
+    public void setCorsAllowedMethods(String corsAllowedMethods) {
+<span class="nc" id="L439">        this.corsAllowedMethods = corsAllowedMethods;</span>
+<span class="nc" id="L440">    }</span>
+
+    public String getCorsExposedHeaders() {
+<span class="nc" id="L443">        return corsExposedHeaders;</span>
+    }
+
+    public void setCorsExposedHeaders(String corsExposedHeaders) {
+<span class="nc" id="L447">        this.corsExposedHeaders = corsExposedHeaders;</span>
+<span class="nc" id="L448">    }</span>
+
+    public boolean isExposeToken() {
+<span class="nc" id="L451">        return exposeToken;</span>
+    }
+
+    public void setExposeToken(boolean exposeToken) {
+<span class="nc" id="L455">        this.exposeToken = exposeToken;</span>
+<span class="nc" id="L456">    }</span>
+
+    public boolean isBearerOnly() {
+<span class="nc" id="L459">        return bearerOnly;</span>
+    }
+
+    public void setBearerOnly(boolean bearerOnly) {
+<span class="nc" id="L463">        this.bearerOnly = bearerOnly;</span>
+<span class="nc" id="L464">    }</span>
+
+    public boolean isAutodetectBearerOnly() {
+<span class="nc" id="L467">        return autodetectBearerOnly;</span>
+    }
+
+    public void setAutodetectBearerOnly(boolean autodetectBearerOnly) {
+<span class="nc" id="L471">        this.autodetectBearerOnly = autodetectBearerOnly;</span>
+<span class="nc" id="L472">    }</span>
+
+    public boolean isEnableBasicAuth() {
+<span class="nc" id="L475">        return enableBasicAuth;</span>
+    }
+
+    public void setEnableBasicAuth(boolean enableBasicAuth) {
+<span class="nc" id="L479">        this.enableBasicAuth = enableBasicAuth;</span>
+<span class="nc" id="L480">    }</span>
+
+    public Map&lt;String, Object&gt; getCredentials() {
+<span class="nc" id="L483">        return credentials;</span>
+    }
+
+    public void setCredentials(Map&lt;String, Object&gt; credentials) {
+<span class="nc" id="L487">        this.credentials = credentials;</span>
+<span class="nc" id="L488">    }</span>
+
+    public boolean isPublicClient() {
+<span class="nc" id="L491">        return publicClient;</span>
+    }
+
+    public void setPublicClient(boolean publicClient) {
+<span class="nc" id="L495">        this.publicClient = publicClient;</span>
+<span class="nc" id="L496">    }</span>
+
+    public Map&lt;String, String&gt; getRedirectRewriteRules() {
+<span class="nc" id="L499">        return redirectRewriteRules;</span>
+    }
+
+    public void setRedirectRewriteRules(Map&lt;String, String&gt; redirectRewriteRules) {
+<span class="nc" id="L503">        this.redirectRewriteRules = redirectRewriteRules;</span>
+<span class="nc" id="L504">    }</span>
+
+    public String getTokenSignatureAlgorithm() {
+<span class="nc" id="L507">        return tokenSignatureAlgorithm;</span>
+    }
+
+    public void setTokenSignatureAlgorithm(String tokenSignatureAlgorithm) {
+<span class="nc" id="L511">        this.tokenSignatureAlgorithm = tokenSignatureAlgorithm;</span>
+<span class="nc" id="L512">    }</span>
+
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

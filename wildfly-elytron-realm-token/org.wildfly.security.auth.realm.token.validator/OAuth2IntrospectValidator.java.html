@@ -1,0 +1,322 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OAuth2IntrospectValidator.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-realm-token</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.realm.token.validator</a> &gt; <span class="el_source">OAuth2IntrospectValidator.java</span></div><h1>OAuth2IntrospectValidator.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.realm.token.validator;
+
+import org.wildfly.common.Assert;
+import org.wildfly.common.bytes.ByteStringBuilder;
+import org.wildfly.common.iteration.CodePointIterator;
+import org.wildfly.security.auth.realm.token.TokenValidator;
+import org.wildfly.security.auth.server.RealmUnavailableException;
+import org.wildfly.security.authz.Attributes;
+import org.wildfly.security.evidence.BearerTokenEvidence;
+
+import javax.json.Json;
+import javax.json.JsonObject;
+import javax.json.JsonReader;
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import java.io.BufferedInputStream;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.wildfly.security.auth.realm.token._private.ElytronMessages.log;
+import static org.wildfly.security.json.util.JsonUtil.toAttributes;
+
+
+/**
+ * A RFC-7662 (OAuth2 Token Introspection) compliant {@link TokenValidator}.
+ *
+ * @author &lt;a href=&quot;mailto:psilva@redhat.com&quot;&gt;Pedro Igor&lt;/a&gt;
+ */
+public class OAuth2IntrospectValidator implements TokenValidator {
+
+    /**
+     * Returns a {@link Builder} instance that can be used to configure and create a {@link OAuth2IntrospectValidator}.
+     *
+     * @return the {@link Builder}
+     */
+    public static Builder builder() {
+<span class="fc" id="L65">        return new Builder();</span>
+    }
+
+    private final URL tokenIntrospectionUrl;
+    private final String clientId;
+    private final String clientSecret;
+    private final SSLContext sslContext;
+    private final HostnameVerifier hostnameVerifier;
+    private final int connectionTimeout;
+    private final int readTimeout;
+
+<span class="fc" id="L76">    OAuth2IntrospectValidator(Builder configuration) {</span>
+<span class="fc" id="L77">        this.tokenIntrospectionUrl = Assert.checkNotNullParam(&quot;tokenIntrospectionUrl&quot;, configuration.tokenIntrospectionUrl);</span>
+<span class="fc" id="L78">        this.clientId = Assert.checkNotNullParam(&quot;clientId&quot;, configuration.clientId);</span>
+<span class="fc" id="L79">        this.clientSecret = Assert.checkNotNullParam(&quot;clientSecret&quot;, configuration.clientSecret);</span>
+
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        if (tokenIntrospectionUrl.getProtocol().equalsIgnoreCase(&quot;https&quot;)) {</span>
+<span class="nc" id="L82">            Assert.checkNotNullParam(&quot;sslContext&quot;, configuration.sslContext);</span>
+        }
+
+<span class="fc" id="L85">        this.sslContext = configuration.sslContext;</span>
+<span class="fc" id="L86">        this.hostnameVerifier = configuration.hostnameVerifier;</span>
+<span class="fc" id="L87">        this.connectionTimeout = configuration.connectionTimeout;</span>
+<span class="fc" id="L88">        this.readTimeout = configuration.readTimeout;</span>
+<span class="fc" id="L89">    }</span>
+
+    @Override
+    public Attributes validate(BearerTokenEvidence evidence) throws RealmUnavailableException {
+<span class="fc" id="L93">        Assert.checkNotNullParam(&quot;evidence&quot;, evidence);</span>
+
+        try {
+<span class="fc" id="L96">            JsonObject claims = introspectAccessToken(this.tokenIntrospectionUrl,</span>
+<span class="fc" id="L97">                    this.clientId, this.clientSecret, evidence.getToken(), this.sslContext, this.hostnameVerifier);</span>
+
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            if (isValidToken(claims)) {</span>
+<span class="fc" id="L100">                return toAttributes(claims);</span>
+            }
+<span class="fc" id="L102">        } catch (Exception e) {</span>
+<span class="fc" id="L103">            throw log.tokenRealmOAuth2TokenIntrospectionFailed(e);</span>
+<span class="fc" id="L104">        }</span>
+
+<span class="fc" id="L106">        return null;</span>
+    }
+
+    private boolean isValidToken(JsonObject claims) {
+<span class="pc bpc" id="L110" title="1 of 4 branches missed.">        return claims != null &amp;&amp; claims.getBoolean(&quot;active&quot;, false);</span>
+    }
+
+    /**
+     * Introspects an OAuth2 Access Token using a RFC-7662 compatible endpoint.
+     *
+     * @param tokenIntrospectionUrl an {@link URL} pointing to a RFC-7662 compatible endpoint
+     * @param clientId the identifier of a client within the OAUth2 Authorization Server
+     * @param clientSecret the secret of the client
+     * @param token the access token to introspect
+     * @param sslContext the ssl context
+     * @param hostnameVerifier the hostname verifier
+     * @return a @{JsonObject} representing the response from the introspection endpoint or null if
+     */
+    private JsonObject introspectAccessToken(URL tokenIntrospectionUrl, String clientId, String clientSecret, String token, SSLContext sslContext, HostnameVerifier hostnameVerifier) throws RealmUnavailableException {
+<span class="nc" id="L125">        Assert.checkNotNullParam(&quot;clientId&quot;, clientId);</span>
+<span class="nc" id="L126">        Assert.checkNotNullParam(&quot;clientSecret&quot;, clientSecret);</span>
+<span class="nc" id="L127">        Assert.checkNotNullParam(&quot;token&quot;, token);</span>
+
+<span class="nc" id="L129">        HttpURLConnection connection = null;</span>
+
+        try {
+<span class="nc" id="L132">            connection = openConnection(tokenIntrospectionUrl, sslContext, hostnameVerifier);</span>
+
+<span class="nc" id="L134">            HashMap&lt;String, String&gt; parameters = new HashMap&lt;&gt;();</span>
+
+<span class="nc" id="L136">            parameters.put(&quot;token&quot;, token);</span>
+<span class="nc" id="L137">            parameters.put(&quot;token_type_hint&quot;, &quot;access_token&quot;);</span>
+
+<span class="nc" id="L139">            byte[] params = buildParameters(parameters);</span>
+
+<span class="nc" id="L141">            connection.setDoOutput(true);</span>
+<span class="nc" id="L142">            connection.setRequestMethod(&quot;POST&quot;);</span>
+<span class="nc" id="L143">            connection.setRequestProperty(&quot;Content-Type&quot;, &quot;application/x-www-form-urlencoded&quot;);</span>
+<span class="nc" id="L144">            connection.setRequestProperty(&quot;Content-Length&quot;, String.valueOf(params.length));</span>
+<span class="nc" id="L145">            connection.setRequestProperty(&quot;Authorization&quot;, &quot;Basic &quot; + CodePointIterator.ofString(clientId + &quot;:&quot; + clientSecret).asUtf8().base64Encode().drainToString());</span>
+
+<span class="nc" id="L147">            try (OutputStream outputStream = connection.getOutputStream()) {</span>
+<span class="nc" id="L148">                outputStream.write(params);</span>
+            }
+
+<span class="nc" id="L151">            try (final InputStream inputStream = new BufferedInputStream(connection.getInputStream());</span>
+<span class="nc" id="L152">                    final JsonReader jsonReader = Json.createReader(inputStream)) {</span>
+<span class="nc" id="L153">                return jsonReader.readObject();</span>
+            }
+<span class="nc" id="L155">        } catch (IOException ioe) {</span>
+<span class="nc bnc" id="L156" title="All 4 branches missed.">            if (connection != null &amp;&amp; connection.getErrorStream() != null) {</span>
+<span class="nc" id="L157">                InputStream errorStream = connection.getErrorStream();</span>
+
+<span class="nc" id="L159">                try (BufferedReader reader = new BufferedReader(new InputStreamReader(errorStream, StandardCharsets.UTF_8))) {</span>
+<span class="nc" id="L160">                    StringBuffer response = reader.lines().reduce(new StringBuffer(), StringBuffer::append, (buffer1, buffer2) -&gt; buffer1);</span>
+<span class="nc" id="L161">                    log.errorf(ioe, &quot;Unexpected response from token introspection endpoint [%s]. Response: [%s]&quot;, tokenIntrospectionUrl, response);</span>
+<span class="nc" id="L162">                } catch (IOException e) {</span>
+<span class="nc" id="L163">                    throw log.tokenRealmOAuth2TokenIntrospectionFailed(ioe);</span>
+<span class="nc" id="L164">                }</span>
+<span class="nc" id="L165">            } else {</span>
+<span class="nc" id="L166">                throw log.tokenRealmOAuth2TokenIntrospectionFailed(ioe);</span>
+            }
+<span class="nc" id="L168">        } catch (Exception e) {</span>
+<span class="nc" id="L169">            throw log.tokenRealmOAuth2TokenIntrospectionFailed(e);</span>
+<span class="nc" id="L170">        }</span>
+
+<span class="nc" id="L172">        return null;</span>
+    }
+
+    private HttpURLConnection openConnection(URL url, SSLContext sslContext, HostnameVerifier hostnameVerifier) throws IOException {
+<span class="nc" id="L176">        Assert.checkNotNullParam(&quot;url&quot;, url);</span>
+
+<span class="nc" id="L178">        boolean isHttps = url.getProtocol().equalsIgnoreCase(&quot;https&quot;);</span>
+
+        try {
+<span class="nc" id="L181">            log.debugf(&quot;Opening connection to token introspection endpoint [%s]&quot;, url);</span>
+<span class="nc" id="L182">            HttpURLConnection connection = (HttpURLConnection) url.openConnection();</span>
+
+<span class="nc bnc" id="L184" title="All 2 branches missed.">            if (isHttps) {</span>
+<span class="nc" id="L185">                HttpsURLConnection https = (HttpsURLConnection) connection;</span>
+
+<span class="nc" id="L187">                https.setSSLSocketFactory(sslContext.getSocketFactory());</span>
+
+<span class="nc bnc" id="L189" title="All 2 branches missed.">                if (hostnameVerifier != null) {</span>
+<span class="nc" id="L190">                    https.setHostnameVerifier(hostnameVerifier);</span>
+                }
+            }
+<span class="nc" id="L193">            connection.setConnectTimeout(connectionTimeout);</span>
+<span class="nc" id="L194">            connection.setReadTimeout(readTimeout);</span>
+
+<span class="nc" id="L196">            return connection;</span>
+<span class="nc" id="L197">        } catch (IOException cause) {</span>
+<span class="nc" id="L198">            throw cause;</span>
+        }
+    }
+
+    private byte[] buildParameters(Map&lt;String, String&gt; parameters) throws UnsupportedEncodingException {
+<span class="nc" id="L203">        ByteStringBuilder params = new ByteStringBuilder();</span>
+
+<span class="nc" id="L205">        parameters.entrySet().stream().forEach(entry -&gt; {</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">            if (params.length() &gt; 0) {</span>
+<span class="nc" id="L207">                params.append('&amp;');</span>
+            }
+<span class="nc" id="L209">            params.append(entry.getKey()).append('=').append(entry.getValue());</span>
+<span class="nc" id="L210">        });</span>
+
+<span class="nc" id="L212">        return params.toArray();</span>
+    }
+
+    public static class Builder {
+
+        private String clientId;
+        private String clientSecret;
+        private URL tokenIntrospectionUrl;
+        private SSLContext sslContext;
+        private HostnameVerifier hostnameVerifier;
+        private int connectionTimeout;
+        private int readTimeout;
+
+        private Builder() {
+        }
+
+        /**
+         * An {@link URL} pointing to a RFC-7662 OAuth2 Token Introspection compatible endpoint.
+         *
+         * @param url the token introspection endpoint
+         * @return this instance
+         */
+        public Builder tokenIntrospectionUrl(URL url) {
+<span class="fc" id="L235">            this.tokenIntrospectionUrl = url;</span>
+<span class="fc" id="L236">            return this;</span>
+        }
+
+        /**
+         * &lt;p&gt;The identifier of a client registered within the OAuth2 Authorization Server that will be used to authenticate this server
+         * in order to validate bearer tokens arriving to this server.
+         *
+         * &lt;p&gt;Please note that the client will be usually a confidential client with both an identifier and secret configured in order to
+         * authenticate against the token introspection endpoint. In this case, the endpoint must support HTTP BASIC authentication using
+         * the client credentials (both id and secret).
+         *
+         * @param clientId the identifier of a client within the OAUth2 Authorization Server
+         * @return this instance
+         */
+        public Builder clientId(String clientId) {
+<span class="fc" id="L251">            this.clientId = clientId;</span>
+<span class="fc" id="L252">            return this;</span>
+        }
+
+        /**
+         * The secret of the client identified by the given {@link #clientId}.
+         *
+         * @param clientSecret the secret of the client
+         * @return this instance
+         */
+        public Builder clientSecret(String clientSecret) {
+<span class="fc" id="L262">            this.clientSecret = clientSecret;</span>
+<span class="fc" id="L263">            return this;</span>
+        }
+
+        /**
+         * &lt;p&gt;A predefined {@link SSLContext} that will be used to connect to the token introspection endpoint when using SSL/TLS. This configuration is mandatory
+         * if the given token introspection url is using SSL/TLS.
+         *
+         * @param sslContext the SSL context
+         * @return this instance
+         */
+        public Builder useSslContext(SSLContext sslContext) {
+<span class="nc" id="L274">            this.sslContext = sslContext;</span>
+<span class="nc" id="L275">            return this;</span>
+        }
+
+        /**
+         * A {@link HostnameVerifier} that will be used to validate the hostname when using SSL/TLS. This configuration is mandatory
+         * if the given token introspection url is using SSL/TLS.
+         *
+         * @param hostnameVerifier the hostname verifier
+         * @return this instance
+         */
+        public Builder useSslHostnameVerifier(HostnameVerifier hostnameVerifier) {
+<span class="nc" id="L286">            this.hostnameVerifier = hostnameVerifier;</span>
+<span class="nc" id="L287">            return this;</span>
+        }
+
+        /**
+         * Sets the connection timeout to a specified timeout, in milliseconds. A non-zero value specifies the timeout when connecting
+         * to a resource. A timeout of zero is interpreted as an infinite timeout.
+         * @param connectionTimeout the connection timeout
+         * @return this instance
+         */
+        public Builder connectionTimeout(int connectionTimeout) {
+<span class="nc" id="L297">            this.connectionTimeout = connectionTimeout;</span>
+<span class="nc" id="L298">            return this;</span>
+        }
+
+        /**
+         * Sets the read timeout to a specified timeout, in milliseconds. A non-zero value specifies the timeout when reading
+         * from Input stream when a connection is established to a resource. A timeout of zero is interpreted as an infinite timeout.
+         * @param readTimeout the read timeout
+         * @return this instance
+         */
+        public Builder readTimeout(int readTimeout) {
+<span class="nc" id="L308">            this.readTimeout = readTimeout;</span>
+<span class="nc" id="L309">            return this;</span>
+        }
+
+        /**
+         * Returns a {@link OAuth2IntrospectValidator} instance based on all the configuration provided with this builder.
+         *
+         * @return a new {@link OAuth2IntrospectValidator} instance with all the given configuration
+         */
+        public OAuth2IntrospectValidator build() {
+<span class="fc" id="L318">            return new OAuth2IntrospectValidator(this);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

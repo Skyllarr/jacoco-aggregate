@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DirContextFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-realm-ldap</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.realm.ldap</a> &gt; <span class="el_source">DirContextFactory.java</span></div><h1>DirContextFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.realm.ldap;
+
+import static org.wildfly.security.auth.realm.ldap.ElytronMessages.log;
+
+import java.util.EnumSet;
+
+import javax.naming.NamingException;
+import javax.naming.directory.DirContext;
+import javax.naming.directory.InitialDirContext;
+import javax.security.auth.callback.CallbackHandler;
+
+/**
+ * Factory for obtaining connected DirContext instances.
+ *
+ * By using a factory for the contexts different strategies can be substituted in a managed environment.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public interface DirContextFactory {
+
+    /**
+     * Obtain a {@link DirContext} for the configured referral mode.
+     *
+     * @param mode the referral mode for if a referral is encountered querying LDAP; the passed in referral mode can be {@code null}
+     *        in which case the default of {@code IGNORE} will be assumed
+     * @return a ready to use {@link DirContext} for searching and attribute retrieval
+     */
+    DirContext obtainDirContext(final ReferralMode mode) throws NamingException;
+
+    /**
+     * Obtain a {@link DirContext} based on the credentials extracted from the given {@link CallbackHandler}.
+     *
+     * @param handler the callback handler used to extract credentials in order to obtain a connected DirContext instance.
+     * @param mode the referral mode for if a referral is encountered querying LDAP; the passed in referral mode can be {@code null}
+     *        in which case the default of {@code IGNORE} will be assumed
+     * @return a ready to use {@link DirContext} for searching and attribute retrieval
+     */
+    DirContext obtainDirContext(CallbackHandler handler, ReferralMode mode) throws NamingException;
+
+    /**
+     * Return the {@link DirContext} once it is no longer required. The returned DirContext is not necessarily an
+     * {@link InitialDirContext} and as a result we can not assume it is closeable.
+     * Should only be called if a context was successfully obtained.
+     *
+     * @param context the {@link DirContext} to return
+     */
+    void returnContext(final DirContext context);
+
+    /**
+     * Pass back a {@link DirContext} to this factory to be discarded.
+     *
+     * The context may be passed back either because it is detected as being invalid or possibly because it has been created to
+     * act as a specific account and so should not be pooled.
+     *
+     * Although the context is being discarded this method allows the factory to perform any additional clean up required around
+     * this context.
+     *
+     * @param context the {@link DirContext} to discard.
+     */
+    default void discardContext(final DirContext context) {
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        if (context instanceof InitialDirContext) {</span>
+            try {
+<span class="nc" id="L81">                context.close();</span>
+<span class="nc" id="L82">                log.debugf(&quot;Context [%s] was closed. Connection closed or just returned to the pool.&quot;, context);</span>
+<span class="nc" id="L83">            } catch (NamingException ignored) {</span>
+<span class="nc" id="L84">            }</span>
+        }
+<span class="nc" id="L86">    }</span>
+
+    // TODO - Obtaining a DirContext after a referral.
+
+    /**
+     * The referral mode.
+     */
+<span class="nc" id="L93">    public enum ReferralMode {</span>
+        /**
+         * Referrals should be ignored.
+         */
+<span class="nc" id="L97">        IGNORE(&quot;ignore&quot;),</span>
+        /**
+         * Referrals should be followed.
+         */
+<span class="nc" id="L101">        FOLLOW(&quot;follow&quot;),</span>
+        /**
+         * Referrals should result in an exception.
+         */
+<span class="nc" id="L105">        THROW(&quot;throw&quot;),</span>
+        ;
+
+        private final String value;
+
+<span class="nc" id="L110">        private ReferralMode(final String value) {</span>
+<span class="nc" id="L111">            this.value = value;</span>
+<span class="nc" id="L112">        }</span>
+
+        /**
+         * Get the string value for this referral mode.
+         *
+         * @return the string value for this referral mode
+         */
+        public String getValue() {
+<span class="nc" id="L120">            return value;</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="nc" id="L125">            return value;</span>
+        }
+
+<span class="nc" id="L128">        private static final int fullSize = values().length;</span>
+
+        /**
+         * Determine whether the given set is fully populated (or &quot;full&quot;), meaning it contains all possible values.
+         *
+         * @param set the set
+         *
+         * @return {@code true} if the set is full, {@code false} otherwise
+         */
+        public static boolean isFull(final EnumSet&lt;ReferralMode&gt; set) {
+<span class="nc bnc" id="L138" title="All 4 branches missed.">            return set != null &amp;&amp; set.size() == fullSize;</span>
+        }
+
+        /**
+         * Determine whether this instance is equal to one of the given instances.
+         *
+         * @param v1 the first instance
+         *
+         * @return {@code true} if one of the instances matches this one, {@code false} otherwise
+         */
+        public boolean in(final ReferralMode v1) {
+<span class="nc bnc" id="L149" title="All 2 branches missed.">            return this == v1;</span>
+        }
+
+        /**
+         * Determine whether this instance is equal to one of the given instances.
+         *
+         * @param v1 the first instance
+         * @param v2 the second instance
+         *
+         * @return {@code true} if one of the instances matches this one, {@code false} otherwise
+         */
+        public boolean in(final ReferralMode v1, final ReferralMode v2) {
+<span class="nc bnc" id="L161" title="All 4 branches missed.">            return this == v1 || this == v2;</span>
+        }
+
+        /**
+         * Determine whether this instance is equal to one of the given instances.
+         *
+         * @param v1 the first instance
+         * @param v2 the second instance
+         * @param v3 the third instance
+         *
+         * @return {@code true} if one of the instances matches this one, {@code false} otherwise
+         */
+        public boolean in(final ReferralMode v1, final ReferralMode v2, final ReferralMode v3) {
+<span class="nc bnc" id="L174" title="All 6 branches missed.">            return this == v1 || this == v2 || this == v3;</span>
+        }
+
+        /**
+         * Determine whether this instance is equal to one of the given instances.
+         *
+         * @param values the possible values
+         *
+         * @return {@code true} if one of the instances matches this one, {@code false} otherwise
+         */
+        public boolean in(final ReferralMode... values) {
+<span class="nc bnc" id="L185" title="All 4 branches missed.">            if (values != null) for (ReferralMode value : values) {</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">                if (this == value) return true;</span>
+            }
+<span class="nc" id="L188">            return false;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

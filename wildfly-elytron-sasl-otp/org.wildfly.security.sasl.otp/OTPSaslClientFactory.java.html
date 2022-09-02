@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OTPSaslClientFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl-otp</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.otp</a> &gt; <span class="el_source">OTPSaslClientFactory.java</span></div><h1>OTPSaslClientFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.otp;
+
+import static org.wildfly.security.sasl.otp.OTPUtil.*;
+import static org.wildfly.security.provider.util.ProviderUtil.INSTALLED_PROVIDERS;
+
+import java.security.NoSuchAlgorithmException;
+import java.security.Provider;
+import java.security.SecureRandom;
+import java.util.Collections;
+import java.util.Map;
+import java.util.function.Supplier;
+
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.sasl.SaslClient;
+import javax.security.sasl.SaslClientFactory;
+import javax.security.sasl.SaslException;
+
+import org.kohsuke.MetaInfServices;
+import org.wildfly.common.Assert;
+import org.wildfly.common.iteration.CodePointIterator;
+import org.wildfly.security.sasl.WildFlySasl;
+import org.wildfly.security.sasl.util.SaslMechanismInformation;
+
+/**
+ * The client factory for the OTP SASL mechanism.
+ *
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+@MetaInfServices(value = SaslClientFactory.class)
+public final class OTPSaslClientFactory implements SaslClientFactory {
+
+    private final Supplier&lt;Provider[]&gt; providers;
+
+<span class="nc" id="L52">    public OTPSaslClientFactory() {</span>
+<span class="nc" id="L53">        providers = INSTALLED_PROVIDERS;</span>
+<span class="nc" id="L54">    }</span>
+
+<span class="nc" id="L56">    public OTPSaslClientFactory(final Provider provider) {</span>
+<span class="nc" id="L57">        providers = () -&gt; new Provider[] { provider };</span>
+<span class="nc" id="L58">    }</span>
+
+    public SaslClient createSaslClient(final String[] mechanisms, final String authorizationId, final String protocol, final String serverName, Map&lt;String, ?&gt; props, final CallbackHandler cbh) throws SaslException {
+<span class="nc" id="L61">        Assert.checkNotNullParam(&quot;cbh&quot;, cbh);</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        if (props == null) props = Collections.emptyMap();</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">        if (OTP.isMatched(props, false)) {</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">            for (String mechanism : mechanisms) {</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">                if (SaslMechanismInformation.Names.OTP.equals(mechanism)) {</span>
+<span class="nc" id="L66">                    final Object rngNameValue = props.get(WildFlySasl.SECURE_RNG);</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">                    final String rngName = rngNameValue instanceof String ? (String) rngNameValue : null;</span>
+<span class="nc" id="L68">                    SecureRandom secureRandom = null;</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">                    if (rngName != null) {</span>
+                        try {
+<span class="nc" id="L71">                            secureRandom = SecureRandom.getInstance(rngName);</span>
+<span class="nc" id="L72">                        } catch (NoSuchAlgorithmException ignored) {</span>
+<span class="nc" id="L73">                        }</span>
+                    }
+<span class="nc" id="L75">                    final String alternateDictionaryProperty = (String)props.get(WildFlySasl.OTP_ALTERNATE_DICTIONARY);</span>
+<span class="nc" id="L76">                    String[] alternateDictionary = null;</span>
+<span class="nc bnc" id="L77" title="All 4 branches missed.">                    if ((alternateDictionaryProperty != null) &amp;&amp; (! alternateDictionaryProperty.isEmpty())) {</span>
+<span class="nc" id="L78">                        alternateDictionary = dictionaryPropertyToArray(alternateDictionaryProperty);</span>
+<span class="nc" id="L79">                        validateAlternateDictionary(alternateDictionary);</span>
+                    }
+<span class="nc" id="L81">                    final OTPSaslClient client = new OTPSaslClient(mechanism, secureRandom, alternateDictionary, protocol, serverName, cbh, authorizationId, providers);</span>
+<span class="nc" id="L82">                    client.init();</span>
+<span class="nc" id="L83">                    return client;</span>
+                }
+            }
+        }
+<span class="nc" id="L87">        return null;</span>
+    }
+
+    public String[] getMechanismNames(final Map&lt;String, ?&gt; props) {
+<span class="nc bnc" id="L91" title="All 2 branches missed.">        return OTP.isMatched(props, true) ? new String[] { SaslMechanismInformation.Names.OTP } : WildFlySasl.NO_NAMES;</span>
+    }
+
+    /**
+     * Construct the value of the {@code OTP_ALTERNATE_DICTIONARY} property from an array of words.
+     *
+     * @param dictionaryArray the array of words in the alternate dictionary
+     * @return the alternate dictionary as a string, where each word is separated by a
+     * space character
+     */
+    public static String dictionaryArrayToProperty(String[] dictionaryArray){
+<span class="nc" id="L102">        StringBuilder dictionary = new StringBuilder();</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        for (int i = 0; i &lt; dictionaryArray.length; i++){</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">            if (i != 0) {</span>
+<span class="nc" id="L105">                dictionary.append(OTP.DICTIONARY_DELIMITER);</span>
+            }
+<span class="nc" id="L107">            dictionary.append(dictionaryArray[i]);</span>
+        }
+<span class="nc" id="L109">        return dictionary.toString();</span>
+    }
+
+    static String[] dictionaryPropertyToArray(String property) throws SaslException {
+<span class="nc" id="L113">        String[] dictionary = new String[OTP.DICTIONARY_SIZE];</span>
+<span class="nc" id="L114">        CodePointIterator cpi = CodePointIterator.ofString(property);</span>
+<span class="nc" id="L115">        CodePointIterator di = cpi.delimitedBy(OTP.DICTIONARY_DELIMITER);</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        for (int i = 0; i &lt; dictionary.length; i++) {</span>
+<span class="nc" id="L117">            dictionary[i] = di.drainToString();</span>
+<span class="nc" id="L118">            skipDelims(di, cpi, OTP.DICTIONARY_DELIMITER);</span>
+        }
+<span class="nc" id="L120">        return dictionary;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

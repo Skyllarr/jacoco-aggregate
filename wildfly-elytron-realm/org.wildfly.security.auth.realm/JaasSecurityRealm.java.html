@@ -1,0 +1,412 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>JaasSecurityRealm.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-realm</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.realm</a> &gt; <span class="el_source">JaasSecurityRealm.java</span></div><h1>JaasSecurityRealm.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.realm;
+
+import static org.wildfly.security.auth.realm.ElytronMessages.log;
+
+import javax.security.auth.Subject;
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.NameCallback;
+import javax.security.auth.callback.PasswordCallback;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.auth.login.Configuration;
+import javax.security.auth.login.LoginContext;
+import javax.security.auth.login.LoginException;
+
+import java.io.File;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.net.URI;
+import java.nio.file.Paths;
+import java.security.NoSuchAlgorithmException;
+import java.security.Principal;
+import java.security.Security;
+import java.security.URIParameter;
+import java.security.spec.AlgorithmParameterSpec;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.auth.callback.CredentialCallback;
+import org.wildfly.security.authz.Attributes;
+import org.wildfly.security.authz.AuthorizationIdentity;
+import org.wildfly.security.auth.server.RealmIdentity;
+import org.wildfly.security.auth.server.RealmUnavailableException;
+import org.wildfly.security.auth.server.SecurityRealm;
+import org.wildfly.security.auth.SupportLevel;
+import org.wildfly.security.authz.MapAttributes;
+import org.wildfly.security.credential.Credential;
+import org.wildfly.security.evidence.Evidence;
+import org.wildfly.security.evidence.PasswordGuessEvidence;
+
+/**
+ * A JAAS based {@link SecurityRealm} implementation.
+ *
+ * @author &lt;a href=&quot;mailto:sguilhen@redhat.com&quot;&gt;Stefan Guilhen&lt;/a&gt;
+ */
+public class JaasSecurityRealm implements SecurityRealm {
+
+    private static final String DEFAULT_CONFIGURATION_POLICY_TYPE = &quot;JavaLoginConfig&quot;;
+    private final URI jaasConfigFilePath;
+    private final String entry;
+    private final CallbackHandler handler;
+    private final ClassLoader classLoader;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param entry JAAS configuration file entry (must not be {@code null})
+     */
+    public JaasSecurityRealm(final String entry) {
+<span class="nc" id="L76">        this(entry, (String) null);</span>
+<span class="nc" id="L77">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param entry       JAAS configuration file entry (must not be {@code null})
+     * @param classLoader classLoader to use with LoginContext, this class loader must contain LoginModule CallbackHandler classes
+     */
+    public JaasSecurityRealm(final String entry, final ClassLoader classLoader) {
+<span class="nc" id="L86">        this(entry, null, classLoader);</span>
+<span class="nc" id="L87">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param entry       JAAS configuration file entry (must not be {@code null})
+     * @param jaasConfigFilePath path to JAAS configuration file
+     */
+    public JaasSecurityRealm(final String entry, final String jaasConfigFilePath) {
+<span class="nc" id="L96">        this(entry, jaasConfigFilePath, null);</span>
+<span class="nc" id="L97">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param entry              JAAS configuration file entry (must not be {@code null})
+     * @param jaasConfigFilePath path to JAAS configuration file
+     * @param classLoader        classLoader to use with LoginContext, this class loader must contain LoginModule CallbackHandler classes
+     */
+    public JaasSecurityRealm(final String entry, final String jaasConfigFilePath, final ClassLoader classLoader) {
+<span class="nc" id="L107">        this(entry, jaasConfigFilePath, classLoader, null);</span>
+<span class="nc" id="L108">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param entry              JAAS configuration file entry (must not be {@code null})
+     * @param jaasConfigFilePath path to JAAS configuration file
+     * @param callbackHandler    callbackHandler to pass to LoginContext
+     * @param classLoader        classLoader to use with LoginContext, this class loader must contain LoginModule CallbackHandler classes
+     */
+<span class="nc" id="L118">    public JaasSecurityRealm(final String entry, final String jaasConfigFilePath, final ClassLoader classLoader, final CallbackHandler callbackHandler) {</span>
+<span class="nc" id="L119">        Assert.checkNotNullParam(&quot;entry&quot;, entry);</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        if (jaasConfigFilePath != null) {</span>
+<span class="nc" id="L121">            this.jaasConfigFilePath = Paths.get(jaasConfigFilePath).toUri();</span>
+        } else {
+<span class="nc" id="L123">            this.jaasConfigFilePath = null;</span>
+        }
+<span class="nc" id="L125">        this.entry = entry;</span>
+<span class="nc" id="L126">        this.handler = callbackHandler;</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">        if (classLoader != null) {</span>
+<span class="nc" id="L128">            this.classLoader = classLoader;</span>
+        } else {
+<span class="nc" id="L130">            this.classLoader = Thread.currentThread().getContextClassLoader();</span>
+        }
+<span class="nc" id="L132">    }</span>
+
+    @Override
+    public RealmIdentity getRealmIdentity(final Principal principal) {
+<span class="nc" id="L136">        return new JaasRealmIdentity(principal);</span>
+    }
+
+    @Override
+    public SupportLevel getCredentialAcquireSupport(final Class&lt;? extends Credential&gt; credentialType, final String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc" id="L141">        Assert.checkNotNullParam(&quot;credentialType&quot;, credentialType);</span>
+<span class="nc" id="L142">        return SupportLevel.UNSUPPORTED;</span>
+    }
+
+    @Override
+    public SupportLevel getEvidenceVerifySupport(final Class&lt;? extends Evidence&gt; evidenceType, final String algorithmName) throws RealmUnavailableException {
+<span class="nc" id="L147">        Assert.checkNotNullParam(&quot;evidenceType&quot;, evidenceType);</span>
+<span class="nc" id="L148">        return SupportLevel.POSSIBLY_SUPPORTED;</span>
+    }
+
+    /**
+     * @param entry           login configuration file entry
+     * @param subject         classLoader to use with LoginContext, this class loader must contain LoginModule CallbackHandler classes
+     * @param callbackHandler callbackHandler to pass to LoginContext
+     * @return the instance of LoginContext
+     * @throws RealmUnavailableException
+     */
+    private LoginContext createLoginContext(final String entry, final Subject subject, final CallbackHandler callbackHandler) throws RealmUnavailableException {
+<span class="nc bnc" id="L159" title="All 2 branches missed.">        if (jaasConfigFilePath != null) {</span>
+<span class="nc" id="L160">            File file = new File(this.jaasConfigFilePath);</span>
+<span class="nc bnc" id="L161" title="All 4 branches missed.">            if (!file.exists() &amp;&amp; !file.isDirectory()) {</span>
+<span class="nc" id="L162">                throw ElytronMessages.log.failedToLoadJaasConfigFile();</span>
+            }
+        }
+        try {
+<span class="nc bnc" id="L166" title="All 2 branches missed.">            if (jaasConfigFilePath == null) {</span>
+<span class="nc" id="L167">                return new LoginContext(entry, subject, callbackHandler);</span>
+            } else {
+<span class="nc" id="L169">                return new LoginContext(entry, subject, callbackHandler, Configuration.getInstance(DEFAULT_CONFIGURATION_POLICY_TYPE, new URIParameter(jaasConfigFilePath)));</span>
+            }
+<span class="nc" id="L171">        } catch (LoginException | NoSuchAlgorithmException le) {</span>
+<span class="nc" id="L172">            throw ElytronMessages.log.failedToCreateLoginContext(le);</span>
+        }
+    }
+
+    private CallbackHandler createCallbackHandler(final Principal principal, final Evidence evidence) {
+<span class="nc bnc" id="L177" title="All 2 branches missed.">        if (handler != null) {</span>
+            try {
+<span class="nc" id="L179">                final CallbackHandler callbackHandler = handler.getClass().getConstructor().newInstance();</span>
+                // custom handlers were allowed in the past as long as they had a public setSecurityInfo method. Use this method if it exists
+<span class="nc" id="L181">                final Method setSecurityInfo = handler.getClass().getMethod(&quot;setSecurityInfo&quot;, Principal.class, Object.class);</span>
+<span class="nc" id="L182">                setSecurityInfo.invoke(callbackHandler, principal, evidence);</span>
+<span class="nc" id="L183">                return callbackHandler;</span>
+<span class="nc" id="L184">            } catch (InstantiationException | IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {</span>
+                // ignore if this method does not exist
+<span class="nc" id="L186">                return handler;</span>
+            }
+<span class="nc bnc" id="L188" title="All 2 branches missed.">        } else if (Security.getProperty(&quot;auth.login.defaultCallbackHandler&quot;) != null) {</span>
+            // security property &quot;auth.login.defaultCallbackHandler&quot; is not null so LoginContext will initialize it itself
+<span class="nc" id="L190">            return null;</span>
+        } else {
+<span class="nc" id="L192">            return new JaasSecurityRealmDefaultCallbackHandler(principal, evidence);</span>
+        }
+    }
+
+    private class JaasRealmIdentity implements RealmIdentity {
+
+        private final Principal principal;
+        private LoginContext loginContext;
+        private Subject subject;
+
+<span class="nc" id="L202">        private JaasRealmIdentity(final Principal principal) {</span>
+<span class="nc" id="L203">            this.principal = principal;</span>
+<span class="nc" id="L204">        }</span>
+
+        public Principal getRealmIdentityPrincipal() {
+<span class="nc" id="L207">            return principal;</span>
+        }
+
+        public Subject getSubject() {
+<span class="nc" id="L211">            return subject;</span>
+        }
+
+        @Override
+        public SupportLevel getCredentialAcquireSupport(final Class&lt;? extends Credential&gt; credentialType, final String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc" id="L216">            return JaasSecurityRealm.this.getCredentialAcquireSupport(credentialType, algorithmName, parameterSpec);</span>
+        }
+
+        @Override
+        public &lt;C extends Credential&gt; C getCredential(final Class&lt;C&gt; credentialType) throws RealmUnavailableException {
+<span class="nc" id="L221">            return getCredential(credentialType, null);</span>
+        }
+
+        @Override
+        public &lt;C extends Credential&gt; C getCredential(final Class&lt;C&gt; credentialType, final String algorithmName) throws RealmUnavailableException {
+<span class="nc" id="L226">            return getCredential(credentialType, algorithmName, null);</span>
+        }
+
+        @Override
+        public &lt;C extends Credential&gt; C getCredential(final Class&lt;C&gt; credentialType, final String algorithmName, final AlgorithmParameterSpec parameterSpec) throws RealmUnavailableException {
+<span class="nc" id="L231">            return null;</span>
+        }
+
+        @Override
+        public SupportLevel getEvidenceVerifySupport(final Class&lt;? extends Evidence&gt; evidenceType, final String algorithmName) throws RealmUnavailableException {
+<span class="nc" id="L236">            Assert.checkNotNullParam(&quot;evidenceType&quot;, evidenceType);</span>
+<span class="nc" id="L237">            return JaasSecurityRealm.this.getEvidenceVerifySupport(evidenceType, algorithmName);</span>
+        }
+
+        @Override
+        public boolean verifyEvidence(final Evidence evidence) throws RealmUnavailableException {
+<span class="nc" id="L242">            Assert.checkNotNullParam(&quot;evidence&quot;, evidence);</span>
+<span class="nc" id="L243">            this.subject = null;</span>
+            boolean successfulLogin;
+<span class="nc" id="L245">            ClassLoader oldClassLoader = Thread.currentThread().getContextClassLoader();</span>
+            try {
+<span class="nc bnc" id="L247" title="All 2 branches missed.">                if (classLoader != null) {</span>
+<span class="nc" id="L248">                    Thread.currentThread().setContextClassLoader(classLoader);</span>
+                }
+<span class="nc" id="L250">                final CallbackHandler callbackHandler = createCallbackHandler(principal, evidence);</span>
+<span class="nc" id="L251">                final Subject subject = new Subject();</span>
+<span class="nc" id="L252">                loginContext = createLoginContext(entry, subject, callbackHandler);</span>
+<span class="nc" id="L253">                log.tracef(&quot;Trying to authenticate subject %s using LoginContext %s using JaasSecurityRealm&quot;, principal, loginContext);</span>
+                try {
+<span class="nc" id="L255">                    loginContext.login();</span>
+<span class="nc" id="L256">                    successfulLogin = true;</span>
+<span class="nc" id="L257">                    this.subject = loginContext.getSubject();</span>
+<span class="nc" id="L258">                } catch (LoginException loginException) {</span>
+<span class="nc" id="L259">                    successfulLogin = false;</span>
+<span class="nc" id="L260">                    ElytronMessages.log.debugInfoJaasAuthenticationFailure(principal, loginException);</span>
+<span class="nc" id="L261">                }</span>
+            } finally {
+<span class="nc" id="L263">                Thread.currentThread().setContextClassLoader(oldClassLoader);</span>
+            }
+<span class="nc" id="L265">            return successfulLogin;</span>
+        }
+
+        public boolean exists() {
+            /* we don't really know that the identity exists, but we know that there is always
+             * an authorization identity so that's as good as {@code true}
+             */
+<span class="nc" id="L272">            return true;</span>
+        }
+
+        @Override
+        public AuthorizationIdentity getAuthorizationIdentity() throws RealmUnavailableException {
+<span class="nc" id="L277">            return JaasAuthorizationIdentity.fromSubject(subject);</span>
+        }
+
+        @Override
+        public void dispose() {
+            // call logout in order to empty the subject
+<span class="nc" id="L283">            ClassLoader oldClassLoader = Thread.currentThread().getContextClassLoader();</span>
+            try {
+                try {
+<span class="nc bnc" id="L286" title="All 2 branches missed.">                    if (classLoader != null) {</span>
+<span class="nc" id="L287">                        Thread.currentThread().setContextClassLoader(classLoader);</span>
+                    }
+<span class="nc bnc" id="L289" title="All 2 branches missed.">                    if (loginContext != null) {</span>
+<span class="nc" id="L290">                        loginContext.logout();</span>
+                    }
+<span class="nc" id="L292">                } catch (LoginException e) {</span>
+<span class="nc" id="L293">                    ElytronMessages.log.debugInfoJaasLogoutFailure(this.principal, e);</span>
+<span class="nc" id="L294">                }</span>
+            } finally {
+<span class="nc" id="L296">                Thread.currentThread().setContextClassLoader(oldClassLoader);</span>
+            }
+<span class="nc" id="L298">        }</span>
+    }
+
+    /**
+     * Default CallbackHandler passed to the LoginContext when none is provided to JAAS security realm and none is configured in the &quot;auth.login.defaultCallbackHandler&quot; security property.
+     */
+    private static class JaasSecurityRealmDefaultCallbackHandler implements CallbackHandler {
+
+        private final Principal principal;
+        private final Object evidence;
+
+<span class="nc" id="L309">        private JaasSecurityRealmDefaultCallbackHandler(final Principal principal, final Evidence evidence) {</span>
+<span class="nc" id="L310">            this.principal = principal;</span>
+<span class="nc" id="L311">            this.evidence = evidence;</span>
+<span class="nc" id="L312">        }</span>
+
+        @Override
+        public void handle(Callback[] callbacks) throws UnsupportedCallbackException {
+<span class="nc" id="L316">            Assert.checkNotNullParam(&quot;callbacks&quot;, callbacks);</span>
+<span class="nc bnc" id="L317" title="All 2 branches missed.">            for (Callback callback : callbacks) {</span>
+<span class="nc bnc" id="L318" title="All 2 branches missed.">                if (callback instanceof NameCallback) {</span>
+<span class="nc" id="L319">                    NameCallback nc = (NameCallback) callback;</span>
+<span class="nc bnc" id="L320" title="All 2 branches missed.">                    if (principal != null)</span>
+<span class="nc" id="L321">                        nc.setName(principal.getName());</span>
+<span class="nc bnc" id="L322" title="All 2 branches missed.">                } else if (callback instanceof PasswordCallback) {</span>
+<span class="nc bnc" id="L323" title="All 2 branches missed.">                    if (evidence instanceof PasswordGuessEvidence) {</span>
+<span class="nc" id="L324">                        ((PasswordCallback) callback).setPassword(((PasswordGuessEvidence) evidence).getGuess());</span>
+                    } else {
+<span class="nc" id="L326">                        PasswordCallback pc = (PasswordCallback) callback;</span>
+<span class="nc" id="L327">                        char[] password = getPassword();</span>
+<span class="nc bnc" id="L328" title="All 2 branches missed.">                        if (password != null)</span>
+<span class="nc" id="L329">                            pc.setPassword(password);</span>
+<span class="nc" id="L330">                    }</span>
+<span class="nc bnc" id="L331" title="All 4 branches missed.">                } else if (callback instanceof CredentialCallback &amp;&amp; evidence instanceof Credential) {</span>
+<span class="nc" id="L332">                    final CredentialCallback credentialCallback = (CredentialCallback) callback;</span>
+<span class="nc" id="L333">                    Credential credential = (Credential) evidence;</span>
+<span class="nc bnc" id="L334" title="All 2 branches missed.">                    if (credentialCallback.isCredentialSupported(credential)) {</span>
+<span class="nc" id="L335">                        credentialCallback.setCredential(credential);</span>
+                    }
+<span class="nc" id="L337">                } else {</span>
+<span class="nc" id="L338">                    throw ElytronMessages.log.unableToHandleCallback(callback, this.getClass().getName(), callback.getClass().getCanonicalName());</span>
+                }
+            }
+<span class="nc" id="L341">        }</span>
+
+        /**
+         * Source: A utility method for obtaining of password taken from
+         * https://github.com/picketbox/picketbox/blob/master/security-jboss-sx/jbosssx/src/main/java/org/jboss/security/auth/callback/JBossCallbackHandler.java
+         * on November 2021
+         * &lt;p&gt;
+         * Try to convert the credential value into a char[] using the
+         * first of the following attempts which succeeds:
+         * &lt;p&gt;
+         * 1. Check for instanceof char[]
+         * 2. Check for instanceof String and then use toCharArray()
+         * 3. See if credential has a toCharArray() method and use it
+         * 4. Use toString() followed by toCharArray().
+         *
+         * @return a char[] representation of the credential.
+         */
+        private char[] getPassword() {
+<span class="nc" id="L359">            char[] password = null;</span>
+<span class="nc bnc" id="L360" title="All 2 branches missed.">            if (evidence instanceof char[]) {</span>
+<span class="nc" id="L361">                password = (char[]) evidence;</span>
+<span class="nc bnc" id="L362" title="All 2 branches missed.">            } else if (evidence instanceof String) {</span>
+<span class="nc" id="L363">                String s = (String) evidence;</span>
+<span class="nc" id="L364">                password = s.toCharArray();</span>
+<span class="nc" id="L365">            } else {</span>
+                try {
+<span class="nc" id="L367">                    Class&lt;?&gt;[] types = {};</span>
+<span class="nc" id="L368">                    Method m = evidence.getClass().getMethod(&quot;toCharArray&quot;, types);</span>
+<span class="nc" id="L369">                    Object[] args = {};</span>
+<span class="nc" id="L370">                    password = (char[]) m.invoke(evidence, args);</span>
+<span class="nc" id="L371">                } catch (Exception e) {</span>
+<span class="nc bnc" id="L372" title="All 2 branches missed.">                    if (evidence != null) {</span>
+<span class="nc" id="L373">                        String s = evidence.toString();</span>
+<span class="nc" id="L374">                        password = s.toCharArray();</span>
+                    }
+<span class="nc" id="L376">                }</span>
+            }
+<span class="nc" id="L378">            return password;</span>
+        }
+    }
+
+    /**
+     * A JAAS realm's authorization identity. Roles are mapped from all Subject's principals with the following rule:
+     * key of the attribute is principal's simple classname and the value is principal's name
+     */
+    private static class JaasAuthorizationIdentity implements AuthorizationIdentity {
+
+        private MapAttributes attributes;
+
+        private static JaasAuthorizationIdentity fromSubject(final Subject subject) {
+<span class="nc" id="L391">            MapAttributes attributes = new MapAttributes();</span>
+            // map all subject's principals to attributes with the following rule:
+            // key of the attribute is principal's simple classname and the value is principal's name
+<span class="nc bnc" id="L394" title="All 2 branches missed.">            if (subject != null) {</span>
+<span class="nc bnc" id="L395" title="All 2 branches missed.">                for (Principal principal : subject.getPrincipals()) {</span>
+<span class="nc" id="L396">                    attributes.addLast(principal.getClass().getSimpleName(), principal.getName());</span>
+<span class="nc" id="L397">                }</span>
+            }
+<span class="nc" id="L399">            return new JaasAuthorizationIdentity(attributes);</span>
+        }
+
+<span class="nc" id="L402">        private JaasAuthorizationIdentity(MapAttributes attributes) {</span>
+<span class="nc" id="L403">            this.attributes = attributes;</span>
+<span class="nc" id="L404">        }</span>
+
+        @Override
+        public Attributes getAttributes() {
+<span class="nc" id="L408">            return attributes;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

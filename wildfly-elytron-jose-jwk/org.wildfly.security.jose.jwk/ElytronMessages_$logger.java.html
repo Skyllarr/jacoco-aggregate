@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages_$logger.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-jose-jwk</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.jose.jwk</a> &gt; <span class="el_source">ElytronMessages_$logger.java</span></div><h1>ElytronMessages_$logger.java</h1><pre class="source lang-java linenums">package org.wildfly.security.jose.jwk;
+
+import java.util.Locale;
+import java.io.Serializable;
+import javax.annotation.Generated;
+import java.lang.RuntimeException;
+import org.jboss.logging.DelegatingBasicLogger;
+import org.jboss.logging.BasicLogger;
+import java.lang.String;
+import org.jboss.logging.Logger;
+import java.util.Arrays;
+import java.lang.IllegalArgumentException;
+import java.lang.Exception;
+
+/**
+ * Warning this class consists of generated code.
+ */
+@Generated(value = &quot;org.jboss.logging.processor.generator.model.MessageLoggerImplementor&quot;, date = &quot;2022-09-02T20:22:37+0200&quot;)
+public class ElytronMessages_$logger extends DelegatingBasicLogger implements ElytronMessages, BasicLogger, Serializable {
+    private static final long serialVersionUID = 1L;
+<span class="nc" id="L21">    private static final String FQCN = ElytronMessages_$logger.class.getName();</span>
+    public ElytronMessages_$logger(final Logger log) {
+<span class="nc" id="L23">        super(log);</span>
+<span class="nc" id="L24">    }</span>
+<span class="nc" id="L25">    private static final Locale LOCALE = Locale.ROOT;</span>
+    protected Locale getLoggingLocale() {
+<span class="nc" id="L27">        return LOCALE;</span>
+    }
+    protected String unableToParseStringJWK$str() {
+<span class="nc" id="L30">        return &quot;ELY24000: Unable to parse string JWK&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException unableToParseStringJWK(final Exception cause) {
+<span class="nc" id="L34">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), unableToParseStringJWK$str()), cause);</span>
+<span class="nc" id="L35">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L36">        return result;</span>
+    }
+    private static void _copyStackTraceMinusOne(final Throwable e) {
+<span class="nc" id="L39">        final StackTraceElement[] st = e.getStackTrace();</span>
+<span class="nc" id="L40">        e.setStackTrace(Arrays.copyOfRange(st, 1, st.length));</span>
+<span class="nc" id="L41">    }</span>
+    protected String unsupportedKeyTypeForJWK$str() {
+<span class="nc" id="L43">        return &quot;ELY24001: Unsupported key type for JWK: \&quot;%s\&quot;&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException unsupportedKeyTypeForJWK(final String keyType) {
+<span class="nc" id="L47">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), unsupportedKeyTypeForJWK$str(), keyType));</span>
+<span class="nc" id="L48">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L49">        return result;</span>
+    }
+    protected String unsupportedCurve$str() {
+<span class="nc" id="L52">        return &quot;ELY24002: Unsupported curve&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException unsupportedCurve() {
+<span class="nc" id="L56">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), unsupportedCurve$str()));</span>
+<span class="nc" id="L57">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L58">        return result;</span>
+    }
+    protected String unableToCreatePublicKeyFromJWK$str() {
+<span class="nc" id="L61">        return &quot;ELY24003: Unable to create public key from JWK&quot;;</span>
+    }
+    @Override
+    public final RuntimeException unableToCreatePublicKeyFromJWK(final Exception cause) {
+<span class="nc" id="L65">        final RuntimeException result = new RuntimeException(String.format(getLoggingLocale(), unableToCreatePublicKeyFromJWK$str()), cause);</span>
+<span class="nc" id="L66">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L67">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

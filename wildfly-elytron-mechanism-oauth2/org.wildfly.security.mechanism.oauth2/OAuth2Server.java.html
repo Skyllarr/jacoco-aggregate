@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OAuth2Server.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-mechanism-oauth2</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.mechanism.oauth2</a> &gt; <span class="el_source">OAuth2Server.java</span></div><h1>OAuth2Server.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.mechanism.oauth2;
+
+import java.io.IOException;
+import java.util.Map;
+import java.util.NoSuchElementException;
+
+import javax.json.Json;
+import javax.json.JsonObjectBuilder;
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.sasl.AuthorizeCallback;
+
+import org.wildfly.common.iteration.ByteIterator;
+import org.wildfly.security.auth.callback.EvidenceVerifyCallback;
+import org.wildfly.security.auth.callback.IdentityCredentialCallback;
+import org.wildfly.security.credential.BearerTokenCredential;
+import org.wildfly.security.evidence.BearerTokenEvidence;
+import org.wildfly.security.mechanism._private.ElytronMessages;
+import org.wildfly.security.mechanism._private.MechanismUtil;
+import org.wildfly.security.mechanism.AuthenticationMechanismException;
+
+/**
+ * An OAuth2 Sasl Server based on RFC-7628.
+ *
+ * @author &lt;a href=&quot;mailto:psilva@redhat.com&quot;&gt;Pedro Igor&lt;/a&gt;
+ */
+public class OAuth2Server {
+
+    public static final String CONFIG_OPENID_CONFIGURATION_URL = &quot;openid-configuration&quot;;
+    private static final String KV_DELIMITER = &quot;%x01&quot;;
+
+    private final CallbackHandler callbackHandler;
+    private final Map&lt;String, ?&gt; serverConfig;
+    private ElytronMessages log;
+
+<span class="nc" id="L55">    public OAuth2Server(CallbackHandler callbackHandler, Map&lt;String, ?&gt; serverConfig, ElytronMessages log) {</span>
+<span class="nc" id="L56">        this.callbackHandler = callbackHandler;</span>
+<span class="nc" id="L57">        this.serverConfig = serverConfig;</span>
+<span class="nc" id="L58">        this.log = log;</span>
+<span class="nc" id="L59">    }</span>
+
+    public OAuth2InitialClientMessage parseInitialClientMessage(byte[] fromBytes) throws AuthenticationMechanismException {
+<span class="nc" id="L62">        byte[] messageBytes = fromBytes.clone();</span>
+<span class="nc" id="L63">        ByteIterator byteIterator = ByteIterator.ofBytes(fromBytes.clone());</span>
+
+        try {
+<span class="nc" id="L66">            final char cbindFlag = (char) byteIterator.next();</span>
+
+<span class="nc bnc" id="L68" title="All 2 branches missed.">            if (cbindFlag != 'n') {</span>
+<span class="nc" id="L69">                throw log.mechChannelBindingNotSupported();</span>
+            }
+
+<span class="nc" id="L72">            String authorizationID = null;</span>
+
+<span class="nc bnc" id="L74" title="All 2 branches missed.">            if (byteIterator.next() == ',') {</span>
+<span class="nc" id="L75">                final int c = byteIterator.next();</span>
+
+<span class="nc bnc" id="L77" title="All 2 branches missed.">                if (c == 'a') {</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">                    if (byteIterator.next() != '=') {</span>
+<span class="nc" id="L79">                        throw log.mechInvalidClientMessage();</span>
+                    }
+<span class="nc" id="L81">                    authorizationID = byteIterator.delimitedBy(',').asUtf8String().drainToString();</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">                    if (byteIterator.next() != ',') {</span>
+<span class="nc" id="L83">                        throw ElytronMessages.log.mechInvalidClientMessage();</span>
+                    }
+                }
+            }
+
+<span class="nc" id="L88">            String auth = getValue(&quot;auth&quot;, byteIterator.asUtf8String().drainToString());</span>
+
+<span class="nc bnc" id="L90" title="All 2 branches missed.">            if (auth == null) {</span>
+<span class="nc" id="L91">                throw log.mechInvalidClientMessage();</span>
+            }
+
+<span class="nc" id="L94">            return new OAuth2InitialClientMessage(authorizationID, auth, messageBytes);</span>
+<span class="nc" id="L95">        } catch (NoSuchElementException ignored) {</span>
+<span class="nc" id="L96">            throw ElytronMessages.log.mechInvalidMessageReceived();</span>
+        }
+    }
+
+    private String getValue(String key, String keyValuesPart) {
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        for (String current : keyValuesPart.split(KV_DELIMITER)) {</span>
+<span class="nc" id="L102">            String[] keyValue = current.split(&quot;=&quot;);</span>
+
+<span class="nc bnc" id="L104" title="All 2 branches missed.">            if (keyValue[0].equals(key)) {</span>
+<span class="nc" id="L105">                return keyValue[1];</span>
+            }
+        }
+
+<span class="nc" id="L109">        return null;</span>
+    }
+
+    public byte[] evaluateInitialResponse(OAuth2InitialClientMessage initialClientMessage) throws AuthenticationMechanismException {
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        if (initialClientMessage.isBearerToken()) {</span>
+<span class="nc" id="L114">            String auth = initialClientMessage.getAuth();</span>
+<span class="nc" id="L115">            String token = auth.substring(auth.indexOf(&quot; &quot;) + 1);</span>
+<span class="nc" id="L116">            BearerTokenEvidence evidence = new BearerTokenEvidence(token);</span>
+<span class="nc" id="L117">            EvidenceVerifyCallback evidenceVerifyCallback = new EvidenceVerifyCallback(evidence);</span>
+
+            try {
+<span class="nc" id="L120">                MechanismUtil.handleCallbacks(log, this.callbackHandler, evidenceVerifyCallback);</span>
+<span class="nc" id="L121">            } catch (UnsupportedCallbackException e) {</span>
+<span class="nc" id="L122">                throw log.mechAuthorizationUnsupported(e);</span>
+<span class="nc" id="L123">            }</span>
+
+            // successful verification, token is supposed to be valid and just respond with an empty message
+<span class="nc bnc" id="L126" title="All 2 branches missed.">            if (evidenceVerifyCallback.isVerified()) {</span>
+<span class="nc" id="L127">                AuthorizeCallback authorizeCallback = new AuthorizeCallback(null, null);</span>
+
+                try {
+<span class="nc" id="L130">                    MechanismUtil.handleCallbacks(log, this.callbackHandler, authorizeCallback);</span>
+<span class="nc" id="L131">                } catch (UnsupportedCallbackException e) {</span>
+<span class="nc" id="L132">                    throw log.mechAuthorizationUnsupported(e);</span>
+<span class="nc" id="L133">                }</span>
+
+<span class="nc bnc" id="L135" title="All 2 branches missed.">                if (authorizeCallback.isAuthorized()) {</span>
+                    try {
+<span class="nc" id="L137">                        callbackHandler.handle(new Callback[]{new IdentityCredentialCallback(new BearerTokenCredential(evidence.getToken()), true)});</span>
+<span class="nc" id="L138">                    } catch (UnsupportedCallbackException ignore) {</span>
+                        // ignored
+<span class="nc" id="L140">                    } catch (AuthenticationMechanismException e) {</span>
+<span class="nc" id="L141">                        throw e;</span>
+<span class="nc" id="L142">                    } catch (IOException e) {</span>
+<span class="nc" id="L143">                        throw log.mechServerSideAuthenticationFailed(e);</span>
+<span class="nc" id="L144">                    }</span>
+<span class="nc" id="L145">                    return new byte[0];</span>
+                }
+            }
+
+<span class="nc" id="L149">            return createErrorMessage();</span>
+        }
+
+<span class="nc" id="L152">        throw log.mechInvalidClientMessage();</span>
+    }
+
+    private byte[] createErrorMessage() {
+<span class="nc" id="L156">        JsonObjectBuilder objectBuilder = Json.createObjectBuilder();</span>
+
+<span class="nc" id="L158">        objectBuilder.add(&quot;status&quot;, &quot;invalid_token&quot;);</span>
+
+<span class="nc" id="L160">        Object asDiscoveryUrl = serverConfig.get(CONFIG_OPENID_CONFIGURATION_URL);</span>
+
+<span class="nc bnc" id="L162" title="All 2 branches missed.">        if (asDiscoveryUrl != null) {</span>
+<span class="nc" id="L163">            objectBuilder.add(CONFIG_OPENID_CONFIGURATION_URL, asDiscoveryUrl.toString());</span>
+        }
+
+<span class="nc" id="L166">        return ByteIterator.ofBytes(objectBuilder.build().toString().getBytes()).base64Encode().asUtf8().drain();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

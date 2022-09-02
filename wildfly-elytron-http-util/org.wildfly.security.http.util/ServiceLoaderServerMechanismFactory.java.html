@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ServiceLoaderServerMechanismFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-util</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.util</a> &gt; <span class="el_source">ServiceLoaderServerMechanismFactory.java</span></div><h1>ServiceLoaderServerMechanismFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.http.util;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+import static org.wildfly.security.http.util.ElytronMessages.log;
+
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.ServiceConfigurationError;
+import java.util.ServiceLoader;
+import java.util.Set;
+
+import javax.security.auth.callback.CallbackHandler;
+
+import org.wildfly.security.http.HttpAuthenticationException;
+import org.wildfly.security.http.HttpServerAuthenticationMechanism;
+import org.wildfly.security.http.HttpServerAuthenticationMechanismFactory;
+
+/**
+ * A {@link HttpServerAuthenticationMechanismFactory} which locates further factory implementations by iterating a {@link ServiceLoader}
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public final class ServiceLoaderServerMechanismFactory implements HttpServerAuthenticationMechanismFactory {
+
+    private final ServiceLoader&lt;HttpServerAuthenticationMechanismFactory&gt; serviceLoader;
+
+    /**
+     * Constructs a new instance with a previously created {@link ServiceLoader}
+     *
+     * This class synchronizes on the supplied service loader, if the same is synchronized against outside then {@link ServiceLoader#reload()} can safely be called.
+     *
+     * @param serviceLoader the {@link ServiceLoader} to use to locate {@link HttpServerAuthenticationMechanismFactory} instances.
+     */
+<span class="nc" id="L53">    public ServiceLoaderServerMechanismFactory(ServiceLoader&lt;HttpServerAuthenticationMechanismFactory&gt; serviceLoader) {</span>
+<span class="nc" id="L54">        this.serviceLoader = checkNotNullParam(&quot;serviceLoader&quot;, serviceLoader);</span>
+<span class="nc" id="L55">    }</span>
+
+    /**
+     * Constructs a new instance, a {@link ServiceLoader} will be created from the supplied {@link ClassLoader}
+     *
+     * @param classLoader the {@link ClassLoader} to use to construct a {@link ServiceLoader}.
+     */
+    public ServiceLoaderServerMechanismFactory(ClassLoader classLoader) {
+<span class="nc" id="L63">        this(ServiceLoader.load(HttpServerAuthenticationMechanismFactory.class, checkNotNullParam(&quot;classLoader&quot;, classLoader)));</span>
+<span class="nc" id="L64">    }</span>
+
+    /**
+     * @see org.wildfly.security.http.HttpServerAuthenticationMechanismFactory#getMechanismNames(java.util.Map)
+     */
+    @Override
+    public String[] getMechanismNames(Map&lt;String, ?&gt; properties) {
+<span class="nc" id="L71">        Set&lt;String&gt; names = new LinkedHashSet&lt;&gt;();</span>
+<span class="nc" id="L72">        synchronized(serviceLoader) {</span>
+<span class="nc" id="L73">            Iterator&lt;HttpServerAuthenticationMechanismFactory&gt; factoryIterator = serviceLoader.iterator();</span>
+            try {
+<span class="nc bnc" id="L75" title="All 2 branches missed.">                while (factoryIterator.hasNext()) {</span>
+<span class="nc" id="L76">                    HttpServerAuthenticationMechanismFactory current = factoryIterator.next();</span>
+<span class="nc" id="L77">                    Collections.addAll(names, current.getMechanismNames(properties));</span>
+<span class="nc" id="L78">                }</span>
+<span class="nc" id="L79">            } catch (ServiceConfigurationError e) {</span>
+<span class="nc" id="L80">                log.debug(&quot;Unable to read service configuration&quot;, e);</span>
+<span class="nc" id="L81">            }</span>
+<span class="nc" id="L82">        }</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L84">            log.tracef(&quot;No %s provided by service loader in %s: %s&quot;, HttpServerAuthenticationMechanismFactory.class.getSimpleName(), getClass().getSimpleName(), serviceLoader.toString());</span>
+        }
+<span class="nc" id="L86">        return names.toArray(new String[names.size()]);</span>
+    }
+
+    /**
+     * @see org.wildfly.security.http.HttpServerAuthenticationMechanismFactory#createAuthenticationMechanism(java.lang.String, java.util.Map, javax.security.auth.callback.CallbackHandler)
+     */
+    @Override
+    public HttpServerAuthenticationMechanism createAuthenticationMechanism(String mechanismName, Map&lt;String, ?&gt; properties,
+            CallbackHandler callbackHandler) throws HttpAuthenticationException {
+<span class="nc" id="L95">        synchronized(serviceLoader) {</span>
+<span class="nc" id="L96">            Iterator&lt;HttpServerAuthenticationMechanismFactory&gt; factoryIterator = serviceLoader.iterator();</span>
+            try {
+<span class="nc bnc" id="L98" title="All 2 branches missed.">                while (factoryIterator.hasNext()) {</span>
+<span class="nc" id="L99">                    HttpServerAuthenticationMechanismFactory current = factoryIterator.next();</span>
+<span class="nc" id="L100">                    HttpServerAuthenticationMechanism authenticationMechanism = current.createAuthenticationMechanism(mechanismName, properties, callbackHandler);</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">                    if (authenticationMechanism != null) {</span>
+<span class="nc" id="L102">                        return authenticationMechanism;</span>
+                    }
+<span class="nc" id="L104">                }</span>
+<span class="nc" id="L105">            } catch (ServiceConfigurationError e) {</span>
+<span class="nc" id="L106">                log.debug(&quot;Unable to read service configuration&quot;, e);</span>
+<span class="nc" id="L107">            }</span>
+<span class="nc" id="L108">        }</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        if (log.isTraceEnabled()) {</span>
+<span class="nc" id="L110">            log.tracef(&quot;No %s provided by service loader in %s: %s&quot;, HttpServerAuthenticationMechanismFactory.class.getSimpleName(), getClass().getSimpleName(), serviceLoader.toString());</span>
+        }
+<span class="nc" id="L112">        return null;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

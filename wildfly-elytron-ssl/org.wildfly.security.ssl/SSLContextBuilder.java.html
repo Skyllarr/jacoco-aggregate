@@ -1,0 +1,391 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SSLContextBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-ssl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.ssl</a> &gt; <span class="el_source">SSLContextBuilder.java</span></div><h1>SSLContextBuilder.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.ssl;
+
+import static org.wildfly.security.provider.util.ProviderUtil.INSTALLED_PROVIDERS;
+
+import java.security.Provider;
+import java.security.Security;
+import java.util.function.Supplier;
+
+import javax.net.ssl.KeyManager;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSessionContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509ExtendedKeyManager;
+import javax.net.ssl.X509KeyManager;
+import javax.net.ssl.X509TrustManager;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.FixedSecurityFactory;
+import org.wildfly.security.OneTimeSecurityFactory;
+import org.wildfly.security.SecurityFactory;
+import org.wildfly.security.auth.server.MechanismConfiguration;
+import org.wildfly.security.auth.server.MechanismConfigurationSelector;
+import org.wildfly.security.auth.server.SecurityDomain;
+import org.wildfly.security.auth.server.PrincipalDecoder;
+import org.wildfly.security.auth.server.ServerAuthenticationContext;
+import org.wildfly.security.evidence.X509PeerCertificateChainEvidence;
+
+/**
+ * A class which allows building and configuration of a single client- or server-side SSL context.  The builder requires, at a
+ * minimum, that a key manager be set; all other parameters have default values as follows:
+ * &lt;ul&gt;
+ *     &lt;li&gt;The security domain defaults to being empty (no client authentication possible)&lt;/li&gt;
+ *     &lt;li&gt;The principal decoder defaults to the {@linkplain PrincipalDecoder#DEFAULT default principal decoder}&lt;/li&gt;
+ *     &lt;li&gt;The cipher suite selector defaults to {@link CipherSuiteSelector#openSslDefault()}&lt;/li&gt;
+ *     &lt;li&gt;The protocol suite selector defaults to {@link ProtocolSelector#DEFAULT_SELECTOR}&lt;/li&gt;
+ *     &lt;li&gt;The &quot;require client authentication&quot; flag defaults to {@code false}&lt;/li&gt;
+ *     &lt;li&gt;The provider supplier defaults to {@link Security#getProviders() Security::getProviders}&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+<span class="fc" id="L60">public final class SSLContextBuilder {</span>
+
+    private SecurityDomain securityDomain;
+    // ELY-1917: This should be changed to CipherSuiteSelector.openSslCombinedDefault once we are ready to enable
+    // TLS 1.3 by default
+<span class="fc" id="L65">    private CipherSuiteSelector cipherSuiteSelector = CipherSuiteSelector.openSslDefault();</span>
+<span class="fc" id="L66">    private ProtocolSelector protocolSelector = ProtocolSelector.DEFAULT_SELECTOR;</span>
+<span class="fc" id="L67">    private boolean useCipherSuitesOrder = true;</span>
+    private boolean wantClientAuth;
+    private boolean needClientAuth;
+    private boolean authenticationOptional;
+    private boolean clientMode;
+    private int sessionCacheSize;
+    private int sessionTimeout;
+    private SecurityFactory&lt;X509ExtendedKeyManager&gt; keyManagerSecurityFactory;
+<span class="fc" id="L75">    private SecurityFactory&lt;X509TrustManager&gt; trustManagerSecurityFactory = SSLUtils.getDefaultX509TrustManagerSecurityFactory();</span>
+<span class="fc" id="L76">    private Supplier&lt;Provider[]&gt; providerSupplier = INSTALLED_PROVIDERS;</span>
+    private String providerName;
+<span class="fc" id="L78">    private boolean wrap = true;</span>
+    private MechanismConfigurationSelector mechanismConfigurationSelector;
+
+    /**
+     * Set the security domain to use to authenticate clients.
+     *
+     * @param securityDomain the security domain to use to authenticate clients, or {@code null} to disable client
+     *    certificate authentication
+     */
+    public SSLContextBuilder setSecurityDomain(final SecurityDomain securityDomain) {
+
+<span class="nc bnc" id="L89" title="All 4 branches missed.">        if (securityDomain != null &amp;&amp; securityDomain.getEvidenceVerifySupport(X509PeerCertificateChainEvidence.class).isNotSupported()) {</span>
+<span class="nc" id="L90">            throw ElytronMessages.tls.securityDomainOfSSLContextDoesNotSupportX509();</span>
+        }
+
+<span class="nc" id="L93">        this.securityDomain = securityDomain;</span>
+
+<span class="nc" id="L95">        return this;</span>
+    }
+
+    /**
+     * Set the cipher suite selector to use for this context.
+     *
+     * @param cipherSuiteSelector the cipher suite selector (not {@code null})
+     */
+    public SSLContextBuilder setCipherSuiteSelector(final CipherSuiteSelector cipherSuiteSelector) {
+<span class="fc" id="L104">        Assert.checkNotNullParam(&quot;cipherSuiteSelector&quot;, cipherSuiteSelector);</span>
+<span class="fc" id="L105">        this.cipherSuiteSelector = cipherSuiteSelector;</span>
+
+<span class="fc" id="L107">        return this;</span>
+    }
+
+    /**
+     * Set the protocol selector to use for this context.
+     *
+     * @param protocolSelector the protocol selector to use for this context (not {@code null})
+     */
+    public SSLContextBuilder setProtocolSelector(final ProtocolSelector protocolSelector) {
+<span class="fc" id="L116">        Assert.checkNotNullParam(&quot;protocolSelector&quot;, protocolSelector);</span>
+<span class="fc" id="L117">        this.protocolSelector = protocolSelector;</span>
+
+<span class="fc" id="L119">        return this;</span>
+    }
+
+    /**
+     * Sets whether the local cipher suites preference should be honored.
+     *
+     * @param useCipherSuitesOrder whether the local cipher suites preference should be honored.
+     */
+    public SSLContextBuilder setUseCipherSuitesOrder(final boolean useCipherSuitesOrder) {
+<span class="fc" id="L128">        Assert.checkNotNullParam(&quot;useCipherSuitesOrder&quot;, useCipherSuitesOrder);</span>
+<span class="fc" id="L129">        this.useCipherSuitesOrder = useCipherSuitesOrder;</span>
+
+<span class="fc" id="L131">        return this;</span>
+    }
+
+    /**
+     * Force the SSLContext created by this builder to want client authentication.
+     *
+     * The SSLContext returned by this builder will be configured to want client authentication if this value is set to true OR
+     * of a SecurityDomain is associated.
+     *
+     * @param wantClientAuth should the SSLContext be forced to want client authentication.
+     */
+    public SSLContextBuilder setWantClientAuth(final boolean wantClientAuth) {
+<span class="nc" id="L143">        this.wantClientAuth = wantClientAuth;</span>
+
+<span class="nc" id="L145">        return this;</span>
+    }
+
+    /**
+     * Force the SSLContext created by this builder to need client authentication.
+     *
+     * The SSLContext returned by this builder will be configured to need client authentication if this value is set to true.
+     *
+     * @param needClientAuth should the SSLContext be forced to need client authentication.
+     */
+    public SSLContextBuilder setNeedClientAuth(final boolean needClientAuth) {
+<span class="nc" id="L156">        this.needClientAuth = needClientAuth;</span>
+
+<span class="nc" id="L158">        return this;</span>
+    }
+
+    /**
+     * Where a SecurityDomain is associated with this Builder if the client presents a certificate an attempt will be made to
+     * obtain a SecurityIdentity by using the certificate for authentication, setting this flag to {@code true} allows for a
+     * failed authentication to be silently ignored.
+     *
+     * This setting does not bypass any certificate checking performed by the underlying TrustManager so failure there will still cause the connection attempt to be aborted.
+     *
+     * The reason this setting would be used would be to enable a fallback to another authentication mechanism after the connection is established.
+     *
+     * Note: Where this is no security domain associated there is no authentication step so this value will be ignored.
+     *
+     * @param authenticationOptional should the authentication step be allowed to silently fail.
+     */
+    public SSLContextBuilder setAuthenticationOptional(final boolean authenticationOptional) {
+<span class="nc" id="L175">        this.authenticationOptional = authenticationOptional;</span>
+
+<span class="nc" id="L177">        return this;</span>
+    }
+
+
+    /**
+     * Sets the size of the cache used for storing SSLSession objects.
+     *
+     * @param sessionCacheSize the size of the cache used for storing SSLSession objects.
+     * @return The {@link SSLContextBuilder} to allow chaining of method calls.
+     */
+    public SSLContextBuilder setSessionCacheSize(final int sessionCacheSize) {
+<span class="nc" id="L188">        this.sessionCacheSize = sessionCacheSize;</span>
+
+<span class="nc" id="L190">        return this;</span>
+    }
+
+    /**
+     * Sets the timeout limit for SSLSession objects.
+     *
+     * @param sessionTimeout the timeout limit for SSLSession objects.
+     * @return The {@link SSLContextBuilder} to allow chaining of method calls.
+     */
+    public SSLContextBuilder setSessionTimeout(final int sessionTimeout) {
+<span class="fc" id="L200">        this.sessionTimeout = sessionTimeout;</span>
+
+<span class="fc" id="L202">        return this;</span>
+    }
+
+    /**
+     * Set the factory for the key manager which should be used to hold identities for this context.
+     *
+     * @param keyManagerSecurityFactory the security factory which produces the key manager (not {@code null})
+     */
+    public SSLContextBuilder setKeyManagerSecurityFactory(final SecurityFactory&lt;X509ExtendedKeyManager&gt; keyManagerSecurityFactory) {
+<span class="nc" id="L211">        Assert.checkNotNullParam(&quot;keyManagerSecurityFactory&quot;, keyManagerSecurityFactory);</span>
+<span class="nc" id="L212">        this.keyManagerSecurityFactory = keyManagerSecurityFactory;</span>
+
+<span class="nc" id="L214">        return this;</span>
+    }
+
+    /**
+     * Set the key manager which should be used to hold identities for this context.
+     *
+     * @param keyManager the security factory which produces the key manager (not {@code null})
+     */
+    public SSLContextBuilder setKeyManager(final X509ExtendedKeyManager keyManager) {
+<span class="fc" id="L223">        Assert.checkNotNullParam(&quot;keyManager&quot;, keyManager);</span>
+<span class="fc" id="L224">        this.keyManagerSecurityFactory = new FixedSecurityFactory&lt;&gt;(keyManager);</span>
+
+<span class="fc" id="L226">        return this;</span>
+    }
+
+    /**
+     * Set the factory for the trust manager which should be used for the initial trust decisions during connection.
+     *
+     * @param trustManagerSecurityFactory the factory for the trust manager which should be used for the initial trust decisions during connection (not {@code null}).
+     */
+    public SSLContextBuilder setTrustManagerSecurityFactory(final SecurityFactory&lt;X509TrustManager&gt; trustManagerSecurityFactory) {
+<span class="nc" id="L235">        this.trustManagerSecurityFactory = Assert.checkNotNullParam(&quot;trustManagerSecurityFactory&quot;, trustManagerSecurityFactory);</span>
+
+<span class="nc" id="L237">        return this;</span>
+    }
+
+    /**
+     * Set the trust manager which should be used to hold identities for this context.
+     *
+     * @param trustManager the trust manager which should be used to hold identities for this context (not {@code null}).
+     */
+    public SSLContextBuilder setTrustManager(final X509TrustManager trustManager) {
+<span class="nc" id="L246">        Assert.checkNotNullParam(&quot;trustManager&quot;, trustManager);</span>
+<span class="nc" id="L247">        this.trustManagerSecurityFactory = new FixedSecurityFactory&lt;&gt;(trustManager);</span>
+
+<span class="nc" id="L249">        return this;</span>
+    }
+
+    // todo: add a setter which simply accepts a single org.wildfly.security.ssl.X500CertificateChainPrivateCredential instance
+
+    /**
+     * Set the provider supplier.
+     *
+     * @param providerSupplier the provider supplier (not {@code null})
+     */
+    public SSLContextBuilder setProviderSupplier(final Supplier&lt;Provider[]&gt; providerSupplier) {
+<span class="fc" id="L260">        Assert.checkNotNullParam(&quot;providerSupplier&quot;, providerSupplier);</span>
+<span class="fc" id="L261">        this.providerSupplier = providerSupplier;</span>
+
+<span class="fc" id="L263">        return this;</span>
+    }
+
+    /**
+     * Set the provider name.
+     *
+     * @param name the provider name (if {@code null} and provider is allowed)
+     * @return this builder
+     */
+    public SSLContextBuilder setProviderName(final String name) {
+<span class="fc" id="L273">        this.providerName = name;</span>
+<span class="fc" id="L274">        return this;</span>
+    }
+
+    /**
+     * Set the client mode of the target SSL context.
+     *
+     * @param clientMode {@code true} to use client mode, {@code false} otherwise
+     * @return this builder
+     */
+    public SSLContextBuilder setClientMode(final boolean clientMode) {
+<span class="fc" id="L284">        this.clientMode = clientMode;</span>
+<span class="fc" id="L285">        return this;</span>
+    }
+
+    /**
+     * Set if the configured SSL engine and sockets created using the SSL context should be wrapped to prevent modification to the configuration.
+     *
+     * Defaults to {@code true}.
+     *
+     * @param wrap should the engine or socket created by the SSL context be wrapped to prevent modification to the configuration.
+     * @return this builder
+     */
+    public SSLContextBuilder setWrap(final boolean wrap) {
+<span class="nc" id="L297">        this.wrap = wrap;</span>
+<span class="nc" id="L298">        return this;</span>
+    }
+
+    /**
+     * Set selector of mechanism configuration for {@link ServerAuthenticationContext}, which will be used for SSL client authentication.
+     *
+     * @param mechanismConfigurationSelector mechanism configuration selector to be used by {@link ServerAuthenticationContext} in SSL authentication.
+     * @return this builder
+     */
+    public SSLContextBuilder setMechanismConfigurationSelector(final MechanismConfigurationSelector mechanismConfigurationSelector) {
+<span class="nc" id="L308">        this.mechanismConfigurationSelector = mechanismConfigurationSelector;</span>
+<span class="nc" id="L309">        return this;</span>
+    }
+
+
+
+    /**
+     * Build a security factory for the new context.  The factory will cache the constructed instance.
+     *
+     * @return the security factory
+     */
+    public SecurityFactory&lt;SSLContext&gt; build() {
+<span class="fc" id="L320">        final SecurityDomain securityDomain = this.securityDomain;</span>
+<span class="fc" id="L321">        final CipherSuiteSelector cipherSuiteSelector = this.cipherSuiteSelector;</span>
+<span class="fc" id="L322">        final ProtocolSelector protocolSelector = this.protocolSelector;</span>
+<span class="fc" id="L323">        final SecurityFactory&lt;X509TrustManager&gt; trustManagerSecurityFactory = this.trustManagerSecurityFactory;</span>
+<span class="fc" id="L324">        final SecurityFactory&lt;X509ExtendedKeyManager&gt; keyManagerSecurityFactory = this.keyManagerSecurityFactory;</span>
+<span class="fc" id="L325">        final Supplier&lt;Provider[]&gt; providerSupplier = this.providerSupplier;</span>
+<span class="fc" id="L326">        final boolean clientMode = this.clientMode;</span>
+<span class="fc" id="L327">        final boolean authenticationOptional = this.authenticationOptional;</span>
+<span class="fc" id="L328">        final int sessionCacheSize = this.sessionCacheSize;</span>
+<span class="fc" id="L329">        final int sessionTimeout = this.sessionTimeout;</span>
+<span class="fc" id="L330">        final boolean wantClientAuth = this.wantClientAuth;</span>
+<span class="fc" id="L331">        final boolean needClientAuth = this.needClientAuth;</span>
+<span class="fc" id="L332">        final boolean useCipherSuitesOrder = this.useCipherSuitesOrder;</span>
+<span class="fc" id="L333">        final boolean wrap  = this.wrap;</span>
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">        final MechanismConfigurationSelector mechanismConfigurationSelector = this.mechanismConfigurationSelector != null ?</span>
+<span class="nc" id="L335">                this.mechanismConfigurationSelector :</span>
+<span class="fc" id="L336">                MechanismConfigurationSelector.constantSelector(MechanismConfiguration.EMPTY);</span>
+
+<span class="fc" id="L338">        return new OneTimeSecurityFactory&lt;&gt;(() -&gt; {</span>
+<span class="fc" id="L339">            final SecurityFactory&lt;SSLContext&gt; sslContextFactory = SSLUtils.createSslContextFactory(protocolSelector, providerSupplier, providerName);</span>
+            // construct the original context
+<span class="fc" id="L341">            final SSLContext sslContext = sslContextFactory.create();</span>
+<span class="pc bpc" id="L342" title="1 of 2 branches missed.">            final X509KeyManager x509KeyManager = keyManagerSecurityFactory == null ? null : keyManagerSecurityFactory.create();</span>
+<span class="fc" id="L343">            final X509TrustManager x509TrustManager = trustManagerSecurityFactory.create();</span>
+<span class="pc bpc" id="L344" title="3 of 4 branches missed.">            final boolean canAuthPeers = securityDomain != null &amp;&amp; securityDomain.getEvidenceVerifySupport(X509PeerCertificateChainEvidence.class).mayBeSupported();</span>
+
+<span class="pc bpc" id="L346" title="1 of 2 branches missed.">            if (ElytronMessages.tls.isTraceEnabled()) {</span>
+<span class="nc" id="L347">                ElytronMessages.tls.tracef(&quot;SSLContext initialization:%n&quot; +</span>
+                                &quot;    securityDomain = %s%n&quot; +
+                                &quot;    canAuthPeers = %s%n&quot; +
+                                &quot;    cipherSuiteSelector = %s%n&quot; +
+                                &quot;    protocolSelector = %s%n&quot; +
+                                &quot;    x509TrustManager = %s%n&quot; +
+                                &quot;    x509KeyManager = %s%n&quot; +
+                                &quot;    providerSupplier = %s%n&quot; +
+                                &quot;    clientMode = %s%n&quot; +
+                                &quot;    authenticationOptional = %s%n&quot; +
+                                &quot;    sessionCacheSize = %s%n&quot; +
+                                &quot;    sessionTimeout = %s%n&quot; +
+                                &quot;    wantClientAuth = %s%n&quot; +
+                                &quot;    needClientAuth = %s%n&quot; +
+                                &quot;    useCipherSuitesOrder = %s%n&quot; +
+                                &quot;    wrap = %s%n&quot;,
+<span class="nc" id="L363">                        securityDomain, canAuthPeers, cipherSuiteSelector, protocolSelector, x509TrustManager,</span>
+<span class="nc" id="L364">                        x509KeyManager, providerSupplier, clientMode, authenticationOptional, sessionCacheSize,</span>
+<span class="nc" id="L365">                        sessionTimeout, wantClientAuth, needClientAuth, useCipherSuitesOrder, wrap);</span>
+            }
+
+<span class="pc bpc" id="L368" title="1 of 2 branches missed.">            sslContext.init(x509KeyManager == null ? null : new KeyManager[]{</span>
+                    x509KeyManager
+            }, new TrustManager[]{
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">                    canAuthPeers ?</span>
+<span class="nc" id="L372">                            new SecurityDomainTrustManager(x509TrustManager, securityDomain, authenticationOptional, mechanismConfigurationSelector) :</span>
+<span class="fc" id="L373">                            x509TrustManager</span>
+            }, null);
+
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">            SSLSessionContext sessionContext = clientMode ? sslContext.getClientSessionContext() : sslContext.getServerSessionContext();</span>
+<span class="pc bpc" id="L377" title="1 of 2 branches missed.">            if (sessionContext != null) {</span>
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">                if (sessionCacheSize &gt;= 0) sessionContext.setSessionCacheSize(sessionCacheSize);</span>
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">                if (sessionTimeout &gt;= 0) sessionContext.setSessionTimeout(sessionTimeout);</span>
+            }
+
+            // now, set up the wrapping configuration
+<span class="pc bpc" id="L383" title="1 of 2 branches missed.">            final SSLConfigurator sslConfigurator = clientMode ?</span>
+<span class="fc" id="L384">                    new SSLConfiguratorImpl(protocolSelector, cipherSuiteSelector, useCipherSuitesOrder) :</span>
+<span class="pc bnc" id="L385" title="All 4 branches missed.">                    new SSLConfiguratorImpl(protocolSelector, cipherSuiteSelector, wantClientAuth || canAuthPeers, needClientAuth, useCipherSuitesOrder);</span>
+<span class="fc" id="L386">            final ConfiguredSSLContextSpi contextSpi = new ConfiguredSSLContextSpi(sslContext, sslConfigurator, wrap);</span>
+<span class="fc" id="L387">            return new DelegatingSSLContext(contextSpi);</span>
+        });
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

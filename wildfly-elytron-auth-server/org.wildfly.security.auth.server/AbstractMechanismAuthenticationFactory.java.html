@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractMechanismAuthenticationFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.server</a> &gt; <span class="el_source">AbstractMechanismAuthenticationFactory.java</span></div><h1>AbstractMechanismAuthenticationFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.server;
+
+import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.function.UnaryOperator;
+
+import javax.security.auth.callback.CallbackHandler;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.credential.AlgorithmCredential;
+import org.wildfly.security.credential.Credential;
+import org.wildfly.security.evidence.AlgorithmEvidence;
+import org.wildfly.security.evidence.Evidence;
+
+public abstract class AbstractMechanismAuthenticationFactory&lt;M, F, E extends Exception&gt; implements MechanismAuthenticationFactory&lt;M, F, E&gt; {
+
+    private final SecurityDomain securityDomain;
+    private final MechanismConfigurationSelector mechanismConfigurationSelector;
+    private final F factory;
+
+<span class="nc" id="L39">    protected AbstractMechanismAuthenticationFactory(final SecurityDomain securityDomain, final MechanismConfigurationSelector mechanismConfigurationSelector, final F factory) {</span>
+<span class="nc" id="L40">        this.securityDomain = securityDomain;</span>
+<span class="nc" id="L41">        this.mechanismConfigurationSelector = mechanismConfigurationSelector;</span>
+<span class="nc" id="L42">        this.factory = factory;</span>
+<span class="nc" id="L43">    }</span>
+
+    public SecurityDomain getSecurityDomain() {
+<span class="nc" id="L46">        return securityDomain;</span>
+    }
+
+    public F getFactory() {
+<span class="nc" id="L50">        return factory;</span>
+    }
+
+    public M createMechanism(final String name, final UnaryOperator&lt;F&gt; factoryTransformation) throws E {
+<span class="nc" id="L54">        return doCreate(name, new ServerAuthenticationContext(securityDomain, mechanismConfigurationSelector).createCallbackHandler(), factoryTransformation);</span>
+    }
+
+    protected abstract M doCreate(String name, CallbackHandler callbackHandler, final UnaryOperator&lt;F&gt; factoryTransformation) throws E;
+
+    protected abstract Collection&lt;Class&lt;? extends Evidence&gt;&gt; getSupportedEvidenceTypes(String mechName);
+
+    protected abstract Collection&lt;String&gt; getSupportedEvidenceAlgorithmNames(Class&lt;? extends AlgorithmEvidence&gt; evidenceType, String mechName);
+
+    protected abstract Collection&lt;Class&lt;? extends Credential&gt;&gt; getSupportedCredentialTypes(String mechName);
+
+    protected abstract Collection&lt;String&gt; getSupportedCredentialAlgorithmNames(Class&lt;? extends AlgorithmCredential&gt; credentialType, String mechName);
+
+    /**
+     * Determine whether the given mechanism name needs credentials from a realm in order to authenticate.
+     *
+     * @param mechName the mechanism name
+     * @return {@code true} if the mechanism requires realm credential support, {@code false} if it does not
+     */
+    protected abstract boolean usesCredentials(String mechName);
+
+    public Collection&lt;String&gt; getMechanismNames() {
+<span class="nc" id="L76">        final Collection&lt;String&gt; names = new LinkedHashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        top: for (String mechName : getAllSupportedMechNames()) {</span>
+            // if the mech doesn't need credentials, then we support it for sure
+<span class="nc bnc" id="L79" title="All 2 branches missed.">            if (! usesCredentials(mechName)) {</span>
+<span class="nc" id="L80">                names.add(mechName);</span>
+<span class="nc" id="L81">                continue;</span>
+            }
+
+<span class="nc" id="L84">            final SecurityDomain securityDomain = this.securityDomain;</span>
+
+            // if the mech supports verification for a type of evidence we have, we support it
+<span class="nc bnc" id="L87" title="All 2 branches missed.">            for (Class&lt;? extends Evidence&gt; evidenceType : getSupportedEvidenceTypes(mechName)) {</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">                if (AlgorithmEvidence.class.isAssignableFrom(evidenceType)) {</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">                    for (String algorithmName : getSupportedEvidenceAlgorithmNames(evidenceType.asSubclass(AlgorithmEvidence.class), mechName)) {</span>
+<span class="nc bnc" id="L90" title="All 6 branches missed.">                        if (&quot;*&quot;.equals(algorithmName) &amp;&amp; securityDomain.getEvidenceVerifySupport(evidenceType).mayBeSupported() || securityDomain.getEvidenceVerifySupport(evidenceType, algorithmName).mayBeSupported()) {</span>
+<span class="nc" id="L91">                            names.add(mechName);</span>
+<span class="nc" id="L92">                            continue top;</span>
+                        }
+<span class="nc" id="L94">                    }</span>
+                } else {
+<span class="nc bnc" id="L96" title="All 2 branches missed.">                    if (securityDomain.getEvidenceVerifySupport(evidenceType).mayBeSupported()) {</span>
+<span class="nc" id="L97">                        names.add(mechName);</span>
+<span class="nc" id="L98">                        continue top;</span>
+                    }
+                }
+<span class="nc" id="L101">            }</span>
+            // if the mech supports a type of credential we have, we support it
+<span class="nc bnc" id="L103" title="All 2 branches missed.">            for (Class&lt;? extends Credential&gt; credentialType : getSupportedCredentialTypes(mechName)) {</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">                if (AlgorithmCredential.class.isAssignableFrom(credentialType)) {</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">                    for (String algorithmName : getSupportedCredentialAlgorithmNames(credentialType.asSubclass(AlgorithmCredential.class), mechName)) {</span>
+<span class="nc bnc" id="L106" title="All 6 branches missed.">                        if (&quot;*&quot;.equals(algorithmName) &amp;&amp; securityDomain.getCredentialAcquireSupport(credentialType).mayBeSupported() || securityDomain.getCredentialAcquireSupport(credentialType, algorithmName).mayBeSupported()) {</span>
+<span class="nc" id="L107">                            names.add(mechName);</span>
+<span class="nc" id="L108">                            continue top;</span>
+                        }
+<span class="nc" id="L110">                    }</span>
+                } else {
+<span class="nc bnc" id="L112" title="All 2 branches missed.">                    if (securityDomain.getCredentialAcquireSupport(credentialType).mayBeSupported()) {</span>
+<span class="nc" id="L113">                        names.add(mechName);</span>
+<span class="nc" id="L114">                        continue top;</span>
+                    }
+                }
+<span class="nc" id="L117">            }</span>
+<span class="nc" id="L118">        }</span>
+<span class="nc" id="L119">        return names;</span>
+    }
+
+    protected abstract Collection&lt;String&gt; getAllSupportedMechNames();
+
+    protected abstract static class Builder&lt;M, F, E extends Exception&gt; implements MechanismAuthenticationFactory.Builder&lt;M, F, E&gt; {
+        private SecurityDomain securityDomain;
+        private MechanismConfigurationSelector mechanismConfigurationSelector;
+        private F factory;
+
+<span class="nc" id="L129">        protected Builder() {</span>
+<span class="nc" id="L130">        }</span>
+
+        public Builder&lt;M, F, E&gt; setSecurityDomain(final SecurityDomain securityDomain) {
+<span class="nc" id="L133">            Assert.checkNotNullParam(&quot;securityDomain&quot;, securityDomain);</span>
+<span class="nc" id="L134">            this.securityDomain = securityDomain;</span>
+<span class="nc" id="L135">            return this;</span>
+        }
+
+        public Builder&lt;M, F, E&gt; setMechanismConfigurationSelector(final MechanismConfigurationSelector mechanismConfigurationSelector) {
+<span class="nc" id="L139">            this.mechanismConfigurationSelector = mechanismConfigurationSelector;</span>
+<span class="nc" id="L140">            return this;</span>
+        }
+
+        public Builder&lt;M, F, E&gt; setFactory(final F factory) {
+<span class="nc" id="L144">            Assert.checkNotNullParam(&quot;factory&quot;, factory);</span>
+<span class="nc" id="L145">            this.factory = factory;</span>
+<span class="nc" id="L146">            return this;</span>
+        }
+
+        public SecurityDomain getSecurityDomain() {
+<span class="nc" id="L150">            return securityDomain;</span>
+        }
+
+        public MechanismConfigurationSelector getMechanismConfigurationSelector() {
+<span class="nc" id="L154">            return mechanismConfigurationSelector;</span>
+        }
+
+        public F getFactory() {
+<span class="nc" id="L158">            return factory;</span>
+        }
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

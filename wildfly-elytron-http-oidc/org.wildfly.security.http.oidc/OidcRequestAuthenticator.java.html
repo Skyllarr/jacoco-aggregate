@@ -1,0 +1,420 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OidcRequestAuthenticator.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-oidc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.oidc</a> &gt; <span class="el_source">OidcRequestAuthenticator.java</span></div><h1>OidcRequestAuthenticator.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2021 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.http.oidc;
+
+import static org.wildfly.security.http.oidc.ElytronMessages.log;
+import static org.wildfly.security.http.oidc.Oidc.CLIENT_ID;
+import static org.wildfly.security.http.oidc.Oidc.CODE;
+import static org.wildfly.security.http.oidc.Oidc.DOMAIN_HINT;
+import static org.wildfly.security.http.oidc.Oidc.ERROR;
+import static org.wildfly.security.http.oidc.Oidc.KC_IDP_HINT;
+import static org.wildfly.security.http.oidc.Oidc.LOGIN_HINT;
+import static org.wildfly.security.http.oidc.Oidc.MAX_AGE;
+import static org.wildfly.security.http.oidc.Oidc.OIDC_SCOPE;
+import static org.wildfly.security.http.oidc.Oidc.PROMPT;
+import static org.wildfly.security.http.oidc.Oidc.REDIRECT_URI;
+import static org.wildfly.security.http.oidc.Oidc.RESPONSE_TYPE;
+import static org.wildfly.security.http.oidc.Oidc.SCOPE;
+import static org.wildfly.security.http.oidc.Oidc.SESSION_STATE;
+import static org.wildfly.security.http.oidc.Oidc.STATE;
+import static org.wildfly.security.http.oidc.Oidc.UI_LOCALES;
+import static org.wildfly.security.http.oidc.Oidc.generateId;
+import static org.wildfly.security.http.oidc.Oidc.getQueryParamValue;
+import static org.wildfly.security.http.oidc.Oidc.logToken;
+import static org.wildfly.security.http.oidc.Oidc.stripQueryParam;
+
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.http.HttpStatus;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.utils.URIBuilder;
+import org.apache.http.message.BasicNameValuePair;
+import org.wildfly.security.http.HttpConstants;
+
+/**
+ * @author &lt;a href=&quot;mailto:bill@burkecentral.com&quot;&gt;Bill Burke&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+public class OidcRequestAuthenticator {
+    protected OidcClientConfiguration deployment;
+    protected RequestAuthenticator reqAuthenticator;
+    protected int sslRedirectPort;
+    protected OidcTokenStore tokenStore;
+    protected String tokenString;
+    protected String idTokenString;
+    protected IDToken idToken;
+    protected AccessToken token;
+    protected OidcHttpFacade facade;
+    protected AuthChallenge challenge;
+    protected String refreshToken;
+    protected String strippedOauthParametersRequestUri;
+
+<span class="nc" id="L75">    public OidcRequestAuthenticator(RequestAuthenticator requestAuthenticator, OidcHttpFacade facade, OidcClientConfiguration deployment, int sslRedirectPort, OidcTokenStore tokenStore) {</span>
+<span class="nc" id="L76">        this.reqAuthenticator = requestAuthenticator;</span>
+<span class="nc" id="L77">        this.facade = facade;</span>
+<span class="nc" id="L78">        this.deployment = deployment;</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        this.sslRedirectPort = deployment.getConfidentialPort() != -1 ? deployment.getConfidentialPort() : sslRedirectPort;</span>
+<span class="nc" id="L80">        this.tokenStore = tokenStore;</span>
+<span class="nc" id="L81">    }</span>
+
+    public AuthChallenge getChallenge() {
+<span class="nc" id="L84">        return challenge;</span>
+    }
+
+    public String getTokenString() {
+<span class="nc" id="L88">        return tokenString;</span>
+    }
+
+    public AccessToken getToken() {
+<span class="nc" id="L92">        return token;</span>
+    }
+
+    public String getRefreshToken() {
+<span class="nc" id="L96">        return refreshToken;</span>
+    }
+
+    public String getIDTokenString() {
+<span class="nc" id="L100">        return idTokenString;</span>
+    }
+
+    public void setIDTokenString(String idTokenString) {
+<span class="nc" id="L104">        this.idTokenString = idTokenString;</span>
+<span class="nc" id="L105">    }</span>
+
+    public IDToken getIDToken() {
+<span class="nc" id="L108">        return idToken;</span>
+    }
+
+    public void setIDToken(IDToken idToken) {
+<span class="nc" id="L112">        this.idToken = idToken;</span>
+<span class="nc" id="L113">    }</span>
+
+    public String getStrippedOauthParametersRequestUri() {
+<span class="nc" id="L116">        return strippedOauthParametersRequestUri;</span>
+    }
+
+    public void setStrippedOauthParametersRequestUri(String strippedOauthParametersRequestUri) {
+<span class="nc" id="L120">        this.strippedOauthParametersRequestUri = strippedOauthParametersRequestUri;</span>
+<span class="nc" id="L121">    }</span>
+
+    protected String getRequestUrl() {
+<span class="nc" id="L124">        return facade.getRequest().getURI();</span>
+    }
+
+    protected boolean isRequestSecure() {
+<span class="nc" id="L128">        return facade.getRequest().isSecure();</span>
+    }
+
+    protected OidcHttpFacade.Cookie getCookie(String cookieName) {
+<span class="nc" id="L132">        return facade.getRequest().getCookie(cookieName);</span>
+    }
+
+    protected String getCookieValue(String cookieName) {
+<span class="nc" id="L136">        OidcHttpFacade.Cookie cookie = getCookie(cookieName);</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        if (cookie == null) return null;</span>
+<span class="nc" id="L138">        return cookie.getValue();</span>
+    }
+
+    protected String getError() {
+<span class="nc" id="L142">        return getQueryParamValue(facade, ERROR);</span>
+    }
+
+    protected String getCode() {
+<span class="nc" id="L146">        return getQueryParamValue(facade, CODE);</span>
+    }
+
+    protected String getRedirectUri(String state) {
+<span class="nc" id="L150">        String url = getRequestUrl();</span>
+<span class="nc" id="L151">        log.debugf(&quot;callback uri: %s&quot;, url);</span>
+
+        try {
+<span class="nc bnc" id="L154" title="All 4 branches missed.">            if (! facade.getRequest().isSecure() &amp;&amp; deployment.getSSLRequired().isRequired(facade.getRequest().getRemoteAddr())) {</span>
+<span class="nc" id="L155">                int port = getSSLRedirectPort();</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">                if (port &lt; 0) {</span>
+                    // disabled?
+<span class="nc" id="L158">                    return null;</span>
+                }
+<span class="nc" id="L160">                URIBuilder uriBuilder = new URIBuilder(url).setScheme(&quot;https&quot;);</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">                if (port != 443) {</span>
+<span class="nc" id="L162">                    uriBuilder.setPort(port);</span>
+                }
+<span class="nc" id="L164">                url = uriBuilder.build().toString();</span>
+            }
+
+<span class="nc" id="L167">            List&lt;String&gt; forwardableQueryParams = Arrays.asList(LOGIN_HINT, DOMAIN_HINT, KC_IDP_HINT, PROMPT, MAX_AGE, UI_LOCALES, SCOPE);</span>
+<span class="nc" id="L168">            List&lt;NameValuePair&gt; forwardedQueryParams = new ArrayList&lt;&gt;(forwardableQueryParams.size());</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">            for (String paramName : forwardableQueryParams) {</span>
+<span class="nc" id="L170">                String paramValue = getQueryParamValue(facade, paramName);</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">                if (SCOPE.equals(paramName)) {</span>
+<span class="nc" id="L172">                    paramValue = addOidcScopeIfNeeded(paramValue);</span>
+                }
+<span class="nc bnc" id="L174" title="All 4 branches missed.">                if (paramValue != null &amp;&amp; !paramValue.isEmpty()) {</span>
+<span class="nc" id="L175">                    forwardedQueryParams.add(new BasicNameValuePair(paramName, paramValue));</span>
+                }
+<span class="nc" id="L177">                url = stripQueryParam(url, paramName);</span>
+<span class="nc" id="L178">            }</span>
+
+<span class="nc bnc" id="L180" title="All 2 branches missed.">            if (deployment.getAuthUrl() == null) {</span>
+<span class="nc" id="L181">                return null;</span>
+            }
+<span class="nc" id="L183">            URIBuilder redirectUriBuilder = new URIBuilder(deployment.getAuthUrl())</span>
+<span class="nc" id="L184">                    .addParameter(RESPONSE_TYPE, CODE)</span>
+<span class="nc" id="L185">                    .addParameter(CLIENT_ID, deployment.getResourceName())</span>
+<span class="nc" id="L186">                    .addParameter(REDIRECT_URI, rewrittenRedirectUri(url))</span>
+<span class="nc" id="L187">                    .addParameter(STATE, state);</span>
+<span class="nc" id="L188">            redirectUriBuilder.addParameters(forwardedQueryParams);</span>
+<span class="nc" id="L189">            return redirectUriBuilder.build().toString();</span>
+<span class="nc" id="L190">        } catch (URISyntaxException e) {</span>
+<span class="nc" id="L191">            throw log.unableToCreateRedirectResponse(e);</span>
+        }
+    }
+
+    protected int getSSLRedirectPort() {
+<span class="nc" id="L196">        return sslRedirectPort;</span>
+    }
+
+    protected String getStateCode() {
+<span class="nc" id="L200">        return generateId();</span>
+    }
+
+    protected AuthChallenge loginRedirect() {
+<span class="nc" id="L204">        final String state = getStateCode();</span>
+<span class="nc" id="L205">        final String redirect = getRedirectUri(state);</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">        if (redirect == null) {</span>
+<span class="nc" id="L207">            return challenge(HttpStatus.SC_FORBIDDEN, AuthenticationError.Reason.NO_REDIRECT_URI, null);</span>
+        }
+<span class="nc" id="L209">        return new AuthChallenge() {</span>
+
+            @Override
+            public int getResponseCode() {
+<span class="nc" id="L213">                return 0;</span>
+            }
+
+            @Override
+            public boolean challenge(OidcHttpFacade exchange) {
+<span class="nc" id="L218">                tokenStore.saveRequest();</span>
+<span class="nc" id="L219">                log.debug(&quot;Sending redirect to login page: &quot; + redirect);</span>
+<span class="nc" id="L220">                exchange.getResponse().setStatus(HttpStatus.SC_MOVED_TEMPORARILY);</span>
+<span class="nc" id="L221">                exchange.getResponse().setCookie(deployment.getStateCookieName(), state, &quot;/&quot;, null, -1, deployment.getSSLRequired().isRequired(facade.getRequest().getRemoteAddr()), true);</span>
+<span class="nc" id="L222">                exchange.getResponse().setHeader(HttpConstants.LOCATION, redirect);</span>
+<span class="nc" id="L223">                return true;</span>
+            }
+        };
+    }
+
+    protected AuthChallenge checkStateCookie() {
+<span class="nc" id="L229">        OidcHttpFacade.Cookie stateCookie = getCookie(deployment.getStateCookieName());</span>
+
+<span class="nc bnc" id="L231" title="All 2 branches missed.">        if (stateCookie == null) {</span>
+<span class="nc" id="L232">            log.warn(&quot;No state cookie&quot;);</span>
+<span class="nc" id="L233">            return challenge(HttpStatus.SC_BAD_REQUEST, AuthenticationError.Reason.INVALID_STATE_COOKIE, null);</span>
+        }
+        // reset the cookie
+<span class="nc" id="L236">        log.debug(&quot;** reseting application state cookie&quot;);</span>
+<span class="nc" id="L237">        facade.getResponse().resetCookie(deployment.getStateCookieName(), stateCookie.getPath());</span>
+<span class="nc" id="L238">        String stateCookieValue = getCookieValue(deployment.getStateCookieName());</span>
+
+<span class="nc" id="L240">        String state = getQueryParamValue(facade, STATE);</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">        if (state == null) {</span>
+<span class="nc" id="L242">            log.warn(&quot;state parameter was null&quot;);</span>
+<span class="nc" id="L243">            return challenge(HttpStatus.SC_BAD_REQUEST, AuthenticationError.Reason.INVALID_STATE_COOKIE, null);</span>
+        }
+<span class="nc bnc" id="L245" title="All 2 branches missed.">        if (!state.equals(stateCookieValue)) {</span>
+<span class="nc" id="L246">            log.warn(&quot;state parameter invalid&quot;);</span>
+<span class="nc" id="L247">            log.warn(&quot;cookie: &quot; + stateCookieValue);</span>
+<span class="nc" id="L248">            log.warn(&quot;queryParam: &quot; + state);</span>
+<span class="nc" id="L249">            return challenge(HttpStatus.SC_BAD_REQUEST, AuthenticationError.Reason.INVALID_STATE_COOKIE, null);</span>
+        }
+<span class="nc" id="L251">        return null;</span>
+
+    }
+
+    public Oidc.AuthOutcome authenticate() {
+<span class="nc" id="L256">        String code = getCode();</span>
+<span class="nc bnc" id="L257" title="All 2 branches missed.">        if (code == null) {</span>
+<span class="nc" id="L258">            log.debug(&quot;there was no code&quot;);</span>
+<span class="nc" id="L259">            String error = getError();</span>
+<span class="nc bnc" id="L260" title="All 2 branches missed.">            if (error != null) {</span>
+<span class="nc" id="L261">                log.warn(&quot;There was an error: &quot; + error);</span>
+<span class="nc" id="L262">                challenge = challenge(HttpStatus.SC_BAD_REQUEST, AuthenticationError.Reason.OAUTH_ERROR, error);</span>
+<span class="nc" id="L263">                return Oidc.AuthOutcome.FAILED;</span>
+            } else {
+<span class="nc" id="L265">                log.debug(&quot;redirecting to auth server&quot;);</span>
+<span class="nc" id="L266">                challenge = loginRedirect();</span>
+<span class="nc" id="L267">                return Oidc.AuthOutcome.NOT_ATTEMPTED;</span>
+            }
+        } else {
+<span class="nc" id="L270">            log.debug(&quot;there was a code, resolving&quot;);</span>
+<span class="nc" id="L271">            challenge = resolveCode(code);</span>
+<span class="nc bnc" id="L272" title="All 2 branches missed.">            if (challenge != null) {</span>
+<span class="nc" id="L273">                return Oidc.AuthOutcome.FAILED;</span>
+            }
+<span class="nc" id="L275">            return Oidc.AuthOutcome.AUTHENTICATED;</span>
+        }
+
+    }
+
+    protected AuthChallenge challenge(final int code, final AuthenticationError.Reason reason, final String description) {
+<span class="nc" id="L281">        return new AuthChallenge() {</span>
+            @Override
+            public int getResponseCode() {
+<span class="nc" id="L284">                return code;</span>
+            }
+
+            @Override
+            public boolean challenge(OidcHttpFacade exchange) {
+<span class="nc" id="L289">                AuthenticationError error = new AuthenticationError(reason, description);</span>
+<span class="nc" id="L290">                exchange.getRequest().setError(error);</span>
+<span class="nc" id="L291">                exchange.getResponse().sendError(code);</span>
+<span class="nc" id="L292">                return true;</span>
+            }
+        };
+    }
+
+    /**
+     * Start or continue the oauth login process.
+     * &lt;p/&gt;
+     * If code query parameter is not present, then browser is redirected to authUrl. The redirect URL will be
+     * the URL of the current request.
+     * &lt;p/&gt;
+     * If code query parameter is present, then an access token is obtained by invoking a secure request to the codeUrl.
+     * If the access token is obtained, the browser is again redirected to the current request URL, but any OAuth
+     * protocol specific query parameters are removed.
+     *
+     * @return null if an access token was obtained, otherwise a challenge is returned
+     */
+    protected AuthChallenge resolveCode(String code) {
+        // abort if not HTTPS
+<span class="nc bnc" id="L311" title="All 4 branches missed.">        if (! isRequestSecure() &amp;&amp; deployment.getSSLRequired().isRequired(facade.getRequest().getRemoteAddr())) {</span>
+<span class="nc" id="L312">            log.error(&quot;SSL required. Request: &quot; + facade.getRequest().getURI());</span>
+<span class="nc" id="L313">            return challenge(HttpStatus.SC_FORBIDDEN, AuthenticationError.Reason.SSL_REQUIRED, null);</span>
+        }
+
+<span class="nc" id="L316">        log.debug(&quot;checking state cookie for after code&quot;);</span>
+<span class="nc" id="L317">        AuthChallenge challenge = checkStateCookie();</span>
+<span class="nc bnc" id="L318" title="All 2 branches missed.">        if (challenge != null) return challenge;</span>
+
+        AccessAndIDTokenResponse tokenResponse;
+<span class="nc" id="L321">        strippedOauthParametersRequestUri = rewrittenRedirectUri(stripOauthParametersFromRedirect(facade.getRequest().getURI()));</span>
+
+        try {
+<span class="nc" id="L324">            tokenResponse = ServerRequest.invokeAccessCodeToToken(deployment, code, strippedOauthParametersRequestUri);</span>
+<span class="nc" id="L325">        } catch (ServerRequest.HttpFailure failure) {</span>
+<span class="nc" id="L326">            log.error(&quot;failed to turn code into token&quot;);</span>
+<span class="nc" id="L327">            log.error(&quot;status from server: &quot; + failure.getStatus());</span>
+<span class="nc bnc" id="L328" title="All 4 branches missed.">            if (failure.getError() != null &amp;&amp; !failure.getError().trim().isEmpty()) {</span>
+<span class="nc" id="L329">                log.error(&quot;   &quot; + failure.getError());</span>
+            }
+<span class="nc" id="L331">            return challenge(HttpStatus.SC_FORBIDDEN, AuthenticationError.Reason.CODE_TO_TOKEN_FAILURE, null);</span>
+
+<span class="nc" id="L333">        } catch (IOException e) {</span>
+<span class="nc" id="L334">            log.error(&quot;failed to turn code into token&quot;, e);</span>
+<span class="nc" id="L335">            return challenge(HttpStatus.SC_FORBIDDEN, AuthenticationError.Reason.CODE_TO_TOKEN_FAILURE, null);</span>
+<span class="nc" id="L336">        }</span>
+
+<span class="nc" id="L338">        tokenString = tokenResponse.getAccessToken();</span>
+<span class="nc" id="L339">        refreshToken = tokenResponse.getRefreshToken();</span>
+<span class="nc" id="L340">        idTokenString = tokenResponse.getIDToken();</span>
+
+<span class="nc" id="L342">        log.debug(&quot;Verifying tokens&quot;);</span>
+
+<span class="nc" id="L344">        logToken(&quot;\taccess_token&quot;, tokenString);</span>
+<span class="nc" id="L345">        logToken(&quot;\tid_token&quot;, idTokenString);</span>
+<span class="nc" id="L346">        logToken(&quot;\trefresh_token&quot;, refreshToken);</span>
+
+        try {
+<span class="nc" id="L349">            TokenValidator tokenValidator = TokenValidator.builder(deployment).build();</span>
+<span class="nc" id="L350">            TokenValidator.VerifiedTokens verifiedTokens = tokenValidator.parseAndVerifyToken(idTokenString, tokenString);</span>
+<span class="nc" id="L351">            idToken = verifiedTokens.getIdToken();</span>
+<span class="nc" id="L352">            token = verifiedTokens.getAccessToken();</span>
+<span class="nc" id="L353">            log.debug(&quot;Token Verification succeeded!&quot;);</span>
+<span class="nc" id="L354">        } catch (OidcException e) {</span>
+<span class="nc" id="L355">            log.failedVerificationOfToken(e.getMessage());</span>
+<span class="nc" id="L356">            return challenge(HttpStatus.SC_FORBIDDEN, AuthenticationError.Reason.INVALID_TOKEN, null);</span>
+<span class="nc" id="L357">        }</span>
+<span class="nc bnc" id="L358" title="All 2 branches missed.">        if (tokenResponse.getNotBeforePolicy() &gt; deployment.getNotBefore()) { // Keycloak specific</span>
+<span class="nc" id="L359">            deployment.updateNotBefore(tokenResponse.getNotBeforePolicy());</span>
+        }
+<span class="nc bnc" id="L361" title="All 2 branches missed.">        if (token.getIssuedAt() &lt; deployment.getNotBefore()) {</span>
+<span class="nc" id="L362">            log.error(&quot;Stale token&quot;);</span>
+<span class="nc" id="L363">            return challenge(HttpStatus.SC_FORBIDDEN, AuthenticationError.Reason.STALE_TOKEN, null);</span>
+        }
+<span class="nc" id="L365">        log.debug(&quot;successfully authenticated&quot;);</span>
+<span class="nc" id="L366">        return null;</span>
+    }
+
+    private static String stripOauthParametersFromRedirect(String uri) {
+<span class="nc" id="L370">        uri = stripQueryParam(uri, CODE);</span>
+<span class="nc" id="L371">        uri = stripQueryParam(uri, STATE);</span>
+<span class="nc" id="L372">        return stripQueryParam(uri, SESSION_STATE);</span>
+    }
+
+    private String rewrittenRedirectUri(String originalUri) {
+<span class="nc" id="L376">        Map&lt;String, String&gt; rewriteRules = deployment.getRedirectRewriteRules();</span>
+        try {
+<span class="nc" id="L378">            URL url = new URL(originalUri);</span>
+<span class="nc" id="L379">            Map.Entry&lt;String, String&gt; rule = null;</span>
+<span class="nc bnc" id="L380" title="All 4 branches missed.">            if (rewriteRules != null &amp;&amp; ! rewriteRules.isEmpty()) {</span>
+<span class="nc" id="L381">                rule =  rewriteRules.entrySet().iterator().next();</span>
+            }
+<span class="nc" id="L383">            StringBuilder redirectUriBuilder = new StringBuilder(url.getProtocol());</span>
+<span class="nc" id="L384">            redirectUriBuilder.append(&quot;://&quot;).append(url.getAuthority());</span>
+<span class="nc bnc" id="L385" title="All 2 branches missed.">            if (rule != null) {</span>
+<span class="nc" id="L386">                redirectUriBuilder.append(url.getPath().replaceFirst(rule.getKey(), rule.getValue()));</span>
+            } else {
+<span class="nc" id="L388">                redirectUriBuilder.append(url.getPath());</span>
+            }
+<span class="nc" id="L390">            return redirectUriBuilder.toString();</span>
+<span class="nc" id="L391">        } catch (MalformedURLException ex) {</span>
+<span class="nc" id="L392">            log.error(&quot;Not a valid request url&quot;);</span>
+<span class="nc" id="L393">            throw new RuntimeException(ex);</span>
+        }
+    }
+
+    private static String addOidcScopeIfNeeded(String scope) {
+<span class="nc bnc" id="L398" title="All 4 branches missed.">        if (scope == null || scope.isEmpty()) {</span>
+<span class="nc" id="L399">            return OIDC_SCOPE;</span>
+<span class="nc bnc" id="L400" title="All 2 branches missed.">        } else if (hasScope(scope, OIDC_SCOPE)) {</span>
+<span class="nc" id="L401">            return scope;</span>
+        } else {
+<span class="nc" id="L403">            return OIDC_SCOPE + &quot; &quot; + scope;</span>
+        }
+    }
+
+    private static boolean hasScope(String scopeParam, String targetScope) {
+<span class="nc bnc" id="L408" title="All 4 branches missed.">        if (scopeParam == null || targetScope == null) {</span>
+<span class="nc" id="L409">            return false;</span>
+        }
+<span class="nc" id="L411">        String[] scopes = scopeParam.split(&quot; &quot;);</span>
+<span class="nc bnc" id="L412" title="All 2 branches missed.">        for (String scope : scopes) {</span>
+<span class="nc bnc" id="L413" title="All 2 branches missed.">            if (targetScope.equals(scope)) {</span>
+<span class="nc" id="L414">                return true;</span>
+            }
+        }
+<span class="nc" id="L417">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SecurityMessages_$logger.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-permission</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.permission</a> &gt; <span class="el_source">SecurityMessages_$logger.java</span></div><h1>SecurityMessages_$logger.java</h1><pre class="source lang-java linenums">package org.wildfly.security.permission;
+
+import java.util.Locale;
+import java.io.Serializable;
+import javax.annotation.Generated;
+import java.lang.String;
+import org.jboss.logging.Logger;
+import java.util.Arrays;
+import java.lang.IllegalArgumentException;
+
+/**
+ * Warning this class consists of generated code.
+ */
+@Generated(value = &quot;org.jboss.logging.processor.generator.model.MessageLoggerImplementor&quot;, date = &quot;2022-09-02T20:20:29+0200&quot;)
+public class SecurityMessages_$logger implements SecurityMessages, Serializable {
+    private static final long serialVersionUID = 1L;
+<span class="nc" id="L17">    private static final String FQCN = SecurityMessages_$logger.class.getName();</span>
+<span class="nc" id="L18">    public SecurityMessages_$logger(final Logger log) {</span>
+<span class="nc" id="L19">        this.log = log;</span>
+<span class="nc" id="L20">    }</span>
+    protected final Logger log;
+<span class="nc" id="L22">    private static final Locale LOCALE = Locale.ROOT;</span>
+    protected Locale getLoggingLocale() {
+<span class="nc" id="L24">        return LOCALE;</span>
+    }
+    protected String unexpectedActionCharacter$str() {
+<span class="nc" id="L27">        return &quot;WFSM000004: Unexpected character '%s' at offset %d of '%s'&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException unexpectedActionCharacter(final char ch, final int offset, final String actionString) {
+<span class="nc" id="L31">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), unexpectedActionCharacter$str(), ch, offset, actionString));</span>
+<span class="nc" id="L32">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L33">        return result;</span>
+    }
+    private static void _copyStackTraceMinusOne(final Throwable e) {
+<span class="nc" id="L36">        final StackTraceElement[] st = e.getStackTrace();</span>
+<span class="nc" id="L37">        e.setStackTrace(Arrays.copyOfRange(st, 1, st.length));</span>
+<span class="nc" id="L38">    }</span>
+    protected String invalidAction$str() {
+<span class="nc" id="L40">        return &quot;WFSM000005: Invalid action '%s' at offset %d of '%s'&quot;;</span>
+    }
+    @Override
+    public final IllegalArgumentException invalidAction(final String action, final int offset, final String actionString) {
+<span class="nc" id="L44">        final IllegalArgumentException result = new IllegalArgumentException(String.format(getLoggingLocale(), invalidAction$str(), action, offset, actionString));</span>
+<span class="nc" id="L45">        _copyStackTraceMinusOne(result);</span>
+<span class="nc" id="L46">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,764 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DEREncoder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-asn1</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.asn1</a> &gt; <span class="el_source">DEREncoder.java</span></div><h1>DEREncoder.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.asn1;
+
+import static org.wildfly.security.asn1.ElytronMessages.log;
+import static org.wildfly.security.asn1.ASN1.*;
+
+import java.math.BigInteger;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.EnumSet;
+import java.util.LinkedList;
+
+import org.wildfly.common.bytes.ByteStringBuilder;
+import org.wildfly.common.iteration.ByteIterator;
+
+/**
+ * A class used to encode ASN.1 values using the Distinguished Encoding Rules (DER), as specified
+ * in &lt;a href=&quot;http://www.itu.int/ITU-T/studygroups/com17/languages/X.690-0207.pdf&quot;&gt;ITU-T X.690&lt;/a&gt;.
+ *
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+public class DEREncoder implements ASN1Encoder {
+<span class="fc" id="L47">    private static final int[] BITS = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80};</span>
+    private static final long LARGEST_UNSHIFTED_LONG = Long.MAX_VALUE / 10L;
+<span class="fc" id="L49">    private static final byte[] NULL_CONTENTS = new byte[0];</span>
+<span class="fc" id="L50">    private static final TagComparator TAG_COMPARATOR = new TagComparator();</span>
+<span class="fc" id="L51">    private static final LexicographicComparator LEXICOGRAPHIC_COMPARATOR = new LexicographicComparator();</span>
+<span class="fc" id="L52">    private static final byte[] BOOLEAN_TRUE_AS_BYTES = new byte[] { ~0 };</span>
+<span class="fc" id="L53">    private static final byte[] BOOLEAN_FALSE_AS_BYTES = new byte[] { 0 };</span>
+
+<span class="fc" id="L55">    private final ArrayDeque&lt;EncoderState&gt; states = new ArrayDeque&lt;EncoderState&gt;();</span>
+<span class="fc" id="L56">    private final ArrayList&lt;ByteStringBuilder&gt; buffers = new ArrayList&lt;ByteStringBuilder&gt;();</span>
+    private ByteStringBuilder currentBuffer;
+<span class="fc" id="L58">    private int currentBufferPos = -1;</span>
+    private final ByteStringBuilder target;
+<span class="fc" id="L60">    private int implicitTag = -1;</span>
+
+    /**
+     * Create a DER encoder.
+     */
+    public DEREncoder() {
+<span class="fc" id="L66">        this(new ByteStringBuilder());</span>
+<span class="fc" id="L67">    }</span>
+
+    /**
+     * Create a DER encoder that writes its output to the given {@code ByteStringBuilder}.
+     *
+     * @param target the {@code ByteStringBuilder} to which the DER encoded values are written
+     */
+<span class="fc" id="L74">    DEREncoder(ByteStringBuilder target) {</span>
+<span class="fc" id="L75">        this.target = target;</span>
+<span class="fc" id="L76">        currentBuffer = target;</span>
+<span class="fc" id="L77">    }</span>
+
+    @Override
+    public void startSequence() {
+<span class="fc" id="L81">        startConstructedElement(SEQUENCE_TYPE);</span>
+<span class="fc" id="L82">    }</span>
+
+    @Override
+    public void startSet() {
+<span class="fc" id="L86">        startConstructedElement(SET_TYPE);</span>
+<span class="fc" id="L87">    }</span>
+
+    @Override
+    public void startSetOf() {
+<span class="fc" id="L91">        startSet();</span>
+<span class="fc" id="L92">    }</span>
+
+    @Override
+    public void startExplicit(int number) {
+<span class="fc" id="L96">        startExplicit(CONTEXT_SPECIFIC_MASK, number);</span>
+<span class="fc" id="L97">    }</span>
+
+    @Override
+    public void startExplicit(int clazz, int number) {
+<span class="fc" id="L101">        int explicitTag = clazz | CONSTRUCTED_MASK | number;</span>
+<span class="fc" id="L102">        startConstructedElement(explicitTag);</span>
+<span class="fc" id="L103">    }</span>
+
+    private void startConstructedElement(int tag) {
+<span class="fc" id="L106">        EncoderState lastState = states.peekLast();</span>
+<span class="fc bfc" id="L107" title="All 4 branches covered.">        if ((lastState != null) &amp;&amp; (lastState.getTag() == SET_TYPE)) {</span>
+<span class="fc" id="L108">            updateCurrentBuffer();</span>
+<span class="fc" id="L109">            lastState.addChildElement(tag, currentBufferPos);</span>
+        }
+<span class="fc" id="L111">        writeTag(tag, currentBuffer);</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (tag != SET_TYPE) {</span>
+<span class="fc" id="L113">            updateCurrentBuffer();</span>
+        }
+<span class="fc" id="L115">        states.add(new EncoderState(tag, currentBufferPos));</span>
+<span class="fc" id="L116">    }</span>
+
+    @Override
+    public void endSequence() throws IllegalStateException {
+<span class="fc" id="L120">        EncoderState lastState = states.peekLast();</span>
+<span class="pc bpc" id="L121" title="1 of 4 branches missed.">        if ((lastState == null) || (lastState.getTag() != SEQUENCE_TYPE)) {</span>
+<span class="fc" id="L122">            throw log.noSequenceToEnd();</span>
+        }
+<span class="fc" id="L124">        endConstructedElement();</span>
+<span class="fc" id="L125">    }</span>
+
+    @Override
+    public void endExplicit() throws IllegalStateException {
+<span class="fc" id="L129">        EncoderState lastState = states.peekLast();</span>
+<span class="pc bpc" id="L130" title="1 of 4 branches missed.">        if ((lastState == null) || (lastState.getTag() == SEQUENCE_TYPE)</span>
+<span class="pc bpc" id="L131" title="2 of 4 branches missed.">                || (lastState.getTag() == SET_TYPE) || ((lastState.getTag() &amp; CONSTRUCTED_MASK) == 0)) {</span>
+<span class="fc" id="L132">            throw log.noExplicitlyTaggedElementToEnd();</span>
+        }
+<span class="fc" id="L134">        endConstructedElement();</span>
+<span class="fc" id="L135">    }</span>
+
+    private void endConstructedElement() {
+        ByteStringBuilder dest;
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (currentBufferPos &gt; 0) {</span>
+            // Output the element to its parent buffer
+<span class="fc" id="L141">            dest = buffers.get(currentBufferPos - 1);</span>
+        } else {
+            // Output the element directly to the target destination
+<span class="fc" id="L144">            dest = target;</span>
+        }
+<span class="fc" id="L146">        int length = currentBuffer.length();</span>
+<span class="fc" id="L147">        int numLengthOctets = writeLength(length, dest);</span>
+<span class="fc" id="L148">        dest.append(currentBuffer);</span>
+<span class="fc" id="L149">        currentBuffer.setLength(0);</span>
+<span class="fc" id="L150">        currentBuffer = dest;</span>
+<span class="fc" id="L151">        currentBufferPos -= 1;</span>
+<span class="fc" id="L152">        states.removeLast();</span>
+
+        // If this element's parent element is a set element, update the parent's accumulated length
+<span class="fc" id="L155">        EncoderState lastState = states.peekLast();</span>
+<span class="fc bfc" id="L156" title="All 4 branches covered.">        if ((lastState != null) &amp;&amp; (lastState.getTag() == SET_TYPE)) {</span>
+<span class="fc" id="L157">            lastState.addChildLength(1 + numLengthOctets + length);</span>
+        }
+<span class="fc" id="L159">    }</span>
+
+    @Override
+    public void endSet() throws IllegalStateException {
+<span class="fc" id="L163">        endSet(TAG_COMPARATOR);</span>
+<span class="fc" id="L164">    }</span>
+
+    @Override
+    public void endSetOf() throws IllegalStateException {
+<span class="fc" id="L168">        endSet(LEXICOGRAPHIC_COMPARATOR);</span>
+<span class="fc" id="L169">    }</span>
+
+    private void endSet(Comparator&lt;EncoderState&gt; comparator) {
+<span class="fc" id="L172">        EncoderState lastState = states.peekLast();</span>
+<span class="pc bpc" id="L173" title="2 of 4 branches missed.">        if ((lastState == null) || (lastState.getTag() != SET_TYPE)) {</span>
+<span class="nc" id="L174">            throw log.noSetToEnd();</span>
+        }
+
+        // The child elements of a set must be encoded in ascending order by tag
+<span class="fc" id="L178">        LinkedList&lt;EncoderState&gt; childElements = lastState.getSortedChildElements(comparator);</span>
+<span class="fc" id="L179">        int setBufferPos = lastState.getBufferPos();</span>
+        ByteStringBuilder dest;
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (setBufferPos &gt;= 0) {</span>
+<span class="fc" id="L182">            dest = buffers.get(setBufferPos);</span>
+        } else {
+<span class="fc" id="L184">            dest = target;</span>
+        }
+
+        ByteStringBuilder contents;
+<span class="fc" id="L188">        int childLength = lastState.getChildLength();</span>
+<span class="fc" id="L189">        int numLengthOctets = writeLength(lastState.getChildLength(), dest);</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">        for (EncoderState element : childElements) {</span>
+<span class="fc" id="L191">            contents = buffers.get(element.getBufferPos());</span>
+<span class="fc" id="L192">            dest.append(contents);</span>
+<span class="fc" id="L193">            contents.setLength(0);</span>
+<span class="fc" id="L194">        }</span>
+<span class="fc" id="L195">        currentBuffer = dest;</span>
+<span class="fc" id="L196">        currentBufferPos = setBufferPos;</span>
+<span class="fc" id="L197">        states.removeLast();</span>
+
+        // If this set's parent element is a set element, update the parent's accumulated length
+<span class="fc" id="L200">        lastState = states.peekLast();</span>
+<span class="fc bfc" id="L201" title="All 4 branches covered.">        if ((lastState != null) &amp;&amp; (lastState.getTag() == SET_TYPE)) {</span>
+<span class="fc" id="L202">            lastState.addChildLength(1 + numLengthOctets + childLength);</span>
+        }
+<span class="fc" id="L204">    }</span>
+
+    @Override
+    public void encodeOctetString(String str) {
+<span class="fc" id="L208">        encodeOctetString(str.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L209">    }</span>
+
+    @Override
+    public void encodeOctetString(byte[] str) {
+<span class="fc" id="L213">        writeElement(OCTET_STRING_TYPE, str);</span>
+<span class="fc" id="L214">    }</span>
+
+    void encodeOctetString(ByteStringBuilder str) {
+<span class="fc" id="L217">        writeElement(OCTET_STRING_TYPE, str);</span>
+<span class="fc" id="L218">    }</span>
+
+    @Override
+    public void encodeIA5String(String str) {
+<span class="fc" id="L222">        encodeIA5String(str.getBytes(StandardCharsets.US_ASCII));</span>
+<span class="fc" id="L223">    }</span>
+
+    @Override
+    public void encodeIA5String(byte[] str) {
+<span class="fc" id="L227">        writeElement(IA5_STRING_TYPE, str);</span>
+<span class="fc" id="L228">    }</span>
+
+    void encodeIA5String(ByteStringBuilder str) {
+<span class="fc" id="L231">        writeElement(IA5_STRING_TYPE, str);</span>
+<span class="fc" id="L232">    }</span>
+
+    @Override
+    public void encodePrintableString(final byte[] str) {
+<span class="nc bnc" id="L236" title="All 2 branches missed.">        for (byte b : str) {</span>
+<span class="nc" id="L237">            validatePrintableByte(b &amp; 0xff);</span>
+        }
+<span class="nc" id="L239">        writeElement(PRINTABLE_STRING_TYPE, str);</span>
+<span class="nc" id="L240">    }</span>
+
+    @Override
+    public void encodePrintableString(final String str) {
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        for (int i = 0; i &lt; str.length(); i = str.offsetByCodePoints(i, 1)) {</span>
+<span class="fc" id="L245">            validatePrintableByte(str.codePointAt(i));</span>
+        }
+<span class="fc" id="L247">        writeElement(PRINTABLE_STRING_TYPE, str.getBytes(StandardCharsets.US_ASCII));</span>
+<span class="fc" id="L248">    }</span>
+
+    @Override
+    public void encodeUTF8String(final String str) {
+<span class="fc" id="L252">        writeElement(UTF8_STRING_TYPE, str.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L253">    }</span>
+
+    @Override
+    public void encodeBMPString(final String str) {
+        // technically this may fail if str contains a code point outside of the BMP
+<span class="fc" id="L258">        writeElement(BMP_STRING_TYPE, str.getBytes(StandardCharsets.UTF_16BE));</span>
+<span class="fc" id="L259">    }</span>
+
+<span class="fc" id="L261">    private static final Charset UTF_32BE = Charset.forName(&quot;UTF-32BE&quot;);</span>
+
+    @Override
+    public void encodeUniversalString(final String str) {
+<span class="fc" id="L265">        writeElement(UNIVERSAL_STRING_TYPE, str.getBytes(UTF_32BE));</span>
+<span class="fc" id="L266">    }</span>
+
+    @Override
+    public void encodeBitString(byte[] str) {
+<span class="fc" id="L270">        encodeBitString(str, 0); // All bits will be used</span>
+<span class="fc" id="L271">    }</span>
+
+    @Override
+    public void encodeBitString(byte[] str, int numUnusedBits) {
+<span class="fc" id="L275">        byte[] contents = new byte[str.length + 1];</span>
+<span class="fc" id="L276">        contents[0] = (byte) numUnusedBits;</span>
+<span class="fc" id="L277">        System.arraycopy(str, 0, contents, 1, str.length);</span>
+<span class="fc" id="L278">        writeElement(BIT_STRING_TYPE, contents);</span>
+<span class="fc" id="L279">    }</span>
+
+    @Override
+    public void encodeBitString(final EnumSet&lt;?&gt; enumSet) {
+        int ord;
+<span class="fc" id="L284">        final BitSet bitSet = new BitSet();</span>
+<span class="fc bfc" id="L285" title="All 2 branches covered.">        for (Enum&lt;?&gt; anEnum : enumSet) {</span>
+<span class="fc" id="L286">            ord = anEnum.ordinal();</span>
+<span class="fc" id="L287">            bitSet.set(ord);</span>
+<span class="fc" id="L288">        }</span>
+<span class="fc" id="L289">        encodeBitString(bitSet);</span>
+<span class="fc" id="L290">    }</span>
+
+    @Override
+    public void encodeBitString(final BitSet bitSet) {
+<span class="fc" id="L294">        final byte[] array = bitSet.toByteArray();</span>
+<span class="fc" id="L295">        final int unusedBits = - bitSet.length() &amp; 0b111;</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">        for (int i = 0; i &lt; array.length; i++) {</span>
+<span class="fc" id="L297">            array[i] = (byte) (Integer.reverse(array[i]) &gt;&gt; 24);</span>
+        }
+<span class="fc" id="L299">        encodeBitString(array, unusedBits);</span>
+<span class="fc" id="L300">    }</span>
+
+    @Override
+    public void encodeBitString(String binaryStr) {
+<span class="fc" id="L304">        int numBits = binaryStr.length();</span>
+<span class="fc" id="L305">        int numBytes = numBits &gt;&gt; 3;</span>
+<span class="fc" id="L306">        int remainder = numBits % 8;</span>
+<span class="fc" id="L307">        int numUnusedBits = 0;</span>
+
+<span class="fc bfc" id="L309" title="All 2 branches covered.">        if (remainder != 0) {</span>
+<span class="fc" id="L310">            numBytes = numBytes + 1;</span>
+<span class="fc" id="L311">            numUnusedBits = 8 - remainder;</span>
+        }
+
+<span class="fc" id="L314">        byte[] contents = new byte[numBytes + 1];</span>
+<span class="fc" id="L315">        contents[0] = (byte) numUnusedBits;</span>
+<span class="fc bfc" id="L316" title="All 2 branches covered.">        for (int i = 1; i &lt;= numBytes; i++) {</span>
+<span class="fc" id="L317">            contents[i] = (byte) 0;</span>
+        }
+
+<span class="fc" id="L320">        char[] binaryStrChars = binaryStr.toCharArray();</span>
+<span class="fc" id="L321">        int index = 0;</span>
+<span class="pc bpc" id="L322" title="1 of 4 branches missed.">        for (int i = 1; i &lt;= numBytes &amp;&amp; index &lt; numBits; i++) {</span>
+<span class="fc bfc" id="L323" title="All 4 branches covered.">            for (int bit = 7; bit &gt;= 0 &amp;&amp; index &lt; numBits; bit--) {</span>
+<span class="pc bpc" id="L324" title="1 of 4 branches missed.">                if ((i == numBytes) &amp;&amp; (bit &lt; numUnusedBits)) {</span>
+<span class="nc" id="L325">                    continue;</span>
+                }
+<span class="fc bfc" id="L327" title="All 2 branches covered.">                if (binaryStrChars[index++] == '1') {</span>
+<span class="fc" id="L328">                    contents[i] |= BITS[bit];</span>
+                }
+            }
+        }
+<span class="fc" id="L332">        writeElement(BIT_STRING_TYPE, contents);</span>
+<span class="fc" id="L333">    }</span>
+
+    @Override
+    public void encodeBitString(BigInteger integer) {
+<span class="fc" id="L337">        ByteStringBuilder target = new ByteStringBuilder();</span>
+<span class="fc" id="L338">        new DEREncoder(target).encodeInteger(integer);</span>
+<span class="fc" id="L339">        encodeBitString(target.toArray());</span>
+<span class="fc" id="L340">    }</span>
+
+<span class="fc" id="L342">    private static final DateTimeFormatter GENERALIZED_TIME_FORMAT = DateTimeFormatter.ofPattern(&quot;yyyyMMddHHmmssX&quot;);</span>
+
+    @Override
+    public void encodeGeneralizedTime(final ZonedDateTime time) {
+<span class="fc" id="L346">        writeElement(GENERALIZED_TIME_TYPE, GENERALIZED_TIME_FORMAT.format(time).getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L347">    }</span>
+
+    @Override
+    public void encodeObjectIdentifier(String objectIdentifier) throws ASN1Exception {
+<span class="pc bpc" id="L351" title="2 of 4 branches missed.">        if (objectIdentifier == null || objectIdentifier.length() == 0) {</span>
+<span class="nc" id="L352">            throw log.asnOidMustHaveAtLeast2Components();</span>
+        }
+<span class="fc" id="L354">        int len = objectIdentifier.length();</span>
+<span class="fc" id="L355">        int offs = 0;</span>
+<span class="fc" id="L356">        int idx = 0;</span>
+<span class="fc" id="L357">        long t = 0L;</span>
+        char c;
+<span class="fc" id="L359">        int numComponents = 0;</span>
+<span class="fc" id="L360">        int first = -1;</span>
+<span class="fc" id="L361">        ByteStringBuilder contents = new ByteStringBuilder();</span>
+
+        a: for (;;) {
+<span class="fc" id="L364">            c = objectIdentifier.charAt(offs + idx ++);</span>
+<span class="fc bfc" id="L365" title="All 2 branches covered.">            if (Character.isDigit(c)) {</span>
+<span class="fc" id="L366">                int digit = Character.digit(c, 10);</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">                if (t &gt; LARGEST_UNSHIFTED_LONG) {</span>
+<span class="fc" id="L368">                    BigInteger bi = BigInteger.valueOf(t).multiply(BigInteger.TEN).add(digits[digit]);</span>
+<span class="fc" id="L369">                    t = 0L;</span>
+                    for (;;) {
+<span class="fc" id="L371">                        c = objectIdentifier.charAt(offs + idx ++);</span>
+<span class="fc bfc" id="L372" title="All 2 branches covered.">                        if (Character.isDigit(c)) {</span>
+<span class="fc" id="L373">                            digit = Character.digit(c, 10);</span>
+<span class="fc" id="L374">                            bi = bi.multiply(BigInteger.TEN).add(digits[digit]);</span>
+<span class="pc bpc" id="L375" title="1 of 2 branches missed.">                        } else if (c == '.') {</span>
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">                            if (numComponents == 0) {</span>
+<span class="nc" id="L377">                                first = validateFirstOIDComponent(bi);</span>
+                            } else {
+<span class="fc" id="L379">                                encodeOIDComponent(bi, contents, numComponents, first);</span>
+                            }
+<span class="fc" id="L381">                            numComponents++;</span>
+<span class="fc" id="L382">                            continue a;</span>
+                        } else {
+<span class="nc" id="L384">                            throw log.asnInvalidOidCharacter();</span>
+                        }
+<span class="pc bpc" id="L386" title="1 of 2 branches missed.">                        if (idx == len) {</span>
+<span class="nc bnc" id="L387" title="All 2 branches missed.">                            if (numComponents == 0) {</span>
+<span class="nc" id="L388">                                throw log.asnOidMustHaveAtLeast2Components();</span>
+                            }
+<span class="nc" id="L390">                            encodeOIDComponent(bi, contents, numComponents, first);</span>
+<span class="nc" id="L391">                            writeElement(OBJECT_IDENTIFIER_TYPE, contents);</span>
+<span class="nc" id="L392">                            return;</span>
+                        }
+                    }
+                } else {
+<span class="fc" id="L396">                    t = 10L * t + (long) digit;</span>
+                }
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">            } else if (c == '.') {</span>
+<span class="fc bfc" id="L399" title="All 2 branches covered.">                if (numComponents == 0) {</span>
+<span class="fc" id="L400">                    first = validateFirstOIDComponent(t);</span>
+                } else {
+<span class="fc" id="L402">                    encodeOIDComponent(t, contents, numComponents, first);</span>
+                }
+<span class="fc" id="L404">                numComponents++;</span>
+<span class="fc" id="L405">                t = 0L;</span>
+            } else {
+<span class="nc" id="L407">                throw log.asnInvalidOidCharacter();</span>
+            }
+<span class="fc bfc" id="L409" title="All 2 branches covered.">            if (idx == len) {</span>
+<span class="pc bpc" id="L410" title="1 of 2 branches missed.">                if (c == '.') {</span>
+<span class="nc" id="L411">                    throw log.asnInvalidOidCharacter();</span>
+                }
+<span class="fc bfc" id="L413" title="All 2 branches covered.">                if (numComponents == 0) {</span>
+<span class="fc" id="L414">                    throw log.asnOidMustHaveAtLeast2Components();</span>
+                }
+<span class="fc" id="L416">                encodeOIDComponent(t, contents, numComponents, first);</span>
+<span class="fc" id="L417">                writeElement(OBJECT_IDENTIFIER_TYPE, contents);</span>
+<span class="fc" id="L418">                return;</span>
+            }
+        }
+    }
+
+    @Override
+    public void encodeNull() {
+<span class="fc" id="L425">        writeElement(NULL_TYPE, NULL_CONTENTS);</span>
+<span class="fc" id="L426">    }</span>
+
+    @Override
+    public void encodeImplicit(int number) {
+<span class="fc" id="L430">        encodeImplicit(CONTEXT_SPECIFIC_MASK, number);</span>
+<span class="fc" id="L431">    }</span>
+
+    @Override
+    public void encodeImplicit(int clazz, int number) {
+<span class="pc bpc" id="L435" title="1 of 2 branches missed.">        if (implicitTag == -1) {</span>
+<span class="fc" id="L436">            implicitTag = clazz | number;</span>
+        }
+<span class="fc" id="L438">    }</span>
+
+    @Override
+    public void encodeBoolean(final boolean value) {
+<span class="fc bfc" id="L442" title="All 2 branches covered.">        writeElement(BOOLEAN_TYPE, value ? BOOLEAN_TRUE_AS_BYTES : BOOLEAN_FALSE_AS_BYTES);</span>
+<span class="fc" id="L443">    }</span>
+
+    @Override
+    public void encodeInteger(BigInteger integer) {
+<span class="fc" id="L447">        writeElement(INTEGER_TYPE, integer.toByteArray());</span>
+<span class="fc" id="L448">    }</span>
+
+    @Override
+    public void writeEncoded(byte[] encoded) {
+<span class="fc" id="L452">        EncoderState lastState = states.peekLast();</span>
+<span class="fc bfc" id="L453" title="All 4 branches covered.">        if ((lastState != null) &amp;&amp; (lastState.getTag() == SET_TYPE)) {</span>
+<span class="fc" id="L454">            updateCurrentBuffer();</span>
+<span class="fc" id="L455">            lastState.addChildElement(encoded[0], currentBufferPos);</span>
+        }
+
+<span class="fc bfc" id="L458" title="All 2 branches covered.">        if (implicitTag != -1) {</span>
+<span class="fc" id="L459">            writeTag(encoded[0], currentBuffer);</span>
+<span class="fc" id="L460">            currentBuffer.append(encoded, 1, encoded.length - 1);</span>
+        } else {
+<span class="fc" id="L462">            currentBuffer.append(encoded);</span>
+        }
+
+        // If this element's parent element is a set element, update the parent's accumulated length
+<span class="fc bfc" id="L466" title="All 4 branches covered.">        if ((lastState != null) &amp;&amp; (lastState.getTag() == SET_TYPE)) {</span>
+<span class="fc" id="L467">            lastState.addChildLength(currentBuffer.length());</span>
+        }
+<span class="fc" id="L469">    }</span>
+
+    @Override
+    public void flush() {
+<span class="fc bfc" id="L473" title="All 2 branches covered.">        while (states.size() != 0) {</span>
+<span class="fc" id="L474">            EncoderState lastState = states.peekLast();</span>
+<span class="fc bfc" id="L475" title="All 2 branches covered.">            if (lastState.getTag() == SEQUENCE_TYPE) {</span>
+<span class="fc" id="L476">                endSequence();</span>
+<span class="pc bpc" id="L477" title="1 of 2 branches missed.">            } else if (lastState.getTag() == SET_TYPE) {</span>
+<span class="fc" id="L478">                endSet();</span>
+            }
+<span class="fc" id="L480">        }</span>
+<span class="fc" id="L481">    }</span>
+
+    @Override
+    public byte[] getEncoded() {
+<span class="fc" id="L485">        return target.toArray();</span>
+    }
+
+    private int validateFirstOIDComponent(long value) throws ASN1Exception {
+<span class="pc bpc" id="L489" title="1 of 4 branches missed.">        if (value &lt; 0 || value &gt; 2) {</span>
+<span class="fc" id="L490">            throw log.asnInvalidValueForFirstOidComponent();</span>
+        }
+<span class="fc" id="L492">        return (int) value;</span>
+    }
+
+    private int validateFirstOIDComponent(BigInteger value) throws ASN1Exception  {
+<span class="nc bnc" id="L496" title="All 2 branches missed.">        if ((value.compareTo(BigInteger.valueOf(0)) == -1)</span>
+<span class="nc bnc" id="L497" title="All 2 branches missed.">                || (value.compareTo(BigInteger.valueOf(2)) == 1)) {</span>
+<span class="nc" id="L498">            throw log.asnInvalidValueForFirstOidComponent();</span>
+        }
+<span class="nc" id="L500">        return value.intValue();</span>
+    }
+
+    private void validateSecondOIDComponent(long second, int first) throws ASN1Exception  {
+<span class="fc bfc" id="L504" title="All 4 branches covered.">        if ((first &lt; 2) &amp;&amp; (second &gt; 39)) {</span>
+<span class="fc" id="L505">            throw log.asnInvalidValueForSecondOidComponent();</span>
+        }
+<span class="fc" id="L507">    }</span>
+
+    private void validateSecondOIDComponent(BigInteger second, int first) throws ASN1Exception {
+<span class="nc bnc" id="L510" title="All 4 branches missed.">        if ((first &lt; 2) &amp;&amp; (second.compareTo(BigInteger.valueOf(39)) == 1)) {</span>
+<span class="nc" id="L511">            throw log.asnInvalidValueForSecondOidComponent();</span>
+        }
+<span class="nc" id="L513">    }</span>
+
+    private void encodeOIDComponent(long value, ByteStringBuilder contents,
+            int numComponents, int first) throws ASN1Exception {
+<span class="fc bfc" id="L517" title="All 2 branches covered.">         if (numComponents == 1) {</span>
+<span class="fc" id="L518">            validateSecondOIDComponent(value, first);</span>
+<span class="fc" id="L519">            encodeOIDComponent(value + (40 * first), contents);</span>
+        } else {
+<span class="fc" id="L521">            encodeOIDComponent(value, contents);</span>
+        }
+<span class="fc" id="L523">    }</span>
+
+    private void encodeOIDComponent(BigInteger value, ByteStringBuilder contents,
+            int numComponents, int first) throws ASN1Exception {
+<span class="pc bpc" id="L527" title="1 of 2 branches missed.">         if (numComponents == 1) {</span>
+<span class="nc" id="L528">            validateSecondOIDComponent(value, first);</span>
+<span class="nc" id="L529">            encodeOIDComponent(value.add(BigInteger.valueOf(40 * first)), contents);</span>
+        } else {
+<span class="fc" id="L531">            encodeOIDComponent(value, contents);</span>
+        }
+<span class="fc" id="L533">    }</span>
+
+    private void encodeOIDComponent(long value, ByteStringBuilder contents) {
+<span class="fc" id="L536">        int shift = 56;</span>
+        int octet;
+<span class="fc bfc" id="L538" title="All 2 branches covered.">        while (shift &gt; 0) {</span>
+<span class="fc bfc" id="L539" title="All 2 branches covered.">            if (value &gt;= (1L &lt;&lt; shift)) {</span>
+<span class="fc" id="L540">                octet = (int) ((value &gt;&gt;&gt; shift) | 0x80);</span>
+<span class="fc" id="L541">                contents.append((byte) octet);</span>
+            }
+<span class="fc" id="L543">            shift = shift - 7;</span>
+        }
+<span class="fc" id="L545">        octet = (int) (value &amp; 0x7f);</span>
+<span class="fc" id="L546">        contents.append((byte) octet);</span>
+<span class="fc" id="L547">    }</span>
+
+    private void encodeOIDComponent(BigInteger value, ByteStringBuilder contents) {
+<span class="fc" id="L550">        int numBytes = (value.bitLength() + 6) / 7;</span>
+<span class="pc bpc" id="L551" title="1 of 2 branches missed.">        if (numBytes == 0) {</span>
+<span class="nc" id="L552">            contents.append((byte) 0);</span>
+        } else {
+<span class="fc" id="L554">            byte[] result = new byte[numBytes];</span>
+<span class="fc" id="L555">            BigInteger currValue = value;</span>
+<span class="fc bfc" id="L556" title="All 2 branches covered.">            for (int i = numBytes - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L557">                result[i] = (byte) ((currValue.intValue() &amp; 0x7f) | 0x80);</span>
+<span class="fc" id="L558">                currValue = currValue.shiftRight(7);</span>
+            }
+<span class="fc" id="L560">            result[numBytes - 1] &amp;= 0x7f;</span>
+<span class="fc" id="L561">            contents.append(result);</span>
+        }
+<span class="fc" id="L563">    }</span>
+
+<span class="fc" id="L565">    private static final BigInteger[] digits = {</span>
+        BigInteger.ZERO,
+        BigInteger.ONE,
+<span class="fc" id="L568">        BigInteger.valueOf(2),</span>
+<span class="fc" id="L569">        BigInteger.valueOf(3),</span>
+<span class="fc" id="L570">        BigInteger.valueOf(4),</span>
+<span class="fc" id="L571">        BigInteger.valueOf(5),</span>
+<span class="fc" id="L572">        BigInteger.valueOf(6),</span>
+<span class="fc" id="L573">        BigInteger.valueOf(7),</span>
+<span class="fc" id="L574">        BigInteger.valueOf(8),</span>
+<span class="fc" id="L575">        BigInteger.valueOf(9),</span>
+    };
+
+    private void writeTag(int tag, ByteStringBuilder dest) {
+<span class="fc" id="L579">        int constructed = tag &amp; CONSTRUCTED_MASK;</span>
+<span class="fc bfc" id="L580" title="All 2 branches covered.">        if (implicitTag != -1) {</span>
+<span class="fc" id="L581">            tag = implicitTag | constructed;</span>
+<span class="fc" id="L582">            implicitTag = -1;</span>
+        }
+<span class="fc" id="L584">        int tagClass = tag &amp; CLASS_MASK;</span>
+<span class="fc" id="L585">        int tagNumber = tag &amp; TAG_NUMBER_MASK;</span>
+<span class="pc bpc" id="L586" title="1 of 2 branches missed.">        if (tagNumber &lt; 31) {</span>
+<span class="fc" id="L587">            dest.append((byte) (tagClass | constructed | tagNumber));</span>
+        } else {
+            // High-tag-number-form
+<span class="nc" id="L590">            dest.append((byte) (tagClass | constructed | 0x1f));</span>
+<span class="nc bnc" id="L591" title="All 2 branches missed.">            if (tagNumber &lt; 128) {</span>
+<span class="nc" id="L592">                dest.append((byte) tagNumber);</span>
+            } else {
+<span class="nc" id="L594">                int shift = 28;</span>
+                int octet;
+<span class="nc bnc" id="L596" title="All 2 branches missed.">                while (shift &gt; 0) {</span>
+<span class="nc bnc" id="L597" title="All 2 branches missed.">                    if (tagNumber &gt;= (1 &lt;&lt; shift)) {</span>
+<span class="nc" id="L598">                        octet = (tagNumber &gt;&gt;&gt; shift) | 0x80;</span>
+<span class="nc" id="L599">                        dest.append((byte) octet);</span>
+                    }
+<span class="nc" id="L601">                    shift = shift - 7;</span>
+                }
+<span class="nc" id="L603">                octet = tagNumber &amp; 0x7f;</span>
+<span class="nc" id="L604">                dest.append((byte) octet);</span>
+            }
+        }
+<span class="fc" id="L607">    }</span>
+
+    private int writeLength(int length, ByteStringBuilder dest) throws ASN1Exception {
+        int numLengthOctets;
+<span class="pc bpc" id="L611" title="1 of 2 branches missed.">        if (length &lt; 0) {</span>
+<span class="nc" id="L612">            throw log.asnInvalidLength();</span>
+<span class="fc bfc" id="L613" title="All 2 branches covered.">        } else if (length &lt;= 127) {</span>
+            // Short form
+<span class="fc" id="L615">            numLengthOctets = 1;</span>
+        } else {
+            // Long form
+<span class="fc" id="L618">            numLengthOctets = 1;</span>
+<span class="fc" id="L619">            int value = length;</span>
+<span class="fc bfc" id="L620" title="All 2 branches covered.">            while ((value &gt;&gt;&gt;= 8) != 0) {</span>
+<span class="fc" id="L621">                numLengthOctets += 1;</span>
+            }
+        }
+<span class="fc bfc" id="L624" title="All 2 branches covered.">        if (length &gt; 127) {</span>
+            // bit 8 of the first octet has value &quot;1&quot; and bits 7-1 give the number of additional length octets
+<span class="fc" id="L626">            dest.append((byte) (numLengthOctets | 0x80));</span>
+        }
+<span class="fc bfc" id="L628" title="All 2 branches covered.">        for (int i = (numLengthOctets - 1) * 8; i &gt;= 0; i -= 8) {</span>
+<span class="fc" id="L629">            dest.append((byte) (length &gt;&gt; i));</span>
+        }
+<span class="fc bfc" id="L631" title="All 2 branches covered.">        if (length &gt; 127) {</span>
+            // include the first octet
+<span class="fc" id="L633">            return 1 + numLengthOctets;</span>
+        } else {
+<span class="fc" id="L635">            return numLengthOctets;</span>
+        }
+    }
+
+    private void updateCurrentBuffer() {
+<span class="fc" id="L640">        currentBufferPos += 1;</span>
+<span class="fc bfc" id="L641" title="All 2 branches covered.">        if (currentBufferPos &lt; buffers.size()) {</span>
+<span class="fc" id="L642">            currentBuffer = buffers.get(currentBufferPos);</span>
+        } else {
+<span class="fc" id="L644">            ByteStringBuilder buffer = new ByteStringBuilder();</span>
+<span class="fc" id="L645">            buffers.add(buffer);</span>
+<span class="fc" id="L646">            currentBuffer = buffer;</span>
+        }
+<span class="fc" id="L648">    }</span>
+
+    private void writeElement(int tag, byte[] contents) {
+<span class="fc" id="L651">        EncoderState lastState = states.peekLast();</span>
+<span class="fc bfc" id="L652" title="All 4 branches covered.">        if ((lastState != null) &amp;&amp; (lastState.getTag() == SET_TYPE)) {</span>
+<span class="fc" id="L653">            updateCurrentBuffer();</span>
+<span class="fc" id="L654">            lastState.addChildElement(tag, currentBufferPos);</span>
+        }
+
+<span class="fc" id="L657">        writeTag(tag, currentBuffer);</span>
+<span class="fc" id="L658">        writeLength(contents.length, currentBuffer);</span>
+<span class="fc" id="L659">        currentBuffer.append(contents);</span>
+
+        // If this element's parent element is a set element, update the parent's accumulated length
+<span class="fc bfc" id="L662" title="All 4 branches covered.">        if ((lastState != null) &amp;&amp; (lastState.getTag() == SET_TYPE)) {</span>
+<span class="fc" id="L663">            lastState.addChildLength(currentBuffer.length());</span>
+        }
+<span class="fc" id="L665">    }</span>
+
+    private void writeElement(int tag, ByteStringBuilder contents) {
+<span class="fc" id="L668">        EncoderState lastState = states.peekLast();</span>
+<span class="fc bfc" id="L669" title="All 4 branches covered.">        if ((lastState != null) &amp;&amp; (lastState.getTag() == SET_TYPE)) {</span>
+<span class="fc" id="L670">            updateCurrentBuffer();</span>
+<span class="fc" id="L671">            lastState.addChildElement(tag, currentBufferPos);</span>
+        }
+
+<span class="fc" id="L674">        writeTag(tag, currentBuffer);</span>
+<span class="fc" id="L675">        writeLength(contents.length(), currentBuffer);</span>
+<span class="fc" id="L676">        currentBuffer.append(contents);</span>
+
+        // If this element's parent element is a set element, update the parent's accumulated length
+<span class="fc bfc" id="L679" title="All 4 branches covered.">        if ((lastState != null) &amp;&amp; (lastState.getTag() == SET_TYPE)) {</span>
+<span class="fc" id="L680">            lastState.addChildLength(currentBuffer.length());</span>
+        }
+<span class="fc" id="L682">    }</span>
+
+    /**
+     * A class used to maintain state information during DER encoding.
+     */
+    private class EncoderState {
+        private final int tag;
+        private final int bufferPos;
+<span class="fc" id="L690">        private LinkedList&lt;EncoderState&gt; childElements = new LinkedList&lt;EncoderState&gt;();</span>
+<span class="fc" id="L691">        private int childLength = 0;</span>
+
+<span class="fc" id="L693">        public EncoderState(int tag, int bufferPos) {</span>
+<span class="fc" id="L694">            this.tag = tag;</span>
+<span class="fc" id="L695">            this.bufferPos = bufferPos;</span>
+<span class="fc" id="L696">        }</span>
+
+        public int getTag() {
+<span class="fc" id="L699">            return tag;</span>
+        }
+
+        public int getBufferPos() {
+<span class="fc" id="L703">            return bufferPos;</span>
+        }
+
+        public ByteStringBuilder getBuffer() {
+<span class="fc" id="L707">            return buffers.get(getBufferPos());</span>
+        }
+
+        public int getChildLength() {
+<span class="fc" id="L711">            return childLength;</span>
+        }
+
+        public LinkedList&lt;EncoderState&gt; getSortedChildElements(Comparator&lt;EncoderState&gt; comparator) {
+<span class="fc" id="L715">            Collections.sort(childElements, comparator);</span>
+<span class="fc" id="L716">            return childElements;</span>
+        }
+
+        public void addChildElement(int tag, int bufferPos) {
+<span class="fc" id="L720">            childElements.add(new EncoderState(tag, bufferPos));</span>
+<span class="fc" id="L721">        }</span>
+
+        public void addChildLength(int length) {
+<span class="fc" id="L724">            childLength += length;</span>
+<span class="fc" id="L725">        }</span>
+    }
+
+    /**
+     * A class that compares DER encodings based on their tags.
+     */
+    private static class TagComparator implements Comparator&lt;EncoderState&gt; {
+        @Override
+        public int compare(EncoderState state1, EncoderState state2) {
+            // Ignore the constructed bit when comparing tags
+<span class="fc" id="L735">            return (state1.getTag() | CONSTRUCTED_MASK) - (state2.getTag() | CONSTRUCTED_MASK);</span>
+        }
+    }
+
+    /**
+     * A class that compares DER encodings using lexicographic order.
+     */
+    private static class LexicographicComparator implements Comparator&lt;EncoderState&gt; {
+        @Override
+        public int compare(EncoderState state1, EncoderState state2) {
+<span class="fc" id="L745">            ByteStringBuilder bytes1 = state1.getBuffer();</span>
+<span class="fc" id="L746">            ByteStringBuilder bytes2 = state2.getBuffer();</span>
+<span class="fc" id="L747">            ByteIterator bi1 = bytes1.iterate();</span>
+<span class="fc" id="L748">            ByteIterator bi2 = bytes2.iterate();</span>
+
+            // Scan the two encodings from left to right until a difference is found
+            int diff;
+<span class="pc bpc" id="L752" title="2 of 4 branches missed.">            while (bi1.hasNext() &amp;&amp; bi2.hasNext()) {</span>
+<span class="fc" id="L753">                diff = (bi1.next() &amp; 0xff) - (bi2.next() &amp; 0xff);</span>
+<span class="fc bfc" id="L754" title="All 2 branches covered.">                if (diff != 0) {</span>
+<span class="fc" id="L755">                    return diff;</span>
+                }
+            }
+
+            // The longer encoding is considered to be the bigger-valued encoding
+<span class="nc" id="L760">            return bytes1.length() - bytes2.length();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

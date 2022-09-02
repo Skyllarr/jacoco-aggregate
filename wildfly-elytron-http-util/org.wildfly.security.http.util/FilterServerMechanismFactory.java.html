@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FilterServerMechanismFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-util</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.util</a> &gt; <span class="el_source">FilterServerMechanismFactory.java</span></div><h1>FilterServerMechanismFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.http.util;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+import static org.wildfly.security.http.util.ElytronMessages.log;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Predicate;
+
+import javax.security.auth.callback.CallbackHandler;
+
+import org.wildfly.security.http.HttpAuthenticationException;
+import org.wildfly.security.http.HttpServerAuthenticationMechanism;
+import org.wildfly.security.http.HttpServerAuthenticationMechanismFactory;
+
+/**
+ * An implementation of {@link HttpServerAuthenticationMechanismFactory} that wraps an existing factory and provides mechanism
+ * filtering by name.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public final class FilterServerMechanismFactory implements HttpServerAuthenticationMechanismFactory {
+
+    private final HttpServerAuthenticationMechanismFactory delegate;
+    private final Predicate&lt;String&gt; predicate;
+
+    /**
+     * Constructs a new instance.
+     *
+     * @param delegate the {@link HttpServerAuthenticationMechanismFactory} to delegate to.
+     * @param predicate mechanism name based predicate to filter available mechanisms.
+     */
+<span class="nc" id="L55">    public FilterServerMechanismFactory(final HttpServerAuthenticationMechanismFactory delegate, final Predicate&lt;String&gt; predicate) {</span>
+<span class="nc" id="L56">        this.delegate = checkNotNullParam(&quot;delegate&quot;, delegate);</span>
+<span class="nc" id="L57">        this.predicate = checkNotNullParam(&quot;predicate&quot;, predicate);</span>
+<span class="nc" id="L58">    }</span>
+
+    /**
+     * Construct a new instance that filters from a provided set of mechanism names.
+     *
+     * @param delegate the {@link HttpServerAuthenticationMechanismFactory} to delegate to.
+     * @param include when {@code true} mechanisms will be advertised as available if included in the provided mechanismNames.
+     * @param mechanismNames the mechanism names to use as a filter.
+     */
+<span class="nc" id="L67">    public FilterServerMechanismFactory(final HttpServerAuthenticationMechanismFactory delegate, final boolean include , String ... mechanismNames) {</span>
+<span class="nc" id="L68">        this.delegate = checkNotNullParam(&quot;delegate&quot;, delegate);</span>
+<span class="nc" id="L69">        final Set&lt;String&gt; nameSet = new HashSet&lt;&gt;(mechanismNames.length);</span>
+<span class="nc" id="L70">        Collections.addAll(nameSet, mechanismNames);</span>
+
+<span class="nc" id="L72">        Predicate&lt;String&gt; predicate = nameSet::contains;</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        this.predicate = include ? predicate : predicate.negate();</span>
+<span class="nc" id="L74">    }</span>
+
+    /**
+     * Construct a new instance that filters from a provided set of mechanism names.
+     *
+     * @param delegate the {@link HttpServerAuthenticationMechanismFactory} to delegate to.
+     * @param include when {@code true} mechanisms will be advertised as available if included in the provided mechanismNames.
+     * @param mechanismNames the mechanism names to use as a filter.
+     */
+<span class="nc" id="L83">    public FilterServerMechanismFactory(final HttpServerAuthenticationMechanismFactory delegate, final boolean include , Collection&lt;String&gt; mechanismNames) {</span>
+<span class="nc" id="L84">        this.delegate = checkNotNullParam(&quot;delegate&quot;, delegate);</span>
+<span class="nc" id="L85">        final Set&lt;String&gt; nameSet = new HashSet&lt;&gt;(checkNotNullParam(&quot;mechanismNames&quot;, mechanismNames));</span>
+
+<span class="nc" id="L87">        Predicate&lt;String&gt; predicate = nameSet::contains;</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">        this.predicate = include ? predicate : predicate.negate();</span>
+<span class="nc" id="L89">    }</span>
+
+    /**
+     * Get the available mechanism names after filtering has been performed by the previously provided {@link Predicate}
+     *
+     * @param properties the {@link Map} of properties to pass into the {@link HttpServerAuthenticationMechanismFactory#getMechanismNames(Map)} call on the delegate.
+     * @return The array of filtered mechanism names.
+     * @see org.wildfly.security.http.HttpServerAuthenticationMechanismFactory#getMechanismNames(java.util.Map)
+     */
+    @Override
+    public String[] getMechanismNames(Map&lt;String, ?&gt; properties) {
+<span class="nc" id="L100">        String[] allMechanisms = delegate.getMechanismNames(properties);</span>
+<span class="nc" id="L101">        ArrayList&lt;String&gt; filtered = new ArrayList&lt;&gt;(allMechanisms.length);</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        for (String current : allMechanisms) {</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">            if (predicate.test(current)) {</span>
+<span class="nc" id="L104">                filtered.add(current);</span>
+            }
+        }
+<span class="nc bnc" id="L107" title="All 4 branches missed.">        if (filtered.size() == 0 &amp;&amp; log.isTraceEnabled()) {</span>
+<span class="nc" id="L108">            log.tracef(&quot;No mechanisms after filtering by %s (original mechanisms: %s)&quot;, FilterServerMechanismFactory.class.getSimpleName(), Arrays.toString(allMechanisms));</span>
+        }
+<span class="nc" id="L110">        return filtered.toArray(new String[filtered.size()]);</span>
+    }
+
+    /**
+     * Create the requested {@link HttpServerAuthenticationMechanism} provided it is available and allowed by the current filter.
+     *
+     * @param mechanismName the name of the required mechanism.
+     * @param properties the configuration properties to pass in for mechanism creation.
+     * @param callbackHandler the {@link CallbackHandler} the mechanism should use for verification.
+     * @return The {@link HttpServerAuthenticationMechanism} or {@code null} if not available.
+     * @throws HttpAuthenticationException
+     * @see org.wildfly.security.http.HttpServerAuthenticationMechanismFactory#createAuthenticationMechanism(java.lang.String,
+     * java.util.Map, javax.security.auth.callback.CallbackHandler)
+     */
+    @Override
+    public HttpServerAuthenticationMechanism createAuthenticationMechanism(String mechanismName, Map&lt;String, ?&gt; properties,
+            CallbackHandler callbackHandler) throws HttpAuthenticationException {
+<span class="nc bnc" id="L127" title="All 2 branches missed.">        return predicate.test(mechanismName) ? delegate.createAuthenticationMechanism(mechanismName, properties, callbackHandler) : null;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

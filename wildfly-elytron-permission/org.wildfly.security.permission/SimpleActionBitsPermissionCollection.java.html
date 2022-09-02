@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SimpleActionBitsPermissionCollection.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-permission</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.permission</a> &gt; <span class="el_source">SimpleActionBitsPermissionCollection.java</span></div><h1>SimpleActionBitsPermissionCollection.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.permission;
+
+import java.security.Permission;
+import java.util.Enumeration;
+import java.util.Iterator;
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.wildfly.security.util.ArrayIterator;
+
+/**
+ * A trivially simple permission collection, suitable as a default for most permission types (though probably not as efficient
+ * as a specialized type in many cases).
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class SimpleActionBitsPermissionCollection extends AbstractPermissionCollection {
+
+<span class="nc" id="L36">    private static final AbstractActionSetPermission&lt;?&gt;[] NO_PERMS = new AbstractActionSetPermission&lt;?&gt;[0];</span>
+
+<span class="nc" id="L38">    private final AtomicReference&lt;AbstractActionSetPermission&lt;?&gt;[]&gt; permissionsRef = new AtomicReference&lt;&gt;(NO_PERMS);</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param sourcePermission the source permission for this collection (must not be {@code null})
+     */
+    public SimpleActionBitsPermissionCollection(final AbstractActionSetPermission&lt;?&gt; sourcePermission) {
+<span class="nc" id="L46">        super(sourcePermission);</span>
+<span class="nc" id="L47">    }</span>
+
+    public int size() {
+<span class="nc" id="L50">        return permissionsRef.get().length;</span>
+    }
+
+    @Override
+    protected void doAdd(final AbstractPermission&lt;?&gt; permission) {
+<span class="nc bnc" id="L55" title="All 2 branches missed.">        if (permission instanceof AbstractActionSetPermission&lt;?&gt;) {</span>
+<span class="nc" id="L56">            doAdd((AbstractActionSetPermission&lt;?&gt;) permission);</span>
+        }
+<span class="nc" id="L58">        throw ElytronMessages.log.invalidPermissionType(AbstractActionSetPermission.class, permission);</span>
+    }
+
+    /**
+     * Adds a permission.
+     *
+     * @param permission the non-{@code null} permission
+     */
+    protected void doAdd(final AbstractActionSetPermission&lt;?&gt; permission) {
+        AbstractActionSetPermission&lt;?&gt;[] oldVal, readVal, newVal;
+        int count;
+<span class="nc" id="L69">        final AtomicReference&lt;AbstractActionSetPermission&lt;?&gt;[]&gt; permissionsRef = this.permissionsRef;</span>
+        do {
+<span class="nc" id="L71">            readVal = permissionsRef.get();</span>
+<span class="nc" id="L72">            count = 0;</span>
+            do {
+<span class="nc" id="L74">                oldVal = readVal;</span>
+<span class="nc" id="L75">                AbstractActionSetPermission&lt;?&gt; merged = permission;</span>
+                retry: for (;;) {
+<span class="nc bnc" id="L77" title="All 2 branches missed.">                    for (AbstractActionSetPermission&lt;?&gt; test : oldVal) {</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">                        if (test.implies(merged)) {</span>
+                            // fail fast
+<span class="nc" id="L80">                            return;</span>
+                        }
+<span class="nc bnc" id="L82" title="All 2 branches missed.">                        if (test.nameEquals(merged)) {</span>
+                            // combine
+<span class="nc" id="L84">                            merged = merged.withActionBits(permission.getActionBits());</span>
+                            // test again with merged permission
+<span class="nc" id="L86">                            count = 0;</span>
+<span class="nc" id="L87">                            continue retry;</span>
+                        }
+<span class="nc bnc" id="L89" title="All 2 branches missed.">                        if (! merged.implies(test)) {</span>
+                            // prepare to skip any permissions that are obviated by this one
+<span class="nc" id="L91">                            count ++;</span>
+                        }
+                    }
+<span class="nc" id="L94">                    break;</span>
+                }
+                // see if it's still what we expect before we commit to the possibly expensive update...
+<span class="nc" id="L97">                readVal = permissionsRef.get();</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            } while (readVal != oldVal);</span>
+<span class="nc" id="L99">            newVal = new AbstractActionSetPermission&lt;?&gt;[count + 1];</span>
+<span class="nc" id="L100">            int i = 0;</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">            for (AbstractActionSetPermission&lt;?&gt; test : oldVal) {</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">                if (! permission.implies(test)) {</span>
+<span class="nc" id="L103">                    newVal[i++] = test;</span>
+                }
+            }
+<span class="nc" id="L106">            newVal[i] = permission;</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        } while (! permissionsRef.compareAndSet(oldVal, newVal));</span>
+<span class="nc" id="L108">    }</span>
+
+    public boolean implies(final Permission permission) {
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        for (Permission test : permissionsRef.get()) {</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">            if (test.implies(permission)) {</span>
+<span class="nc" id="L113">                return true;</span>
+            }
+        }
+<span class="nc" id="L116">        return false;</span>
+    }
+
+    public Iterator&lt;Permission&gt; iterator() {
+<span class="nc" id="L120">        return new ArrayIterator&lt;Permission&gt;(permissionsRef.get());</span>
+    }
+
+    public Enumeration&lt;Permission&gt; elements() {
+<span class="nc" id="L124">        return new ArrayIterator&lt;Permission&gt;(permissionsRef.get());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

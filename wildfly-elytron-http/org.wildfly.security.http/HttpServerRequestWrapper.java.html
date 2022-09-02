@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>HttpServerRequestWrapper.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http</a> &gt; <span class="el_source">HttpServerRequestWrapper.java</span></div><h1>HttpServerRequestWrapper.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.http;
+
+import java.io.InputStream;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.security.cert.Certificate;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import javax.net.ssl.SSLSession;
+
+import org.wildfly.common.Assert;
+
+/**
+ * A wrapper delegating any request to the delegated implementation.
+ * &lt;p&gt;
+ * Determined to be used as base class for {@link HttpServerRequest} without need to implement
+ * methods delegating requests to the delegated implementation.
+ *
+ * @author &lt;a href=&quot;mailto:psilva@redhat.com&quot;&gt;Pedro Igor&lt;/a&gt;
+ */
+public class HttpServerRequestWrapper implements HttpServerRequest {
+
+    private final HttpServerRequest delegate;
+
+    /**
+     * Construct new instance.
+     *
+     * @param delegate a request to which will be delegated any requests
+     */
+<span class="nc" id="L51">    public HttpServerRequestWrapper(HttpServerRequest delegate) {</span>
+<span class="nc" id="L52">        Assert.checkNotNullParam(&quot;delegate&quot;, delegate);</span>
+<span class="nc" id="L53">        this.delegate = delegate;</span>
+<span class="nc" id="L54">    }</span>
+
+    @Override
+    public HttpScope getScope(Scope scope) {
+<span class="nc" id="L58">        return delegate.getScope(scope);</span>
+    }
+
+    @Override
+    public Collection&lt;String&gt; getScopeIds(Scope scope) {
+<span class="nc" id="L63">        return delegate.getScopeIds(scope);</span>
+    }
+
+    @Override
+    public HttpScope getScope(Scope scope, String id) {
+<span class="nc" id="L68">        return delegate.getScope(scope, id);</span>
+    }
+
+    @Override
+    public List&lt;String&gt; getRequestHeaderValues(String headerName) {
+<span class="nc" id="L73">        return delegate.getRequestHeaderValues(headerName);</span>
+    }
+
+    @Override
+    public String getFirstRequestHeaderValue(String headerName) {
+<span class="nc" id="L78">        return delegate.getFirstRequestHeaderValue(headerName);</span>
+    }
+
+    @Override
+    public SSLSession getSSLSession() {
+<span class="nc" id="L83">        return delegate.getSSLSession();</span>
+    }
+
+    @Override
+    public Certificate[] getPeerCertificates() {
+<span class="nc" id="L88">        return delegate.getPeerCertificates();</span>
+    }
+
+    @Override
+    public void noAuthenticationInProgress(HttpServerMechanismsResponder responder) {
+<span class="nc" id="L93">        delegate.noAuthenticationInProgress(responder);</span>
+<span class="nc" id="L94">    }</span>
+
+    @Override
+    public void authenticationInProgress(HttpServerMechanismsResponder responder) {
+<span class="nc" id="L98">        delegate.authenticationInProgress(responder);</span>
+<span class="nc" id="L99">    }</span>
+
+    @Override
+    public void authenticationComplete(HttpServerMechanismsResponder responder) {
+<span class="nc" id="L103">        delegate.authenticationComplete(responder);</span>
+<span class="nc" id="L104">    }</span>
+
+    @Override
+    public void authenticationComplete(HttpServerMechanismsResponder responder, Runnable logoutHandler) {
+<span class="nc" id="L108">        delegate.authenticationComplete(responder, logoutHandler);</span>
+<span class="nc" id="L109">    }</span>
+
+    @Override
+    public void authenticationFailed(String message, HttpServerMechanismsResponder responder) {
+<span class="nc" id="L113">        delegate.authenticationFailed(message, responder);</span>
+<span class="nc" id="L114">    }</span>
+
+    @Override
+    public void badRequest(HttpAuthenticationException failure, HttpServerMechanismsResponder responder) {
+<span class="nc" id="L118">        delegate.badRequest(failure, responder);</span>
+<span class="nc" id="L119">    }</span>
+
+    @Override
+    public String getRequestMethod() {
+<span class="nc" id="L123">        return delegate.getRequestMethod();</span>
+    }
+
+    @Override
+    public URI getRequestURI() {
+<span class="nc" id="L128">        return delegate.getRequestURI();</span>
+    }
+
+    @Override
+    public String getRequestPath() {
+<span class="nc" id="L133">        return delegate.getRequestPath();</span>
+    }
+
+    @Override
+    public Map&lt;String, List&lt;String&gt;&gt; getParameters() {
+<span class="nc" id="L138">        return delegate.getParameters();</span>
+    }
+
+    @Override
+    public Set&lt;String&gt; getParameterNames() {
+<span class="nc" id="L143">        return delegate.getParameterNames();</span>
+    }
+
+    @Override
+    public List&lt;String&gt; getParameterValues(String name) {
+<span class="nc" id="L148">        return delegate.getParameterValues(name);</span>
+    }
+
+    @Override
+    public String getFirstParameterValue(String name) {
+<span class="nc" id="L153">        return delegate.getFirstParameterValue(name);</span>
+    }
+
+    @Override
+    public List&lt;HttpServerCookie&gt; getCookies() {
+<span class="nc" id="L158">        return delegate.getCookies();</span>
+    }
+
+    @Override
+    public InputStream getInputStream() {
+<span class="nc" id="L163">        return delegate.getInputStream();</span>
+    }
+
+    @Override
+    public InetSocketAddress getSourceAddress() {
+<span class="nc" id="L168">        return delegate.getSourceAddress();</span>
+    }
+
+    @Override
+    public boolean suspendRequest() {
+<span class="nc" id="L173">        return delegate.suspendRequest();</span>
+    }
+
+    @Override
+    public boolean resumeRequest() {
+<span class="nc" id="L178">        return delegate.resumeRequest();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

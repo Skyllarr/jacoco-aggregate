@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BearerTokenAuthenticationMechanism.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-bearer</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.bearer</a> &gt; <span class="el_source">BearerTokenAuthenticationMechanism.java</span></div><h1>BearerTokenAuthenticationMechanism.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2017 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.http.bearer;
+
+import static org.wildfly.security.http.HttpConstants.BEARER_TOKEN;
+import static org.wildfly.security.http.HttpConstants.BEARER_TOKEN_PATTERN;
+import static org.wildfly.security.http.HttpConstants.FORBIDDEN;
+import static org.wildfly.security.http.HttpConstants.REALM;
+import static org.wildfly.security.http.HttpConstants.UNAUTHORIZED;
+import static org.wildfly.security.http.HttpConstants.WWW_AUTHENTICATE;
+import static org.wildfly.security.mechanism._private.ElytronMessages.httpBearer;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.regex.Matcher;
+
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.sasl.AuthorizeCallback;
+
+import org.wildfly.security.auth.callback.AuthenticationCompleteCallback;
+import org.wildfly.security.auth.callback.AvailableRealmsCallback;
+import org.wildfly.security.auth.callback.EvidenceVerifyCallback;
+import org.wildfly.security.auth.callback.IdentityCredentialCallback;
+import org.wildfly.security.credential.BearerTokenCredential;
+import org.wildfly.security.evidence.BearerTokenEvidence;
+import org.wildfly.security.http.HttpAuthenticationException;
+import org.wildfly.security.http.HttpConstants;
+import org.wildfly.security.http.HttpServerAuthenticationMechanism;
+import org.wildfly.security.http.HttpServerRequest;
+import org.wildfly.security.http.HttpServerResponse;
+import org.wildfly.security.mechanism._private.MechanismUtil;
+import org.wildfly.security.mechanism.AuthenticationMechanismException;
+
+/**
+ * &lt;p&gt;A {@link HttpServerAuthenticationMechanism} capable to perform authentication based on a bearer token.
+ *
+ * &lt;p&gt;This mechanisms expects bearer tokens to be sent along with a &lt;code&gt;Authorization&lt;/code&gt; request header as follows:
+ *
+ * &lt;pre&gt;
+ *      GET /resource-server HTTP/1.1
+ *      Host: elytron.org
+ *      Authorization: Bearer hgTasdMNMMAsii
+ * &lt;/pre&gt;
+ *
+ *
+ * @author &lt;a href=&quot;mailto:psilva@redhat.com&quot;&gt;Pedro Igor&lt;/a&gt;
+ */
+final class BearerTokenAuthenticationMechanism implements HttpServerAuthenticationMechanism {
+
+    private final CallbackHandler callbackHandler;
+
+<span class="nc" id="L70">    BearerTokenAuthenticationMechanism(CallbackHandler callbackHandler) {</span>
+<span class="nc" id="L71">        this.callbackHandler = callbackHandler;</span>
+<span class="nc" id="L72">    }</span>
+
+    @Override
+    public String getMechanismName() {
+<span class="nc" id="L76">        return BEARER_TOKEN;</span>
+    }
+
+    @Override
+    public void evaluateRequest(HttpServerRequest request) throws HttpAuthenticationException {
+<span class="nc" id="L81">        List&lt;String&gt; authorizationValues = request.getRequestHeaderValues(HttpConstants.AUTHORIZATION);</span>
+
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        if (authorizationValues != null) {</span>
+            Matcher matcher;
+<span class="nc bnc" id="L85" title="All 2 branches missed.">            for (String current : authorizationValues) {</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">                if ((matcher = BEARER_TOKEN_PATTERN.matcher(current)).matches()) {</span>
+<span class="nc" id="L87">                    BearerTokenEvidence tokenEvidence = new BearerTokenEvidence(matcher.group(1));</span>
+<span class="nc" id="L88">                    EvidenceVerifyCallback verifyCallback = new EvidenceVerifyCallback(tokenEvidence);</span>
+
+<span class="nc" id="L90">                    handleCallback(verifyCallback);</span>
+
+<span class="nc bnc" id="L92" title="All 2 branches missed.">                    if (verifyCallback.isVerified()) {</span>
+<span class="nc" id="L93">                        AuthorizeCallback authorizeCallback = new AuthorizeCallback(null, null);</span>
+
+<span class="nc" id="L95">                        handleCallback(authorizeCallback);</span>
+
+<span class="nc bnc" id="L97" title="All 2 branches missed.">                        if (authorizeCallback.isAuthorized()) {</span>
+<span class="nc" id="L98">                            httpBearer.debugf(&quot;Token authentication successful.&quot;);</span>
+<span class="nc" id="L99">                            handleCallback(new IdentityCredentialCallback(new BearerTokenCredential(tokenEvidence.getToken()), true));</span>
+<span class="nc" id="L100">                            handleCallback(AuthenticationCompleteCallback.SUCCEEDED);</span>
+<span class="nc" id="L101">                            request.authenticationComplete();</span>
+                        } else {
+<span class="nc" id="L103">                            httpBearer.debugf(&quot;Token authorization failed.&quot;);</span>
+<span class="nc" id="L104">                            request.authenticationFailed(&quot;Authorization failed.&quot;, response -&gt; response.setStatusCode(FORBIDDEN));</span>
+                        }
+<span class="nc" id="L106">                    } else {</span>
+<span class="nc" id="L107">                        httpBearer.debugf(&quot;Token authentication failed.&quot;);</span>
+<span class="nc" id="L108">                        request.authenticationFailed(httpBearer.authenticationFailed(), this::unauthorizedResponse);</span>
+                    }
+<span class="nc" id="L110">                    return;</span>
+                }
+<span class="nc" id="L112">            }</span>
+        }
+
+<span class="nc" id="L115">        request.noAuthenticationInProgress(this::unauthorizedResponse);</span>
+<span class="nc" id="L116">    }</span>
+
+    private void handleCallback(Callback callback) throws HttpAuthenticationException {
+        try {
+<span class="nc" id="L120">            MechanismUtil.handleCallbacks(httpBearer, callbackHandler, callback);</span>
+<span class="nc" id="L121">        } catch (AuthenticationMechanismException e) {</span>
+<span class="nc" id="L122">            throw e.toHttpAuthenticationException();</span>
+<span class="nc" id="L123">        } catch (UnsupportedCallbackException ignored) {</span>
+<span class="nc" id="L124">            httpBearer.tracef(&quot;Unsupported callback [%s]&quot;, callback);</span>
+<span class="nc" id="L125">        }</span>
+<span class="nc" id="L126">    }</span>
+
+    private void unauthorizedResponse(HttpServerResponse response) throws HttpAuthenticationException {
+<span class="nc" id="L129">        StringBuilder sb = new StringBuilder(&quot;Bearer&quot;);</span>
+<span class="nc" id="L130">        String realmName = getRealmName();</span>
+
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        if (realmName != null) {</span>
+<span class="nc" id="L133">            sb.append(&quot; &quot;).append(REALM).append(&quot;=\&quot;&quot;).append(realmName).append(&quot;\&quot;&quot;);</span>
+        }
+
+<span class="nc" id="L136">        response.addResponseHeader(WWW_AUTHENTICATE, sb.toString());</span>
+<span class="nc" id="L137">        response.setStatusCode(UNAUTHORIZED);</span>
+<span class="nc" id="L138">    }</span>
+
+    private String getRealmName() throws HttpAuthenticationException {
+        try {
+<span class="nc" id="L142">            AvailableRealmsCallback availableRealmsCallback = new AvailableRealmsCallback();</span>
+<span class="nc" id="L143">            callbackHandler.handle(new Callback[] { availableRealmsCallback });</span>
+<span class="nc" id="L144">            String[] realmNames = availableRealmsCallback.getRealmNames();</span>
+<span class="nc bnc" id="L145" title="All 4 branches missed.">            if (realmNames != null &amp;&amp; realmNames.length &gt; 0) {</span>
+<span class="nc" id="L146">                return realmNames[0];</span>
+            }
+<span class="nc" id="L148">        } catch (UnsupportedCallbackException ignored) {</span>
+<span class="nc" id="L149">        } catch (IOException e) {</span>
+<span class="nc" id="L150">            throw httpBearer.mechCallbackHandlerFailedForUnknownReason(e).toHttpAuthenticationException();</span>
+<span class="nc" id="L151">        }</span>
+<span class="nc" id="L152">        return null;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

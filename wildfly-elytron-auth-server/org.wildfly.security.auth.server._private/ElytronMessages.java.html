@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronMessages.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-auth-server</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.server._private</a> &gt; <span class="el_source">ElytronMessages.java</span></div><h1>ElytronMessages.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.server._private;
+
+import static org.jboss.logging.Logger.Level.ERROR;
+
+import java.io.IOException;
+import java.security.GeneralSecurityException;
+import java.security.Principal;
+
+import org.jboss.logging.BasicLogger;
+import org.jboss.logging.Logger;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.LogMessage;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageLogger;
+import org.jboss.logging.annotations.Param;
+
+import org.jboss.logging.annotations.ValidIdRange;
+import org.jboss.logging.annotations.ValidIdRanges;
+import org.wildfly.security.auth.server.RealmUnavailableException;
+import org.wildfly.security.authz.AuthorizationFailureException;
+
+/**
+ * Log messages and exceptions for Elytron.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+@MessageLogger(projectCode = &quot;ELY&quot;, length = 5)
+@ValidIdRanges({
+    @ValidIdRange(min = 3, max = 3),
+    @ValidIdRange(min = 8, max = 8),
+    @ValidIdRange(min = 1000, max = 1156),
+    @ValidIdRange(min = 8510, max = 8511),
+    @ValidIdRange(min = 16000, max = 16999)
+})
+public interface ElytronMessages extends BasicLogger {
+
+<span class="fc" id="L56">    ElytronMessages log = Logger.getMessageLogger(ElytronMessages.class, &quot;org.wildfly.security&quot;);</span>
+
+    @Message(id = 3, value = &quot;This builder has already been built&quot;)
+    IllegalStateException builderAlreadyBuilt();
+
+    @Message(id = 8, value = &quot;The given credential is not supported here&quot;)
+    IllegalArgumentException credentialNotSupported();
+
+    @Message(id = 1000, value = &quot;Authentication name was already set on this context&quot;)
+    IllegalStateException nameAlreadySet();
+
+    @Message(id = 1003, value = &quot;No authentication is in progress&quot;)
+    IllegalStateException noAuthenticationInProgress();
+
+    @Message(id = 1005, value = &quot;Realm map does not contain mapping for default realm '%s'&quot;)
+    IllegalArgumentException realmMapDoesNotContainDefault(String defaultRealm);
+
+    @Message(id = 1019, value = &quot;Unable to obtain exclusive access to backing identity&quot;)
+    RealmUnavailableException unableToObtainExclusiveAccess();
+
+    @Message(id = 1033, value = &quot;User does not exist&quot;)
+    IllegalStateException userDoesNotExist();
+
+    @Message(id = 1034, value = &quot;Invalid credential type specified&quot;)
+    IllegalStateException invalidCredentialTypeSpecified();
+
+    @Message(id = 1064, value = &quot;Invalid identity name&quot;)
+    IllegalArgumentException invalidName();
+
+    @Message(id = 1088, value = &quot;Attempting to run as \&quot;%s\&quot; authorization operation failed&quot;)
+    AuthorizationFailureException runAsAuthorizationFailed(@Param Principal principal, Principal targetPrincipal,
+            @Cause Throwable cause);
+
+    @Message(id = 1092, value = &quot;Invalid mechanism realm selection \&quot;%s\&quot;&quot;)
+    IllegalArgumentException invalidMechRealmSelection(String realmName);
+
+    @Message(id = 1093, value = &quot;Mechanism realm was already selected&quot;)
+    IllegalStateException mechRealmAlreadySelected();
+
+    @Message(id = 1095, value = &quot;Unable to create identity&quot;)
+    RealmUnavailableException unableToCreateIdentity();
+
+    @Message(id = 1096, value = &quot;No such identity&quot;)
+    RealmUnavailableException noSuchIdentity();
+
+    @Message(id = 1112, value = &quot;Authentication cannot succeed; not authorized&quot;)
+    IllegalStateException cannotSucceedNotAuthorized();
+
+    @Message(id = 1119, value = &quot;Unable to resolve MechanismConfiguration for mechanismType='%s', mechanismName='%s', hostName='%s', protocol='%s'.&quot;)
+    IllegalStateException unableToSelectMechanismConfiguration(String mechanismType, String mechanismName,
+            String hostName, String protocol);
+
+    @Message(id = 1120, value = &quot;Too late to set mechanism information as authentication has already begun.&quot;)
+    IllegalStateException tooLateToSetMechanismInformation();
+
+    @Message(id = 1124, value = &quot;The security realm does not support updating a credential&quot;)
+    UnsupportedOperationException credentialUpdateNotSupportedByRealm();
+
+    @Message(id = 1148, value = &quot;A SecurityDomain has already been associated with the specified ClassLoader&quot;)
+    IllegalStateException classLoaderSecurityDomainExists();
+
+    @Message(id = 1149, value = &quot;Can not use SecurityIdentity with SecurityIdentity from same SecurityDomain&quot;)
+    IllegalArgumentException cantWithSameSecurityDomainDomain();
+
+    @Message(id = 1151, value = &quot;Evidence Verification Failed.&quot;)
+    SecurityException authenticationFailedEvidenceVerification();
+
+    @Message(id = 1152, value = &quot;Authorization Check Failed.&quot;)
+    SecurityException authenticationFailedAuthorization();
+
+    @Message(id = 1155, value = &quot;Security domain mismatch&quot;)
+    IllegalArgumentException securityDomainMismatch();
+
+    @Message(id = 1156, value = &quot;Cannot obtain a credential from a security factory&quot;)
+    IOException cannotObtainCredentialFromFactory(@Cause GeneralSecurityException e);
+
+    @LogMessage(level = ERROR)
+    @Message(id = 1094, value = &quot;An event handler threw an exception&quot;)
+    void eventHandlerFailed(@Cause Throwable cause);
+
+    @Message(id = 8510, value = &quot;Role mapper has already been initialized.&quot;)
+    IllegalStateException roleMappedAlreadyInitialized();
+
+    @Message(id = 8511, value = &quot;Role mapper hasn't been initialized yet.&quot;)
+    IllegalStateException roleMappedNotInitialized();
+
+    @Message(id = 16000, value = &quot;Invalid replacement in regex role mapper.&quot;)
+    IllegalArgumentException invalidReplacementInRegexRoleMapper();
+
+    @Message(id = 16001, value = &quot;Invalid pattern in regex role mapper.&quot;)
+    IllegalArgumentException invalidPatternInRegexRoleMapper();
+
+    @Message(id = 16002, value = &quot;Can not handle SecurityEvent with SecurityIdentity from other SecurityDomain&quot;)
+    IllegalArgumentException securityEventIdentityWrongDomain();
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

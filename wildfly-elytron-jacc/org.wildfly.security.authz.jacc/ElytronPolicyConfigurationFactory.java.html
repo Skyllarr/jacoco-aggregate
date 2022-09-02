@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ElytronPolicyConfigurationFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-jacc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.authz.jacc</a> &gt; <span class="el_source">ElytronPolicyConfigurationFactory.java</span></div><h1>ElytronPolicyConfigurationFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source
+ *
+ * Copyright 2015 Red Hat, Inc. and/or its affiliates.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.authz.jacc;
+
+import javax.security.jacc.PolicyConfiguration;
+import javax.security.jacc.PolicyConfigurationFactory;
+import javax.security.jacc.PolicyContext;
+import javax.security.jacc.PolicyContextException;
+import java.security.PrivilegedAction;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+import static java.lang.System.getSecurityManager;
+import static java.security.AccessController.doPrivileged;
+import static org.wildfly.common.Assert.checkNotNullParam;
+import static org.wildfly.security.authz.jacc.ElytronMessages.log;
+import static org.wildfly.security.authz.jacc.ElytronPolicyConfiguration.State.OPEN;
+
+/**
+ * &lt;p&gt;A {@link javax.security.jacc.PolicyConfigurationFactory} implementation.
+ *
+ * &lt;p&gt;Accordingly with the JACC specification, a {@link PolicyConfigurationFactory} is a singleton, instantiate once during
+ * the application server startup. Thus, there is only one instance of this class for a given JRE of an application server.
+ *
+ * &lt;p&gt;The static method {@link #getCurrentPolicyConfiguration()} is necessary in order to keep compatibility with TCK, given that
+ * it will wrap both factory and policy provider into its own implementations and still should be possible to obtain the policy configuration
+ * created by this factory by the {@link JaccDelegatingPolicy}. This behavior is exactly the same as currently being used by RI implementation from
+ * GF and PicketBox.
+ *
+ * @author &lt;a href=&quot;mailto:psilva@redhat.com&quot;&gt;Pedro Igor&lt;/a&gt;
+ * @see org.wildfly.security.authz.jacc.JaccDelegatingPolicy
+ */
+<span class="fc" id="L48">public class ElytronPolicyConfigurationFactory extends PolicyConfigurationFactory {</span>
+
+<span class="pc" id="L50">    public static final PrivilegedAction&lt;String&gt; GET_CONTEXT_ID = () -&gt; PolicyContext.getContextID();</span>
+
+    /**
+     * Holds all {@link javax.security.jacc.PolicyConfiguration} created in runtime.
+     */
+<span class="fc" id="L55">    private static final Map&lt;String, ElytronPolicyConfiguration&gt; configurationRegistry = new ConcurrentHashMap&lt;&gt;();</span>
+
+    /**
+     * &lt;p&gt;Returns the {@link javax.security.jacc.PolicyConfiguration} associated with the current policy context identifier.
+     *
+     * &lt;p&gt;This method only returns {@link javax.security.jacc.PolicyConfiguration} transitioned to the &lt;i&gt;in service&lt;/i&gt; state.
+     * If the configuration associated with the current policy context identifier is in a different state, a exception is thrown.
+     *
+     * @return this method always returns a configuration instance transitioned with the &lt;i&gt;in service&lt;/i&gt; state and associated
+     *         with the current policy context identifier.
+     * @throws PolicyContextException if the configuration is in a different state than &lt;i&gt;in service&lt;/i&gt;, no policy context identifier
+     * was set or if no configuration is found for the given identifier.
+     */
+    static &lt;P extends PolicyConfiguration&gt; P getCurrentPolicyConfiguration() throws PolicyContextException {
+        String contextID;
+
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        if (getSecurityManager() != null) {</span>
+<span class="nc" id="L72">            contextID = doPrivileged(GET_CONTEXT_ID);</span>
+        } else {
+<span class="fc" id="L74">            contextID = PolicyContext.getContextID();</span>
+        }
+
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (contextID == null) {</span>
+<span class="nc" id="L78">            throw log.authzContextIdentifierNotSet();</span>
+        }
+
+        try {
+<span class="fc" id="L82">            P policyConfiguration = (P) configurationRegistry.get(contextID);</span>
+
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">            if (policyConfiguration == null) {</span>
+<span class="nc" id="L85">                throw log.authzInvalidPolicyContextIdentifier(contextID);</span>
+            }
+
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            if (!policyConfiguration.inService()) {</span>
+<span class="fc" id="L89">                throw log.authzPolicyConfigurationNotInService(contextID);</span>
+            }
+
+<span class="fc" id="L92">            return policyConfiguration;</span>
+<span class="fc" id="L93">        } catch (Exception e) {</span>
+<span class="fc" id="L94">            throw log.authzUnableToObtainPolicyConfiguration(contextID, e);</span>
+        }
+    }
+
+    @Override
+    public PolicyConfiguration getPolicyConfiguration(String contextID, boolean remove) throws PolicyContextException {
+<span class="fc" id="L100">        checkNotNullParam(&quot;contextID&quot;, contextID);</span>
+
+<span class="fc" id="L102">        synchronized (configurationRegistry) {</span>
+<span class="fc" id="L103">            ElytronPolicyConfiguration policyConfiguration = configurationRegistry.get(contextID);</span>
+
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            if (policyConfiguration == null) {</span>
+<span class="fc" id="L106">                return createPolicyConfiguration(contextID);</span>
+            }
+
+<span class="fc bfc" id="L109" title="All 2 branches covered.">            if (remove) {</span>
+<span class="fc" id="L110">                policyConfiguration.delete();</span>
+            }
+
+<span class="fc" id="L113">            policyConfiguration.transitionTo(OPEN);</span>
+
+<span class="fc" id="L115">            return policyConfiguration;</span>
+        }
+    }
+
+    @Override
+    public boolean inService(String contextID) throws PolicyContextException {
+<span class="fc" id="L121">        checkNotNullParam(&quot;contextID&quot;, contextID);</span>
+
+<span class="fc" id="L123">        synchronized (configurationRegistry) {</span>
+<span class="fc" id="L124">            PolicyConfiguration policyConfiguration = configurationRegistry.get(contextID);</span>
+
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">            if (policyConfiguration == null) {</span>
+<span class="nc" id="L127">                return false;</span>
+            }
+
+<span class="fc" id="L130">            return policyConfiguration.inService();</span>
+        }
+    }
+
+    private ElytronPolicyConfiguration createPolicyConfiguration(String contextID) {
+<span class="fc" id="L135">        return configurationRegistry.computeIfAbsent(contextID, ElytronPolicyConfiguration::new);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

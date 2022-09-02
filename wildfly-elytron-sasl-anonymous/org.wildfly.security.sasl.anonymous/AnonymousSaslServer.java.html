@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AnonymousSaslServer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl-anonymous</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.anonymous</a> &gt; <span class="el_source">AnonymousSaslServer.java</span></div><h1>AnonymousSaslServer.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.anonymous;
+
+import static org.wildfly.security.mechanism._private.ElytronMessages.saslAnonymous;
+
+import java.nio.charset.StandardCharsets;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.auth.callback.AnonymousAuthorizationCallback;
+import org.wildfly.security.sasl.util.AbstractSaslServer;
+import org.wildfly.security.sasl.util.SaslMechanismInformation;
+
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.sasl.SaslException;
+
+/**
+ * A server implementation of the RFC 4505 {@code ANONYMOUS} mechanism.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class AnonymousSaslServer extends AbstractSaslServer {
+
+    private static final int INITIAL_STATE = 1;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param protocol the protocol
+     * @param serverName the server name
+     * @param callbackHandler the callback handler
+     */
+    AnonymousSaslServer(final String protocol, final String serverName, final CallbackHandler callbackHandler) {
+<span class="nc" id="L50">        super(SaslMechanismInformation.Names.ANONYMOUS, protocol, serverName, callbackHandler, saslAnonymous);</span>
+<span class="nc" id="L51">        setNegotiationState(INITIAL_STATE);</span>
+<span class="nc" id="L52">    }</span>
+
+    /** {@inheritDoc} */
+    public String getAuthorizationID() {
+<span class="nc" id="L56">        return &quot;anonymous&quot;;</span>
+    }
+
+    @Override
+    protected byte[] evaluateMessage(int state, final byte[] message) throws SaslException {
+<span class="nc bnc" id="L61" title="All 2 branches missed.">        switch (state) {</span>
+            case INITIAL_STATE:
+<span class="nc" id="L63">                int length = message.length;</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">                if (length == 0) {</span>
+                    // need initial challenge
+<span class="nc" id="L66">                    return NO_BYTES;</span>
+                } else {
+                    // sanity check
+<span class="nc bnc" id="L69" title="All 2 branches missed.">                    if (length &gt; 1020) {</span>
+<span class="nc" id="L70">                        throw saslAnonymous.mechAuthenticationNameTooLong().toSaslException();</span>
+                    }
+<span class="nc" id="L72">                    String name = new String(message, StandardCharsets.UTF_8);</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">                    if (name.length() &gt; 255) {</span>
+<span class="nc" id="L74">                        throw saslAnonymous.mechAuthenticationNameTooLong().toSaslException();</span>
+                    }
+<span class="nc" id="L76">                    final AnonymousAuthorizationCallback callback = new AnonymousAuthorizationCallback(name);</span>
+<span class="nc" id="L77">                    handleCallbacks(callback);</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">                    if (! callback.isAuthorized()) {</span>
+<span class="nc" id="L79">                        throw saslAnonymous.mechAnonymousAuthorizationDenied().toSaslException();</span>
+                    }
+<span class="nc" id="L81">                    negotiationComplete();</span>
+<span class="nc" id="L82">                    return null;</span>
+                }
+        }
+<span class="nc" id="L85">        throw Assert.impossibleSwitchCase(state);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

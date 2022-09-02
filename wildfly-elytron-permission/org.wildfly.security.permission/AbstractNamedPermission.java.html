@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractNamedPermission.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-permission</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.permission</a> &gt; <span class="el_source">AbstractNamedPermission.java</span></div><h1>AbstractNamedPermission.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.permission;
+
+import org.wildfly.common.Assert;
+
+import java.security.Permission;
+
+/**
+ * An abstract base class for named permissions with useful API and implementation methods.
+ * &lt;p&gt;
+ * Subclasses of this class are always serialized as a special serialized permission object, which captures the type class,
+ * the permission name (if any), and the permission action (if any) as a string.  Therefore, none of the fields of any
+ * subclass of this class are serialized unless they are included in the name or actions properties.
+ * &lt;p&gt;
+ * Concrete subclasses are expected to be immutable and final.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public abstract class AbstractNamedPermission&lt;This extends AbstractNamedPermission&lt;This&gt;&gt; extends AbstractPermission&lt;This&gt; {
+    private static final long serialVersionUID = 5774685776540853292L;
+
+    /**
+     * Construct a new instance.
+     *
+     * @param name the permission name (must not be {@code null})
+     */
+    protected AbstractNamedPermission(final String name) {
+<span class="fc" id="L45">        super(Assert.checkNotNullParam(&quot;name&quot;, name));</span>
+<span class="fc" id="L46">    }</span>
+
+    /**
+     * Create a new permission which is identical to this one, except with a new {@code name}.
+     *
+     * @param name the name to use (must not be {@code null})
+     * @return the new permission
+     */
+    public abstract This withName(String name);
+
+    /**
+     * Determine whether this permission has a name equal to the given name.
+     *
+     * @param name the name to check
+     * @return {@code true} if this permission's name is equal to the given name, {@code false} otherwise
+     */
+    public boolean nameEquals(final String name) {
+<span class="fc" id="L63">        return getName().equals(name);</span>
+    }
+
+    /**
+     * Determine whether this permission has a name equal to the name of the given permission.  If the given permission
+     * is of a different type than this permission, {@code false} is returned.
+     *
+     * @param permission the permission whose name is to be checked
+     * @return {@code true} if this permission's name is equal to the given permission's name, {@code false} otherwise
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public final boolean nameEquals(final Permission permission) {
+<span class="nc bnc" id="L75" title="All 6 branches missed.">        return permission != null &amp;&amp; permission.getClass() == getClass() &amp;&amp; nameEquals((This) permission);</span>
+    }
+
+    /**
+     * Determine whether this permission has a name equal to the name of the given permission.
+     *
+     * @param permission the permission whose name is to be checked
+     * @return {@code true} if this permission's name is equal to the given permission's name, {@code false} otherwise
+     */
+    public final boolean nameEquals(final This permission) {
+<span class="nc bnc" id="L85" title="All 4 branches missed.">        return permission != null &amp;&amp; nameEquals(permission.getName());</span>
+    }
+
+    /**
+     * Get the hash code of the name.  The default implementation returns {@code getName().hashCode()}.
+     *
+     * @return the hash code of the name
+     */
+    protected int nameHashCode() {
+<span class="nc" id="L94">        return getName().hashCode();</span>
+    }
+
+    /**
+     * Determine whether this permission implies the given name.
+     *
+     * @param name the name to check
+     * @return {@code true} if this permission's name implies the given name, {@code false} otherwise
+     */
+    public boolean impliesName(final String name) {
+<span class="pc bpc" id="L104" title="3 of 4 branches missed.">        return nameEquals(&quot;*&quot;) || nameEquals(name);</span>
+    }
+
+    /**
+     * Determine whether this permission implies the name of the given permission.  If
+     * the permission is not of the same type as this permission, {@code false} is returned.
+     *
+     * @param permission the permission whose name is to be checked
+     * @return {@code true} if this permission's name implies the given name, {@code false} otherwise
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public final boolean impliesName(final Permission permission) {
+<span class="nc bnc" id="L116" title="All 6 branches missed.">        return permission != null &amp;&amp; permission.getClass() == getClass() &amp;&amp; impliesName((This) permission);</span>
+    }
+
+    /**
+     * Determine whether this permission implies the name of the given permission.
+     *
+     * @param permission the permission whose name is to be checked
+     * @return {@code true} if this permission's name implies the given name, {@code false} otherwise
+     */
+    public boolean impliesName(final This permission) {
+<span class="pc bpc" id="L126" title="2 of 4 branches missed.">        return permission != null &amp;&amp; impliesName(permission.getName());</span>
+    }
+
+    public boolean implies(final This permission) {
+<span class="pc bpc" id="L130" title="2 of 4 branches missed.">        return permission != null &amp;&amp; impliesName(permission);</span>
+    }
+
+    public boolean equals(final This other) {
+<span class="nc bnc" id="L134" title="All 4 branches missed.">        return other != null &amp;&amp; nameEquals(other);</span>
+    }
+
+    public int hashCode() {
+<span class="nc" id="L138">        return getClass().hashCode() * 71 + nameHashCode();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>HttpScope.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http</a> &gt; <span class="el_source">HttpScope.java</span></div><h1>HttpScope.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.http;
+
+import static org.wildfly.security.http.ElytronMessages.log;
+
+import java.io.InputStream;
+import java.util.function.Consumer;
+
+/**
+ * An attachment scope for use by an authentication mechanism.
+ * &lt;p&gt;
+ * Different scopes may be available to share Objects e.g. Application, Session, Connection.
+ *
+ * @author &lt;a href=&quot;mailto:darran.lofthouse@jboss.com&quot;&gt;Darran Lofthouse&lt;/a&gt;
+ */
+public interface HttpScope {
+
+    /**
+     * Get the ID of this scope or (@code null} if IDs are not supported for this scope or the scope doesn't currently exist.
+     *
+     * @return the ID of this scope or (@code null} if IDs are not supported for this scope or the scope doesn't currently exist.
+     */
+    default String getID() {
+<span class="nc" id="L40">        return null;</span>
+    }
+
+    /**
+     * Tests whether this scope exists.
+     *
+     * @return {@code true} if this scope exists. Otherwise, {@code false}
+     */
+    default boolean exists() {
+<span class="nc" id="L49">        return true;</span>
+    }
+
+    /**
+     * Create this scope.
+     *
+     * @return {@code true} if the scope was created. Otherwise, {@code false} indicating that this scope was already created or that creation is not support.
+     */
+    default boolean create() {
+<span class="nc" id="L58">        return false;</span>
+    }
+
+    /**
+     * Tests whether this scope support attachments.
+     *
+     * @return {@code true} if this scope supports attachments, {@code false} otherwise
+     */
+    default boolean supportsAttachments() {
+<span class="nc" id="L67">        return false;</span>
+    }
+
+    /**
+     * Set the named attribute on this scope, setting to {@code null} will clear any value previously set for this key.
+     *
+     * @param key the key to use to store the attachment.
+     * @param value the value to store with the key or {@code null} to clear any previously stored attachment.
+     * @throws UnsupportedOperationException if attachments are not supported.
+     */
+    default void setAttachment(final String key, final Object value) {
+<span class="nc" id="L78">        throw log.noAttachmentSupport();</span>
+    }
+
+    /**
+     * Get the attachment previously associated with the key specified on this scope.
+     *
+     * @param key the key used to store the attachment on this scope.
+     * @return the value associated with the scope or {@code null} if no association exists.
+     * @throws UnsupportedOperationException if attachments are not supported.
+     */
+    default Object getAttachment(final String key) {
+<span class="nc" id="L89">        throw log.noAttachmentSupport();</span>
+    }
+
+    /**
+     * Get the attachment previously associated with the key specified on this scope and cast it to the type specified.
+     *
+     * This method will only return a value if the attachment exists AND can be cast to the desired type, otherwise it returns
+     * {@code null}.
+     *
+     * @param key the key used to store the attachment on this scope.
+     * @param type the desired type of the attachment.
+     * @return the value associated with the scope or {@code null} if no association exists or if it could not be converted to
+     *         the requested type.
+     * @throws UnsupportedOperationException if attachments are not supported.
+     */
+    default &lt;T&gt; T getAttachment(final String key, final Class&lt;T&gt; type) {
+<span class="nc" id="L105">        Object attachment = getAttachment(key);</span>
+<span class="nc bnc" id="L106" title="All 4 branches missed.">        if (attachment != null &amp;&amp; type.isInstance(attachment)) {</span>
+<span class="nc" id="L107">            return type.cast(attachment);</span>
+        }
+<span class="nc" id="L109">        return null;</span>
+    }
+
+    /**
+     * Is invalidation supported for this scope?
+     *
+     * @return {@code true} if this scope supports invalidation, {@code false} otherwise.
+     */
+    default boolean supportsInvalidation() {
+<span class="nc" id="L118">        return false;</span>
+    }
+
+    /**
+     * Invalidate this scope.
+     *
+     * @return {@code true} if invalidation was successful, {@code false} otherwise.
+     */
+    default boolean invalidate() {
+<span class="nc" id="L127">        return false;</span>
+    }
+
+    /**
+     * Is changing the ID of the scope supported?
+     *
+     * @return {@code true} if this scope supports changing the ID, {@code false} otherwise.
+     */
+    default boolean supportsChangeID() {
+<span class="nc" id="L136">        return false;</span>
+    }
+
+    /**
+     * Change the ID of this scope.
+     *
+     * @return {@code true} if the change was successful, {@code false} otherwise.
+     */
+    default boolean changeID() {
+<span class="nc" id="L145">        return false;</span>
+    }
+
+    /**
+     * Tests whether this scope support access to scope specific resources.
+     *
+     * @return {@code true} if this scope supports access to scope specific resources, {@code false} otherwise.
+     */
+    default boolean supportsResources() {
+<span class="nc" id="L154">        return false;</span>
+    }
+
+    /**
+     * Get the resource associated with the path specified.
+     *
+     * @param path the path to the resource.
+     * @return the {@link InputStream} of the resource or {@code null} if resources is not supported or the specified resource is not found.
+     */
+    default InputStream getResource(final String path) {
+<span class="nc" id="L164">        return null;</span>
+    }
+
+    /**
+     * Tests whether this scope support registration to receive notifications.
+     *
+     * @return {@code true} if this scope supports registration for notifications, {@code false} otherwise.
+     */
+    default boolean supportsNotifications() {
+<span class="nc" id="L173">        return false;</span>
+    }
+
+    /**
+     * Register a notification consumer to receive notifications from this scope.
+     *
+     * @param notificationConsumer the consumer to receive notifications from this scope.
+     */
+    default void registerForNotification(Consumer&lt;HttpScopeNotification&gt; notificationConsumer) {
+<span class="nc" id="L182">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

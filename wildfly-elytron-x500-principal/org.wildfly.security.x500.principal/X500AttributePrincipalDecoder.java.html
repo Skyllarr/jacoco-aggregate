@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>X500AttributePrincipalDecoder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-x500-principal</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.x500.principal</a> &gt; <span class="el_source">X500AttributePrincipalDecoder.java</span></div><h1>X500AttributePrincipalDecoder.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2015 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.x500.principal;
+
+import java.security.Principal;
+import java.util.Arrays;
+import java.util.stream.Collectors;
+
+import javax.security.auth.x500.X500Principal;
+
+import org.wildfly.security.auth.server.PrincipalDecoder;
+import org.wildfly.security.x500.util.X500PrincipalUtil;
+
+/**
+ * A principal decoder which decodes an attribute from an X.500 principal.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class X500AttributePrincipalDecoder implements PrincipalDecoder {
+<span class="nc" id="L36">    private static final String[] NO_REQUIRED_OIDS = new String[0];</span>
+
+    private final String oid;
+    private final String joiner;
+    private final int startSegment;
+    private final int maximumSegments;
+    private final boolean reverse;
+    private final String[] requiredOids;
+    private final boolean convert;
+
+    /**
+     * Construct a new instance.  A joining string of &quot;.&quot; is assumed.
+     *
+     * @param oid the OID of the attribute to map
+     */
+    public X500AttributePrincipalDecoder(final String oid) {
+<span class="nc" id="L52">        this(oid, false);</span>
+<span class="nc" id="L53">    }</span>
+
+    /**
+     * Construct a new instance.  A joining string of &quot;.&quot; is assumed.
+     *
+     * @param oid the OID of the attribute to map
+     * @param reverse {@code true} if the attribute values should be processed and returned in reverse order
+     */
+    public X500AttributePrincipalDecoder(final String oid, final boolean reverse) {
+<span class="nc" id="L62">        this(oid, &quot;.&quot;, 0, Integer.MAX_VALUE, reverse);</span>
+<span class="nc" id="L63">    }</span>
+
+    /**
+     * Construct a new instance.  A joining string of &quot;.&quot; is assumed.
+     *
+     * @param oid the OID of the attribute to map
+     * @param maximumSegments the maximum number of occurrences of the attribute to map
+     */
+    public X500AttributePrincipalDecoder(final String oid, final int maximumSegments) {
+<span class="nc" id="L72">        this(oid, maximumSegments, false);</span>
+<span class="nc" id="L73">    }</span>
+
+    /**
+     * Construct a new instance.  A joining string of &quot;.&quot; is assumed.
+     *
+     * @param oid the OID of the attribute to map
+     * @param maximumSegments the maximum number of occurrences of the attribute to map
+     * @param reverse {@code true} if the attribute values should be processed and returned in reverse order
+     */
+    public X500AttributePrincipalDecoder(final String oid, final int maximumSegments, final boolean reverse) {
+<span class="nc" id="L83">        this(oid, &quot;.&quot;, 0, maximumSegments, reverse);</span>
+<span class="nc" id="L84">    }</span>
+
+    /**
+     * Construct a new instance.  A joining string of &quot;.&quot; is assumed.
+     *
+     * @param oid the OID of the attribute to map
+     * @param startSegment the 0-based starting occurrence of the attribute to map
+     * @param maximumSegments the maximum number of occurrences of the attribute to map
+     */
+    public X500AttributePrincipalDecoder(final String oid, final int startSegment, final int maximumSegments) {
+<span class="nc" id="L94">        this(oid, startSegment, maximumSegments, false);</span>
+<span class="nc" id="L95">    }</span>
+
+    /**
+     * Construct a new instance.  A joining string of &quot;.&quot; is assumed.
+     *
+     * @param oid the OID of the attribute to map
+     * @param startSegment the 0-based starting occurrence of the attribute to map
+     * @param maximumSegments the maximum number of occurrences of the attribute to map
+     * @param reverse {@code true} if the attribute values should be processed and returned in reverse order
+     */
+    public X500AttributePrincipalDecoder(final String oid, final int startSegment, final int maximumSegments, final boolean reverse) {
+<span class="nc" id="L106">        this(oid, &quot;.&quot;, startSegment, maximumSegments, reverse);</span>
+<span class="nc" id="L107">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param oid the OID of the attribute to map
+     * @param joiner the joining string
+     */
+    public X500AttributePrincipalDecoder(final String oid, final String joiner) {
+<span class="nc" id="L116">        this(oid, joiner, false);</span>
+<span class="nc" id="L117">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param oid the OID of the attribute to map
+     * @param joiner the joining string
+     * @param reverse {@code true} if the attribute values should be processed and returned in reverse order
+     */
+    public X500AttributePrincipalDecoder(final String oid, final String joiner, final boolean reverse) {
+<span class="nc" id="L127">        this(oid, joiner, 0, Integer.MAX_VALUE, reverse);</span>
+<span class="nc" id="L128">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param oid the OID of the attribute to map
+     * @param joiner the joining string
+     * @param maximumSegments the maximum number of occurrences of the attribute to map
+     */
+    public X500AttributePrincipalDecoder(final String oid, final String joiner, final int maximumSegments) {
+<span class="nc" id="L138">        this(oid, joiner, 0, maximumSegments, false);</span>
+<span class="nc" id="L139">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param oid the OID of the attribute to map
+     * @param joiner the joining string
+     * @param startSegment the 0-based starting occurrence of the attribute to map
+     * @param maximumSegments the maximum number of occurrences of the attribute to map
+     * @param reverse {@code true} if the attribute values should be processed and returned in reverse order
+     */
+    public X500AttributePrincipalDecoder(final String oid, final String joiner, final int startSegment, final int maximumSegments, final boolean reverse) {
+<span class="nc" id="L151">        this(oid, joiner, startSegment, maximumSegments, reverse, false, NO_REQUIRED_OIDS);</span>
+<span class="nc" id="L152">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param oid the OID of the attribute to map
+     * @param joiner the joining string
+     * @param startSegment the 0-based starting occurrence of the attribute to map
+     * @param maximumSegments the maximum number of occurrences of the attribute to map
+     * @param reverse {@code true} if the attribute values should be processed and returned in reverse order
+     * @param convert {@code true} if the Principal should be converted to {@link X500Principal} if not one already
+     * @param requiredOids the OIDs of the attributes that must be present
+     */
+    public X500AttributePrincipalDecoder(final String oid, final String joiner, final int startSegment, final int maximumSegments,
+<span class="nc" id="L166">                                         final boolean reverse, final boolean convert, final String... requiredOids) {</span>
+<span class="nc" id="L167">        this.oid = oid;</span>
+<span class="nc" id="L168">        this.joiner = joiner;</span>
+<span class="nc" id="L169">        this.startSegment = startSegment;</span>
+<span class="nc" id="L170">        this.maximumSegments = maximumSegments;</span>
+<span class="nc" id="L171">        this.reverse = reverse;</span>
+<span class="nc" id="L172">        this.convert = convert;</span>
+<span class="nc" id="L173">        this.requiredOids = requiredOids;</span>
+<span class="nc" id="L174">    }</span>
+
+    public String getName(final Principal principal) {
+<span class="nc" id="L177">        final X500Principal x500Principal = X500PrincipalUtil.asX500Principal(principal, convert);</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        if (x500Principal == null) {</span>
+<span class="nc" id="L179">            return null;</span>
+        }
+<span class="nc bnc" id="L181" title="All 6 branches missed.">        if (requiredOids != null &amp;&amp; requiredOids.length != 0 &amp;&amp; ! X500PrincipalUtil.containsAllAttributes(x500Principal, requiredOids)) {</span>
+<span class="nc" id="L182">            ElytronMessages.log.tracef(&quot;X500 principal [%s] was not decoded - does not contain required oids&quot;, x500Principal);</span>
+<span class="nc" id="L183">            return null;</span>
+        }
+<span class="nc" id="L185">        final String[] values = X500PrincipalUtil.getAttributeValues(x500Principal, oid, reverse);</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        if (values.length == 0) {</span>
+<span class="nc" id="L187">            ElytronMessages.log.tracef(&quot;X500 principal [%s] was not decoded - no values of attribute [%s]&quot;, x500Principal, oid);</span>
+<span class="nc" id="L188">            return null;</span>
+        } else {
+<span class="nc" id="L190">            final String name = Arrays.stream(values).skip(startSegment).limit(maximumSegments).collect(Collectors.joining(joiner));</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">            if (ElytronMessages.log.isTraceEnabled()) {</span>
+<span class="nc" id="L192">                ElytronMessages.log.tracef(&quot;X500 principal [%s] decoded as name [%s] (attribute values: [%s])&quot;, x500Principal, name, String.join(&quot;, &quot;, values));</span>
+            }
+<span class="nc" id="L194">            return name;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OidcConfigurationServletListener.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-oidc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.oidc</a> &gt; <span class="el_source">OidcConfigurationServletListener.java</span></div><h1>OidcConfigurationServletListener.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2020 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.http.oidc;
+
+import static org.wildfly.security.http.oidc.ElytronMessages.log;
+import static org.wildfly.security.http.oidc.Oidc.JSON_CONFIG_CONTEXT_PARAM;
+import static org.wildfly.security.http.oidc.Oidc.OIDC_CLIENT_CONFIG_RESOLVER;
+import static org.wildfly.security.http.oidc.Oidc.OIDC_CLIENT_CONTEXT_KEY;
+import static org.wildfly.security.http.oidc.Oidc.OIDC_CONFIG_FILE_LOCATION;
+import static org.wildfly.security.http.oidc.Oidc.OIDC_JSON_FILE;
+
+import javax.servlet.ServletContext;
+import javax.servlet.ServletContextEvent;
+import javax.servlet.ServletContextListener;
+
+import java.io.ByteArrayInputStream;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.InputStream;
+
+
+/**
+ * &lt;p&gt;A {@link ServletContextListener} that parses the OIDC configuration and sets the configuration
+ * as a {@link ServletContext} attribute in order to provide to {@link OidcAuthenticationMechanism} a way
+ * to obtain the configuration when processing requests.
+ *
+ * @author &lt;a href=&quot;mailto:psilva@redhat.com&quot;&gt;Pedro Igor&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+<span class="nc" id="L46">public class OidcConfigurationServletListener implements ServletContextListener {</span>
+
+    @Override
+    public void contextInitialized(ServletContextEvent sce) {
+<span class="nc" id="L50">        ServletContext servletContext = sce.getServletContext();</span>
+<span class="nc" id="L51">        String configResolverClass = servletContext.getInitParameter(OIDC_CLIENT_CONFIG_RESOLVER);</span>
+        OidcClientConfigurationResolver configResolver;
+<span class="nc" id="L53">        OidcClientContext clientContext = (OidcClientContext) servletContext.getAttribute(OidcClientContext.class.getName());</span>
+
+<span class="nc bnc" id="L55" title="All 2 branches missed.">        if (clientContext == null) {</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">            if (configResolverClass != null) {</span>
+                try {
+<span class="nc" id="L58">                    configResolver = (OidcClientConfigurationResolver) servletContext.getClassLoader().loadClass(configResolverClass).newInstance();</span>
+<span class="nc" id="L59">                    clientContext = new OidcClientContext(configResolver);</span>
+<span class="nc" id="L60">                } catch (Exception ex) {</span>
+<span class="nc" id="L61">                    clientContext = new OidcClientContext(new OidcClientConfiguration());</span>
+<span class="nc" id="L62">                }</span>
+            } else {
+<span class="nc" id="L64">                InputStream is = getConfigInputStream(servletContext);</span>
+                OidcClientConfiguration oidcClientConfiguration;
+<span class="nc bnc" id="L66" title="All 2 branches missed.">                if (is == null) {</span>
+<span class="nc" id="L67">                    oidcClientConfiguration = new OidcClientConfiguration();</span>
+                } else {
+<span class="nc" id="L69">                    oidcClientConfiguration = OidcClientConfigurationBuilder.build(is);</span>
+                }
+<span class="nc" id="L71">                clientContext = new OidcClientContext(oidcClientConfiguration);</span>
+            }
+        }
+<span class="nc" id="L74">        servletContext.setAttribute(OIDC_CLIENT_CONTEXT_KEY, clientContext);</span>
+<span class="nc" id="L75">    }</span>
+
+    @Override
+    public void contextDestroyed(ServletContextEvent sce) {
+<span class="nc" id="L79">    }</span>
+
+    private InputStream getConfigInputStream(ServletContext servletContext) {
+<span class="nc" id="L82">        InputStream is = getJsonFromServletContext(servletContext);</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        if (is == null) {</span>
+<span class="nc" id="L84">            String path = servletContext.getInitParameter(OIDC_CONFIG_FILE_LOCATION);</span>
+
+<span class="nc bnc" id="L86" title="All 2 branches missed.">            if (path == null) {</span>
+<span class="nc" id="L87">                is = servletContext.getResourceAsStream(OIDC_JSON_FILE);</span>
+            } else {
+                try {
+<span class="nc" id="L90">                    is = new FileInputStream(path);</span>
+<span class="nc" id="L91">                } catch (FileNotFoundException e) {</span>
+<span class="nc" id="L92">                    throw log.oidcConfigFileNotFound(e);</span>
+<span class="nc" id="L93">                }</span>
+            }
+        }
+<span class="nc" id="L96">        return is;</span>
+    }
+
+    private InputStream getJsonFromServletContext(ServletContext servletContext) {
+<span class="nc" id="L100">        String json = servletContext.getInitParameter(JSON_CONFIG_CONTEXT_PARAM);</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        if (json == null) {</span>
+<span class="nc" id="L102">            return null;</span>
+        }
+<span class="nc" id="L104">        return new ByteArrayInputStream(json.getBytes());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

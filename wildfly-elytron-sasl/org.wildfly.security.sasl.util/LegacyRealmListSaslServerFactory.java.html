@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LegacyRealmListSaslServerFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-sasl</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.sasl.util</a> &gt; <span class="el_source">LegacyRealmListSaslServerFactory.java</span></div><h1>LegacyRealmListSaslServerFactory.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2016 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.sasl.util;
+
+import static org.wildfly.common.Assert.checkNotNullParam;
+import static org.wildfly.security.sasl._private.ElytronMessages.sasl;
+
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.sasl.SaslException;
+import javax.security.sasl.SaslServer;
+import javax.security.sasl.SaslServerFactory;
+
+import org.wildfly.common.iteration.CodePointIterator;
+import org.wildfly.security.auth.callback.AvailableRealmsCallback;
+import org.wildfly.security.sasl.WildFlySasl;
+
+/**
+ * A {@link SaslServerFactory} which uses the {@link AvailableRealmsCallback} to populate the legacy
+ * {@link WildFlySasl#REALM_LIST} property, if needed by a mechanism.
+ *
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+public final class LegacyRealmListSaslServerFactory extends AbstractDelegatingSaslServerFactory {
+
+    public static final char DEFAULT_DELIMITER = ' ';
+    public static final char DEFAULT_ESCAPE_CHARACTER = '\\';
+
+    private final int escapeCharacter;
+    private final int[] delims;
+
+    /**
+     * Construct a new instance. The delimiter that should be used to separate the realm names when populating the
+     * list of realms is assumed to be {@value #DEFAULT_DELIMITER}. The escape character is assumed to be
+     * {@value #DEFAULT_ESCAPE_CHARACTER}.
+     *
+     * @param delegate the delegate {@code SaslServerFactory}
+     */
+    public LegacyRealmListSaslServerFactory(final SaslServerFactory delegate) {
+<span class="nc" id="L62">        this(delegate, DEFAULT_ESCAPE_CHARACTER, DEFAULT_DELIMITER);</span>
+<span class="nc" id="L63">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param delegate the delegate {@code SaslServerFactory}
+     * @param escapeCharacter the escape character to use when populating the list of realms
+     * @param delims the delimiters that should be used to separate the realm names when populating the list of realms
+     */
+    public LegacyRealmListSaslServerFactory(final SaslServerFactory delegate, final char escapeCharacter, final String delims) {
+<span class="nc" id="L73">        super(delegate);</span>
+<span class="nc" id="L74">        checkNotNullParam(&quot;escapeCharacter&quot;, escapeCharacter);</span>
+<span class="nc" id="L75">        checkNotNullParam(&quot;delims&quot;, delims);</span>
+<span class="nc" id="L76">        this.escapeCharacter = escapeCharacter;</span>
+<span class="nc" id="L77">        this.delims = delims.chars().toArray();</span>
+<span class="nc" id="L78">    }</span>
+
+    /**
+     * Construct a new instance.
+     *
+     * @param delegate the delegate {@code SaslServerFactory}
+     * @param escapeCharacter the escape character to use when populating the list of realms
+     * @param delims the delimiters that should be used to separate the realm names when populating the list of realms
+     */
+    public LegacyRealmListSaslServerFactory(final SaslServerFactory delegate, final char escapeCharacter, final int... delims) {
+<span class="nc" id="L88">        super(delegate);</span>
+<span class="nc" id="L89">        this.escapeCharacter = checkNotNullParam(&quot;escapeCharacter&quot;, escapeCharacter);</span>
+<span class="nc" id="L90">        this.delims = checkNotNullParam(&quot;delims&quot;, delims);</span>
+<span class="nc" id="L91">    }</span>
+
+    public SaslServer createSaslServer(final String mechanism, final String protocol, final String serverName, final Map&lt;String, ?&gt; props, final CallbackHandler cbh) throws SaslException {
+<span class="nc" id="L94">        String[] realms = null;</span>
+<span class="nc" id="L95">        final AvailableRealmsCallback availableRealmsCallback = new AvailableRealmsCallback();</span>
+        try {
+<span class="nc" id="L97">            cbh.handle(new Callback[] { availableRealmsCallback });</span>
+<span class="nc" id="L98">            realms = availableRealmsCallback.getRealmNames();</span>
+<span class="nc" id="L99">        } catch (UnsupportedCallbackException ignored) {</span>
+<span class="nc" id="L100">        } catch (SaslException e) {</span>
+<span class="nc" id="L101">            throw e;</span>
+<span class="nc" id="L102">        } catch (IOException e) {</span>
+<span class="nc" id="L103">            throw sasl.mechCallbackHandlerFailedForUnknownReason(e).toSaslException();</span>
+<span class="nc" id="L104">        }</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        if (realms == null) {</span>
+<span class="nc" id="L106">            realms = new String[] { serverName };</span>
+        }
+<span class="nc" id="L108">        final String realmList = arrayToRealmListProperty(realms, escapeCharacter, delims);</span>
+<span class="nc" id="L109">        final Map&lt;String, Object&gt; newProps = new HashMap&lt;String, Object&gt;(props) {</span>
+            public Object get(Object key) {
+<span class="nc" id="L111">                Object value = super.get(key);</span>
+<span class="nc bnc" id="L112" title="All 4 branches missed.">                if (key.equals(WildFlySasl.REALM_LIST) &amp;&amp; (value == null)) {</span>
+<span class="nc" id="L113">                    value = realmList;</span>
+<span class="nc" id="L114">                    put(WildFlySasl.REALM_LIST, value);</span>
+                }
+<span class="nc" id="L116">                return value;</span>
+            }
+        };
+<span class="nc" id="L119">        return delegate.createSaslServer(mechanism, protocol, serverName, newProps, cbh);</span>
+    }
+
+    static String arrayToRealmListProperty(String[] realms) {
+<span class="fc" id="L123">        return arrayToRealmListProperty(realms, DEFAULT_ESCAPE_CHARACTER, DEFAULT_DELIMITER);</span>
+    }
+
+    static String arrayToRealmListProperty(String[] realms, int escapeCharacter, int... delims) {
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (realms == null) {</span>
+<span class="nc" id="L128">            return null;</span>
+        }
+<span class="fc" id="L130">        final int[] escapeCharacterAndDelims = Arrays.copyOf(delims, delims.length + 1);</span>
+<span class="fc" id="L131">        escapeCharacterAndDelims[escapeCharacterAndDelims.length - 1] = escapeCharacter;</span>
+<span class="fc" id="L132">        StringBuilder realmList = new StringBuilder();</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        for (int i = 0; i &lt; realms.length; i++) {</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            if (i != 0) {</span>
+<span class="fc" id="L135">                addDelims(realmList, delims);</span>
+            }
+<span class="fc" id="L137">            CodePointIterator cpi = CodePointIterator.ofString(realms[i]);</span>
+<span class="fc" id="L138">            CodePointIterator di = cpi.delimitedBy(escapeCharacterAndDelims);</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            while (cpi.hasNext()) {</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">                if (di.hasNext()) {</span>
+<span class="fc" id="L141">                    di.drainTo(realmList);</span>
+                } else {
+<span class="fc" id="L143">                    realmList.append((char) escapeCharacter); // escape the delimiter or escape character</span>
+<span class="fc" id="L144">                    realmList.append((char) cpi.next());</span>
+                }
+            }
+        }
+<span class="fc" id="L148">        return realmList.toString();</span>
+    }
+
+    private static void addDelims(StringBuilder realmList, int... delims) {
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        for (int delim : delims) {</span>
+<span class="fc" id="L153">            realmList.append((char) delim);</span>
+        }
+<span class="fc" id="L155">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

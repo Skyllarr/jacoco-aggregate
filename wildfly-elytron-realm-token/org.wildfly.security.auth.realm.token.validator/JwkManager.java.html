@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>JwkManager.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-realm-token</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.realm.token.validator</a> &gt; <span class="el_source">JwkManager.java</span></div><h1>JwkManager.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2018 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.wildfly.security.auth.realm.token.validator;
+
+import org.wildfly.common.Assert;
+
+import javax.json.Json;
+import javax.json.JsonArray;
+import javax.json.JsonObject;
+import javax.json.JsonReader;
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import java.io.IOException;
+import java.io.InputStream;
+import java.math.BigInteger;
+import java.net.URL;
+import java.net.URLConnection;
+import java.security.KeyFactory;
+import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
+import java.security.interfaces.RSAPublicKey;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.RSAPublicKeySpec;
+import java.util.Base64;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import static org.wildfly.security.auth.realm.token._private.ElytronMessages.log;
+
+/**
+ * Object for caching RSA JSON Web Keys for signature validation
+ *
+ * @author &lt;a href=&quot;mailto:mmazanek@redhat.com&quot;&gt;Martin Mazanek&lt;/a&gt;
+ */
+class JwkManager {
+
+<span class="nc" id="L54">    private final Map&lt;URL, CacheEntry&gt; keys = new LinkedHashMap&lt;&gt;();</span>
+    private final SSLContext sslContext;
+    private final HostnameVerifier hostnameVerifier;
+
+    private final long updateTimeout;
+    private final int minTimeBetweenRequests;
+
+    private final int connectionTimeout;
+    private final int readTimeout;
+
+<span class="nc" id="L64">    JwkManager(SSLContext sslContext, HostnameVerifier hostnameVerifier, long updateTimeout, int connectionTimeout, int readTimeout, int minTimeBetweenRequests) {</span>
+<span class="nc" id="L65">        this.sslContext = sslContext;</span>
+<span class="nc" id="L66">        this.hostnameVerifier = hostnameVerifier;</span>
+<span class="nc" id="L67">        this.updateTimeout = updateTimeout;</span>
+<span class="nc" id="L68">        this.connectionTimeout = connectionTimeout;</span>
+<span class="nc" id="L69">        this.readTimeout = readTimeout;</span>
+<span class="nc" id="L70">        this.minTimeBetweenRequests = minTimeBetweenRequests;</span>
+<span class="nc" id="L71">    }</span>
+
+    /**
+     * Thread-safe method for receiving remote public key
+     * @param kid key id
+     * @param url remote jkws url
+     * @return signature verification public key if found, null otherwise
+     */
+    public PublicKey getPublicKey(String kid, URL url) {
+<span class="nc" id="L80">        Map&lt;String, RSAPublicKey&gt; urlKeys = checkRemote(kid, url);</span>
+
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        if (urlKeys == null) {</span>
+<span class="nc" id="L83">            return null;</span>
+        }
+
+<span class="nc" id="L86">        PublicKey pk = urlKeys.get(kid);</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        if (pk == null) {</span>
+<span class="nc" id="L88">            log.warn(&quot;Unknown kid: &quot; + kid);</span>
+<span class="nc" id="L89">            return null;</span>
+        }
+<span class="nc" id="L91">        return pk;</span>
+    }
+
+    private Map&lt;String, RSAPublicKey&gt; checkRemote(String kid, URL url) {
+<span class="nc" id="L95">        Assert.checkNotNullParam(&quot;kid&quot;, kid);</span>
+<span class="nc" id="L96">        Assert.checkNotNullParam(&quot;url&quot;, url);</span>
+
+        CacheEntry cacheEntry;
+        long lastUpdate;
+        Map&lt;String, RSAPublicKey&gt; urlKeys;
+
+<span class="nc" id="L102">        synchronized (keys) {</span>
+<span class="nc" id="L103">            cacheEntry = keys.get(url);</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">            if (cacheEntry == null) {</span>
+<span class="nc" id="L105">                cacheEntry = new CacheEntry();</span>
+<span class="nc" id="L106">                keys.put(url, cacheEntry);</span>
+            }
+<span class="nc" id="L108">            lastUpdate = cacheEntry.getTimestamp();</span>
+<span class="nc" id="L109">            urlKeys = cacheEntry.getKeys();</span>
+<span class="nc" id="L110">        }</span>
+
+<span class="nc" id="L112">        long currentTime = System.currentTimeMillis();</span>
+
+        // check kid is in the entry and lastUpdate is inside the TTL
+<span class="nc bnc" id="L115" title="All 4 branches missed.">        if (urlKeys.containsKey(kid) &amp;&amp; lastUpdate + updateTimeout &gt; currentTime) {</span>
+<span class="nc" id="L116">            return urlKeys;</span>
+        }
+
+        // check the minimum timeout to avoid flooding
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        if (lastUpdate + minTimeBetweenRequests &gt; currentTime) {</span>
+<span class="nc" id="L121">            log.avoidingFetchJwks(url, currentTime);</span>
+<span class="nc" id="L122">            return urlKeys;</span>
+        }
+
+        // update the cached entry because cache is not valid
+<span class="nc" id="L126">        synchronized (cacheEntry) {</span>
+            // re-check just in case another thread updated the entry
+<span class="nc bnc" id="L128" title="All 4 branches missed.">            if ((!cacheEntry.getKeys().containsKey(kid) || cacheEntry.getTimestamp() + updateTimeout &lt;= currentTime)</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">                    &amp;&amp; cacheEntry.getTimestamp() + minTimeBetweenRequests &lt;= currentTime) {</span>
+<span class="nc" id="L130">                Map&lt;String, RSAPublicKey&gt; newJwks = getJwksFromUrl(url, sslContext, hostnameVerifier, connectionTimeout, readTimeout);</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">                if (newJwks == null) {</span>
+<span class="nc" id="L132">                    log.unableToFetchJwks(url.toString());</span>
+<span class="nc" id="L133">                    return null;</span>
+                }
+<span class="nc" id="L135">                cacheEntry.setKeys(newJwks);</span>
+<span class="nc" id="L136">                cacheEntry.setTimestamp(currentTime);</span>
+            }
+<span class="nc" id="L138">            return cacheEntry.getKeys();</span>
+        }
+    }
+
+    private static Map&lt;String, RSAPublicKey&gt; getJwksFromUrl(final URL url, SSLContext sslContext, HostnameVerifier hostnameVerifier, int connectionTimeout, int readTimeout) {
+<span class="nc" id="L143">        JsonObject response = null;</span>
+<span class="nc" id="L144">        JsonReader jsonReader = null;</span>
+        try {
+<span class="nc" id="L146">            URLConnection connection = url.openConnection();</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">            if (connection instanceof HttpsURLConnection) {</span>
+<span class="nc" id="L148">                HttpsURLConnection conn = (HttpsURLConnection) connection;</span>
+<span class="nc" id="L149">                conn.setRequestMethod(&quot;GET&quot;);</span>
+<span class="nc" id="L150">                conn.setSSLSocketFactory(sslContext.getSocketFactory());</span>
+<span class="nc" id="L151">                conn.setHostnameVerifier(hostnameVerifier);</span>
+<span class="nc" id="L152">                conn.setConnectTimeout(connectionTimeout);</span>
+<span class="nc" id="L153">                conn.setReadTimeout(readTimeout);</span>
+<span class="nc" id="L154">                conn.connect();</span>
+<span class="nc" id="L155">                InputStream inputStream = conn.getInputStream();</span>
+<span class="nc" id="L156">                jsonReader = Json.createReader(inputStream);</span>
+<span class="nc" id="L157">                response = jsonReader.readObject();</span>
+            }
+<span class="nc" id="L159">        } catch (IOException e) {</span>
+<span class="nc" id="L160">            log.warn(&quot;Unable to connect to &quot; + url.toString());</span>
+<span class="nc" id="L161">            return null;</span>
+        } finally {
+<span class="nc bnc" id="L163" title="All 2 branches missed.">            if (jsonReader != null) {</span>
+<span class="nc" id="L164">                jsonReader.close();</span>
+            }
+        }
+
+<span class="nc bnc" id="L168" title="All 2 branches missed.">        if (response == null) {</span>
+<span class="nc" id="L169">            log.warn(&quot;No response when fetching jwk set from &quot; + url.toString());</span>
+<span class="nc" id="L170">            return null;</span>
+        }
+<span class="nc" id="L172">        JsonArray jwks = response.getJsonArray(&quot;keys&quot;);</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">        if (jwks == null) {</span>
+<span class="nc" id="L174">            log.warn(&quot;Unable to parse jwks&quot;);</span>
+<span class="nc" id="L175">            return null;</span>
+        }
+<span class="nc" id="L177">        Map&lt;String, RSAPublicKey&gt; res = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        for (int i = 0; i &lt; jwks.size(); i++) {</span>
+<span class="nc" id="L179">            JsonObject jwk = jwks.getJsonObject(i);</span>
+<span class="nc" id="L180">            String kid = jwk.getString(&quot;kid&quot;, null);</span>
+<span class="nc" id="L181">            String kty = jwk.getString(&quot;kty&quot;, null);</span>
+<span class="nc" id="L182">            String e1 = jwk.getString(&quot;e&quot;, null);</span>
+<span class="nc" id="L183">            String n1 = jwk.getString(&quot;n&quot;, null);</span>
+
+<span class="nc bnc" id="L185" title="All 2 branches missed.">            if (kid == null) {</span>
+<span class="nc" id="L186">                log.tokenRealmJwkMissingClaim(&quot;kid&quot;);</span>
+<span class="nc" id="L187">                continue;</span>
+            }
+<span class="nc bnc" id="L189" title="All 2 branches missed.">            if (!&quot;RSA&quot;.equals(kty)) {</span>
+<span class="nc" id="L190">                log.tokenRealmJwkMissingClaim(&quot;kty&quot;);</span>
+<span class="nc" id="L191">                continue;</span>
+            }
+<span class="nc bnc" id="L193" title="All 2 branches missed.">            if (e1 == null) {</span>
+<span class="nc" id="L194">                log.tokenRealmJwkMissingClaim(&quot;e&quot;);</span>
+<span class="nc" id="L195">                continue;</span>
+            }
+<span class="nc bnc" id="L197" title="All 2 branches missed.">            if (n1 == null) {</span>
+<span class="nc" id="L198">                log.tokenRealmJwkMissingClaim(&quot;n&quot;);</span>
+<span class="nc" id="L199">                continue;</span>
+            }
+
+<span class="nc" id="L202">            BigInteger e = new BigInteger(1, Base64.getUrlDecoder().decode(e1));</span>
+<span class="nc" id="L203">            BigInteger n = new BigInteger(1, Base64.getUrlDecoder().decode(n1));</span>
+<span class="nc" id="L204">            RSAPublicKeySpec keySpec = new RSAPublicKeySpec(n, e);</span>
+
+            try {
+<span class="nc" id="L207">                RSAPublicKey publicKey = (RSAPublicKey) KeyFactory.getInstance(&quot;RSA&quot;).generatePublic(keySpec);</span>
+<span class="nc" id="L208">                res.put(kid, publicKey);</span>
+<span class="nc" id="L209">            } catch (InvalidKeySpecException | NoSuchAlgorithmException ex) {</span>
+<span class="nc" id="L210">                log.info(&quot;Fetched jwk could not be parsed, ignoring...&quot;, ex);</span>
+<span class="nc" id="L211">            }</span>
+        }
+<span class="nc" id="L213">        return res;</span>
+    }
+
+    private static class CacheEntry {
+        private Map&lt;String, RSAPublicKey&gt; keys;
+        private long timestamp;
+
+<span class="nc" id="L220">        public CacheEntry() {</span>
+<span class="nc" id="L221">            this.keys = Collections.emptyMap();</span>
+<span class="nc" id="L222">            this.timestamp = 0;</span>
+<span class="nc" id="L223">        }</span>
+
+        public Map&lt;String, RSAPublicKey&gt; getKeys() {
+<span class="nc" id="L226">            return keys;</span>
+        }
+
+        public long getTimestamp() {
+<span class="nc" id="L230">            return timestamp;</span>
+        }
+
+        public void setKeys(Map&lt;String, RSAPublicKey&gt; keys) {
+<span class="nc" id="L234">            this.keys = keys;</span>
+<span class="nc" id="L235">        }</span>
+
+        public void setTimestamp(long timestamp) {
+<span class="nc" id="L238">            this.timestamp = timestamp;</span>
+<span class="nc" id="L239">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,503 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AuthenticationContextConfigurationClient.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-client</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.auth.client</a> &gt; <span class="el_source">AuthenticationContextConfigurationClient.java</span></div><h1>AuthenticationContextConfigurationClient.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2014 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.wildfly.security.auth.client;
+
+import static org.wildfly.security.auth.client._private.ElytronMessages.log;
+
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.net.URI;
+import java.security.AccessControlContext;
+import java.security.GeneralSecurityException;
+import java.security.Principal;
+import java.security.PrivilegedAction;
+import java.security.Provider;
+import java.util.Collection;
+import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
+
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSession;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.sasl.SaslClient;
+import javax.security.sasl.SaslClientFactory;
+import javax.security.sasl.SaslException;
+
+import org.wildfly.common.Assert;
+import org.wildfly.security.SecurityFactory;
+import org.wildfly.security.auth.principal.AnonymousPrincipal;
+import org.wildfly.security.auth.server.IdentityCredentials;
+import org.wildfly.security.auth.server.SecurityDomain;
+import org.wildfly.security.auth.server.SecurityIdentity;
+import org.wildfly.security.permission.ElytronPermission;
+
+/**
+ * A client for consuming authentication context configurations.
+ *
+ * @author &lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&gt;David M. Lloyd&lt;/a&gt;
+ */
+public final class AuthenticationContextConfigurationClient {
+
+<span class="fc" id="L59">    private static final ElytronPermission CREATE_PERMISSION = new ElytronPermission(&quot;createAuthenticationContextConfigurationClient&quot;);</span>
+
+    /**
+     * A reusable privileged action to create a new configuration client.
+     */
+<span class="fc" id="L64">    public static final PrivilegedAction&lt;AuthenticationContextConfigurationClient&gt; ACTION = AuthenticationContextConfigurationClient::new;</span>
+
+    /**
+     * Construct a new instance.  Requires the {@code createAuthenticationContextConfigurationClient} {@link ElytronPermission}.
+     *
+     * @throws SecurityException if the caller does not have permission to instantiate this class
+     */
+<span class="fc" id="L71">    public AuthenticationContextConfigurationClient() throws SecurityException {</span>
+<span class="fc" id="L72">        final SecurityManager sm = System.getSecurityManager();</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (sm != null) {</span>
+<span class="nc" id="L74">            sm.checkPermission(CREATE_PERMISSION);</span>
+        }
+<span class="fc" id="L76">    }</span>
+
+    /**
+     * Get the authentication configuration which matches the given URI, or {@link AuthenticationConfiguration#EMPTY} if there is none.
+     *
+     * @param uri the URI to match (must not be {@code null})
+     * @param authenticationContext the authentication context to examine (must not be {@code null})
+     * @return the matching configuration
+     */
+    public AuthenticationConfiguration getAuthenticationConfiguration(URI uri, AuthenticationContext authenticationContext) {
+<span class="nc" id="L86">        return getAuthenticationConfiguration(uri, authenticationContext, -1);</span>
+    }
+
+    /**
+     * Get the authentication configuration which matches the given URI, or {@link AuthenticationConfiguration#EMPTY} if there is none, setting
+     * a default protocol port.
+     *
+     * @param uri the URI to match (must not be {@code null})
+     * @param authenticationContext the authentication context to examine (must not be {@code null})
+     * @param protocolDefaultPort the protocol-default port
+     * @return the matching configuration
+     */
+    public AuthenticationConfiguration getAuthenticationConfiguration(URI uri, AuthenticationContext authenticationContext, int protocolDefaultPort) {
+<span class="nc" id="L99">        return getAuthenticationConfiguration(uri, authenticationContext, protocolDefaultPort, null, null);</span>
+    }
+
+    /**
+     * Get the authentication configuration which matches the given URI and type, or {@link AuthenticationConfiguration#EMPTY} if there is none, setting
+     * a default protocol port.  The user name, host, port, and protocol from the URI are copied into the configuration when the configuration does not already
+     * establish values for those fields.
+     *
+     * @param uri the URI to match (must not be {@code null})
+     * @param authenticationContext the authentication context to examine (must not be {@code null})
+     * @param protocolDefaultPort the protocol-default port
+     * @param abstractType the abstract type (may be {@code null})
+     * @param abstractTypeAuthority the abstract type authority (may be {@code null})
+     * @return the matching configuration
+     */
+    public AuthenticationConfiguration getAuthenticationConfiguration(URI uri, AuthenticationContext authenticationContext, int protocolDefaultPort, String abstractType, String abstractTypeAuthority) {
+<span class="nc" id="L115">        Assert.checkNotNullParam(&quot;uri&quot;, uri);</span>
+<span class="nc" id="L116">        Assert.checkNotNullParam(&quot;authenticationContext&quot;, authenticationContext);</span>
+<span class="nc" id="L117">        final RuleNode&lt;AuthenticationConfiguration&gt; node = authenticationContext.authRuleMatching(uri, abstractType, abstractTypeAuthority);</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        AuthenticationConfiguration configuration = node != null ? node.getConfiguration() : AuthenticationConfiguration.empty();</span>
+<span class="nc" id="L119">        configuration = initializeConfiguration(uri, configuration);</span>
+<span class="nc" id="L120">        configuration = establishOverrides(uri, protocolDefaultPort, configuration);</span>
+
+<span class="nc" id="L122">        log.tracef(&quot;getAuthenticationConfiguration uri=%s, protocolDefaultPort=%d, abstractType=%s, abstractTypeAuthority=%s, MatchRule=[%s], AuthenticationConfiguration=[%s]&quot;,</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">                uri, protocolDefaultPort, abstractType, abstractTypeAuthority, node != null ? node.rule : null, configuration);</span>
+
+<span class="nc" id="L125">        return configuration;</span>
+    }
+
+    /**
+     * Get the authentication configuration which matches the given URI and type, or {@link AuthenticationConfiguration#EMPTY} if there is none.
+     * The user name from the URI is copied into the configuration if the configuration does not already establish a value for that field.
+     * No host, port, or protocol information is copied to the resultant configuration from the URI.
+     *
+     * @param uri the URI to match (must not be {@code null})
+     * @param authenticationContext the authentication context to examine (must not be {@code null})
+     * @param abstractType the abstract type (may be {@code null})
+     * @param abstractTypeAuthority the abstract type authority (may be {@code null})
+     * @return the matching configuration
+     */
+    public AuthenticationConfiguration getAuthenticationConfigurationNoOverrides(URI uri, AuthenticationContext authenticationContext, String abstractType, String abstractTypeAuthority) {
+<span class="nc" id="L140">        Assert.checkNotNullParam(&quot;uri&quot;, uri);</span>
+<span class="nc" id="L141">        Assert.checkNotNullParam(&quot;authenticationContext&quot;, authenticationContext);</span>
+<span class="nc" id="L142">        final RuleNode&lt;AuthenticationConfiguration&gt; node = authenticationContext.authRuleMatching(uri, abstractType, abstractTypeAuthority);</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        AuthenticationConfiguration configuration = node != null ? node.getConfiguration() : AuthenticationConfiguration.empty();</span>
+<span class="nc" id="L144">        configuration = initializeConfiguration(uri, configuration);</span>
+
+<span class="nc" id="L146">        log.tracef(&quot;getAuthenticationConfiguration uri=%s, abstractType=%s, abstractTypeAuthority=%s, MatchRule=[%s], AuthenticationConfiguration=[%s]&quot;,</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">                uri, abstractType, abstractTypeAuthority, node != null ? node.rule : null, configuration);</span>
+
+<span class="nc" id="L149">        return configuration;</span>
+    }
+
+    @SuppressWarnings(&quot;deprecation&quot;)
+    private static AuthenticationConfiguration establishOverrides(final URI uri, final int protocolDefaultPort, AuthenticationConfiguration configuration) {
+<span class="nc" id="L154">        final String uriHost = uri.getHost();</span>
+<span class="nc bnc" id="L155" title="All 4 branches missed.">        if (uriHost != null &amp;&amp; configuration.setHost == null) {</span>
+<span class="nc" id="L156">            configuration = configuration.useHost(uriHost);</span>
+        }
+<span class="nc" id="L158">        int port = uri.getPort();</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">        if (port == -1) port = protocolDefaultPort;</span>
+<span class="nc bnc" id="L160" title="All 4 branches missed.">        if (port != -1 &amp;&amp; configuration.setPort == -1) {</span>
+            // use the URI port in this configuration
+<span class="nc" id="L162">            configuration = configuration.usePort(port);</span>
+        }
+<span class="nc" id="L164">        final String scheme = uri.getScheme();</span>
+<span class="nc bnc" id="L165" title="All 4 branches missed.">        if (scheme != null &amp;&amp; configuration.setProtocol == null) {</span>
+<span class="nc" id="L166">            configuration = configuration.useProtocol(scheme);</span>
+        }
+<span class="nc" id="L168">        return configuration;</span>
+    }
+
+    private static AuthenticationConfiguration initializeConfiguration(final URI uri, AuthenticationConfiguration configuration) {
+<span class="nc" id="L172">        final SecurityDomain authenticationNameForwardSecurityDomain = configuration.authenticationNameForwardSecurityDomain;</span>
+<span class="nc" id="L173">        final String userInfo = uri.getUserInfo();</span>
+<span class="nc bnc" id="L174" title="All 6 branches missed.">        if (userInfo != null &amp;&amp; configuration.getPrincipal() == AnonymousPrincipal.getInstance() &amp;&amp; authenticationNameForwardSecurityDomain == null) {</span>
+<span class="nc" id="L175">            configuration = configuration.useName(userInfo);</span>
+        }
+        // capture forwards
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        if (authenticationNameForwardSecurityDomain != null) {</span>
+<span class="nc" id="L179">            configuration = configuration.useForwardedAuthenticationIdentity(null).usePrincipal(authenticationNameForwardSecurityDomain.getCurrentSecurityIdentity().getPrincipal());</span>
+        }
+<span class="nc" id="L181">        final SecurityDomain authenticationCredentialsForwardSecurityDomain = configuration.authenticationCredentialsForwardSecurityDomain;</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">        if (authenticationCredentialsForwardSecurityDomain != null) {</span>
+<span class="nc" id="L183">            final SecurityIdentity securityIdentity = authenticationCredentialsForwardSecurityDomain.getCurrentSecurityIdentity();</span>
+<span class="nc" id="L184">            final IdentityCredentials privateCredentials = securityIdentity.getPrivateCredentials();</span>
+<span class="nc" id="L185">            final IdentityCredentials publicCredentials = securityIdentity.getPublicCredentials();</span>
+            // private overrides public
+<span class="nc" id="L187">            configuration = configuration.useForwardedAuthenticationCredentials(null).useCredentials(publicCredentials.with(privateCredentials));</span>
+        }
+<span class="nc" id="L189">        configuration = configuration.captureAuthorizationIdentity();</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">        if (AuthenticationConfiguration.WILDFLY_ELYTRON_CAPTURE_ACCESS_CONTROL_CONTEXT_PROPERTY) {</span>
+<span class="nc" id="L191">            final AccessControlContext capturedContext = configuration.getCapturedContext();</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">            if (capturedContext == null) {</span>
+<span class="nc" id="L193">                configuration = configuration.withCapturedAccessControlContext();</span>
+            }
+        }
+<span class="nc" id="L196">        return configuration;</span>
+    }
+
+    /**
+     * Get the configured SSL context which matches ALL rules from provided AuthenticationContext, or {@link SSLContext#getDefault()} if there is none.
+     *
+     * @param authenticationContext the authentication context to examine (must not be {@code null})
+     * @return the SSL context from provided AuthenticationContext that matches ALL rules
+     */
+    public SSLContext getSSLContext(AuthenticationContext authenticationContext) throws GeneralSecurityException {
+<span class="fc" id="L206">        return getSSLContext(null,  authenticationContext, null, null);</span>
+    }
+
+    /**
+     * Get the SSL context which matches the given URI, or {@link SSLContext#getDefault()} if there is none.
+     *
+     * @param uri the URI to match (must not be {@code null})
+     * @param authenticationContext the authentication context to examine (must not be {@code null})
+     * @return the matching SSL context
+     */
+    public SSLContext getSSLContext(URI uri, AuthenticationContext authenticationContext) throws GeneralSecurityException {
+<span class="nc" id="L217">        return getSSLContext(uri, authenticationContext, null, null);</span>
+    }
+
+    /**
+     * Get the SSL context which matches the given URI and type, or {@link SSLContext#getDefault()} if there is none.
+     *
+     * @param uri the URI to match (must not be {@code null})
+     * @param authenticationContext the authentication context to examine (must not be {@code null})
+     * @param abstractType the abstract type (may be {@code null})
+     * @param abstractTypeAuthority the abstract type authority (may be {@code null})
+     * @return the matching SSL context
+     */
+    public SSLContext getSSLContext(URI uri, AuthenticationContext authenticationContext, String abstractType, String abstractTypeAuthority) throws GeneralSecurityException {
+<span class="fc" id="L230">        return getSSLContextFactory(uri, authenticationContext, abstractType, abstractTypeAuthority).create();</span>
+    }
+
+    /**
+     * Get the SSL context factory which matches the given URI and type, or {@link SSLContext#getDefault()} if there is none.
+     *
+     * @param uri the URI to match
+     * @param authenticationContext the authentication context to examine (must not be {@code null})
+     * @param abstractType the abstract type (may be {@code null})
+     * @param abstractTypeAuthority the abstract type authority (may be {@code null})
+     * @return the matching SSL context factory (not {@code null})
+     */
+    public SecurityFactory&lt;SSLContext&gt; getSSLContextFactory(URI uri, AuthenticationContext authenticationContext, String abstractType, String abstractTypeAuthority) {
+<span class="fc" id="L243">        Assert.checkNotNullParam(&quot;authenticationContext&quot;, authenticationContext);</span>
+<span class="fc" id="L244">        final RuleNode&lt;SecurityFactory&lt;SSLContext&gt;&gt; node = authenticationContext.sslRuleMatching(uri, abstractType, abstractTypeAuthority);</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        if (node == null) return SSLContext::getDefault;</span>
+<span class="fc" id="L246">        return node.getConfiguration();</span>
+    }
+
+    /**
+     * Get an authentication callback handler for the given configuration.
+     *
+     * @param configuration the configuration (must not be {@code null})
+     * @return the callback handler
+     */
+    public CallbackHandler getCallbackHandler(AuthenticationConfiguration configuration) {
+<span class="nc" id="L256">        Assert.checkNotNullParam(&quot;configuration&quot;, configuration);</span>
+<span class="nc" id="L257">        final CallbackHandler callbackHandler = configuration.getUserCallbackHandler();</span>
+<span class="nc bnc" id="L258" title="All 2 branches missed.">        return callbackHandler == null ? configuration.createCallbackHandler() : callbackHandler;</span>
+    }
+
+    /**
+     * Get the actual host to use for the given configuration and URI.
+     *
+     * @param uri the URI (must not be {@code null})
+     * @param configuration the configuration (must not be {@code null})
+     * @return the real host to use
+     * @deprecated Use {@link URI#getHost()} instead.
+     */
+    @Deprecated
+    public String getRealHost(URI uri, AuthenticationConfiguration configuration) {
+<span class="nc" id="L271">        Assert.checkNotNullParam(&quot;uri&quot;, uri);</span>
+<span class="nc" id="L272">        Assert.checkNotNullParam(&quot;configuration&quot;, configuration);</span>
+<span class="nc" id="L273">        final String configurationHost = configuration.getHost();</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">        return configurationHost == null ? uri.getHost() : configurationHost;</span>
+    }
+
+    /**
+     * Get the actual host to use for the given configuration.
+     *
+     * @param configuration the configuration (must not be {@code null})
+     * @return the real host to use
+     * @deprecated This configuration is not supported by most providers and will be removed in a future release.
+     */
+    @Deprecated
+    public String getRealHost(AuthenticationConfiguration configuration) {
+<span class="nc" id="L286">        Assert.checkNotNullParam(&quot;configuration&quot;, configuration);</span>
+<span class="nc" id="L287">        return configuration.getHost();</span>
+    }
+
+    /**
+     * Get the actual port to use for the given configuration and URI.
+     *
+     * @param uri the URI (must not be {@code null})
+     * @param configuration the configuration (must not be {@code null})
+     * @return the real port to use
+     * @deprecated Use {@link URI#getPort()} instead.
+     */
+    @Deprecated
+    public int getRealPort(URI uri, AuthenticationConfiguration configuration) {
+<span class="nc" id="L300">        Assert.checkNotNullParam(&quot;uri&quot;, uri);</span>
+<span class="nc" id="L301">        Assert.checkNotNullParam(&quot;configuration&quot;, configuration);</span>
+<span class="nc" id="L302">        final int configurationPort = configuration.getPort();</span>
+<span class="nc bnc" id="L303" title="All 2 branches missed.">        return configurationPort == -1 ? uri.getPort() : configurationPort;</span>
+    }
+
+    /**
+     * Get the actual port to use for the given configuration.
+     *
+     * @param configuration the configuration (must not be {@code null})
+     * @return the real port to use
+     * @deprecated This configuration is not supported by most providers and will be removed in a future release.
+     */
+    @Deprecated
+    public int getRealPort(AuthenticationConfiguration configuration) {
+<span class="nc" id="L315">        Assert.checkNotNullParam(&quot;configuration&quot;, configuration);</span>
+<span class="nc" id="L316">        return configuration.getPort();</span>
+    }
+
+    /**
+     * Get the actual protocol to use for the given configuration and URI.
+     *
+     * @param uri the URI (must not be {@code null})
+     * @param configuration the configuration (must not be {@code null})
+     * @return the actual protocol to use, or {@code null} if none is configured and none is present on the URI
+     * @deprecated Use {@link URI#getScheme()} instead.
+     */
+    @Deprecated
+    public String getRealProtocol(URI uri, AuthenticationConfiguration configuration) {
+<span class="nc" id="L329">        Assert.checkNotNullParam(&quot;uri&quot;, uri);</span>
+<span class="nc" id="L330">        Assert.checkNotNullParam(&quot;configuration&quot;, configuration);</span>
+<span class="nc" id="L331">        final String protocol = configuration.getProtocol();</span>
+<span class="nc bnc" id="L332" title="All 2 branches missed.">        return protocol == null ? uri.getScheme() : protocol;</span>
+    }
+
+    /**
+     * Get the actual protocol to use for the given configuration.
+     *
+     * @param configuration the configuration (must not be {@code null})
+     * @return the actual protocol to use, or {@code null} if none is configured
+     * @deprecated This configuration is not supported by most providers and will be removed in a future release.
+     */
+    @Deprecated
+    public String getRealProtocol(AuthenticationConfiguration configuration) {
+<span class="nc" id="L344">        Assert.checkNotNullParam(&quot;configuration&quot;, configuration);</span>
+<span class="nc" id="L345">        return configuration.getProtocol();</span>
+    }
+
+    /**
+     * Get the actual sasl protocol to use for the given configuration.
+     *
+     * @param configuration the configuration (must not be {@code null})
+     * @return the real port to use
+     */
+    public String getSaslProtocol(AuthenticationConfiguration configuration) {
+<span class="nc" id="L355">        Assert.checkNotNullParam(&quot;configuration&quot;, configuration);</span>
+<span class="nc" id="L356">        return configuration.getSaslProtocol();</span>
+    }
+
+    /**
+     * Get the WebServices HTTP mechanism to use for the given configuration.
+     *
+     * @param configuration the configuration (must not be {@code null})
+     * @return the HTTP mechanism to use
+     */
+    public String getWsHttpMech(AuthenticationConfiguration configuration) {
+<span class="nc" id="L366">        Assert.checkNotNullParam(&quot;configuration&quot;, configuration);</span>
+<span class="nc" id="L367">        return configuration.getWsHttpMechanism();</span>
+    }
+
+    /**
+     * Get the actual WS-Security type to use for the given configuration.
+     *
+     * @param configuration the configuration (must not be {@code null})
+     * @return the WS-Security type to use
+     */
+    public String getWsSecurityType(AuthenticationConfiguration configuration) {
+<span class="nc" id="L377">        Assert.checkNotNullParam(&quot;configuration&quot;, configuration);</span>
+<span class="nc" id="L378">        return configuration.getWsSecurityType();</span>
+    }
+
+    /**
+     * Get the authentication principal to use for the given configuration.
+     *
+     * @param configuration the configuration (must not be {@code null})
+     * @return the authentication principal (not {@code null})
+     */
+    public Principal getPrincipal(AuthenticationConfiguration configuration) {
+<span class="nc" id="L388">        Assert.checkNotNullParam(&quot;configuration&quot;, configuration);</span>
+<span class="nc" id="L389">        return configuration.getPrincipal();</span>
+    }
+
+    /**
+     * Get the authorization principal to use for the given configuration.
+     *
+     * @param configuration the configuration (must not be {@code null})
+     * @return the authorization principal, or {@code null} if none is specified
+     */
+    public Principal getAuthorizationPrincipal(AuthenticationConfiguration configuration) {
+<span class="nc" id="L399">        Assert.checkNotNullParam(&quot;configuration&quot;, configuration);</span>
+<span class="nc" id="L400">        return configuration.getAuthorizationPrincipal();</span>
+    }
+
+    /**
+     * Create a SASL client using the given URI and configuration from the given SASL client factory.
+     *
+     * @param uri the target URI (must not be {@code null})
+     * @param configuration the authentication configuration (must not be {@code null})
+     * @param offeredMechanisms the available mechanisms (must not be {@code null})
+     * @return the SASL client, or {@code null} if no clients were available or could be configured
+     */
+    public SaslClient createSaslClient(URI uri, AuthenticationConfiguration configuration,  Collection&lt;String&gt; offeredMechanisms) throws SaslException {
+<span class="nc" id="L412">        return createSaslClient(uri, configuration, offeredMechanisms, UnaryOperator.identity());</span>
+    }
+
+    /**
+     * Create a SASL client using the given URI and configuration from the given SASL client factory.
+     *
+     * @param uri the target URI (must not be {@code null})
+     * @param configuration the authentication configuration (must not be {@code null})
+     * @param offeredMechanisms the available mechanisms (must not be {@code null})
+     * @param factoryOperator a {@link UnaryOperator} to apply to the {@link SaslClientFactory} used
+     * @return the SASL client, or {@code null} if no clients were available or could be configured
+     */
+    public SaslClient createSaslClient(URI uri, AuthenticationConfiguration configuration,  Collection&lt;String&gt; offeredMechanisms, UnaryOperator&lt;SaslClientFactory&gt; factoryOperator) throws SaslException {
+<span class="nc" id="L425">        return createSaslClient(uri, configuration, offeredMechanisms, factoryOperator, null);</span>
+    }
+
+    /**
+     * Create a SASL client using the given URI and configuration from the given SASL client factory.
+     *
+     * @param uri the target URI (must not be {@code null})
+     * @param configuration the authentication configuration (must not be {@code null})
+     * @param offeredMechanisms the available mechanisms (must not be {@code null})
+     * @param factoryOperator a {@link UnaryOperator} to apply to the {@link SaslClientFactory} used
+     * @param sslSession the SSL session active for this connection, or {@code null} for none
+     * @return the SASL client, or {@code null} if no clients were available or could be configured
+     */
+    public SaslClient createSaslClient(URI uri, AuthenticationConfiguration configuration, Collection&lt;String&gt; offeredMechanisms, UnaryOperator&lt;SaslClientFactory&gt; factoryOperator, final SSLSession sslSession) throws SaslException {
+<span class="nc" id="L439">        return configuration.createSaslClient(uri, offeredMechanisms, factoryOperator, sslSession);</span>
+    }
+
+    /**
+     * Get the address of the destination from a configuration and URI.  The configuration may rewrite the destination as needed.
+     *
+     * @param uri the connection URI (must not be {@code null})
+     * @param configuration the authentication configuration to use (must not be {@code null})
+     * @param protocolDefaultPort the default port for the protocol
+     * @return the address of the destination
+     * @deprecated Use {@link org.wildfly.common.net.Inet#getResolved(java.net.URI, int)} instead.
+     */
+    @Deprecated
+    public InetSocketAddress getDestinationInetSocketAddress(URI uri, AuthenticationConfiguration configuration, int protocolDefaultPort) {
+<span class="nc" id="L453">        Assert.checkNotNullParam(&quot;uri&quot;, uri);</span>
+<span class="nc" id="L454">        Assert.checkNotNullParam(&quot;configuration&quot;, configuration);</span>
+<span class="nc" id="L455">        String host = configuration.getHost();</span>
+<span class="nc bnc" id="L456" title="All 2 branches missed.">        if (host == null) host = uri.getHost();</span>
+<span class="nc" id="L457">        int port = configuration.getPort();</span>
+<span class="nc bnc" id="L458" title="All 2 branches missed.">        if (port == -1) port = uri.getPort();</span>
+<span class="nc bnc" id="L459" title="All 2 branches missed.">        if (port == -1) port = protocolDefaultPort;</span>
+<span class="nc" id="L460">        return new InetSocketAddress(host, port);</span>
+    }
+
+    /**
+     * Get the address of the destination from a configuration.  The configuration may rewrite the destination as needed.
+     *
+     * @param configuration the authentication configuration to use (must not be {@code null})
+     * @return the address of the destination
+     * @deprecated This configuration is not supported by most providers and will be removed in a future release.
+     */
+    @Deprecated
+    public InetSocketAddress getDestinationInetSocketAddress(AuthenticationConfiguration configuration) {
+<span class="nc" id="L472">        Assert.checkNotNullParam(&quot;configuration&quot;, configuration);</span>
+<span class="nc" id="L473">        return new InetSocketAddress(configuration.getHost(), configuration.getPort());</span>
+    }
+
+    /**
+     * Connect a plain socket to the given URI.
+     *
+     * @param uri the connection URI
+     * @param configuration the authentication configuration to use
+     * @param protocolDefaultPort the default port for the protocol used in the URI
+     * @return the connected socket
+     * @throws IOException if socket creation or connection fails for some reason
+     * @deprecated Use {@link org.wildfly.common.net.Inet#getResolved(java.net.URI, int)} with {@link Socket#Socket(InetAddress, int)} instead.
+     */
+    @Deprecated
+    public Socket connect(URI uri, AuthenticationConfiguration configuration, int protocolDefaultPort) throws IOException {
+<span class="nc" id="L488">        final InetSocketAddress address = getDestinationInetSocketAddress(uri, configuration, protocolDefaultPort);</span>
+<span class="nc" id="L489">        return new Socket(address.getAddress(), address.getPort());</span>
+    }
+
+    /**
+     * Get a {@link Supplier} as a source for all {@link Provider} instances registered in the given {@code configuration}.
+     *
+     * @param configuration the authentication configuration to use (must not be {@code null})
+     * @return a supplier as a source for {@link Provider} instances (not {@code null})
+     */
+    public Supplier&lt;Provider[]&gt; getProviderSupplier(AuthenticationConfiguration configuration) {
+<span class="nc" id="L499">        Assert.checkNotNullParam(&quot;configuration&quot;, configuration);</span>
+<span class="nc" id="L500">        return configuration.getProviderSupplier();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

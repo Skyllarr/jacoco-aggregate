@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AuthenticationError.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">WildFly Elytron</a> &gt; <a href="../index.html" class="el_bundle">wildfly-elytron-http-oidc</a> &gt; <a href="index.source.html" class="el_package">org.wildfly.security.http.oidc</a> &gt; <span class="el_source">AuthenticationError.java</span></div><h1>AuthenticationError.java</h1><pre class="source lang-java linenums">/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2021 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package org.wildfly.security.http.oidc;
+
+/**
+ * Indicates an OIDC related authentication error. For servlets, you'll be able to extract
+ * this error from the HttpServletRequest.getAttribute(AuthenticationError.class.getName()).
+ *
+ * @author &lt;a href=&quot;mailto:bill@burkecentral.com&quot;&gt;Bill Burke&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:fjuma@redhat.com&quot;&gt;Farah Juma&lt;/a&gt;
+ */
+public class AuthenticationError {
+<span class="nc" id="L29">    public static enum Reason {</span>
+<span class="nc" id="L30">        NO_BEARER_TOKEN,</span>
+<span class="nc" id="L31">        NO_REDIRECT_URI,</span>
+<span class="nc" id="L32">        INVALID_STATE_COOKIE,</span>
+<span class="nc" id="L33">        OAUTH_ERROR,</span>
+<span class="nc" id="L34">        SSL_REQUIRED,</span>
+<span class="nc" id="L35">        CODE_TO_TOKEN_FAILURE,</span>
+<span class="nc" id="L36">        INVALID_TOKEN,</span>
+<span class="nc" id="L37">        STALE_TOKEN,</span>
+<span class="nc" id="L38">        NO_AUTHORIZATION_HEADER,</span>
+<span class="nc" id="L39">        NO_QUERY_PARAMETER_ACCESS_TOKEN</span>
+    }
+
+    private Reason reason;
+    private String description;
+
+<span class="nc" id="L45">    public AuthenticationError(Reason reason, String description) {</span>
+<span class="nc" id="L46">        this.reason = reason;</span>
+<span class="nc" id="L47">        this.description = description;</span>
+<span class="nc" id="L48">    }</span>
+
+    public Reason getReason() {
+<span class="nc" id="L51">        return reason;</span>
+    }
+
+    public String getDescription() {
+<span class="nc" id="L55">        return description;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L60">        return &quot;AuthenticationError [reason=&quot; + reason + &quot;, description=&quot; + description + &quot;]&quot;;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
